@@ -1,0 +1,49 @@
+= README
+:experimental:
+:toc: right
+:imagesdir: images
+
+== 安装
+
+[NOTE]
+====
+需要相应地转换以下内容。
+
+`<this directory>` 更改为 *README* 所在的目录。
+====
+
+[source, shell]
+----
+# 安装 docker 和 nvidia-container-toolkit
+cd <this directory>
+chmod +x ./install.sh
+./install.sh
+
+# 验证安装
+docker -v
+nvidia-container-toolkit -version
+----
+
+== 使用方法
+// TODO: 添加 Notion 教程后补充。
+* [我的 Notion 教程]
+
+== 移除
+[source, shell]
+----
+# 移除 docker 和 nvidia-container-toolkit
+cd <this directory>
+chmod +x ./remove.sh
+./remove.sh
+
+# 验证移除
+docker -v
+nvidia-container-toolkit -version
+# docker, nvidia-container-toolkit 命令未找到。
+----
+
+== 参考资料
+* https://www.docker.com/[Docker 官方网站]
+* https://docs.docker.com/engine/install/ubuntu/[在 Ubuntu 上安装 Docker 引擎]
+* https://docs.docker.com/engine/install/linux-postinstall/[Linux 后安装步骤]
+* https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html[NVIDIA 容器工具包]

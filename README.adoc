@@ -1,0 +1,15 @@
+= README
+
+this repository is ycpss91255 user config
+
+== TODO List
+
+* [ ] fish
+* [ ] fonts
+* [ ] git
+* [ ] nvidia_driver
+* [ ] samll-tools
+* [ ] ssh
+* [ ] tmux
+* [ ] vim
+* [ ] vscode

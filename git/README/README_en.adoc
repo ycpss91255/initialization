@@ -1,0 +1,63 @@
+= README
+:experimental:
+:toc: right
+:imagesdir: images
+
+== Install
+[NOTE]
+====
+The following content needs to be converted accordingly.
+
+`<README_PATH>` is the directory where this *README* file is located.
+
+`<WORKSPACE_PATH>` is the git directory to be used.
+====
+
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./install.sh
+./install.sh
+
+# verify installation
+git --version
+# git version 2.17.1
+git-lfs --version
+# git-lfs/2.4.2 (GitHub; linux amd64; go 1.10.1)
+tig --version
+# tig 2.3.3
+----
+
+== Usage
+[source, shell]
+----
+cd <WORKSPACE_PATH>
+git init
+# local (recommended, once per repository)
+git config --local init.defaultBranch main
+git config --local user.name "Your Name"
+git config --local user.email "email@example.com"
+
+# global (optional, once per machine)
+git config --global init.defaultBranch main
+git config --global user.name "Your Name"
+git config --global user.email "email@example.com"
+----
+
+== Remove
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./remove.sh
+./remove.sh
+
+# verify removal
+git --version
+# Command 'git' not found...
+git-lfs --version
+# Command 'git-lfs' not found...
+tig --version
+# Command 'tig' not found...
+----
+
+== Reference

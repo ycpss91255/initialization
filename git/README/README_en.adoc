@@ -60,4 +60,6 @@ tig --version
 # Command 'tig' not found...
 ----
 
+== link:../README.adoc[Go back]
+
 == Reference

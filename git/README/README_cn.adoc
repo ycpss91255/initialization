@@ -29,6 +29,8 @@ tig --version
 ----
 
 == 使用方法
+* `""` 里面的文字需要自行替换。
+
 [source, shell]
 ----
 cd <WORKSPACE_PATH>
@@ -37,11 +39,15 @@ git init
 git config --local init.defaultBranch main
 git config --local user.name "Your Name"
 git config --local user.email "email@example.com"
+# 可选
+git config --local core.editor "editor"
 
-# 全局 (可选, 每台电脑一次)
+# 全局 (不推荐, 每台电脑一次)
 git config --global init.defaultBranch main
 git config --global user.name "Your Name"
 git config --global user.email "email@example.com"
+# 可选
+git config --global core.editor "editor"
 ----
 
 == 移除

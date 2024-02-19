@@ -1,12 +1,10 @@
 = README
-
-this repository is ycpss91255 user config
+This repository is a tool I use in Ubuntu, It uses a script to complete the initialzation action.
 
 == TODO List
 
 * [ ] fish
 * [ ] fonts
-* [ ] git
 * [ ] nvidia_driver
 * [ ] small-tools
 * [ ] ssh

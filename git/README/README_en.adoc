@@ -29,19 +29,25 @@ tig --version
 ----
 
 == Usage
+* The text inside `""` needs to be replaced by yourself.
+
 [source, shell]
 ----
 cd <WORKSPACE_PATH>
 git init
 # local (recommended, once per repository)
-git config --local init.defaultBranch main
+git config --local init.defaultBranch "main"
 git config --local user.name "Your Name"
 git config --local user.email "email@example.com"
+# optional
+git config --local core.editor "editor"
 
-# global (optional, once per machine)
-git config --global init.defaultBranch main
+# global (not recommended, once per machine)
+git config --global init.defaultBranch "main"
 git config --global user.name "Your Name"
 git config --global user.email "email@example.com"
+# optional
+git config --global core.editor "editor"
 ----
 
 == Remove

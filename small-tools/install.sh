@@ -8,30 +8,28 @@ USER_NAME=${1:-"$USER"}
 # Update the package lists
 sudo apt update && \
 
-# Install small tools dependencies
+# Install 'small tools' dependencies
 sudo apt install -y --no-install-recommends \
-    ca-certificates \
-    curl \
     git \
-    gnupg \
-    lsb-release \
     python3 \
     python3-pip \
-    software-properties-common \
     && \
-pip install -U pip && \
+pip install -U pip setuptools && \
 
 # Install required packages for 'monitoring tools'
-sudo apt-get update && \
+sudo apt update && \
 sudo apt install -y --no-install-recommends \
     bat \
     bashtop \
     bmon \
+    btop \
+    git-lfs \
     htop \
     iftop \
     iotop \
     nmon \
     powertop \
+    tig \
     && \
 pip install bpytop \
     git+https://github.com/XuehaiPan/nvitop.git#egg=nvitop && \

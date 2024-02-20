@@ -5,6 +5,13 @@
 # SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 USER_NAME=${1:-"$USER"}
 
+# remove symbolic link for 'bat'
+BAT_FILE=$(readlink -f "/usr/bin/bat")
+
+if [ "${BAT_FILE}" == "/usr/bin/batcat" ]; then
+    sudo rm /usr/bin/bat
+fi
+
 # purge 'small tools' related packages
 sudo apt purge -y \
     bat \
@@ -21,6 +28,7 @@ sudo apt purge -y \
 pip uninstall -y \
     bpytop \
     nvitop && \
+
 
 # purge 'other tools' related packages
 sudo apt purge -y \

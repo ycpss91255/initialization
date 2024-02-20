@@ -13,7 +13,6 @@ sudo apt install -y --no-install-recommends \
     git \
     python3 \
     python3-pip \
-    which \
     && \
 pip install -U pip setuptools && \
 

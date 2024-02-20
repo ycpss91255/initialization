@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 
-# ${1}: USER NAME
+# ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
 
-# file_dir=$(dirname "$(readlink -f "${0}")")
-# username=${1:-"$USER"}
+# SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
+# USER_NAME=${1:-"$USER"}
 
-# sudo apt update && \
-# sudo apt install -y --no-install-recommends \
+# Update the package lists
+sudo apt update && \
+
+# Install required packages for Git installation
+sudo apt install -y --no-install-recommends \
+    && \
+
+# echo Success or failure message
+echo -e "\033[1;37;42mGit install successfully.\033[0m" || \
+echo -e "\033[1;37;41mGit Install failed.\033[0m"

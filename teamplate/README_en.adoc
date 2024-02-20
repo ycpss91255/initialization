@@ -9,4 +9,6 @@
 
 == Remove
 
+== link:../README.adoc[Go back]
+
 == Reference

@@ -8,7 +8,7 @@
 # Update the package lists
 sudo apt update && \
 
-# Install required packages for Git installation
+# Install required packages for ''
 sudo apt install -y --no-install-recommends \
     && \
 

@@ -34,7 +34,7 @@ sudo apt install -y --no-install-recommends \
 pip install bpytop \
     git+https://github.com/XuehaiPan/nvitop.git#egg=nvitop && \
 
-# Create a symbolic link for 'bat'
+# Create a symbolic link for 'bat', repeated installation may cause problems
 sudo ln -s $(which batcat) /usr/bin/bat && \
 
 # Install required packages for 'other tools'

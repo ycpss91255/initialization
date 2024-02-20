@@ -1,0 +1,33 @@
+= README
+:experimental:
+:toc: right
+:imagesdir: images
+
+== Install
+
+== Usage
+* lynx:
+* ranger:
+* powerstat:
+* neofetch:
+* curl:
+* wget:
+* net-tools:
+* jq:
+* nmap:
+
+* bat
+* bashtop
+* bmon
+* docker-ctop
+* htop
+* iftop
+* iotop
+* nmon
+* powertop
+
+== Remove
+
+== link:../README.adoc[Go back]
+
+== Reference

@@ -52,6 +52,9 @@ sudo apt install -y --no-install-recommends \
 sudo apt install -y --no-install-recommends \
     ranger \
     && \
+# delete old ranger_devicons, avoid problems
+rm /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
+# Install ranger plugins 'ranger_devicons'
 git clone https://github.com/alexanderjeurissen/ranger_devicons \
         /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 

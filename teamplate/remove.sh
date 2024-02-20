@@ -5,13 +5,13 @@
 # SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 # USER_NAME=${1:-"$USER"}
 
-# purge '' related packages
+# purge 'XXX' related packages
 sudo apt purge -y \
     && \
 
-# Remove '' related files
+# Remove 'XXX' related files
 sudo rm
 
 # echo Success or failure message
-echo -e "\033[1;37;42mGit purge successfully.\033[0m" || \
-echo -e "\033[1;37;41mGit purge failed.\033[0m"
+echo -e "\033[1;37;42mXXX purge successfully.\033[0m" || \
+echo -e "\033[1;37;41mXXX purge failed.\033[0m"

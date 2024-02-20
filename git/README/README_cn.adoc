@@ -1,0 +1,71 @@
+= README
+:experimental:
+:toc: right
+:imagesdir: images
+
+== 安装
+[NOTE]
+====
+以下内容需要进行对应转换。
+
+`<README_PATH>` 是 *README.adoc* 档案的所在目录。
+
+`<WORKSPACE_PATH>` 是要使用 git 的目录。
+====
+
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./install.sh
+./install.sh
+
+# 验证安装
+git --version
+# git version 2.17.1
+git-lfs --version
+# git-lfs/2.4.2 (GitHub; linux amd64; go 1.10.1)
+tig --version
+# tig 2.3.3
+----
+
+== 使用方法
+* `""` 里面的文字需要自行替换。
+
+[source, shell]
+----
+cd <WORKSPACE_PATH>
+git init
+# 区域 (推荐, 每个储存库一次)
+git config --local init.defaultBranch main
+git config --local user.name "Your Name"
+git config --local user.email "email@example.com"
+# 可选
+git config --local core.editor "editor"
+
+# 全局 (不推荐, 每台电脑一次)
+git config --global init.defaultBranch main
+git config --global user.name "Your Name"
+git config --global user.email "email@example.com"
+# 可选
+git config --global core.editor "editor"
+----
+
+== 移除
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./remove.sh
+./remove.sh
+
+# 验证移除
+git --version
+# Command 'git' not found...
+git-lfs --version
+# Command 'git-lfs' not found...
+tig --version
+# Command 'tig' not found...
+----
+
+== link:../README.adoc[返回]
+
+== 參考

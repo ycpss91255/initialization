@@ -1,0 +1,34 @@
+= README
+:experimental:
+:toc: right
+:imagesdir: images
+
+== 安装
+[NOTE]
+====
+以下内容需要进行对应转换。
+
+`<README_PATH>` 是 *README.adoc* 档案的所在目录。
+====
+
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./install.sh
+./install.sh
+----
+
+== 使用方法
+
+== 移除
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./remove.sh
+./remove.sh
+
+----
+
+== link:../README.adoc[返回]
+
+== 參考

@@ -1,0 +1,31 @@
+= README
+:experimental:
+:toc: right
+:imagesdir: images
+
+link:./README_ch.adoc[繁體中文]
+
+== Install
+[NOTE]
+====
+The following content needs to be converted accordingly.
+
+* `<README_PATH>` is the directory where this *README.adoc* file is located.
+====
+
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./install.sh
+./install.sh
+----
+
+== Remove
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./remove.sh
+./remove.sh
+----
+
+// TODO: change to wget install fonts (maybe)

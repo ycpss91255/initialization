@@ -1,5 +1,5 @@
 = README
-This repository is a tool I use in Ubuntu, It uses a script to complete the initialzation action.
+This repository is a tool I use in Ubuntu, It uses a script to complete the initialization action.
 
 == TODO List
 

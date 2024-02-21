@@ -21,6 +21,12 @@ chmod +x ./install.sh
 ----
 
 == Usage
+[source, shell]
+----
+nvidia-smi
+
+nvitop
+----
 
 == Remove
 [source, shell]

@@ -128,4 +128,4 @@ chmod +x ./remove.sh
 ----
 
 == 有趣的
-* https://github.com/romner-set/btop-gpu[btop-gpu Github (*沒有安裝, 但是可以看到 GPU, 超棒的!)]
+* https://github.com/romner-set/btop-gpu[btop-gpu Github (*沒有安裝*, 但是可以看到 GPU, 超棒的!)]

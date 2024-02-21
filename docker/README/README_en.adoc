@@ -3,13 +3,15 @@
 :toc: right
 :imagesdir: images
 
+link:./README_ch.adoc[繁體中文]
+
 == Install
 
 [NOTE]
 ====
 The following content needs to be converted accordingly.
 
-`<this directory>` is the directory where this README is located.
+* `<README_PATH>` is the directory where this *README.adoc* file is located.
 ====
 
 [source, shell]

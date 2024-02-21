@@ -3,6 +3,7 @@
 :toc: right
 :imagesdir: images
 
+---
 link:./README_ch.adoc[繁體中文]
 
 == Install

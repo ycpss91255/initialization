@@ -3,6 +3,7 @@
 :toc: right
 :imagesdir: images
 
+---
 link:./README.adoc[English]
 
 == 安裝

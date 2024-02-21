@@ -10,7 +10,7 @@ link:./README.adoc[English]
 ====
 以下內容需要進行對應轉換。
 
-`<README_PATH>` 是 *README.adoc* 檔案的所在目錄。
+* `<README_PATH>` 是 *README.adoc* 檔案的所在目錄。
 ====
 
 [source, shell]

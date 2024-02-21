@@ -13,7 +13,7 @@ if [ -n "${INSTALLED_NVIDIA_DRIVER}" ]; then
     sudo apt purge -y "${INSTALLED_NVIDIA_DRIVER}" && \
 
     # print Success or failure message
-    printf "\033[1;37;42mXXX purge successfully.\033[0m\n" || \
-    printf "\033[1;37;41mXXX purge failed.\033[0m\n"
+    printf "\033[1;37;42mNVIDIA driver purge successfully.\033[0m\n" || \
+    printf "\033[1;37;41mNVIDIA driver purge failed.\033[0m\n"
 fi
 

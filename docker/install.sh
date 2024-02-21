@@ -49,11 +49,7 @@ sudo apt install -y --no-install-recommends \
     docker-compose-plugin && \
 
 # Check for NVIDIA hardware and install NVIDIA container toolkit if present
-if (lspci | grep -q VGA ||
-    lspci | grep -iq NVIDIA ||
-    lsmod | grep -q nvidia ||
-    nvidia-smi -L >/dev/null 2>&1 | grep -iq nvidia) &&
-    (command -v nvidia-smi >/dev/null 2>&1); then
+if lspci | grep -q "VGA.*NVIDIA" && dpkg --get-selections | grep -qP "^nvidia-driver-\d+"; then
 
     # Install NVIDIA container toolkit
     distribution=$(. /etc/os-release;echo "${ID}${VERSION_ID}") && \
@@ -69,9 +65,7 @@ if (lspci | grep -q VGA ||
 
     # configure the container runtime
     sudo nvidia-ctk runtime configure --runtime=docker
-    sudo systemctl restart docker
-
-fi && \
+fi
 
 # Create a Docker group and add the current user to it
 sudo groupadd docker
@@ -84,7 +78,11 @@ newgrp docker && \
 sudo chown "$USER:$USER" /home/"${USER}"/.docker -R && \
 sudo chmod g+rwx "/home/${USER}/.docker" -R && \
 
-# Enable and start Docker and containerd services
-sudo systemctl enable docker.service && \
-sudo systemctl enable containerd.service && \
-sudo systemctl enable docker
+# Enable and restart Docker and containerd services
+sudo systemctl enable docker.service containerd.service && \
+sudo systemctl restart docker && \
+sudo systemctl enable docker && \
+
+# print Success or failure message
+printf "\033[1;37;42mNVIDIA driver dependencies install successfully.\033[0m\n" || \
+printf "\033[1;37;41mNVIDIA driver dependencies Install failed.\033[0m\n"

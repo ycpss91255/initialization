@@ -1,7 +1,131 @@
 = README
+:experimental:
+:toc: right
+:imagesdir: images
 
-== link:./README/README_en.adoc[English]
+link:./README_ch.adoc[繁體中文]
 
-== link:./README/README_cn.adoc[簡體中文]
+== Install
+[NOTE]
+====
+The following content needs to be converted accordingly.
 
-== link:./README/README_ch.adoc[繁體中文]
+* `<README_PATH>` is the directory where this *README.adoc* file is located.
+* `<FILE_PATH>` is the path of the file you want to view.
+* `<URL>` is the URL of the file you want to download.
+* `<WORKSPACE_PATH>` is the directory where you want to create a new repository.
+* `<JSON_PATH>` is the path of the JSON file you want to view.
+* `<IP>` is the IP address of the target.
+* `<MASK>` is the subnet mask of the target.
+* `[FOLDER_PATH]` is the path of the folder you want to navigate to. (optional)
+* `<COMMAND>` is the command you want to know more about.
+====
+
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./install.sh
+./install.sh
+----
+
+== Usage
+.Monitor tools
+[source, shell]
+----
+# bashtop
+bashtop
+
+# bpytop
+bpytop
+
+# bmon
+bmon
+
+# htop
+htop
+
+# nmon
+nmon
+
+# powertop
+sudo powertop
+
+# iftop
+sudo iftop
+
+# iotop
+sudo iotop
+----
+
+.Other tools
+[source, shell]
+----
+# bat
+bat <FILE_PATH>
+
+# curl
+curl <URL> -o <FILE_PATH>
+
+# git
+cd <WORKSPACE_PATH>
+git init
+## local（once per repository）
+git config --local init.defaultBranch "main"
+git config --local user.name "your name"
+git config --local user.email "email@example.com"
+## optional
+git config --local core.editor "editor"
+
+## global（once per computer）
+git config --global init.defaultBranch "main"
+git config --global user.name "your name"
+git config --global user.email "email@example.com"
+## optional
+git config --global core.editor "editor"
+
+# jq
+cat <JSON_PATH> | jq '.'
+
+# neofetch
+neofetch
+
+# net-tools
+ifconfig
+
+# nmap
+nmap <IP>/<MASK>
+
+# powerstat
+sudo powerstat
+
+# ranger
+ranger [FOLDER_PATH]
+
+# tig
+tig [--all]
+tig status
+
+# tldr
+tldr <COMMAND>
+
+# tree
+tree [FOLDER_PATH]
+
+# wget
+wget -O <FILE_PATH> <URL>
+
+# zoxide
+z <FOLDER_PATH>
+----
+* link:./usage/git.adoc[git]
+
+== Remove
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./remove.sh
+./remove.sh
+----
+
+== Interesting
+* https://github.com/romner-set/btop-gpu[btop-gpu Github (*not install*, but can see the GPU, awesome!)]

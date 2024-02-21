@@ -3,13 +3,128 @@
 :toc: right
 :imagesdir: images
 
+link:./README.adoc[English]
+
 == 安裝
+[NOTE]
+====
+以下內容需要進行對應轉換。
+
+* `<README_PATH>` 是 *README.adoc* 檔案的所在目錄。
+* `<FILE_PATH>` 是要顯示的檔案路徑。
+* `<URL>` 是要下載的網址。
+* `<WORKSPACE_PATH>` 是要初始化的工作區路徑。
+* `<JSON_PATH>` 是要顯示的 JSON 檔案路徑。
+* `<IP>` 是要掃描的 IP。
+* `<MASK>` 是要掃描的子網路遮罩。
+* `[FOLDER_PATH]` 是要顯示的資料夾路徑。(可選)
+* `<COMMAND>` 是要查詢的指令。
+====
+
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./install.sh
+./install.sh
+----
 
 == 使用方法
+.監控工具
+[source, shell]
+----
+# bashtop
+bashtop
+
+# bpytop
+bpytop
+
+# bmon
+bmon
+
+# htop
+htop
+
+# nmon
+nmon
+
+# powertop
+sudo powertop
+
+# iftop
+sudo iftop
+
+# iotop
+sudo iotop
+----
+
+.其他工具
+[source, shell]
+----
+# bat
+bat <FILE_PATH>
+
+# curl
+curl <URL> -o <FILE_PATH>
+
+# git
+cd <WORKSPACE_PATH>
+git init
+## 區域性（每個存儲庫一次）
+git config --local init.defaultBranch "main"
+git config --local user.name "your name"
+git config --local user.email "email@example.com"
+## 可選
+git config --local core.editor "editor"
+
+## 全域性（每台電腦一次）
+git config --global init.defaultBranch "main"
+git config --global user.name "your name"
+git config --global user.email "email@example.com"
+## 可選
+git config --global core.editor "editor"
+
+# jq
+cat <JSON_PATH> | jq '.'
+
+# neofetch
+neofetch
+
+# net-tools
+ifconfig
+
+# nmap
+nmap <IP>/<MASK>
+
+# powerstat
+sudo powerstat
+
+# ranger
+ranger [FOLDER_PATH]
+
+# tig
+tig [--all]
+tig status
+
+# tldr
+tldr <COMMAND>
+
+# tree
+tree [FOLDER_PATH]
+
+# wget
+wget -O <FILE_PATH> <URL>
+
+# zoxide
+z <FOLDER_PATH>
+----
 
 == 移除
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./remove.sh
+./remove.sh
+----
 
-== link:../README.adoc[返回]
-
-== 參考資料
-
+== 有趣的
+* https://github.com/romner-set/btop-gpu[btop-gpu Github (*沒有安裝, 但是可以看到 GPU, 超棒的!)]

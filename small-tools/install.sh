@@ -19,40 +19,39 @@ pip install -U pip setuptools && \
 # Install required packages for 'monitoring tools'
 sudo apt update && \
 sudo apt install -y --no-install-recommends \
-    bat \
     bashtop \
     bmon \
-    btop \
-    git-lfs \
     htop \
     iftop \
     iotop \
     nmon \
     powertop \
-    tig \
     && \
-pip install bpytop \
-    git+https://github.com/XuehaiPan/nvitop.git#egg=nvitop && \
-
-# Create a symbolic link for 'bat', repeated installation may cause problems
-sudo ln -s $(which batcat) /usr/bin/bat && \
+pip install \
+    bpytop \
+    && \
 
 # Install required packages for 'other tools'
 sudo apt install -y --no-install-recommends \
+    bat \
     curl \
-    wget \
+    git-lfs \
     jq \
-    tree \
+    neofetch \
     net-tools \
     nmap \
-    neofetch \
     powerstat \
-    && \
-
-# Install required packages for 'ranger'
-sudo apt install -y --no-install-recommends \
     ranger \
+    tig \
+    tldr \
+    tree \
+    wget \
+    zoxide \
     && \
+# Create a symbolic link for 'bat', repeated installation may cause problems
+sudo ln -s $(which batcat) /usr/bin/bat && \
+# tldr update
+sudo tldr --update && \
 # delete old ranger_devicons, avoid problems
 rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 # Install ranger plugins 'ranger_devicons'

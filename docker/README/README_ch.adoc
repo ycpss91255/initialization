@@ -5,11 +5,13 @@
 
 == 安裝
 
+link:./README.adoc[English]
+
 [NOTE]
 ====
 需要相應地轉換以下內容。
 
-`<this directory>` 更改為 *README* 所在的目錄。
+* `<README_PATH>` 是 *README.adoc* 檔案的所在目錄。
 ====
 
 [source, shell]

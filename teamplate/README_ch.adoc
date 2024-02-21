@@ -3,12 +3,14 @@
 :toc: right
 :imagesdir: images
 
-== 安装
+link:./README.adoc[English]
+
+== 安裝
 [NOTE]
 ====
-以下内容需要进行对应转换。
+以下內容需要進行對應轉換。
 
-`<README_PATH>` 是 *README.adoc* 档案的所在目录。
+`<README_PATH>` 是 *README.adoc* 檔案的所在目錄。
 ====
 
 [source, shell]
@@ -26,9 +28,6 @@ chmod +x ./install.sh
 cd <README_PATH>
 chmod +x ./remove.sh
 ./remove.sh
-
 ----
-
-== link:../README.adoc[返回]
 
 == 參考

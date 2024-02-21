@@ -49,6 +49,6 @@ sudo apt purge -y \
 # Remove ranger plugins 'ranger_devicons'
 sudo rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 
-# echo Success or failure message
-echo -e "\033[1;37;42mSmall tools purge successfully.\033[0m" || \
-echo -e "\033[1;37;41mSmall tools purge failed.\033[0m"
+# print Success or failure message
+printf "\033[1;37;42mSmall tools purge successfully.\033[0m\n" || \
+printf "\033[1;37;41mSmall tools purge failed.\033[0m\n"

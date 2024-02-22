@@ -12,18 +12,27 @@ if [ "${BAT_FILE}" == "/usr/bin/batcat" ]; then
     sudo rm /usr/bin/bat
 fi
 
+# disble X11Forwarding
+if [ -f "/etc/ssh/ssh_config" ]; then
+    sudo sed -i 's/\s*\(ForwardX11 yes\)/# \1/' '/etc/ssh/ssh_config'
+fi
+if [ -f "/ect/ssh/sshd_config" ]; then
+    sudo sed -i -e 's/\s*\(AllowTcpForwarding yes\)/# \1/' \
+        -e 's/#\s*\(X11Forwarding yes\)# \1/' \
+        -e 's/#\s*\(X11DisplayOffset 10\)# \1/' \
+        -e 's/#\s*\(X11UseLocalhost yes\)# \1/' \
+        '/etc/ssh/sshd_config'
+fi
+
 # purge 'small tools' related packages
 sudo apt purge -y \
-    bat \
     bashtop \
     bmon \
-    git-lfs \
     htop \
     iftop \
     iotop \
     nmon \
     powertop \
-    tig \
     && \
 pip uninstall -y \
     bpytop \
@@ -32,20 +41,26 @@ pip uninstall -y \
 
 # purge 'other tools' related packages
 sudo apt purge -y \
+    bat \
     curl \
-    wget \
+    git-lfs \
     jq \
-    tree \
+    neofetch \
     net-tools \
     nmap \
-    neofetch \
+    openssh-client \
+    openssh-server \
     powerstat \
+    ranger \
+    tig \
+    tldr \
+    tree \
+    ssh \
+    sshfs \
+    wget \
+    zoxide \
     && \
 
-# purge 'ranger' related packages
-sudo apt purge -y \
-    ranger \
-    && \
 # Remove ranger plugins 'ranger_devicons'
 sudo rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 

@@ -12,6 +12,9 @@ if [ "${BAT_FILE}" == "/usr/bin/batcat" ]; then
     sudo rm /usr/bin/bat
 fi
 
+# delete tldr folder
+rm -rf /home/"${USER_NAME}"/.local/share/tldr && \
+
 # delete 'tmux' configuration file
 rm -rf /home/"${USER_NAME}"/.tmux/plugins/tpm /home/"${USER_NAME}"/.tmux.conf && \
 

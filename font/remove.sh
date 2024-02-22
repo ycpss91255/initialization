@@ -2,7 +2,7 @@
 
 # ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
 
-# USER_NAME=${1:-"$USER"}
+USER_NAME=${1:-"$USER"}
 SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 readarray -t FONT_NAMES < <(find "${SCRIPT_PATH}/fonts" -maxdepth 1 -type d | sed 's|.*/||')
 
@@ -10,7 +10,7 @@ error_occurred=false
 
 for font in "${FONT_NAMES[@]}"; do
     # remove fonts from the user's font directory
-    rm -rf "${HOME}/.local/share/fonts/${font}" || error_occurred=true
+    rm -rf "/home/${USER_NAME}/.local/share/fonts/${font}" || error_occurred=true
 done
 
 sudo fc-cache --force --verbose || error_occurred=true

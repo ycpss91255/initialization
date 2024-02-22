@@ -2,7 +2,7 @@
 
 # ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
 
-# USER_NAME=${1:-"$USER"}
+USER_NAME=${1:-"$USER"}
 SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 FONTS_DIR=($(find "${SCRIPT_PATH}/fonts" -maxdepth 1 -type d))
 
@@ -16,7 +16,7 @@ sudo apt install -y --no-install-recommends \
     && \
 
 # copy fonts to the user's font directory
-cp -r "${FONTS_DIR}" "${HOME}/.local/share/fonts/" && \
+cp -r "${FONTS_DIR}" "/home/${USER_NAME}/.local/share/fonts/" && \
 # refresh the font cache
 sudo fc-cache --force --verbose && \
 

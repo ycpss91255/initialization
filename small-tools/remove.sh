@@ -30,7 +30,7 @@ if [ -f "/ect/ssh/sshd_config" ]; then
 fi
 
 # Remove ranger plugins 'ranger_devicons'
-sudo rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
+rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 
 # purge 'small tools' related packages
 sudo apt purge -y \

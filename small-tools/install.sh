@@ -40,23 +40,40 @@ sudo apt install -y --no-install-recommends \
     neofetch \
     net-tools \
     nmap \
+    openssh-client \
+    openssh-server \
     powerstat \
     ranger \
     tig \
     tldr \
     tree \
+    ssh \
+    sshfs \
     wget \
     zoxide \
     && \
+
 # Create a symbolic link for 'bat', repeated installation may cause problems
 sudo ln -s $(which batcat) /usr/bin/bat && \
+
 # tldr update
 sudo tldr --update && \
+
 # delete old ranger_devicons, avoid problems
 rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 # Install ranger plugins 'ranger_devicons'
 git clone https://github.com/alexanderjeurissen/ranger_devicons \
         /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
+
+# enable X11Forwarding
+sudo sed -i 's/#\s*\(ForwardX11 yes\)/\1/' '/etc/ssh/ssh_config' && \
+sudo sed -i -e 's/#\s*\(AllowTcpForwarding yes\)/\1/' \
+           -e 's/#\s*\(X11Forwarding yes\)/\1/' \
+           -e 's/#\s*\(X11DisplayOffset 10\)/\1/' \
+           -e 's/#\s*\(X11UseLocalhost yes\)/\1/' \
+           '/etc/ssh/sshd_config' && \
+sudo systemctl enable ssh && \
+sudo systemctl restart ssh && \
 
 # print Success or failure message
 printf "\033[1;37;42mSmall tools install successfully.\033[0m\n" || \

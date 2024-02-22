@@ -5,12 +5,21 @@
 # SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 USER_NAME=${1:-"$USER"}
 
+# get symbolic link
+BAT_FILE=$(readlink -f "/usr/local/bin/bat")
+FDFIND_FILE=$(readlink -f "/usr/local/bin/fdfind")j
 # remove symbolic link for 'bat'
-BAT_FILE=$(readlink -f "/usr/bin/bat")
-
 if [ "${BAT_FILE}" == "/usr/bin/batcat" ]; then
-    sudo rm /usr/bin/bat
+    sudo rm /usr/local/bin/bat
 fi
+# remove symbolic link for 'fdfind'
+if [ "${FDFIND_FILE}" == "/usr/bin/fdfind" ]; then
+    sudo rm /usr/local/bin/fdfind
+fi
+
+# delete 'fish' configuration file
+rm -rf /home/"${USER_NAME}"/.config/fish && \
+sudo add-apt-repository --remove -y ppa:fish-shell/release-3 && \
 
 # delete tldr folder
 rm -rf /home/"${USER_NAME}"/.local/share/tldr && \
@@ -35,6 +44,7 @@ fi
 # Remove ranger plugins 'ranger_devicons'
 rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 
+
 # purge 'small tools' related packages
 sudo apt purge -y \
     bashtop \
@@ -54,6 +64,8 @@ pip uninstall -y \
 sudo apt purge -y \
     bat \
     curl \
+    fd-find \
+    fzf \
     git-lfs \
     jq \
     neofetch \
@@ -65,11 +77,16 @@ sudo apt purge -y \
     ranger \
     tig \
     tldr \
+    tmux \
+    tmuxinator \
     tree \
     ssh \
     sshfs \
     wget \
     zoxide \
+    && \
+pip uninstall -y \
+    thefuck \
     && \
 
 # print Success or failure message

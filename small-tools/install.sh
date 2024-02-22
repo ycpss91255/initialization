@@ -5,6 +5,13 @@
 USER_NAME=${1:-"$USER"}
 SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 
+BAT_FILE=$(readlink -f "/usr/bin/bat")
+
+# delete old bat, avoid problems
+if [ "${BAT_FILE}" == "/usr/bin/batcat" ]; then
+    sudo rm /usr/bin/bat
+fi
+
 # Update the package lists
 sudo apt update && \
 

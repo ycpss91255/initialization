@@ -20,6 +20,7 @@ The following content needs to be converted accordingly.
 * `<MASK>` is the subnet mask of the target.
 * `[FOLDER_PATH]` is the path of the folder you want to navigate to. (optional)
 * `<COMMAND>` is the command you want to know more about.
+* `<NUM>` is the number of levels you want to display. (optional)
 ====
 
 [source, shell]
@@ -111,6 +112,7 @@ tldr <COMMAND>
 
 # tree
 tree [FOLDER_PATH]
+tree [-C] [-L <NUM>] [FOLDER_PATH]
 
 # wget
 wget -O <FILE_PATH> <URL>

@@ -20,6 +20,7 @@ link:./README.adoc[English]
 * `<MASK>` 是要掃描的子網路遮罩。
 * `[FOLDER_PATH]` 是要顯示的資料夾路徑。(可選)
 * `<COMMAND>` 是要查詢的指令。
+* `<NUM>` 是要顯示的層級數。(可選)
 ====
 
 [source, shell]
@@ -111,6 +112,7 @@ tldr <COMMAND>
 
 # tree
 tree [FOLDER_PATH]
+tree [-C] [-L <NUM>] [FOLDER_PATH]
 
 # wget
 wget -O <FILE_PATH> <URL>

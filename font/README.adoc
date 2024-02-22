@@ -20,6 +20,15 @@ chmod +x ./install.sh
 ./install.sh
 ----
 
+== Usage
+[source, shell]
+----
+fc-list | grep -i "noto sans"
+fc-list | grep -i "firacode"
+fc-list | grep -i "source code pro"
+fc-list | grep -i "meslo"
+----
+
 == Remove
 [source, shell]
 ----

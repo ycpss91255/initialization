@@ -59,6 +59,7 @@ sudo apt install -y --no-install-recommends \
     tig \
     tldr \
     tmux \
+    tmuxinator \
     tree \
     ssh \
     sshfs \

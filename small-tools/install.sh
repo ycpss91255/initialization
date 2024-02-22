@@ -65,7 +65,8 @@ sudo apt install -y --no-install-recommends \
 sudo ln -s $(which batcat) /usr/bin/bat && \
 
 # tldr update
-sudo tldr --update && \
+mkdir -p /home/"${USER_NAME}"/.local/share/tldr && \
+tldr --update && \
 
 # delete old tmux plugin manager, avoid problems
 rm -rf /home/"${USER_NAME}"/.tmux/plugins/tpm && \

@@ -12,6 +12,11 @@ if [ "${BAT_FILE}" == "/usr/bin/batcat" ]; then
     sudo rm /usr/bin/bat
 fi
 
+# delete old tldr folder, avoid problems
+if [ -d "/home/${USER_NAME}/.local/share/tldr" ]; then
+    rm -rf /home/"${USER_NAME}"/.local/share/tldr
+fi
+
 # Update the package lists
 sudo apt update && \
 

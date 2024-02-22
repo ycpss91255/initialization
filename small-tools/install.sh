@@ -5,26 +5,36 @@
 USER_NAME=${1:-"$USER"}
 SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 
-BAT_FILE=$(readlink -f "/usr/bin/bat")
-
-# delete old bat, avoid problems
-if [ "${BAT_FILE}" == "/usr/bin/batcat" ]; then
-    sudo rm /usr/bin/bat
-fi
-
-# delete old tldr folder, avoid problems
-if [ -d "/home/${USER_NAME}/.local/share/tldr" ]; then
+# delete old tldr folder or unknown file, avoid problems
+if [ -n "/home/${USER_NAME}/.local/share/tldr" ]; then
     rm -rf /home/"${USER_NAME}"/.local/share/tldr
 fi
+
+if [ -z "/home/"${USER_NAME}"/.local/share" ]; then
+    mkdir -p /home/"${USER_NAME}"/.local/share
+fi
+
+if [ -z "/home/"${USER_NAME}"/.config/fish" ]; then
+    mkdir -p /home/"${USER_NAME}"/.config/fish
+fi
+
+# add apt repository for 'fish'
+sudo apt-add-repository -y ppa:fish-shell/release-3 && \
 
 # Update the package lists
 sudo apt update && \
 
 # Install 'small tools' dependencies
 sudo apt install -y --no-install-recommends \
+    curl \
+    fish \
     git \
     python3 \
+    python3-dev \
     python3-pip \
+    python3-setuptools \
+    software-properties-common \
+    wget \
     && \
 pip install -U pip setuptools && \
 
@@ -39,7 +49,7 @@ sudo apt install -y --no-install-recommends \
     nmon \
     powertop \
     && \
-pip install \
+pip install -U \
     bpytop \
     && \
 
@@ -47,6 +57,8 @@ pip install \
 sudo apt install -y --no-install-recommends \
     bat \
     curl \
+    fd-find \
+    fzf \
     git-lfs \
     jq \
     neofetch \
@@ -66,9 +78,34 @@ sudo apt install -y --no-install-recommends \
     wget \
     zoxide \
     && \
+pip install -U \
+    thefuck \
+    && \
 
 # Create a symbolic link for 'bat', repeated installation may cause problems
-sudo ln -s $(which batcat) /usr/bin/bat && \
+sudo ln -sf $(which batcat) /usr/local/bin/bat && \
+sudo ln -sf $(which fdfind) /usr/local/bin/fd && \
+
+# Create fish and install fisher tools
+cp -r "${SCRIPT_PATH}/config/fish/." "/home/${USER_NAME}/.config/fish/"
+# Install fisher
+curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish \
+    | fish -c "source && fisher install jorgebucaran/fisher" && \
+# Install fish plugin
+fish -c "fisher install \
+    IlanCosman/tide@v5 \
+    andreiborisov/sponge \
+    jorgebucaran/autopair.fish \
+    PatrickF1/fzf.fish \
+    oh-my-fish/plugin-thefuck \
+    edc/bass \
+    joseluisq/gitnow@2.11.0 \
+    markcial/upto \
+    danhper/fish-ssh-agent \
+    jorgebucaran/nvm.fish \
+    && \
+    set -U fish_user_paths /home/${USER_NAME}/.local/bin \$fish_user_paths" && \
+chsh -s "$(which fish)" && \
 
 # tldr update
 mkdir -p /home/"${USER_NAME}"/.local/share/tldr && \
@@ -81,11 +118,11 @@ git clone --depth 1 \
     https://github.com/tmux-plugins/tpm \
     /home/"${USER_NAME}"/.tmux/plugins/tpm && \
 # copy tmux configuration file
-cp "${SCRIPT_PATH}"/config/tmux.conf /home/"${USER_NAME}"/.tmux.conf && \
+cp "${SCRIPT_PATH}"/config/tmux/tmux.conf /home/"${USER_NAME}"/.tmux.conf && \
 /home/"${USER_NAME}"/.tmux/plugins/tpm/scripts/install_plugins.sh && \
 
 # copy ssh config template to ~/.ssh/config
-cp "${SCRIPT_PATH}"/config/ssh_config /home/"${USER_NAME}"/.ssh/config && \
+cp "${SCRIPT_PATH}"/config/ssh/ssh_config /home/"${USER_NAME}"/.ssh/config && \
 # enable X11Forwarding
 sudo sed -i 's/#\s*\(ForwardX11 yes\)/\1/' '/etc/ssh/ssh_config' && \
 sudo sed -i -e 's/#\s*\(AllowTcpForwarding yes\)/\1/' \

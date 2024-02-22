@@ -12,6 +12,11 @@ if [ "${BAT_FILE}" == "/usr/bin/batcat" ]; then
     sudo rm /usr/bin/bat
 fi
 
+# delete 'tmux' configuration file
+rm -rf /home/"${USER_NAME}"/.tmux/plugins/tpm /home/"${USER_NAME}"/.tmux.conf && \
+
+# delete 'ssh' configuration file
+rm -f /home/"${USER_NAME}"/.ssh/config && \
 # disble X11Forwarding
 if [ -f "/etc/ssh/ssh_config" ]; then
     sudo sed -i 's/\s*\(ForwardX11 yes\)/# \1/' '/etc/ssh/ssh_config'
@@ -23,6 +28,9 @@ if [ -f "/ect/ssh/sshd_config" ]; then
         -e 's/#\s*\(X11UseLocalhost yes\)# \1/' \
         '/etc/ssh/sshd_config'
 fi
+
+# Remove ranger plugins 'ranger_devicons'
+sudo rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 
 # purge 'small tools' related packages
 sudo apt purge -y \
@@ -60,9 +68,6 @@ sudo apt purge -y \
     wget \
     zoxide \
     && \
-
-# Remove ranger plugins 'ranger_devicons'
-sudo rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 
 # print Success or failure message
 printf "\033[1;37;42mSmall tools purge successfully.\033[0m\n" || \

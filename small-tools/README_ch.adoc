@@ -121,6 +121,13 @@ wget -O <FILE_PATH> <URL>
 z <FOLDER_PATH>
 ----
 
+.ssh
+[source, shell]
+----
+# 修改 config
+<EDITOR> ~/.ssh/config
+----
+
 == 移除
 [source, shell]
 ----

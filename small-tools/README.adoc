@@ -120,7 +120,13 @@ wget -O <FILE_PATH> <URL>
 # zoxide
 z <FOLDER_PATH>
 ----
-* link:./usage/git.adoc[git]
+
+.ssh
+[source, shell]
+----
+# 修改 config
+<EDITOR> ~/.ssh/config
+----
 
 == Remove
 [source, shell]

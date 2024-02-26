@@ -91,7 +91,7 @@ sudo ln -sf $(which batcat) /usr/local/bin/bat && \
 sudo ln -sf $(which fdfind) /usr/local/bin/fd && \
 
 # Create fish and install fisher tools
-cp -r "${SCRIPT_PATH}/config/fish/*" "/home/${USER_NAME}/.config/fish/"
+cp -r "${SCRIPT_PATH}/config/fish" "/home/${USER_NAME}/.config/fish"
 # Install fisher
 curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish \
     | fish -c "source && fisher install jorgebucaran/fisher" && \

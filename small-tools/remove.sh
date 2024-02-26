@@ -30,22 +30,24 @@ fish -c "fisher remove \
     danhper/fish-ssh-agent \
     jorgebucaran/nvm.fish \
     && \
-    /home/'${USER_NAME}'/.fzf/uninstall && \
-    set -e fish_user_paths" && \
-rm -rf /home/"${USER_NAME}"/.config/fish && \
-sudo add-apt-repository --remove -y ppa:fish-shell/release-3 && \
+    /home/${USER_NAME}/.fzf/uninstall && \
+    set -e fish_user_paths"
+sudo add-apt-repository --remove -y ppa:fish-shell/release-3
+
+# delete 'fish' configuration file
+rm -rf /home/"${USER_NAME}"/.config/fish
 
 # delete 'fzf' configuration file
-rm -rf /home/"${USER_NAME}"/.fzf && \
+rm -rf /home/"${USER_NAME}"/.fzf
 
 # delete tldr folder
-rm -rf /home/"${USER_NAME}"/.local/share/tldr && \
+rm -rf /home/"${USER_NAME}"/.local/share/tldr
 
 # delete 'tmux' configuration file
-rm -rf /home/"${USER_NAME}"/.tmux/plugins/tpm /home/"${USER_NAME}"/.tmux.conf && \
+rm -rf /home/"${USER_NAME}"/.tmux/plugins/tpm /home/"${USER_NAME}"/.tmux.conf
 
 # delete 'ssh' configuration file
-rm -f /home/"${USER_NAME}"/.ssh/config && \
+rm -f /home/"${USER_NAME}"/.ssh/config
 # disble X11Forwarding
 if [ -f "/etc/ssh/ssh_config" ]; then
     sudo sed -i 's/\s*\(ForwardX11 yes\)/# \1/' '/etc/ssh/ssh_config'
@@ -59,7 +61,7 @@ if [ -f "/ect/ssh/sshd_config" ]; then
 fi
 
 # Remove ranger plugins 'ranger_devicons'
-rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
+rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons
 
 # purge 'small tools' related packages
 sudo apt purge -y \
@@ -73,7 +75,7 @@ sudo apt purge -y \
     && \
 pip uninstall -y \
     bpytop \
-    nvitop && \
+    nvitop
 
 
 # purge 'other tools' related packages
@@ -97,15 +99,11 @@ sudo apt purge -y \
     tree \
     ssh \
     sshfs \
-    zoxide \
-    && \
+    zoxide
+
 pip uninstall -y \
-    thefuck \
-    && \
+    thefuck
+
 
 # switch default shell to bash
-sudo chsh -s "$(which bash)" "${USER_NAME}" && \
-
-# print Success or failure message
-printf "\033[1;37;42mSmall tools purge successfully.\033[0m\n" || \
-printf "\033[1;37;41mSmall tools purge failed.\033[0m\n"
+sudo chsh -s "$(which bash)" "${USER_NAME}"

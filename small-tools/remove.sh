@@ -35,7 +35,7 @@ rm -rf /home/"${USER_NAME}"/.config/fish && \
 sudo add-apt-repository --remove -y ppa:fish-shell/release-3 && \
 
 # delete 'fzf' configuration file
-/home/"${USER_NAME}"/.fzf/uninstall && \
+fish -c "/home/"${USER_NAME}"/.fzf/uninstall" && \
 rm -rf /home/"${USER_NAME}"/.fzf && \
 
 # delete tldr folder

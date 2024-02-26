@@ -81,7 +81,7 @@ pip install -U \
 
 # clone fzf repositories from the ~/.fzf and install
 git clone --depth 1 https://github.com/junegunn/fzf.git /home/"${USER_NAME}"/.fzf && \
-/home/"${USER_NAME}"/.fzf/install --all && \
+fish -c "/home/"${USER_NAME}"/.fzf/install --all" && \
 
 # Create a symbolic link for 'bat', repeated installation may cause problems
 sudo ln -sf $(which batcat) /usr/local/bin/bat && \

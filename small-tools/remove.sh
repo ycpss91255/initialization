@@ -104,7 +104,7 @@ pip uninstall -y \
     && \
 
 # switch default shell to bash
-chsh -s "$(which bash)" && \
+sudo chsh -s "$(which bash)" "${USER_NAME}" && \
 
 # print Success or failure message
 printf "\033[1;37;42mSmall tools purge successfully.\033[0m\n" || \

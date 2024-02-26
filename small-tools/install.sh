@@ -115,7 +115,7 @@ fish -c "fisher install \
 # fish -c "/home/"${USER_NAME}"/.fzf/install --all" && \
 
 # switch default shell to fish shell
-chsh -s "$(which fish)" && \
+sudo chsh -s "$(which fish)" "${USER_NAME}" && \
 
 # tldr update
 mkdir -p /home/"${USER_NAME}"/.local/share/tldr && \

@@ -65,8 +65,8 @@ sudo iotop
 # bat
 bat <FILE_PATH>
 
-# curl
-curl <URL> -o <FILE_PATH>
+# fish
+fish
 
 # git
 cd <WORKSPACE_PATH>

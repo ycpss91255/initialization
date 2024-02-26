@@ -80,6 +80,7 @@ pip uninstall -y \
 sudo apt purge -y \
     bat \
     fd-find \
+    fish \
     git-lfs \
     jq \
     neofetch \

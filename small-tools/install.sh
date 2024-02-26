@@ -31,7 +31,6 @@ sudo apt update && \
 # Install 'small tools' dependencies
 sudo apt install -y --no-install-recommends \
     curl \
-    fish \
     git \
     python3 \
     python3-dev \
@@ -61,6 +60,7 @@ pip install -U \
 sudo apt install -y --no-install-recommends \
     bat \
     fd-find \
+    fish \
     git-lfs \
     jq \
     neofetch \

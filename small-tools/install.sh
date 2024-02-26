@@ -105,6 +105,7 @@ fish -c "fisher install \
     jorgebucaran/nvm.fish \
     && \
     set -U fish_user_paths /home/${USER_NAME}/.local/bin \$fish_user_paths" && \
+# switch default shell to fish shell
 chsh -s "$(which fish)" && \
 
 # tldr update

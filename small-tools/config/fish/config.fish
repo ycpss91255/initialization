@@ -8,20 +8,20 @@ if status is-interactive
 end
 
 # Use Neovim
-if snap list | grep -q "nvim"; then
+if dpkg -l | grep -q "snap" && snap list | grep -q "nvim"
     alias vim="nvim"
-fi
+end
 
 # use node js version 18, nvim lps dep
-if type -q "fisher" && fisher list | grep -q "nvm"; then
+if type -q "fisher" && fisher list | grep -q "nvm"
     nvm use 18 >/dev/null 2>&1
-fi
+end
 
 # TODO: add ssh-agent support and ssh-add key support
-# if type -q "fisher" && Fisher list | grep -q "ssh-agent"; then
+# if type -q "fisher" && Fisher list | grep -q "ssh-agent"
 #     ssh-agent fish -c "ssh-add"
 #     ssh-agent fish -c "ssh-add ~/.ssh/id_rsa"
-# fi
+# end
 
 # alias and short function
 ## Edit fish user key bindings

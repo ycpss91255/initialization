@@ -89,6 +89,9 @@ pip uninstall -y \
     thefuck \
     && \
 
+# switch default shell to bash
+chsh -s "$(which bash)" && \
+
 # print Success or failure message
 printf "\033[1;37;42mSmall tools purge successfully.\033[0m\n" || \
 printf "\033[1;37;41mSmall tools purge failed.\033[0m\n"

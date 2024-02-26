@@ -30,7 +30,7 @@ fish -c "fisher remove \
     danhper/fish-ssh-agent \
     jorgebucaran/nvm.fish \
     && \
-    /home/"${USER_NAME}"/.fzf/uninstall && \
+    /home/'${USER_NAME}'/.fzf/uninstall && \
     set -e fish_user_paths" && \
 rm -rf /home/"${USER_NAME}"/.config/fish && \
 sudo add-apt-repository --remove -y ppa:fish-shell/release-3 && \

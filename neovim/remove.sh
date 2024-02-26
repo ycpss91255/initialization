@@ -6,10 +6,10 @@
 USER_NAME=${1:-"$USER"}
 
 # purge 'XXX' related packages
-sudo snap remove neovim \
-    && \
+sudo snap remove nvim
 
 # Remove 'XXX' related files
+
 sudo rm /usr/local/bin/lazygit \
     && \
 

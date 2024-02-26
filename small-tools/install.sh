@@ -56,7 +56,6 @@ pip install -U \
 # Install required packages for 'other tools'
 sudo apt install -y --no-install-recommends \
     bat \
-    curl \
     fd-find \
     git-lfs \
     jq \
@@ -74,7 +73,6 @@ sudo apt install -y --no-install-recommends \
     tree \
     ssh \
     sshfs \
-    wget \
     zoxide \
     && \
 pip install -U \
@@ -83,7 +81,7 @@ pip install -U \
 
 # clone fzf repositories from the ~/.fzf and install
 git clone --depth 1 https://github.com/junegunn/fzf.git /home/"${USER_NAME}"/.fzf && \
-bash -c "/home/${USER_NAME}/.fzf/install --all" && \
+/home/"${USER_NAME}"/.fzf/install --all && \
 
 # Create a symbolic link for 'bat', repeated installation may cause problems
 sudo ln -sf $(which batcat) /usr/local/bin/bat && \

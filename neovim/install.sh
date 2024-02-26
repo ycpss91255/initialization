@@ -65,7 +65,7 @@ if dpkg -l |grep -q "bash"; then
     nvm use 18
 fi
 
-curl https://sh.rustup.rs -sSf | sh && \
+curl https://sh.rustup.rs -sSf | sh -s -- -y && \
 
 if command -v curl >/dev/null 2>&1; then
     bash -c "$(curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)"

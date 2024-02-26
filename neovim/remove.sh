@@ -3,16 +3,19 @@
 # ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
 
 # SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
-# USER_NAME=${1:-"$USER"}
+USER_NAME=${1:-"$USER"}
 
 # purge 'XXX' related packages
 sudo snap remove neovim \
     && \
 
 # Remove 'XXX' related files
-sudo rm
+sudo rm /usr/local/bin/lazygit \
+    && \
 
-rustup self uninstall
+rustup self uninstall && \
+
+rm -rf /home/"${USER_NAME}"/.config/nvim && \
 
 # print Success or failure message
 printf "\033[1;37;42mXXX purge successfully.\033[0m" || \

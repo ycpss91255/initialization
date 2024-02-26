@@ -32,9 +32,8 @@ sudo apt install -y --no-install-recommends \
     && \
 
 # Install 'neovim' with 'snap'
-sudo snap install snapd \
-    nvim --classic \
-    && \
+sudo snap install snapd && \
+sudo nvim --classic && \
 
 # Install 'lazygit'
 curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" && \
@@ -74,6 +73,7 @@ else
     bash -c "$(wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)"
 fi
 
+cp -r "${SCRIPT_PATH}/config" "/home/${USER_NAME}/.config/nvim/lua/user" && \
 
 # print success or failure message
 # printf "\033[1;37;42mXXX install successfully.\033[0m" || \

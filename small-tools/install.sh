@@ -18,6 +18,10 @@ if [ -z "/home/"${USER_NAME}"/.config/fish" ]; then
     mkdir -p /home/"${USER_NAME}"/.config/fish
 fi
 
+if [ -n "/home/"${USER_NAME}"/.fzf" ]; then
+    rm -rf /home/"${USER_NAME}"/.fzf
+fi
+
 # add apt repository for 'fish'
 sudo apt-add-repository -y ppa:fish-shell/release-3 && \
 
@@ -81,7 +85,6 @@ pip install -U \
 
 # clone fzf repositories from the ~/.fzf and install
 git clone --depth 1 https://github.com/junegunn/fzf.git /home/"${USER_NAME}"/.fzf && \
-fish -c "/home/"${USER_NAME}"/.fzf/install --all" && \
 
 # Create a symbolic link for 'bat', repeated installation may cause problems
 sudo ln -sf $(which batcat) /usr/local/bin/bat && \
@@ -105,7 +108,10 @@ fish -c "fisher install \
     danhper/fish-ssh-agent \
     jorgebucaran/nvm.fish \
     && \
+    /home/${USER_NAME}/.fzf/install --all && \
     set -U fish_user_paths /home/${USER_NAME}/.local/bin \$fish_user_paths" && \
+
+# fish -c "/home/"${USER_NAME}"/.fzf/install --all" && \
 
 # switch default shell to fish shell
 chsh -s "$(which fish)" && \

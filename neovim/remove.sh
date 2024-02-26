@@ -19,5 +19,5 @@ rm -rf /home/"${USER_NAME}"/.config/nvim
 rm -rf /home/"${USER_NAME}"/.local/share/nvim
 
 # print Success or failure message
-printf "\033[1;37;42mXXX purge successfully.\033[0m" || \
-printf "\033[1;37;41mXXX purge failed.\033[0m"
+# printf "\033[1;37;42mXXX purge successfully.\033[0m" || \
+# printf "\033[1;37;41mXXX purge failed.\033[0m"

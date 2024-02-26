@@ -10,7 +10,7 @@ LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/re
 # Update the package lists
 sudo apt update && \
 
-# Install required packages for 'XXX'
+# Install required packages for 'neovim'
 sudo apt install -y --no-install-recommends \
     clang \
     curl \

@@ -97,17 +97,18 @@ curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fi
     | fish -c "source && fisher install jorgebucaran/fisher" && \
 # Install fish plugin
 fish -c "fisher install \
-    IlanCosman/tide@v5 \
-    andreiborisov/sponge \
-    jorgebucaran/autopair.fish \
-    PatrickF1/fzf.fish \
-    oh-my-fish/plugin-thefuck \
-    edc/bass \
-    joseluisq/gitnow@2.11.0 \
-    markcial/upto \
-    danhper/fish-ssh-agent \
-    jorgebucaran/nvm.fish \
-    && \
+        IlanCosman/tide@v5 \
+        andreiborisov/sponge \
+        jorgebucaran/autopair.fish \
+        PatrickF1/fzf.fish \
+        oh-my-fish/plugin-thefuck \
+        kidonng/zoxide.fish \
+        edc/bass \
+        joseluisq/gitnow@2.11.0 \
+        markcial/upto \
+        danhper/fish-ssh-agent \
+        jorgebucaran/nvm.fish \
+        && \
     /home/${USER_NAME}/.fzf/install --all && \
     set -U fish_user_paths /home/${USER_NAME}/.local/bin \$fish_user_paths" && \
 

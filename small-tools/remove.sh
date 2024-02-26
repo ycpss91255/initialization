@@ -18,11 +18,24 @@ if [ "${FDFIND_FILE}" == "/usr/bin/fdfind" ]; then
 fi
 
 # delete 'fish' configuration file
+fish -c "fisher remove \
+    IlanCosman/tide@v5 \
+    andreiborisov/sponge \
+    jorgebucaran/autopair.fish \
+    PatrickF1/fzf.fish \
+    oh-my-fish/plugin-thefuck \
+    edc/bass \
+    joseluisq/gitnow@2.11.0 \
+    markcial/upto \
+    danhper/fish-ssh-agent \
+    jorgebucaran/nvm.fish \
+    && \
+    set -e fish_user_paths" && \
 rm -rf /home/"${USER_NAME}"/.config/fish && \
 sudo add-apt-repository --remove -y ppa:fish-shell/release-3 && \
 
 # delete 'fzf' configuration file
-bash -c "/home/${USER_NAME}/.fzf/uninstall" && \
+/home/"${USER_NAME}"/.fzf/uninstall && \
 rm -rf /home/"${USER_NAME}"/.fzf && \
 
 # delete tldr folder
@@ -66,7 +79,6 @@ pip uninstall -y \
 # purge 'other tools' related packages
 sudo apt purge -y \
     bat \
-    curl \
     fd-find \
     git-lfs \
     jq \
@@ -84,7 +96,6 @@ sudo apt purge -y \
     tree \
     ssh \
     sshfs \
-    wget \
     zoxide \
     && \
 pip uninstall -y \

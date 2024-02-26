@@ -13,7 +13,7 @@ sudo snap remove nvim
 sudo rm /usr/local/bin/lazygit \
     && \
 
-rustup self uninstall && \
+/home/'${USER_NAME}'/.cargo/bin/rustup self uninstall -y && \
 
 rm -rf /home/"${USER_NAME}"/.config/nvim
 rm -rf /home/"${USER_NAME}"/.local/share/nvim

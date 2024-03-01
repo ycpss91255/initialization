@@ -36,4 +36,4 @@ function efc; vim ~/.config/fish/config.fish; end
 function sfc; source ~/.config/fish/config.fish && echo "source user config.fish"; end
 ## tmux config
 function etc; vim ~/.tmux.conf; end
-function stc; source ~/.tmux.conf; end
+function stc; tmux source-file ~/.tmux.conf; end

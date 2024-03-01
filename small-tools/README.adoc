@@ -138,3 +138,5 @@ chmod +x ./remove.sh
 
 == Interesting
 * https://github.com/romner-set/btop-gpu[btop-gpu Github (*not install*, but can see the GPU, awesome!)]
+
+// TODO: segmentation all tool

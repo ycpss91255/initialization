@@ -2,6 +2,7 @@
 
 # ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
 
+# BUG: error: cannot communicate with server: Post "http://localhost/v2/snaps/snapd": dial unix /run/snapd.socket: connect: no such file or directory (wsl)
 SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 USER_NAME=${1:-"$USER"}
 
@@ -25,6 +26,7 @@ sudo apt install -y --no-install-recommends \
     python3-pip \
     python3-venv \
     ripgrep \
+    snap \
     snapd \
     unzip \
     yarn \

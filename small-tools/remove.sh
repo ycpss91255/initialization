@@ -17,6 +17,7 @@ if [ "${FDFIND_FILE}" == "/usr/bin/fdfind" ]; then
     sudo rm /usr/local/bin/fdfind
 fi
 
+# BUG: 'fish' not found
 # delete 'fish' configuration file
 fish -c "fisher remove \
     IlanCosman/tide@v5 \

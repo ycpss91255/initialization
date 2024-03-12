@@ -91,6 +91,10 @@ cat <JSON_PATH> | jq '.'
 # neofetch
 neofetch
 
+# gpustat
+gpustat
+gpustat -i
+
 # net-tools
 ifconfig
 

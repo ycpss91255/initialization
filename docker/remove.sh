@@ -10,7 +10,7 @@ USER_NAME=${1:-"$USER"}
 #     (command -v nvidia-smi >/dev/null 2>&1); then
 
 # Check for NVIDIA hardware. If present, uninstall the NVIDIA container toolkit.
-if dpkg -l | grep -q nvidia-container-toolkit; then
+if dpkg --get-selections | grep -q "nvidia-container-toolkit[[:space:]]*install"; then
     sudo apt purge -y nvidia-container-toolkit
 
     # remove the NVIDIA container toolkit's GPG key and repository list.

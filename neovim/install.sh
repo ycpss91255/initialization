@@ -44,7 +44,7 @@ sudo install lazygit /usr/local/bin && \
 rm -rf lazygit lazygit.tar.gz && \
 
 # nvm
-if dpkg -l | grep -q "fish" ; then
+if dpkg --get-selections | grep -q "fish[[:space:]]*install"; then
     if fish -c "type -q 'fisher'"; then
         fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish \
         | source && fisher install jorgebucaran/fisher"
@@ -58,7 +58,7 @@ if dpkg -l | grep -q "fish" ; then
     nvm use 18"
 fi
 
-if dpkg -l |grep -q "bash"; then
+if dpkg --get-selections | grep -q "bash[[:space:]]*install"; then
     curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"

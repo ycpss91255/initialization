@@ -73,14 +73,16 @@ sudo apt install -y --no-install-recommends \
     tig \
     tldr \
     tmux \
-    tmuxinator \
+    tmuxp \
     tree \
     ssh \
     sshfs \
+    xdg-utils \
     zoxide \
     && \
 pip install -U \
     thefuck \
+    gpustat \
     && \
 
 # clone fzf repositories from the ~/.fzf and install

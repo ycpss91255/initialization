@@ -2,6 +2,8 @@
 
 # ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
 
+# BUG: "snap" not found (wsl)
+
 USER_NAME=${1:-"$USER"}
 SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 

@@ -47,4 +47,7 @@ settings["dashboard_image"] = function()
     }
 end
 
+---@type boolean
+settings["diagnostics_virtual_text"] = false
+
 return settings

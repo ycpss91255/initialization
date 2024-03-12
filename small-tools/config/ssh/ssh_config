@@ -3,8 +3,8 @@
 Host github.com
     User git
     Hostname github.com
-    # IdentityFile C:\Users\ycpss\.ssh\ycpss91255
-    # IdentityFile ~/.ssh/ycpss91255
+    # IdentityFile C:\Users\ycpss\.ssh\id_ed25519
+    # IdentityFile ~/.ssh/id_ed25519
 
 Host my_server
     User user
@@ -12,5 +12,5 @@ Host my_server
     Port 22
     ForwardX11 yes
     ForwardX11Trusted yes
-    # IdentityFile C:\Users\ycpss\.ssh\ycpss91255
-    # IdentityFile ~/.ssh/ycpss91255
+    # IdentityFile C:\Users\ycpss\.ssh\id_ed25519
+    # IdentityFile ~/.ssh/id_ed25519

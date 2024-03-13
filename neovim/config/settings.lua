@@ -1,10 +1,24 @@
 -- Please check `lua/core/settings.lua` to view the full list of configurable settings
 local settings = {}
 
--- Examples
 settings["use_ssh"] = false
 
 settings["colorscheme"] = "catppuccin"
+
+---@type boolean
+settings["format_on_save"] = false
+
+---@type boolean
+settings["format_notify"] = false
+
+settings["disabled_plugins"] = {
+  -- "neovim/nvim-lspconfig",
+  -- "jose-elias-alvarez/null-ls.nvim",
+  -- "jay-babu/mason-null-ls.nvim",
+}
+
+---@type boolean
+settings["diagnostics_virtual_text"] = false
 
 ---@type string[]
 settings["dashboard_image"] = function()
@@ -46,8 +60,5 @@ settings["dashboard_image"] = function()
       [[⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⣿⡷⢾⡱⠬⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀]],
     }
 end
-
----@type boolean
-settings["diagnostics_virtual_text"] = false
 
 return settings

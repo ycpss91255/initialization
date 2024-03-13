@@ -69,6 +69,8 @@ fi
 
 curl https://sh.rustup.rs -sSf | sh -s -- -y && \
 
+# rustup component add rust-analyzer
+
 if command -v curl >/dev/null 2>&1; then
     bash -c "$(curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)"
 else

@@ -9,10 +9,10 @@ if status is-interactive
         if snap list | grep -q "nvim"
             alias vim="nvim"
             alias view="nvim -R"
-            set -x EDITOR "nvim"
+            setenv EDITOR "nvim"
         end
     else
-        set -x EDITOR "vim"
+        setenv EDITOR "vim"
     end
 
     if dpkg --get-selections | grep -q "xdg-utils[[:space:]]*install"
@@ -74,13 +74,8 @@ if status is-interactive
 
     # alias and short function
     ## Edit fish user key bindings
+    function update_upgrade
+        sudo apt update && sudo apt upgrade -y && sudo apt autoremove -y && sudo apt autoclean
+    end
 
-    function ehk; vim ~/.config/fish/functions/fish_user_key_bindings.fish; end
-    function shk; source ~/.config/fish/functions/fish_user_key_bindings.fish; end
-    ## fish config
-    function efc; vim ~/.config/fish/config.fish; end
-    function sfc; source ~/.config/fish/config.fish && echo "source user config.fish"; end
-    ## tmux config
-    function etc; vim ~/.tmux.conf; end
-    function stc; tmux source-file ~/.tmux.conf; end
 end

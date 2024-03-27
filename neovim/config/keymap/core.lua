@@ -22,8 +22,8 @@ return {
 	["n|<S-Tab>"] = map_cr("tabnext"):with_noremap():with_silent():with_desc("tab: Move to next tab"),
 	["n|<C-h>"] = map_cr("tabprevious"):with_noremap():with_silent():with_desc("tab: Move to previous tab"),
 	["n|<C-l>"] = map_cr("tabnext"):with_noremap():with_silent():with_desc("tab: Move to next tab"),
-	["n|tk"] = map_cr("tabprevious"):with_noremap():with_silent():with_desc("tab: Move to next tab"),
-	["n|tj"] = map_cr("tabnext"):with_noremap():with_silent():with_desc("tab: Move to previous tab"),
+	["n|tj"] = map_cr("tabprevious"):with_noremap():with_silent():with_desc("tab: Move to next tab"),
+	["n|tk"] = map_cr("tabnext"):with_noremap():with_silent():with_desc("tab: Move to previous tab"),
 	-- window
 	["n|<C-j>"] = map_cr("wincmd w"):with_noremap():with_desc("window: Focus next"),
 	["n|<C-k>"] = map_cr("wincmd W"):with_noremap():with_desc("window: Focus previous"),

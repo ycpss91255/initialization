@@ -41,7 +41,9 @@ sudo apt install -y --no-install-recommends \
     software-properties-common \
     wget \
     && \
-pip install -U pip setuptools && \
+
+# ubuntu 24.04 install error, error: externally-managed-environment
+# pip install -U pip setuptools && \
 
 # Install required packages for 'monitoring tools'
 sudo apt update && \
@@ -53,10 +55,13 @@ sudo apt install -y --no-install-recommends \
     iotop \
     nmon \
     powertop \
-    && \
-pip install -U \
     bpytop \
     && \
+
+# ubuntu 24.04 install error, error: externally-managed-environment
+# pip install -U \
+#     bypytop \
+#     && \
 
 # Install required packages for 'other tools'
 sudo apt install -y --no-install-recommends \
@@ -82,11 +87,15 @@ sudo apt install -y --no-install-recommends \
     sshfs \
     xdg-utils \
     zoxide \
-    && \
-pip install -U \
     thefuck \
     gpustat \
     && \
+
+# ubuntu 24.04 install error, error: externally-managed-environment
+# pip install -U \
+#     thefuck \
+#     gpustat \
+#     && \
 
 sudo apt-file update && \
 
@@ -120,6 +129,9 @@ fish -c "fisher install \
     set -U fish_user_paths /home/${USER_NAME}/.local/bin \$fish_user_paths" && \
 
 # fish -c "/home/"${USER_NAME}"/.fzf/install --all" && \
+
+# copy tmux configuration file
+cp -r "${SCRIPT_PATH}"/config/fish /home/"${USER_NAME}"/.config/ && \
 
 # switch default shell to fish shell
 sudo chsh -s "$(which fish)" "${USER_NAME}" && \

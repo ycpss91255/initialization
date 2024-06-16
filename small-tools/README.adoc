@@ -62,6 +62,9 @@ sudo iotop
 .Other tools
 [source, shell]
 ----
+# apt-file
+sudo apt-file search <COMMAND>
+
 # bat
 bat <FILE_PATH>
 

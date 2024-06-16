@@ -60,6 +60,7 @@ pip install -U \
 
 # Install required packages for 'other tools'
 sudo apt install -y --no-install-recommends \
+    apt-file \
     bat \
     fd-find \
     fish \
@@ -86,6 +87,8 @@ pip install -U \
     thefuck \
     gpustat \
     && \
+
+sudo apt-file update && \
 
 # clone fzf repositories from the ~/.fzf and install
 git clone --depth 1 https://github.com/junegunn/fzf.git /home/"${USER_NAME}"/.fzf && \

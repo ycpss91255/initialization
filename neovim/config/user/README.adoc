@@ -1,0 +1,201 @@
+= README
+:experimental:
+:toc: Right
+
+== Mode
+
+* `N` = Normal
+* `I` = Insert
+* `C` = Command
+* `V` = Visual
+* `VL` = Visual Line
+* `VB` = Visual Block
+* `T` = Terminal
+
+== Special Key
+
+[source, shell]
+----
+nvim -c ":h key-notation"
+----
+
+== Neovim 鍵盤快捷鍵
+
+.基礎控制
+[cols="7,^2,^3", options="header"]
+|===
+| 快捷鍵 | 模式 | 描述
+2+^.^| 前綴鍵 | kbd:[C-w]
+2+^.^| Leader 鍵 | kbd:[Space]
+| 開啟命令面板 | `N` | kbd:[<C-p>]
+| 同步插件程式 | `N` | kbd:[<Leader>ps]
+| 清理插件程式 | `N` | kbd:[<Leader>px]
+| 確認插件更新 | `N` | kbd:[<Leader>pc]
+| 切換顯示 nvim-tree | `N` | kbd:[<C-n>]
+| 重新載入 nvim-tree | `N` | kbd:[<Leader>nr]
+| 查看 Git 變更 | `N` | kbd:[<Leader>u]
+
+| 切換顯示水平終端機 | `N`/`I`/`T` | kbd:[<C-\>]
+| 切換顯示浮動終端機 | `N`/`I`/`T` | kbd:[<A-d>]
+
+| 聚焦至下一個窗格 | `N` | kbd:[<C-j>]
+| 聚焦至上一個窗格 | `N` | kbd:[<C-k>]
+| 聚焦至前一個分頁 | `N` | kbd:[<C-l>]
+| 聚焦至後一個分頁 | `N` | kbd:[<C-h>]
+
+| 左移窗格 | `N` | kbd:[<A-h>]
+| 下移窗格 | `N` | kbd:[<A-j>]
+| 上移窗格 | `N` | kbd:[<A-k>]
+| 右移窗格 | `N` | kbd:[<A-l>]
+
+| 右移分頁 | `N` | kbd:[<A-S-j>]
+| 左移分頁 | `N` | kbd:[<A-S-k>]
+| 右移分頁 | `N` | kbd:[<Tab>]
+| 左移分頁 | `N` | kbd:[<S-Tab>]
+
+| 垂直分割視窗 | `N` | kbd:[<C-w>v]
+| 水平分割視窗 | `N` | kbd:[<C-w>s]
+
+| 關閉分頁 | `N` | kbd:[<A-q>]
+| 關閉視窗 | `N` | kbd:[<A-S-q>]
+
+| 退出 Insert 模式 | `I` | kbd:[jk]
+| 切換摺疊 | `N` | kbd:[za]
+
+| 下一個候選字 | `I` | kbd:[<C-n>]
+| 下一個候選字 | `I` | kbd:[<Tab>]
+| 上一個候選字 | `I` | kbd:[<C-p>]
+| 上一個候選字 | `I` | kbd:[<S-Tab>]
+
+| 跳到區塊開始 | `I` | kbd:[<A-h>]
+| 跳到區塊結束 | `I` | kbd:[<A-l>]
+
+| 選擇當前區塊 `()` | `I` | kbd:[vab]
+| 選擇當前區塊 `{}` | `I` | kbd:[vaB]
+| 選擇當前區塊 `function` | `I` | kbd:[vaf]
+| 選擇當前區塊 `class` | `I` | kbd:[vac]
+| 選擇當前內部區塊 `function` | `I` | kbd:[vif]
+| 選擇當前內部區塊 `class` | `I` | kbd:[vic]
+
+| Code 片段執行 | `V` | kbd:[<Leader>r]
+| Code 全部執行 | `N` | kbd:[<Leader>r]
+
+| 跳到某一行 | `N` | kbd:[<Leader>j]/kbd:[<Leader>k]
+| 跳到某個單字 | `N` | kbd:[<Leader>w]
+| 跳到某一個字元 | `N` | kbd:[<Leader>c]
+| 跳到某兩個字元 | `N` | kbd:[<Leader>C]
+
+| 向前尋找某一個字元(`x`) | `N` | kbd:[Fx]/kbd:[Tx]
+| 向後尋找某一個字元(`x`) | `N` | kbd:[fx]/kbd:[tx]
+| 上一個相同字元 | `N` | kbd:[F]/kbd:[T]/kbd:[;]
+| 下一個相同字元 | `N` | kbd:[f]/kbd:[t]/kbd:[,]
+
+| 上個函式開始 | `N` | kbd:[[[]
+| 上個函式結束 | `N` | kbd:[[\]]
+| 下個函式開始 | `N` | kbd:[\][]
+| 下個函式結束 | `N` | kbd:[\]\]]
+| 上個 Git 暫存 | `N` | kbd:[[g]
+| 下個 Git 暫存 | `N` | kbd:[\]g]
+| 上個 Code 問題 | `N` | kbd:[g[]
+| 下個 Code 問題 | `N` | kbd:[g\]]
+
+| 切換單行註解 | `N` | kbd:[gcc]
+| 切換所選行註解 | `V` | kbd:[gc]
+
+| 減少縮排 | `I` | kbd:[<C-d>]
+| 增加縮排 | `I` | kbd:[<C-t>]
+
+| 複製&貼上當前行 | `N` | kbd:[<C-p>]
+| 貼上暫存器內容 | `N` | kbd:[<A-p>]
+| 貼上上一行相同位置的字元 | `N` | kbd:[<C-y>]
+
+| Markdown 預覽 (使用Web瀏覽器) | `N` | kbd:[<F12>]
+
+| 儲存當前工作階段 (要在專案中) | `N` | kbd:[<Leader>ss]
+| 載入當前工作階段 (要在專案中) | `N` | kbd:[<Leader>sl]
+| 刪除當前工作階段 (要在專案中) | `N` | kbd:[<Leader>sd]
+
+| 計算遊標/選擇下的表達式(僅支援 C, Cpp, rust ,go, Python) | `N` | kbd:[K]
+|===
+
+.nvim-tree
+[cols="7,^2,^3", option="header"]
+|===
+| 建立新檔案 | `N` | kbd:[a]
+| 刪除檔案/資料夾 | `N` | kbd:[d]
+| 重命名檔案/資料夾 | `N` | kbd:[r]
+| 開啟資料夾 | `N` | kbd:[o]/kbd:[<Enter>]
+| 關閉資料夾 | `N` | kbd:[o]/kbd:[<BS>]
+| 複製檔案 | `N` | kbd:[y]
+| 複製相對路徑 | `N` | kbd:[<S-y>]
+| 複製絕對路徑 | `N` | kbd:[gy]
+| 切換顯示 `.` 開頭的隱藏檔案 | `N` | kbd:[<S-h>]
+| 切換顯示 `.gitignore` 寫入的隱藏檔案 | `N` | kbd:[<S-i>]
+|===
+
+.Telescope
+[cols="7,^2,^3", option="header"]
+|===
+| 尋找檔案 (依頻率) | `N` | kbd:[<Leader>fr]
+| 尋找檔案 (依歷史) | `N` | kbd:[<Leader>fe]
+| 尋找檔案 (在專案中) | `N` | kbd:[<Leader>ff]
+| 尋找檔案 (再開啟檔案中) | `N` | kbd:[<Leader>fb]
+
+| 尋找文字 (在專案中) | `N` | kbd:[<Leader>fw]
+| 尋找文字 (使用當前位置的字串) | `N` | kbd:[<Leader>fs]
+
+| 尋找專案 | `N` | kbd:[<Leader>fp]
+| 尋找位置 (依 `zoxide`) | `N` | kbd:[<Leader>fz]
+| 開啟函式(符號) 列表 | `N` | kbd:[gto]
+|===
+
+.Lsp 操作
+[cols="7,^2,^3", option="header"]
+|===
+| 顯示 Code 的操作 | `N` | kbd:[ga]
+| 預覽定義 | `N` | kbd:[gd]
+| 跳到定義 | `N` | kbd:[gD]
+| 切換 Code 大綱 | `N` | kbd:[go]
+| 重新命名變數 (當前檔案) | `N` | kbd:[gr]
+| 顯示 Git Commit | `N` | kbd:[gs]
+| 切換顯示 Lsp 診斷 | `N` | kbd:[gt]
+| 切換顯示 Lsp 檔案診斷 | `N` | kbd:[<Leader>ld]
+| 切換顯示 Lsp 工作區診斷 | `N` | kbd:[<Leader>ld]
+| 切換顯示 Code 快速修復 | `N` | kbd:[<Leader>lq]
+// (沒驗證)
+| 重新命名變數 (當前專案) | `N` | kbd:[gR]
+| 顯示當前函式/變數的定義或引用 | `N` | kbd:[gh]
+| 切換顯示 Code 位置列表 | `N` | kbd:[<Leader>lq]
+|===
+
+.Git 操作
+[cols="7,^2,^3", option="header"]
+|===
+| 開啟 `lazygit` | `N` | kbd:[<Leader>gg]
+| 開啟暫存列表 | `N` | kbd:[<Leader>gG]
+| 開啟 diff 檢視 | `N` | kbd:[<Leader>gd]
+| 關閉 diff 檢視 | `N` | kbd:[<Leader>gD]
+| 當前變更/選擇行暫存 | `N`/`V` | kbd:[<Leader>gs]
+| 清除當前變更/選擇行不在暫存區的內容 | `N`/`V` | kbd:[<Leader>gr]
+| 檔案/選擇行取消暫存 | `N` | kbd:[<Leader>gu]
+| 清除當前檔案不在暫存區的內容 | `N` | kbd:[<Leader>gR]
+| 預覽變更 | `N` | kbd:[<Leader>gp]
+| 找兇手 | `N` | kbd:[<Leader>gb]
+|===
+
+
+Reference https://github.com/ayamir/nvimdots/wiki/Keybindings[nvimdots wiki Keybindings]
+
+== VSCodeVim 鍵盤快捷鍵
+
+[cols="7,^1,^3", options="header"]
+|===
+| 快捷鍵 | 模式 | 描述
+2+^.^| 前綴鍵 | kbd:[C-w]
+2+^.^| Leader 鍵 | kbd:[Space]
+| 開啟命令面板 | `N` | kbd:[<C-p>]
+| 開啟延伸模組面板 | `N` | kbd:[<Leader>pc]
+| 切換顯示檔案總管 | `N` | kbd:[<C-n>]
+| 開啟原始碼控制面板 | `N` | kbd:[<Leader>u]
+| AsciiDoc & Markdown 預覽 | `N` | kbd:[<F12>]
+|===

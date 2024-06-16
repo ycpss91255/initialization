@@ -22,6 +22,14 @@ chmod +x ./install.sh
 
 == Usage
 
+=== Copilot auth
+[source, shell]
+----
+# in nvim
+:Copilot auth
+----
+
+
 == Remove
 [source, shell]
 ----

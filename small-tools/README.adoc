@@ -109,6 +109,9 @@ sudo powerstat
 # ranger
 ranger [FOLDER_PATH]
 
+# silversearcher-ag
+ag replace grep
+
 # tig
 tig [--all]
 tig status

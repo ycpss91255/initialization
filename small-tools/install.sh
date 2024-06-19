@@ -83,6 +83,7 @@ sudo apt install -y --no-install-recommends \
     tmux \
     tmuxp \
     tree \
+    silversearcher-ag \
     ssh \
     sshfs \
     xdg-utils \
@@ -120,15 +121,15 @@ fish -c "fisher install \
         oh-my-fish/plugin-thefuck \
         kidonng/zoxide.fish \
         edc/bass \
-        joseluisq/gitnow@2.11.0 \
+        joseluisq/gitnow \
         markcial/upto \
-        danhper/fish-ssh-agent \
         jorgebucaran/nvm.fish \
         && \
     /home/${USER_NAME}/.fzf/install --all && \
     set -U fish_user_paths /home/${USER_NAME}/.local/bin \$fish_user_paths" && \
 
 # fish -c "/home/"${USER_NAME}"/.fzf/install --all" && \
+        ## danhper/fish-ssh-agent \
 
 # copy tmux configuration file
 cp -r "${SCRIPT_PATH}"/config/fish /home/"${USER_NAME}"/.config/ && \

@@ -68,6 +68,9 @@ bat <FILE_PATH>
 # fish
 fish
 
+## 如果要用 fish ssh-agent 的話，ssh key 檔案名稱必需爲 id_ed25519 
+（默認名稱）,或你自己修改 config.fish 檔案。
+
 # git
 cd <WORKSPACE_PATH>
 git init

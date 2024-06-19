@@ -70,6 +70,9 @@ bat <FILE_PATH>
 
 # fish
 fish
+## if you want to use fish ssh-agent,
+## ssh key file name must be id_ed25519 (default name),
+## or modify config.fish youself.
 
 # git
 cd <WORKSPACE_PATH>

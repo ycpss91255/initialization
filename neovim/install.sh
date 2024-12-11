@@ -1,4 +1,6 @@
-#!/usr/bin/env bash
+curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.g0
+sudo rm -rf /opt/nvim
+sudo tar -C /opt -xzf nvim-linux64.tar.gz#!/usr/bin/env bash
 
 # ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
 
@@ -22,6 +24,7 @@ sudo apt install -y --no-install-recommends \
     lldb \
     make \
     npm \
+    nodejs \
     python3 \
     python3-pip \
     python3-venv \
@@ -35,7 +38,16 @@ sudo apt install -y --no-install-recommends \
 
 # Install 'neovim' with 'snap'
 sudo snap install snapd && \
-sudo snap install nvim --classic && \
+sudo snap install --classic nvim && \
+sudo snap install --classic go && \
+
+# Install 'neovim' with 'Github Releases'
+# curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.gz
+# sudo rm -rf /opt/nvim
+# sudo tar -C /opt -xzf nvim-linux64.tar.gz
+
+# Install 'tree-sitter' with 'npm'
+npm install -g tree-sitter-cli && \
 
 # Install 'lazygit'
 curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" && \

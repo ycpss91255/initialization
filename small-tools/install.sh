@@ -156,6 +156,9 @@ git clone --depth 1 \
 cp "${SCRIPT_PATH}"/config/tmux/tmux.conf /home/"${USER_NAME}"/.tmux.conf && \
 /home/"${USER_NAME}"/.tmux/plugins/tpm/scripts/install_plugins.sh && \
 
+mkdir -p /home/"${USER_NAME}"/.config/tmux-powerline && \
+cp "${SCRIPT_PATH}"/config/tmux/tmux-powerline /home/"${USER_NAME}"/.config/tmux-powerline && \
+
 # copy ssh config template to ~/.ssh/config
 cp "${SCRIPT_PATH}"/config/ssh/ssh_config /home/"${USER_NAME}"/.ssh/config && \
 # enable X11Forwarding

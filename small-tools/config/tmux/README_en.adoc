@@ -135,3 +135,5 @@ chmod +x ./remove.sh
 tmux -V
 # tmux: command not found
 ----
+
+// TODO: distinguish small tools

@@ -38,8 +38,11 @@ sudo apt install -y --no-install-recommends \
     python3-dev \
     python3-pip \
     python3-setuptools \
+    snapd \
     software-properties-common \
     wget \
+    xclip \
+    xsel \
     && \
 
 # ubuntu 24.04 install error, error: externally-managed-environment
@@ -65,6 +68,7 @@ sudo apt install -y --no-install-recommends \
 
 # Install required packages for 'other tools'
 sudo apt install -y --no-install-recommends \
+    asciidoctor \
     apt-file \
     bat \
     fd-find \
@@ -147,6 +151,7 @@ rm -rf /home/"${USER_NAME}"/.tmux/plugins/tpm && \
 git clone --depth 1 \
     https://github.com/tmux-plugins/tpm \
     /home/"${USER_NAME}"/.tmux/plugins/tpm && \
+
 # copy tmux configuration file
 cp "${SCRIPT_PATH}"/config/tmux/tmux.conf /home/"${USER_NAME}"/.tmux.conf && \
 /home/"${USER_NAME}"/.tmux/plugins/tpm/scripts/install_plugins.sh && \
@@ -162,6 +167,8 @@ sudo sed -i -e 's/#\s*\(AllowTcpForwarding yes\)/\1/' \
            '/etc/ssh/sshd_config' && \
 sudo systemctl enable ssh && \
 sudo systemctl restart ssh && \
+
+pip install pynvim
 
 # delete old ranger_devicons, avoid problems
 rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \

@@ -11,27 +11,27 @@ settings["format_on_save"] = false
 ---@type boolean
 settings["format_notify"] = false
 
----@type string[]
-settings["lsp_deps"] = {
-	"bashls",
-	"clangd",
-	"html",
-	"jsonls",
-	"lua_ls",
-	"pylsp",
-	-- "gopls",
-}
+-- ---@type string[]
+-- settings["lsp_deps"] = {
+-- 	-- "bashls",
+-- 	-- "clangd",
+-- 	-- "html",
+-- 	-- "jsonls",
+-- 	-- "lua_ls",
+-- 	-- "pylsp",
+-- 	-- "gopls",
+-- }
 
----@type string[]
-settings["null_ls_deps"] = {
-	"clang_format",
-	-- "gofumpt",
-	-- "goimports",
-	"prettier",
-	"shfmt",
-	"stylua",
-	"vint",
-}
+-- ---@type string[]
+-- settings["null_ls_deps"] = {
+-- 	"clang_format",
+-- 	"gofumpt",
+-- 	"goimports",
+-- 	"prettier",
+-- 	"shfmt",
+-- 	"stylua",
+-- 	"vint",
+-- -- }
 
 ---@type string[]
 settings["dap_deps"] = {

@@ -18,8 +18,8 @@ return {
 	["n|<A-k>"] = map_cr("resize +2"):with_silent():with_desc("window: Resize +2 horizontally"),
 	["n|<A-j>"] = map_cr("resize -2"):with_silent():with_desc("window: Resize -2 horizontally"),
 	-- tab
-	["n|<Tab>"] = map_cr("tabnext"):with_noremap():with_silent():with_desc("tab: Move to next tab"),
-	["n|<S-Tab>"] = map_cr("tabprevious"):with_noremap():with_silent():with_desc("tab: Move to previous tab"),
+	-- ["n|<Tab>"] = map_cr("tabnext"):with_noremap():with_silent():with_desc("tab: Move to next tab"),
+	-- ["n|<S-Tab>"] = map_cr("tabprevious"):with_noremap():with_silent():with_desc("tab: Move to previous tab"),
 	["n|<C-h>"] = map_cr("tabprevious"):with_noremap():with_silent():with_desc("tab: Move to previous tab"),
 	["n|<C-l>"] = map_cr("tabnext"):with_noremap():with_silent():with_desc("tab: Move to next tab"),
 	["n|tj"] = map_cr("tabprevious"):with_noremap():with_silent():with_desc("tab: Move to next tab"),

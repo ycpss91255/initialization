@@ -12,5 +12,8 @@ tool["christoomey/vim-tmux-navigator"] = {
 		 "TmuxNavigateNext",
 		},
 }
+tool["wakatime/vim-wakatime"] = {
+	lazy = false,
+}
 
 return tool

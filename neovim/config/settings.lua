@@ -33,6 +33,9 @@ settings["format_notify"] = false
 -- 	"vint",
 -- -- }
 
+---@type number
+settings["format_timeout"] = 500
+
 ---@type string[]
 settings["dap_deps"] = {
 	"codelldb", -- C-Family
@@ -71,6 +74,21 @@ settings["disabled_plugins"] = {
   -- "jay-babu/mason-null-ls.nvim",
   -- "nvimtools/none-ls.nvim",
 }
+
+
+-- ---@type table<string, boolean>
+-- settings["formatter_block_list"] = {
+--   lua = false, -- example
+-- }
+
+-- ---@type table<string, boolean>
+-- settings["server_formatting_block_list"] = {
+--   lua_ls = true,
+--   tsserver = true,
+--   clangd = true,
+-- }
+
+
 
 ---@type boolean
 settings["diagnostics_virtual_text"] = false

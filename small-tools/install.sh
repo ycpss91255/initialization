@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
-
+# TODO: install eza
 # BUG: "snap" not found (wsl)
 
 USER_NAME=${1:-"$USER"}
@@ -75,6 +75,7 @@ sudo apt install -y --no-install-recommends \
     fish \
     git-lfs \
     jq \
+    ncdu \
     neofetch \
     net-tools \
     nmap \
@@ -173,6 +174,7 @@ sudo systemctl restart ssh && \
 
 pip install pynvim
 
+# NOTE: .config/ranger/rc.conf set preview_images true
 # delete old ranger_devicons, avoid problems
 rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 # Install ranger plugins 'ranger_devicons'

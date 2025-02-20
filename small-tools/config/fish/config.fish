@@ -4,7 +4,7 @@ if status is-interactive
        sudo service ssh --full-restart > /dev/null
     end
 
-    # Use Neovim
+    # Replace vim with neovim
     if dpkg --get-selections | grep -q "snap[[:space:]]*install"
         if snap list | grep -q "nvim"
             alias vim="nvim"
@@ -14,6 +14,15 @@ if status is-interactive
     else
         setenv EDITOR "vim"
     end
+
+    # Replace ls with eza
+    if dpkg --get-selections | grep -q "eza[[:space:]]*install"
+        alias ls="eza"
+        alias ll="eza -l"
+        alias la="eza -la"
+        alias l="eza -l"
+    end
+
 
     if dpkg --get-selections | grep -q "xdg-utils[[:space:]]*install"
         alias xopen="xdg-open"

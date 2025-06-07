@@ -1,0 +1,12 @@
+= README
+:experimental:
+:toc: right
+:imagesdir: images
+
+== QMK install
+// TODO: wait done
+
+== QMK usage
+
+== Keymap path
+* `qmk_firmware\keyboards\boardsource\unicorne\keymaps`

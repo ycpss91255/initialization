@@ -31,7 +31,7 @@ if status is-interactive
     # use node js version 18, nvim lps dep
     if type -q "fisher"
         if fisher list | grep -q "nvm"
-            nvm use 18 >/dev/null 2>&1
+            nvm use 20 >/dev/null 2>&1
         end
     end
 

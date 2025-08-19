@@ -44,4 +44,4 @@ else
     sudo -u "$USER_NAME" fc-cache -f -v "${TARGET_FONT_DIR}" >/dev/null
 fi
 
-echo -e "\033[1;37;42mFonts removed successfully for ${USER_NAME}.\033[0m"
+echo -e "\033[1;37;42mFonts removal successfully for ${USER_NAME}.\033[0m"

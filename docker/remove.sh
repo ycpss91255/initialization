@@ -3,18 +3,25 @@
 # ${1}: USER NAME. Use the provided USER_NAME, or default to the current user ($USER).
 USER_NAME=${1:-"$USER"}
 
-# if (lspci | grep -q VGA ||
-#     lspci | grep -iq NVIDIA ||
-#     lsmod | grep -q nvidia ||
-#     nvidia-smi -L >/dev/null 2>&1 | grep -iq nvidia) &&
-#     (command -v nvidia-smi >/dev/null 2>&1); then
+USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6 || true)"
+if [[ -z "${USER_HOME}" || ! -d "${USER_HOME}" ]]; then
+    echo "User home directory for '${USER_NAME}' not found."
+    exit 1
+fi
+
+
+# Disable Docker and containerd services.
+sudo systemctl step docker.service containerd.service 2>/dev/null
+sudo systemctl disable --now docker.service containerd.service 2>/dev/null
 
 # Check for NVIDIA hardware. If present, uninstall the NVIDIA container toolkit.
-if dpkg --get-selections | grep -q "nvidia-container-toolkit[[:space:]]*install"; then
-    sudo apt purge -y nvidia-container-toolkit
+if dpkg -l | awk '
+    /^ii/ && $2=="nvidia-container-toolkit"{found=1}
+    END {exit !found}'; then
 
+    sudo apt purge -y nvidia-container-toolkit
     # remove the NVIDIA container toolkit's GPG key and repository list.
-    sudo rm \
+    sudo rm -f \
         /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
         /etc/apt/sources.list.d/nvidia-container-toolkit.list
 fi
@@ -28,17 +35,14 @@ sudo apt purge -y \
     docker-compose-plugin
 
 # Remove Docker's GPG key, Docker repository list, and clean up Docker directories.
+USER_DOCKER_FILE="${USER_HOME}/.docker"
+
 sudo rm -rf /etc/apt/keyrings/docker.gpg \
     /etc/apt/sources.list.d/docker.list \
-    /home/"${USER_NAME}"/.docker
+    "${USER_DOCKER_FILE}"
 
 # Delete the Docker group and remove the specified user from it.
-sudo groupdel docker
-sudo gpasswd -d "${USER_NAME}" docker
+sudo gpasswd -d "${USER_NAME}" docker 2>/dev/null
+sudo groupdel docker 2>/dev/null
 
-# Remove user's Docker configuration directory.
-sudo rm -rf /home/"${USER_NAME}"/.docker
-
-# Disable Docker and containerd services.
-sudo systemctl disable docker.service
-sudo systemctl disable containerd.service
+echo -e "\033[1;37;42mDocker toolkit removal finished.\033[0m\n"

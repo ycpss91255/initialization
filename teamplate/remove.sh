@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 
-# ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
+# set -euo pipefail
 
-# SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
-# USER_NAME=${1:-"$USER"}
+USER_NAME=${1:-"$USER"}
+
+USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6 || true)"
+if [[ -z "${USER_HOME}" || ! -d "${USER_HOME}" ]]; then
+    echo "User home directory for '${USER_NAME}' not found."
+    exit 1
+fi
+
+SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 
 # purge 'XXX' related packages
 sudo apt purge -y \
-    && \
+
 
 # Remove 'XXX' related files
 sudo rm

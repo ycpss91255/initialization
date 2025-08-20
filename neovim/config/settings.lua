@@ -11,46 +11,53 @@ settings["format_on_save"] = false
 ---@type boolean
 settings["format_notify"] = false
 
--- ---@type string[]
--- settings["lsp_deps"] = {
--- 	-- "bashls",
--- 	-- "clangd",
--- 	-- "html",
--- 	-- "jsonls",
--- 	-- "lua_ls",
--- 	-- "pylsp",
--- 	-- "gopls",
--- }
-
--- ---@type string[]
--- settings["null_ls_deps"] = {
--- 	"clang_format",
--- 	"gofumpt",
--- 	"goimports",
--- 	"prettier",
--- 	"shfmt",
--- 	"stylua",
--- 	"vint",
--- -- }
-
 ---@type number
 settings["format_timeout"] = 500
 
 ---@type string[]
-settings["dap_deps"] = {
-	"codelldb", -- C-Family
-	-- "delve", -- Go
-	"python", -- Python (debugpy)
-}
+settings["lsp_deps"] = function(defaults)
+	return {
+    "bashls",
+    "clangd",
+    "html",
+    "jsonls",
+    "lua_ls",
+    "pylsp",
+    -- "gopls",
+	}
+end
 
 ---@type string[]
-settings["treesitter_deps"] = {
+settings["null_ls_deps"] = function(defaults)
+	return {
+    "clang_format",
+    -- "gofumpt",
+    -- "goimports",
+    "prettier",
+    "shfmt",
+    "stylua",
+    "vint",
+	}
+end
+
+---@type string[]
+settings["dap_deps"] = function(defaults)
+	return {
+    "codelldb", -- C-Family
+    -- "delve", -- Go
+    "python", -- Python (debugpy)
+	}
+end
+
+---@type string[]
+settings["treesitter_deps"] = function(defaults)
+	return {
 	"bash",
 	"c",
 	"cpp",
 	"css",
 	-- "go",
-	"gomod",
+	-- "gomod",
 	"html",
 	"javascript",
 	"json",
@@ -61,14 +68,16 @@ settings["treesitter_deps"] = {
 	"markdown",
 	"markdown_inline",
 	"python",
-	"rust",
-	"typescript",
+	-- "rust",
+	-- "typescript",
 	"vimdoc",
-	"vue",
+	-- "vue",
 	"yaml",
-}
+	}
+end
 
 settings["disabled_plugins"] = {
+    "ray-x/go.nvim"
   -- "neovim/nvim-lspconfig",
   -- "jose-elias-alvarez/null-ls.nvim",
   -- "jay-babu/mason-null-ls.nvim",
@@ -87,7 +96,6 @@ settings["disabled_plugins"] = {
 --   tsserver = true,
 --   clangd = true,
 -- }
-
 
 
 ---@type boolean

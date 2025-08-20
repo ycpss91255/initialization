@@ -16,7 +16,7 @@ sudo systemctl disable --now docker.service containerd.service 2>/dev/null
 
 # Check for NVIDIA hardware. If present, uninstall the NVIDIA container toolkit.
 if dpkg -l | awk '
-    /^ii/ && $2=="nvidia-container-toolkit"{found=1}
+    /^ii/ && $2=="nvidia-container-toolkit" {found=1}
     END {exit !found}'; then
 
     sudo apt purge -y nvidia-container-toolkit

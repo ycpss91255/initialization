@@ -20,6 +20,8 @@ chmod +x ./install.sh
 ./install.sh
 ----
 
+安裝完畢後需要再進入幾次 lazygit 去確認一下是否有需要清除或是更新的套件
+
 == 使用方法
 
 === Copilot 授權
@@ -27,6 +29,16 @@ chmod +x ./install.sh
 ----
 # in nvim
 :Copilot auth
+----
+
+=== lazygit pkg error
+
+* `<PACKAGE_NAME>` 是出錯的套件名稱。
+* `<FILE_PATH>` 是出錯的檔案路徑。
+[source, shell]
+----
+find ~/.local/share/nvim -type f -name tags | grep <PACKAGE_NAME>
+rm <FILE_PATH>
 ----
 
 == 移除

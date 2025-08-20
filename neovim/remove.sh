@@ -2,24 +2,38 @@
 
 # ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
 
-# BUG: rm: cannot remove '/usr/local/bin/lazygit': No such file or directory (wsl)
-# SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 USER_NAME=${1:-"$USER"}
 
-# purge 'XXX' related packages
-sudo snap remove nvim
-
-# Remove 'XXX' related files
-
-sudo rm -rf /usr/local/bin/lazygit
-
-if [ -f "/home/'${USER_NAME}'/.cargo/bin/rustup" ]; then
-    /home/'${USER_NAME}'/.cargo/bin/rustup self uninstall -y
+USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6 || true)"
+if [[ -z "${USER_HOME}" || ! -d "${USER_HOME}" ]]; then
+    echo "User home directory for '${USER_NAME}' not found."
+    exit 1
 fi
 
-rm -rf /home/"${USER_NAME}"/.config/nvim
-rm -rf /home/"${USER_NAME}"/.local/share/nvim
+echo "==> Remove Neovim (Github Releases)"
+sudo rm -rf /opt/nvim /usr/local/bin/nvim
 
-# print Success or failure message
-# printf "\033[1;37;42mXXX purge successfully.\033[0m" || \
-# printf "\033[1;37;41mXXX purge failed.\033[0m"
+rm -rf "${USER_HOME}"/.config/nvim "${USER_HOME}"/.local/share/nvim
+
+echo "==> Remove nvimdots dependencies - lazygit"
+sudo rm -rf /usr/local/bin/lazygit
+
+echo "==> Install nvimdots dependencies - nvm"
+# shell used fish
+if dpkg -l | awk '/^ii/ && $2=="fish" {found=1} END {exit !found}';then
+    if fish -c "type -q fisher"; then
+        fish -c "fisher remove jorgebucaran/nvm.fish"
+    fi
+fi
+rm -rf "${USER_HOME}/.nvm"
+
+echo "==> Install nvimdots dependencies - other (Latest Release)"
+
+# Install 'tree-sitter' with 'npm'
+sudo npm remove -g tree-sitter-cli
+
+if [ -f "${USER_HOME}/.cargo/bin/rustup" ]; then
+    bash -c "${USER_HOME}.cargo/bin/rustup self uninstall -y"
+fi
+
+echo -e "\033[1;37;42mNvim and Nvimdots removal finished.\033[0m"

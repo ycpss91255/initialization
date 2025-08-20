@@ -1,99 +1,116 @@
-curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.g0
-sudo rm -rf /opt/nvim
-sudo tar -C /opt -xzf nvim-linux64.tar.gz#!/usr/bin/env bash
+#!/usr/bin/env bash
 
-# ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
+set -euo pipefail
 
-# BUG: error: cannot communicate with server: Post "http://localhost/v2/snaps/snapd": dial unix /run/snapd.socket: connect: no such file or directory (wsl)
-SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 USER_NAME=${1:-"$USER"}
 
-LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6 || true)"
+if [[ -z "${USER_HOME}" || ! -d "${USER_HOME}" ]]; then
+    echo "User home directory for '${USER_NAME}' not found."
+    exit 1
+fi
 
-# Update the package lists
+SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
+
+echo "==> Install apt basic dependencies"
 sudo apt update && \
-
-# Install required packages for 'neovim'
 sudo apt install -y --no-install-recommends \
-    clang \
+    ca-certificates \
     curl \
-    fd-find \
-    gcc \
     git \
+    ripgrep \
+    fd-find \
+    unzip \
+    build-essential \
+    clang \
     g++ \
-    lldb \
+    gcc \
     make \
-    npm \
-    nodejs \
+    cmake \
+    lldb \
     python3 \
     python3-pip \
     python3-venv \
-    ripgrep \
-    snap \
-    snapd \
-    unzip \
-    yarn \
     zoxide \
-    && \
+    jq \
+    yarn
 
-# Install 'neovim' with 'snap'
-sudo snap install snapd && \
-sudo snap install --classic nvim && \
-sudo snap install --classic go && \
+echo "==> Install Neovim (Github Releases)"
+TMP_NVIM="$(mktemp -t nvim_XXXXXX.tar.gz)"
+NVIM_VERSION="$(
+    curl -fsSL "https://api.github.com/repos/neovim/neovim/releases/latest" \
+    | jq -r .tag_name | sed 's/v//'
+)"
+curl -fsSL -o "${TMP_NVIM}" \
+    https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-x86_64.tar.gz
+sudo rm -rf /opt/nvim
+sudo tar -C /opt -xzf "${TMP_NVIM}"
+sudo mv /opt/nvim-linux-x86_64 /opt/nvim
+sudo ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
+# rm -f /usr/local/bin/nvim
 
-# Install 'neovim' with 'Github Releases'
-# curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.gz
-# sudo rm -rf /opt/nvim
-# sudo tar -C /opt -xzf nvim-linux64.tar.gz
+# https://github.com/ayamir/nvimdots/wiki/Prerequisites
+echo "==> Install nvimdots dependencies - lazygit (Latest Release)"
+TMP_LAZYGIT="$(mktemp -t lazygit_XXXXXX.tar.gz)"
+LAZYGIT_VERSION="$(
+    curl -fsSL "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" \
+    | jq -r .tag_name | sed 's/v//'
+)"
+curl -fsSL -o "${TMP_LAZYGIT}" https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz
+tar -C /tmp -zxf "${TMP_LAZYGIT}" lazygit
+sudo install /tmp/lazygit /usr/local/bin
 
-# Install 'tree-sitter' with 'npm'
-npm install -g tree-sitter-cli && \
-
-# Install 'lazygit'
-curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" && \
-tar xf lazygit.tar.gz lazygit && \
-sudo install lazygit /usr/local/bin && \
-rm -rf lazygit lazygit.tar.gz && \
-
-# nvm
-if dpkg --get-selections | grep -q "fish[[:space:]]*install"; then
-    if fish -c "type -q 'fisher'"; then
-        fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish \
-        | source && fisher install jorgebucaran/fisher"
+echo "==> Install nvimdots dependencies - nvm"
+# shell used fish
+if dpkg -l | awk '/^ii/ && $2=="fish" {found=1} END {exit !found}';then
+    if ! fish -c "type -q fisher"; then
+        fish -c "
+        curl -fsSL \
+            https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish \
+        | source && fisher install jorgebucaran/fisher
+        "
     fi
 
     # Install 'zoxide' and 'nvm'
-    fish -c "fisher install \
-        kidonng/zoxide.fish \
-        jorgebucaran/nvm.fish && \
-    nvm install 18 && \
-    nvm use 18"
-fi
-
-if dpkg --get-selections | grep -q "bash[[:space:]]*install"; then
-    curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
-    export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    fish -c "
+        fisher install \
+            kidonng/zoxide.fish \
+            jorgebucaran/nvm.fish && \
+        nvm install 18 && nvm use 18
+    "
+else
+    curl -fsSL https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
     nvm install 18
     nvm use 18
+
+    # export NVM_DIR="$HOME/.nvm"
+    # [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    # [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 fi
 
-curl https://sh.rustup.rs -sSf | sh -s -- -y && \
+echo "==> Install nvimdots dependencies - other (Latest Release)"
+
+# Install 'tree-sitter' with 'npm'
+sudo npm install -g tree-sitter-cli
+
+curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 # rustup component add rust-analyzer
 
+echo "==> Install nvimdots (Latest Release)"
 if command -v curl >/dev/null 2>&1; then
     bash -c "$(curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)"
 else
     bash -c "$(wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)"
 fi
+USER_CONF_DIR="${USER_HOME}/.config/nvim/lua"
+TARGET_USER_DIR="${USER_CONF_DIR}/user"
 
-if [ -n "/home/${USER_NAME}/.config/nvim/lua/user" ]; then
-    rm -rf "/home/${USER_NAME}/.config/nvim/lua/user"
+mkdir -p "${USER_CONF_DIR}"
+
+if [ -e "${TARGET_USER_DIR}" ]; then
+    rm -rf "${TARGET_USER_DIR}"
 fi
-cp -r "${SCRIPT_PATH}/config" "/home/${USER_NAME}/.config/nvim/lua/user"
+cp -r "${SCRIPT_PATH}/config" "${TARGET_USER_DIR}"
 
-# print success or failure message
-# printf "\033[1;37;42mXXX install successfully.\033[0m" || \
-# printf "\033[1;37;41mxxx install failed.\033[0m"
+echo -e "\033[1;37;42mNvim and Nvimdots install finished.\033[0m"

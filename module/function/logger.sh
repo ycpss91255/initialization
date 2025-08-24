@@ -4,15 +4,19 @@ set -euo pipefail
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
-    printf "To learn how to use it, please refer to './test/test_logger.sh'\n"
+    printf "To learn how to use it, please refer to '%s'\n" "./test/test_logger.sh"
     return 0 2>/dev/null
 fi
+
 [[ -n "${TTY_COLORS_READY:-}" ]] && return 0
 
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export LOG_COLOR="${LOG_COLOR:-true}"
 
 export TTY_COLORS_READY=""
+
+#TODO: add custom output format
+#TODO: add output to file function and option
 
 # Support color output in the terminal
 #

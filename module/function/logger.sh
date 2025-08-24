@@ -100,7 +100,7 @@ function _logger_should_print() {
 #   _logger_fd_for_level <outvar> <level>
 #
 # Parameters:
-#   <outvar>: variable name to store the numeric level
+#   <outvar>: variable name to store the file descriptor
 #   <level>: log level string (e.g. "DEBUG", "INFO", etc.)
 #
 # Examples:
@@ -122,7 +122,7 @@ function _logger_fd_for_level() {
 #   _logger_header_color <outvar> <level>
 #
 # Parameters:
-#   <outvar>: variable name to store the numeric level
+#   <outvar>: variable name to store the header color
 #   <level>: log level string (e.g. "DEBUG", "INFO", etc.)
 #
 # Examples:

@@ -97,6 +97,8 @@ apt_pkg_manager --install -- "${_BASIC_PKGS[@]}"
 # shellcheck disable=SC1091
 source "${SCRIPT_PATH}/module/setup_font.sh" || fatal_pkg+=("font")
 
+# shellcheck disable=SC1091
+source "${SCRIPT_PATH}/module/setup_nvidia_driver.sh" || fatal_pkg+=("nvidia-driver")
 
 # install vscode
 # shellcheck disable=SC1091

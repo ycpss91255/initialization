@@ -1,0 +1,379 @@
+// 將按鍵繫結關係放在此檔案中以覆寫預設auto[]
+[
+    {
+        "key": "ctrl+shift+t",
+        "command": "-commentTranslate.replaceSelections"
+    },
+    {
+        "key": "alt+k",
+        "command": "workbench.action.toggleMaximizedPanel",
+        "when": "terminalFocus && terminalHasBeenCreated && !terminalEditorFocus || terminalFocus && terminalProcessSupported && !terminalEditorFocus"
+    },
+    {
+        "key": "ctrl+b",
+        "command": "-workbench.action.toggleSidebarVisibility"
+    },
+    {
+        "key": "ctrl+shift+c",
+        "command": "-workbench.action.terminal.openNativeConsole",
+        "when": "!terminalFocus"
+    },
+    {
+        "key": "f3",
+        "command": "-workbench.action.terminal.findNext",
+        "when": "terminalFindFocused && terminalHasBeenCreated || terminalFindFocused && terminalProcessSupported || terminalFocus && terminalHasBeenCreated || terminalFocus && terminalProcessSupported"
+    },
+    {
+        "key": "f3",
+        "command": "-editor.action.nextMatchFindAction",
+        "when": "editorFocus"
+    },
+    {
+        "key": "f3",
+        "command": "-list.find",
+        "when": "listFocus && listSupportsFind"
+    },
+    {
+        "key": "ctrl+alt+left",
+        "command": "-workbench.action.moveEditorToPreviousGroup"
+    },
+    {
+        "key": "ctrl+alt+right",
+        "command": "-workbench.action.moveEditorToNextGroup"
+    },
+    {
+        "key": "shift+alt+9",
+        "command": "-workbench.action.moveEditorToLastGroup"
+    },
+    {
+        "key": "shift+alt+1",
+        "command": "-workbench.action.moveEditorToFirstGroup"
+    },
+    {
+        "key": "ctrl+k ctrl+right",
+        "command": "-workbench.action.focusRightGroup"
+    },
+    {
+        "key": "ctrl+k ctrl+left",
+        "command": "-workbench.action.focusLeftGroup"
+    },
+    {
+        "key": "ctrl+k ctrl+oem_5",
+        "command": "-workbench.action.splitEditorDown"
+    },
+    {
+        "key": "ctrl+k ctrl+\\",
+        "command": "-workbench.action.splitEditorOrthogonal"
+    },
+    {
+        "key": "ctrl+k ctrl+\\",
+        "command": "-workbench.action.splitEditorUp"
+    },
+    {
+        "key": "ctrl+w s",
+        "command": "workbench.action.splitEditorDown",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "ctrl+k ctrl+\\",
+        "command": "-workbench.action.splitEditorLeft"
+    },
+    {
+        "key": "ctrl+w v",
+        "command": "workbench.action.splitEditorRight",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "ctrl+k ctrl+\\",
+        "command": "-workbench.action.splitEditorRight"
+    },
+    {
+        "key": "ctrl+pageup",
+        "command": "-workbench.action.terminal.focusPrevious",
+        "when": "terminalFocus && terminalHasBeenCreated && !terminalEditorFocus || terminalFocus && terminalProcessSupported && !terminalEditorFocus"
+    },
+    {
+        "key": "ctrl+f",
+        "command": "-workbench.action.terminal.focusFind",
+        "when": "terminalFindFocused && terminalHasBeenCreated || terminalFindFocused && terminalProcessSupported || terminalFocus && terminalHasBeenCreated || terminalFocus && terminalProcessSupported"
+    },
+    {
+        "key": "ctrl+oem_5",
+        "command": "-workbench.action.splitEditor"
+    },
+    {
+        "key": "ctrl+k ctrl+shift+oem_5",
+        "command": "-workbench.action.splitEditorInGroup",
+        "when": "activeEditorCanSplitInGroup"
+    },
+    {
+        "key": "ctrl+shift+5",
+        "command": "-workbench.action.terminal.split",
+        "when": "terminalFocus && terminalProcessSupported || terminalFocus && terminalWebExtensionContributedProfile"
+    },
+    {
+        "key": "ctrl+shift+oem_4",
+        "command": "-editor.fold",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+oem_2",
+        "command": "-editor.foldAllBlockComments",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+8",
+        "command": "-editor.foldAllMarkerRegions",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+1",
+        "command": "-editor.foldLevel1",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+2",
+        "command": "-editor.foldLevel2",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+3",
+        "command": "-editor.foldLevel3",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+4",
+        "command": "-editor.foldLevel4",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+5",
+        "command": "-editor.foldLevel5",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+6",
+        "command": "-editor.foldLevel6",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+7",
+        "command": "-editor.foldLevel7",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+r",
+        "command": "-workbench.action.terminal.runRecentCommand",
+        "when": "accessibilityModeEnabled && terminalFocus && terminalHasBeenCreated || accessibilityModeEnabled && terminalFocus && terminalProcessSupported"
+    },
+    {
+        "key": "ctrl+l c",
+        "command": "-extension.copyGitHubLinkToClipboard"
+    },
+    {
+        "key": "ctrl+l g",
+        "command": "-extension.openInGitHub"
+    },
+    {
+        "key": "ctrl+l p",
+        "command": "-extension.openPrGitProvider"
+    },
+    {
+        "key": "ctrl+k ctrl+oem_4",
+        "command": "-editor.foldRecursively",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+0",
+        "command": "-editor.foldAll",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+k ctrl+oem_comma",
+        "command": "-editor.createFoldingRangeFromSelection",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "alt+c",
+        "command": "-workbench.action.terminal.toggleFindCaseSensitive",
+        "when": "terminalFindFocused && terminalHasBeenCreated || terminalFindFocused && terminalProcessSupported || terminalFocus && terminalHasBeenCreated || terminalFocus && terminalProcessSupported"
+    },
+    {
+        "key": "ctrl+n",
+        "command": "-workbench.action.files.newUntitledFile",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "ctrl+j",
+        "command": "-workbench.action.togglePanel"
+    },
+    {
+        "key": "ctrl+k ctrl+w",
+        "command": "-workbench.action.closeAllEditors"
+    },
+    {
+        "key": "ctrl+k ctrl+l",
+        "command": "-editor.toggleFold",
+        "when": "editorTextFocus && foldingEnabled"
+    },
+    {
+        "key": "ctrl+q",
+        "command": "-workbench.action.quickOpenView"
+    },
+    {
+        "key": "ctrl+q",
+        "command": "-workbench.action.quickOpenNavigateNextInViewPicker",
+        "when": "inQuickOpen && inViewsPicker"
+    },
+    {
+        "key": "ctrl+n",
+        // "command": "workbench.action.toggleSidebarVisibility",
+        "command": "workbench.view.explorer",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal' && !sideBarVisible"
+    },
+    {
+        "key": "ctrl+n",
+        "command": "workbench.action.toggleSidebarVisibility",
+        // "command": "workbench.view.explorer",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal' && sideBarVisible || sideBarFocus"
+    },
+    {
+        "key": "ctrl+w h",
+        "command": "workbench.action.previousEditorInGroup",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "ctrl+h",
+        "command": "workbench.action.previousEditorInGroup",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "ctrl+w j",
+        "command": "workbench.action.focusNextGroup",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "ctrl+j",
+        "command": "workbench.action.focusNextGroup",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "ctrl+k",
+        "command": "workbench.action.focusPreviousGroup",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "ctrl+w k",
+        "command": "workbench.action.focusPreviousGroup",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "ctrl+w l",
+        "command": "workbench.action.nextEditorInGroup",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "ctrl+l",
+        "command": "workbench.action.nextEditorInGroup",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "shift+alt+q",
+        "command": "workbench.action.closeActiveEditor"
+    },
+    {
+        "key": "alt+h",
+        "command": "workbench.action.decreaseViewSize",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "alt+j",
+        "command": "workbench.action.evenEditorWidths",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+        // "when": "!sideBarFocus && !panelFocus && !inQuickOpen"
+    },
+    {
+        "key": "alt+k",
+        "command": "workbench.action.minimizeOtherEditors",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+        // "when": "(!sideBarFocus && !panelFocus && !inQuickOpen)"
+    },
+    {
+        "key": "alt+l",
+        "command": "workbench.action.increaseViewSize",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "shift+k",
+        "command": "editor.action.moveLinesUpAction",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && (vim.mode == 'VisualLine' || vim.mode == 'Visual' || vim.mode == 'VisualBlock')"
+    },
+    {
+        "key": "alt+up",
+        "command": "-editor.action.moveLinesUpAction",
+        "when": "editorTextFocus && !editorReadonly"
+    },
+    {
+        "key": "shift+j",
+        "command": "editor.action.moveLinesDownAction",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && (vim.mode == 'VisualLine' || vim.mode == 'Visual' || vim.mode == 'VisualBlock')"
+    },
+    {
+        "key": "alt+down",
+        "command": "-editor.action.moveLinesDownAction",
+        "when": "editorTextFocus && !editorReadonly"
+    },
+    {
+        "key": "ctrl+n",
+        "command": "-workbench.action.files.newUntitledFile"
+    },
+    {
+        "key": "ctrl+oem_5",
+        "command": "workbench.action.terminal.toggleTerminal",
+        "when": "terminal.active"
+    },
+    {
+        "key": "ctrl+oem_3",
+        "command": "-workbench.action.terminal.toggleTerminal",
+        "when": "terminal.active"
+    },
+    {
+        "key": "alt+d",
+        "command": "workbench.action.terminal.toggleTerminal",
+        "when": "terminal.active"
+    },
+    {
+        "key": "alt+p",
+        "command": "editor.action.clipboardPasteAction",
+        "when": "editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Insert'"
+    },
+    {
+        "key": "f12",
+        "command": "-editor.action.revealDefinition",
+        "when": "editorHasDefinitionProvider && editorTextFocus && !isInEmbeddedEditor"
+    },
+    {
+        "key": "f12",
+        "command": "asciidoc.showPreviewToSide",
+        "when": "editorLangId == 'asciidoc'&& editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "f12",
+        "command": "markdown.showPreviewToSide",
+        "when": "!notebookEditorFocused && editorLangId == 'markdown' && editorTextFocus && vim.active && !inDebugRepl && vim.mode == 'Normal'"
+    },
+    {
+        "key": "alt+r",
+        "command": "-workbench.action.terminal.toggleFindRegex",
+        "when": "terminalFindFocused && terminalHasBeenCreated || terminalFindFocused && terminalProcessSupported || terminalFocusInAny && terminalHasBeenCreated || terminalFocusInAny && terminalProcessSupported"
+    },
+    {
+        "key": "ctrl+e",
+        "command": "workbench.action.quickOpen",
+        "when": "!terminalFocus"
+    },
+    {
+        "key": "ctrl+e",
+        "command": "-workbench.action.quickOpen"
+    }
+]

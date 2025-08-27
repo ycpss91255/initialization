@@ -13,41 +13,33 @@ if [[ "${MAIN_FILE}" == "true" ]]; then
     export LANGUAGE="C:en"
 
     # logger.sh variables
-    export LOG_LEVEL="DEBUG"
+    export LOG_LEVEL="INFO"
+    export LOG_COLOR="true"
 
     # sub_func.sh variables
-    export LOG_NO_COLOR="false"
-
     unset HAVE_SUDO_ACCESS
-
-    # main.sh variables
-    # export SET_MIRRORS="false"
 
     # shellcheck disable=SC2155
     # export DATETIME="$(date +"%Y-%m-%d-%T")"
     # export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
     :
-else
-    # include module
-    :
 fi
 
+# include sub script
 # shellcheck disable=SC1091
 source "${SCRIPT_PATH}/function/logger.sh"
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/function/sub_func.sh"
+source "${SCRIPT_PATH}/function/general.sh"
 
 # the file used variables
-_script_path="${SCRIPT_PATH}"
-
-# include sub script
+if [[ "${MAIN_FILE}" == "true" ]]; then
+    _script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+else
+    _script_path="${SCRIPT_PATH}"
+fi
 
 # main script
 log_info "Start setup process..."
-
-unset HAVE_SUDO_ACCESS
-
-
 
 if ! have_sudo_access; then
     if [[ "${MAIN_FILE}" == "true" ]]; then
@@ -102,6 +94,7 @@ exec_cmd "sudo install -D -o root -g root -m 644 \"${_script_path}/config/vscode
 
 log_info "Install 'VSCode'"
 apt_pkg_manager --install -- "code"
+log_info "Install 'VSCode' done."
 
 # TODO: add vscode to desktop and favorite
 # TODO: check vscode keyboardbinding

@@ -652,7 +652,7 @@ function get_github_pkg_latest_version() {
     fi
 
     local _curl_jq_mode="true"
-    local _cmd=""
+    local -a _cmd=()
 
     log_debug "Try installing 'curl' and 'jq'..."
     for _cmd in "curl" "jq"; do

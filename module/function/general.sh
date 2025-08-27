@@ -36,7 +36,7 @@ function check_in_mac() {
 # NOTE: not use
 # Get system parameters.
 function get_system_param() {
-    local _system_id _system_codename _system_release
+    local _system_id="" _system_codename="" _system_release=""
 
     if [[ -f /etc/os-release ]]; then
         # shellcheck disable=SC1091
@@ -57,8 +57,10 @@ function get_system_param() {
 # From https://github.com/XuehaiPan/Dev-Setup.git
 function exec_cmd() {
     local -a _cmd=("$@")
+
     if [[ "${EXEC_CMD_NO_PRINT-}" != "true" ]]; then
         local _color="false"; [[ -t 2 ]] && _color="true"
+
         printf "%s" "${_cmd[@]}" | awk -v _color="$_color"\
             'BEGIN {
                 if (_color == "true") {
@@ -167,11 +169,9 @@ function have_sudo_access() {
 
     if [[ "${EUID:-"${UID}"}" -eq "0" ]]; then
         log_debug "User has sudo access."
-
         if [[ ! -x "${_SUDO[0]}" ]]; then
             exec_cmd "apt-get update && apt-get install -y -- sudo"
         fi
-
         return 0
     fi
 
@@ -188,7 +188,6 @@ function have_sudo_access() {
         exec_cmd "${_SUDO[*]} -v &>/dev/null"
         export HAVE_SUDO_ACCESS="$?"
     fi
-
     return "$HAVE_SUDO_ACCESS"
 }
 
@@ -208,7 +207,7 @@ function backup_files() {
         log_fatal "BACKUP_DIR is not set."
     fi
 
-    echo "Backup files to ${BACKUP_DIR}"
+    log_debug "Backup directory: ${BACKUP_DIR}"
     mkdir -p -- "${BACKUP_DIR}"
 
     local _file="" _original_file=""
@@ -241,10 +240,10 @@ function backup_files() {
 #   create_temp_file -d -- var "prefix" "suffix"
 #   create_temp_file -d -- var "prefix"
 function create_temp_file() {
+    local _parsed=""
     local _short_opts="d"
     local _long_opts=""
 
-    local _parsed=""
     if ! _parsed=$(getopt -o "${_short_opts}" --long "${_long_opts}" -n "${FUNCNAME[0]}" -- "$@"); then
         log_fatal "Usage: ${FUNCNAME[0]} [options] [--] <outver> <prefix> [ext]"
     fi
@@ -289,7 +288,7 @@ function create_temp_file() {
 # Check package status.
 #
 # Usage:
-#   check_pkg_status <option> [--] <name> <version>
+#   check_pkg_status <option> [--] <name>
 #
 # Options:
 #   --install | -i  check package installation status
@@ -306,13 +305,12 @@ function create_temp_file() {
 #   if check_pkg_status --install "curl"; then
 #   if check_pkg_status --exec "ls"; then
 function check_pkg_status() {
-    local _short_opts="iev"
-    local _long_opts="install,exec,version"
-
     local _parsed=""
+    local _short_opts="ie"
+    local _long_opts="install,exec"
 
     if ! _parsed=$(getopt -o "${_short_opts}" --long "${_long_opts}" -n "${FUNCNAME[0]}" -- "$@"); then
-        log_fatal "Usage: ${FUNCNAME[0]} <option> [--] <name> <version>"
+        log_fatal "Usage: ${FUNCNAME[0]} <option> [--] <name>"
     fi
 
     eval set -- "${_parsed}"
@@ -333,7 +331,6 @@ function check_pkg_status() {
     case "${_mode}" in
         install)
             log_debug "Checking installation status of package: ${_pkg}"
-
             if dpkg-query -W -f='${db:Status-Abbrev}\n' -- "${_pkg}" 2>/dev/null \
                 | grep -q "^ii" ; then
                 return 0
@@ -343,7 +340,6 @@ function check_pkg_status() {
             ;;
         exec)
             log_debug "Checking executable status of command: ${_pkg}"
-
             if command -v -- "${_pkg}" &>/dev/null; then
                 return 0
             else
@@ -375,10 +371,9 @@ function check_pkg_status() {
 # default path is /etc/apt/sources.list.d
 # setup_apt_mirror -- "tw.packages.microsoft.com" "packages.microsoft.com"
 function setup_apt_mirror() {
+    local _parsed=""
     local _short_opts="p:"
     local _long_opts="path:,dry-run"
-
-    local _parsed=""
 
     if ! _parsed=$(getopt -o "${_short_opts}" --long "${_long_opts}" -n "${FUNCNAME[0]}" -- "$@"); then
         log_fatal "Usage: ${FUNCNAME[0]} [options] [--] <mirror_url> <origin_url>"
@@ -406,7 +401,6 @@ function setup_apt_mirror() {
 
     local _mirror_url="${1:?"${FUNCNAME[0]} need mirror url"}"; shift
     local _origin_url="${1:?"${FUNCNAME[0]} need origin url"}"
-    echo "mirror: ${_mirror_url}, origin: ${_origin_url}"
     # mirror cmd
     local _mirror_cmd="s|${_origin_url}|${_mirror_url}|g"
 
@@ -484,10 +478,9 @@ function setup_apt_mirror() {
 #   apt_pkg_manager --remove "cowsay"
 #   apt_pkg_manager --remove --purge "cowsay"
 function apt_pkg_manager() {
+    local _parsed=""
     local _short_opts=""
     local _long_opts="install,remove,purge,no-update,only-upgrade"
-
-    local _parsed=""
 
     if ! _parsed=$(getopt -o "${_short_opts}" --long "${_long_opts}" -n "${FUNCNAME[0]}" -- "$@"); then
         log_fatal "Usage: ${FUNCNAME[0]} <action> [option] [--] <package1> [<package2> ...]"

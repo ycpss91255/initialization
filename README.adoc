@@ -1,13 +1,5 @@
 = README
 This repository is a tool I use in Ubuntu, It uses a script to complete the initialization action.
 
-== TODO List
 
-* [ ] fish
-* [ ] fonts
-* [ ] nvidia_driver
-* [ ] small-tools
-* [ ] ssh
-* [ ] tmux
-* [ ] vim
-* [ ] vscode
+// TODO: maybe delete some "font" files

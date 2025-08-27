@@ -12,25 +12,46 @@ _script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck disable=SC1091
 source "${_script_path}/logger.sh"
 
-# TODO: not use
+# NOTE: not use
 function check_in_WSL() {
     if [[ -n "${WSL_DISTRO_NAME}" ]] || (uname -r | grep -qiF 'microsoft'); then
         export IN_WSL=true
     fi
 }
 
+# NOTE: not use
 function check_in_docker() {
     if [[ -f "/.dockerenv" ]] || grep -qE '/docker|/lxc/' /proc/1/cgroup 2>/dev/null; then
         export IN_DOCKER=true
     fi
 }
 
+# NOTE: not use
 function check_in_mac() {
     if [[ "$(uname -s)" == "Darwin" ]]; then
         export IN_MAC=true
     fi
 }
 
+# NOTE: not use
+# Get system parameters.
+function get_system_param() {
+    local _system_id _system_codename _system_release
+
+    if [[ -f /etc/os-release ]]; then
+        # shellcheck disable=SC1091
+        source /etc/os-release
+
+        _system_id="${ID:-""}"
+        _system_release="${VERSION_ID:-""}"
+        _system_codename="${VERSION_CODENAME:-""}"
+    fi
+
+    export SYSTEM_ID="${_system_id}"
+    export SYSTEM_RELEASE="${_system_release}"
+    export SYSTEM_CODENAME="${_system_codename}"
+
+}
 
 # export EXEC_CMD_NO_PRINT="true"
 # From https://github.com/XuehaiPan/Dev-Setup.git
@@ -187,13 +208,17 @@ function backup_files() {
         log_fatal "BACKUP_DIR is not set."
     fi
 
+    echo "Backup files to ${BACKUP_DIR}"
     mkdir -p -- "${BACKUP_DIR}"
 
     local _file="" _original_file=""
     for _file in "${@:?"${FUNCNAME[0] need files to backup.}"}"; do
         if [[ -e "${_file}" ]]; then
-            cp -aL --parents -- "${_file}" "${BACKUP_DIR}"
+            log_debug "Backup file: ${_file}"
+            cp -aL -- "${_file}" "${BACKUP_DIR}"
+            continue
         fi
+        log_warn "File not found, skip: ${_file}"
     done
 }
 
@@ -358,6 +383,7 @@ function check_pkg_status() {
 #
 # Options:
 #   [--path <path>]: the path to the file or directory to be mirrored
+#   [--dry-run]: do not modify any files, just print the changes that would be made
 #
 # Parameters:
 #   <mirror_url>: the URL of the mirror
@@ -369,8 +395,8 @@ function check_pkg_status() {
 # default path is /etc/apt/sources.list.d
 # setup_apt_mirror -- "tw.packages.microsoft.com" "packages.microsoft.com"
 function setup_apt_mirror() {
-    local _short_opts="p:f:"
-    local _long_opts="path:,format:"
+    local _short_opts="p:"
+    local _long_opts="path:,dry-run"
 
     local _parsed=""
 
@@ -380,14 +406,15 @@ function setup_apt_mirror() {
 
     eval set -- "${_parsed}"
 
-    local _path=""
-    # local _path="/etc/apt/sources.list.d"
+    local _path="/etc/apt/sources.list.d"
+    local _dry_run="false"
 
     while true; do
         case "$1" in
             --path|-p)
-                _path="$2"; shift 2
-                ;;
+                _path="$2"; shift 2;;
+            --dry-run)
+                log_warn "Dry run mode, no files will be modified."; _dry_run="true"; shift ;;
             --) shift; break ;;
             *) break ;;
         esac
@@ -412,6 +439,11 @@ function setup_apt_mirror() {
                 log_debug "Processing file: ${_file}"
                 if [[ "${_file}" == *.sources || "${_file}" == *.list ]]; then
                     log_debug "Setup APT source mirror in file: ${_file}"
+                    if [[ "${_dry_run}" == "true" ]]; then
+                        log_info "Dry run: sed -E -i.bak 's|${_origin_url}|${_mirror_url}|g' ${_file}"
+                        continue
+                    fi
+
                     exec_cmd "sed -E -i.bak 's|${_origin_url}|${_mirror_url}|g' ${_file}"
                     if cmp -s "{$_file}" "${_file}.bak"; then
                         log_warn "Failed to setup APT source mirror in file: ${_file}, ${_origin_url} -> ${_mirror_url}"
@@ -427,6 +459,11 @@ function setup_apt_mirror() {
         _file="${_path}"
         if [[ "${_file}" == *.sources || "${_file}" == *.list ]]; then
             log_debug "Setup APT source mirror in file: ${_file}"
+            if [[ "${_dry_run}" == "true" ]]; then
+                log_info "Dry run: sed -E -i.bak 's|${_origin_url}|${_mirror_url}|g' ${_file}"
+                return 0
+            fi
+
             exec_cmd "sed -E -i.bak 's|${_origin_url}|${_mirror_url}|g' ${_file}"
             if cmp -s "{$_file}" "${_file}.bak"; then
                 log_error "Failed to setup APT source mirror in file: ${_file}, ${_origin_url} -> ${_mirror_url}"
@@ -548,7 +585,6 @@ function apt_pkg_manager() {
                 log_debug "Installing package: ${_pkg}"
 
                 if sudo apt-cache show "${_pkg}" &>/dev/null; then
-                    log_debug "Package found: ${_pkg}"
                     exec_cmd "${_apt_cmd[*]} ${_pkg}" || _failed_pkgs+=("${_pkg}")
                 else
                     log_debug "Package not found: ${_pkg}"
@@ -669,24 +705,4 @@ function get_github_pkg_latest_version() {
     if [[ -z "${_outvar}" ]]; then
         log_fatal "No valid release version found in url: ${_url}"
     fi
-}
-
-# Get system parameters.
-function get_system_param() {
-    local _system_id _system_codename _system_release
-
-
-    if [[ -f /etc/os-release ]]; then
-        # shellcheck disable=SC1091
-        source /etc/os-release
-
-        _system_id="${ID:-""}"
-        _system_release="${VERSION_ID:-""}"
-        _system_codename="${VERSION_CODENAME:-""}"
-    fi
-
-    export SYSTEM_ID="${_system_id}"
-    export SYSTEM_RELEASE="${_system_release}"
-    export SYSTEM_CODENAME="${_system_codename}"
-
 }

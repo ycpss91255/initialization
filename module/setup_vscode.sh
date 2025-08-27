@@ -94,7 +94,7 @@ exec_cmd "sudo install -D -o root -g root -m 644 \"${_script_path}/config/vscode
 
 log_info "Install 'VSCode'"
 apt_pkg_manager --install -- "code"
-log_info "Install 'VSCode' done."
+log_info "'VSCode' installation finished. version: $(code --version | head -n1)"
 
 # TODO: add vscode to desktop and favorite
 # TODO: check vscode keyboardbinding

@@ -294,11 +294,9 @@ function create_temp_file() {
 # Options:
 #   --install | -i  check package installation status
 #   --exec    | -e  check package executable status
-#   --version | -v  check package version
 #
 # Parameters:
 #   <name>: package name
-#   <version>: package version (option is <version>)
 #
 # Returns:
 #   0 if <name> is installed or executable
@@ -307,7 +305,6 @@ function create_temp_file() {
 # Examples:
 #   if check_pkg_status --install "curl"; then
 #   if check_pkg_status --exec "ls"; then
-#   if check_pkg_status --version "bash" "0.0.1"; then
 function check_pkg_status() {
     local _short_opts="iev"
     local _long_opts="install,exec,version"
@@ -326,7 +323,6 @@ function check_pkg_status() {
         case "$1" in
             --install|-i) _mode="install"; shift ;;
             --exec|-e)    _mode="exec";    shift ;;
-            --version|-v) _mode="version"; shift ;;
             --) shift; break ;;
             *) break ;;
         esac
@@ -353,22 +349,6 @@ function check_pkg_status() {
             else
                 return 1
             fi
-            ;;
-        version)
-            local _version=${2:?"${FUNCNAME[0]} need version."}
-            _version="${_version#v}"
-            log_debug "Checking version of package: ${_pkg}"
-            local _opt=""
-            for _opt in "--version" "-v" "-V"; do
-                local _cmd_version=""
-                if _cmd_version=$("${_pkg}" "${_opt}" 2>&1) && \
-                [[ "${_cmd_version}" == *"${_version}"* ]]; then
-                    log_debug "Found version '${_version}' in '${_cmd_version}'"
-                    return 0
-                fi
-            done
-            log_debug "Version '${_version}' not found for package: ${_pkg}"
-            return 1
             ;;
         *)
             log_fatal "Unknown mode: ${_mode}"

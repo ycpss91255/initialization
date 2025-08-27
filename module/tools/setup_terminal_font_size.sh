@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 read -r -p "font zise? (8x16, 16x32 ...) " FONTSIZE
 
 FONTFACE="Fixed"

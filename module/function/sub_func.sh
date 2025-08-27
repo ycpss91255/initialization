@@ -8,9 +8,9 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     return 0 2>/dev/null
 fi
 
-SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+_script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/logger.sh"
+source "${_script_path}/logger.sh"
 
 # TODO: not use
 function check_in_WSL() {
@@ -155,7 +155,7 @@ function have_sudo_access() {
     fi
 
     if [[ ! -x "${_SUDO[0]}" ]]; then
-        lof_fatal "User is normal user and 'sudo' command not found."
+        log_fatal "User is normal user and 'sudo' command not found."
     fi
 
     if [[ -n "${SUDO_ASKPASS-}" ]]; then
@@ -547,7 +547,8 @@ function apt_pkg_manager() {
             for _pkg in "${_pkgs[@]}"; do
                 log_debug "Installing package: ${_pkg}"
 
-                if sudo apt-cache search "${_pkg}" | grep -q "^${_pkg}" &>/dev/null; then
+                if sudo apt-cache show "${_pkg}" &>/dev/null; then
+                    log_debug "Package found: ${_pkg}"
                     exec_cmd "${_apt_cmd[*]} ${_pkg}" || _failed_pkgs+=("${_pkg}")
                 else
                     log_debug "Package not found: ${_pkg}"

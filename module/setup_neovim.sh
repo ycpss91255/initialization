@@ -164,11 +164,17 @@ exec_cmd "source \"${_source_file}\" && \
 
 log_info "Install nvimdots (Latest Release)"
 
+# go.nvim error
 if command -v curl >/dev/null 2>&1; then
     bash -c "$(curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)" || true
 else
     bash -c "$(wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)" || true
 fi
+
+# find ~/.local ~/.config/ -type f -path "*/lsp_signature*/doc/tags" -exec rm -f {} \;
+# rm ${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/doc/tags
+log_info "Remove lsp_signature.nvim doc tags to avoid error"
+exec_cmd "rm -f \"${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/doc/tags\" || true"
 
 log_info "Copy nvimdots configuration files"
 _nvimdots_sur_dir="${_script_path}/config/neovim/nvimdots_config"

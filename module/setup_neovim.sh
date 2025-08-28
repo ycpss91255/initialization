@@ -142,8 +142,10 @@ if [[ -f "${HOME}/.bashrc" ]]; then
         exec_cmd "cat \"${_source_file}\" >> \"${HOME}/.bashrc\""
     fi
 fi
+
+_source_file="${_script_path}/config/neovim/fnm_shell_config/config.bash"
 _fnm_version="22"
-exec_cmd "source \"${_source_file}\"&& \
+exec_cmd "source \"${_source_file}\" && \
     fnm install ${_fnm_version} && \
     fnm use ${_fnm_version} && \
     fnm alias default ${_fnm_version}"
@@ -151,7 +153,8 @@ exec_cmd "source \"${_source_file}\"&& \
 log_info "node.js version: $(node -v), npm version: $(npm -v)"
 
 log_info "Install 'tree-sitter' with 'npm'"
-sudo npm install -g tree-sitter-cli
+exec_cmd "source \"${_source_file}\" && \
+    npm install -g -- \"tree-sitter-cli\""
 
 
 # log_info "Install nvimdots dependencies - other (Latest Release)"
@@ -162,13 +165,14 @@ sudo npm install -g tree-sitter-cli
 log_info "Install nvimdots (Latest Release)"
 
 if command -v curl >/dev/null 2>&1; then
-    bash -c "$(curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)"
+    bash -c "$(curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)" || true
 else
-    bash -c "$(wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)"
+    bash -c "$(wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)" || true
 fi
 
+log_info "Copy nvimdots configuration files"
 _nvimdots_sur_dir="${_script_path}/config/neovim/nvimdots_config"
-_nvimdots_conf_dir="${USER_HOME}/.config/nvim/lua/user"
+_nvimdots_conf_dir="${HOME}/.config/nvim/lua/user"
 mkdir -p "${_nvimdots_conf_dir}"
 
 if [ -d "${_nvimdots_conf_dir}" ]; then

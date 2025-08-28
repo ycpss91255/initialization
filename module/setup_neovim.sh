@@ -127,6 +127,13 @@ exec_cmd "curl -fsSL --retry 3 \
     \"https://fnm.vercel.app/install\" | bash -s -- --skip-shell"
 
 log_info "Configure shell to use 'fnm'"
+# fish
+if [[ ! -f "${HOME}/.config/fish/conf.d/fnm.fish" ]]; then
+    mkdir -p "${HOME}/.config/fish/conf.d"
+    _source_file="${_script_path}/config/neovim/fnm_shell_config/fnm.fish"
+    log_info "Add fnm configuration to ${HOME}/.config/fish/conf.d/fnm.fish from ${_source_file}"
+    exec_cmd "cp \"${_source_file}\" \"${HOME}/.config/fish/conf.d/fnm.fish\""
+fi
 # bash
 if [[ -f "${HOME}/.bashrc" ]]; then
     if ! grep -q 'fnm env' "${HOME}/.bashrc"; then
@@ -135,16 +142,9 @@ if [[ -f "${HOME}/.bashrc" ]]; then
         exec_cmd "cat \"${_source_file}\" >> \"${HOME}/.bashrc\""
     fi
 fi
-# fish
-if [[ ! -f "${HOME}/.config/fish/conf.d/fnm.fish" ]]; then
-    mkdir -p "${HOME}/.config/fish/conf.d"
-    _source_file="${_script_path}/config/neovim/fnm_shell_config/fnm.fish"
-    log_info "Add fnm configuration to ${HOME}/.config/fish/conf.d/fnm.fish from ${_source_file}"
-    exec_cmd "cp \"${_source_file}\" \"${HOME}/.config/fish/conf.d/fnm.fish\""
-fi
-
 _fnm_version="22"
-exec_cmd "fnm install ${_fnm_version} && \
+exec_cmd "source \"${_source_file}\"&& \
+    fnm install ${_fnm_version} && \
     fnm use ${_fnm_version} && \
     fnm alias default ${_fnm_version}"
 

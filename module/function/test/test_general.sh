@@ -35,8 +35,8 @@ else
     log_info "No sudo access"
 fi
 
-log_info "TEST: backup_files"
-backup_files "${_script_path}/test_general.sh" "${_script_path}/not_found_file.txt"
+log_info "TEST: backup_file"
+backup_file "${_script_path}/test_general.sh" "${_script_path}/not_found_file.txt"
 exec_cmd "ls -l ${BACKUP_DIR}"
 
 log_info "TEST: create_temp_file"

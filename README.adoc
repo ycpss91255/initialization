@@ -3,3 +3,7 @@ This repository is a tool I use in Ubuntu, It uses a script to complete the init
 
 
 // TODO: maybe delete some "font" files
+
+== Neovim
+When you first enter nvim, you need to wait for it to finish. If there is an error, you can try Update or reinstall the plugin. After the entire script is completed, enter nvim again and run lazygit to update the plugin better.
+

@@ -528,7 +528,7 @@ function apt_pkg_manager() {
     local _pkg=""
 
     for _pkg in "$@"; do
-        _pkg="${_pkg//[^a-zA-Z0-9_.-]/}"
+        _pkg="${_pkg//[^a-zA-Z0-9_.:+~= -]/}"
 
         if [[ -n "${_pkg}" ]]; then
             _pkgs+=("${_pkg}")

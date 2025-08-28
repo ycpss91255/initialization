@@ -194,15 +194,15 @@ function have_sudo_access() {
 # Backup files
 #
 # Usage:
-#   backup_files <file1> [<file2> ...]
+#   backup_file <file1> [<file2> ...]
 #
 # Parameters:
 #   <file1>: files to backup
 #   [<file2> ...]: additional files to backup
 #
 # Examples:
-#   backup_files folder folder/file.txt
-function backup_files() {
+#   backup_file folder folder/file.txt
+function backup_file() {
     if [[ -z "${BACKUP_DIR:-}" ]]; then
         log_fatal "BACKUP_DIR is not set."
     fi

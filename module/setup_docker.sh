@@ -151,8 +151,14 @@ if [[ ! -d "$_docker_conf_file" ]]; then
     log_info "Create Docker config folder: ${_docker_conf_file}"
     mkdir -p -- "${_docker_conf_file}"
 fi
+
+
 exec_cmd "sudo chown -R \"${USER}:${USER}\" \"${_docker_conf_file}\" && \
     sudo chmod -R g+rwx \"${_docker_conf_file}\""
+
+# permission denied '/var/run/docker.sock'
+exec_cmd "sudo chown root:docker \"/var/run/docker.sock\" && \
+    sudo chmod 660 \"/var/run/docker.sock\""
 
 log_info "Enable and restart Docker and containerd services"
 exec_cmd "sudo systemctl enable --now docker.service containerd.service"

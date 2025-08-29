@@ -153,15 +153,13 @@ exec_cmd "source \"${_source_file}\" && \
 log_info "node.js version: $(node -v), npm version: $(npm -v)"
 
 log_info "Install packages with 'npm'"
-# TODO: del test
-# _npm_pkgs=(
-#     "tree-sitter-cli"
-#     "prettier"
-# )
-# for _pkg in "${_npm_pkgs[@]}"; do
-#     exec_cmd "source \"${_source_file}\" && \
-#         npm install -g -- \"${_pkg}\""
-# done
+_npm_pkgs=(
+    "tree-sitter-cli"
+)
+for _pkg in "${_npm_pkgs[@]}"; do
+    exec_cmd "source \"${_source_file}\" && \
+        npm install -g -- \"${_pkg}\""
+done
 
 
 # log_info "Install nvimdots dependencies - other (Latest Release)"
@@ -188,8 +186,6 @@ fi
 
 # NOTE: ERROR List
 # go.nvim error
-# mason-null-ls.nvim
-#  `npm install -g -- "prettier"`
 
 # find ~/.local ~/.config/ -type f -path "*/lsp_signature*/doc/tags" -exec rm -f {} \;
 # rm ${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/doc/tags

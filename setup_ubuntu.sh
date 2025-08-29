@@ -97,10 +97,18 @@ apt_pkg_manager --install -- "${_BASIC_PKGS[@]}"
 # shellcheck disable=SC1091
 source "${SCRIPT_PATH}/module/setup_font.sh" || fatal_pkg+=("font")
 
+# shellcheck disable=SC1091
+source "${SCRIPT_PATH}/module/setup_docker.sh" || fatal_pkg+=("docker")
 
-# install vscode
 # shellcheck disable=SC1091
 source "${SCRIPT_PATH}/module/setup_vscode.sh" || fatal_pkg+=("vscode")
+
+# shellcheck disable=SC1091
+source "${SCRIPT_PATH}/module/setup_neovim.sh" || fatal_pkg+=("neovim")
+
+if [ "${#fatal_pkg[@]}" -ne 0 ]; then
+    log_error "Some packages failed to install: ${fatal_pkg[*]}"
+fi
 
 log_info "Done yayayaya"
 

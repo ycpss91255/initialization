@@ -174,12 +174,16 @@ log_info "Install nvimdots (Latest Release)"
 # NOTE: enter is use default option
 if command -v curl >/dev/null 2>&1; then
     # shellcheck disable=SC1090
-    source "${_source_file}" && \
-    bash -c "$(curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)" || true
+    bash -c "$(
+        source "${_source_file}" && \
+        curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh
+    )" || true
 else
     # shellcheck disable=SC1090
-    source "${_source_file}" && \
-    bash -c "$(wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)" || true
+    bash -c "$(
+        source "${_source_file}" && \
+        wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh
+    )" || true
 fi
 
 # NOTE: ERROR List

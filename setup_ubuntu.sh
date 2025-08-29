@@ -21,7 +21,7 @@ shopt -s inherit_errexit &>/dev/null || true
 
 MAIN_FILE="true"; [[ "${BASH_SOURCE[0]}" != "${0}" ]] && MAIN_FILE="false"
 
-if [[ "${MAIN_FILE}" == "true" ]]; then
+if [[ "${MAIN_FILE}" != "true" ]]; then
     printf "Warn: %s is a executable script, not a library.\n" "${BASH_SOURCE[0]##*/}"
     printf "Please run this file.\n"
     return 0 2>/dev/null
@@ -51,7 +51,7 @@ SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck disable=SC1091
 source "${SCRIPT_PATH}/module/function/logger.sh"
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/module/function/sub_func.sh"
+source "${SCRIPT_PATH}/module/function/general.sh"
 
 # main script
 log_info "Start setup process..."

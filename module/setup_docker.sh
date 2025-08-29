@@ -157,6 +157,8 @@ exec_cmd "sudo chown -R \"${USER}:${USER}\" \"${_docker_conf_file}\" && \
     sudo chmod -R g+rwx \"${_docker_conf_file}\""
 
 # permission denied '/var/run/docker.sock'
+# use 'id -nG' or 'id' to check user group
+# use 'newgrp docker' or 'exec su - ${USER}' to re-evaluate the group membership
 exec_cmd "sudo chown root:docker \"/var/run/docker.sock\" && \
     sudo chmod 660 \"/var/run/docker.sock\""
 

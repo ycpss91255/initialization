@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+#TODO: wait review
 set -euo pipefail
 
 USER_NAME=${1:-"$USER"}

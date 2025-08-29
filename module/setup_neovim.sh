@@ -152,9 +152,16 @@ exec_cmd "source \"${_source_file}\" && \
 
 log_info "node.js version: $(node -v), npm version: $(npm -v)"
 
-log_info "Install 'tree-sitter' with 'npm'"
-exec_cmd "source \"${_source_file}\" && \
-    npm install -g -- \"tree-sitter-cli\""
+log_info "Install packages with 'npm'"
+# TODO: del test
+# _npm_pkgs=(
+#     "tree-sitter-cli"
+#     "prettier"
+# )
+# for _pkg in "${_npm_pkgs[@]}"; do
+#     exec_cmd "source \"${_source_file}\" && \
+#         npm install -g -- \"${_pkg}\""
+# done
 
 
 # log_info "Install nvimdots dependencies - other (Latest Release)"
@@ -164,12 +171,21 @@ exec_cmd "source \"${_source_file}\" && \
 
 log_info "Install nvimdots (Latest Release)"
 
-# go.nvim error
+# NOTE: enter is use default option
 if command -v curl >/dev/null 2>&1; then
+    # shellcheck disable=SC1090
+    source "${_source_file}" && \
     bash -c "$(curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)" || true
 else
+    # shellcheck disable=SC1090
+    source "${_source_file}" && \
     bash -c "$(wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh)" || true
 fi
+
+# NOTE: ERROR List
+# go.nvim error
+# mason-null-ls.nvim
+#  `npm install -g -- "prettier"`
 
 # find ~/.local ~/.config/ -type f -path "*/lsp_signature*/doc/tags" -exec rm -f {} \;
 # rm ${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/doc/tags
@@ -188,6 +204,7 @@ cp -r "${_nvimdots_sur_dir}" "${_nvimdots_conf_dir}"
 
 log_info "Neovim installation finished."
 
+log_info "Please"
     # fish -c "
     #     fisher install \
     #         kidonng/zoxide.fish \

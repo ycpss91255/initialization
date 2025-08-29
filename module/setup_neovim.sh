@@ -70,6 +70,7 @@ _neovim_dep_pkgs=(
     "fd-find"
     "zoxide"
     "yarn"
+    "xclip"
 )
 log_info "Install 'Neovim' dependency packages: ${_neovim_dep_pkgs[*]}"
 apt_pkg_manager --install -- "${_neovim_dep_pkgs[@]}"
@@ -185,7 +186,9 @@ else
 fi
 
 # NOTE: ERROR List
-# go.nvim error
+# go.nvim
+# NOTE: WARN list
+# codecompanion.nvim
 
 # find ~/.local ~/.config/ -type f -path "*/lsp_signature*/doc/tags" -exec rm -f {} \;
 # rm ${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/doc/tags

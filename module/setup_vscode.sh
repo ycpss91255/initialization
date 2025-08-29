@@ -53,7 +53,6 @@ fi
 # install step ref: https://code.visualstudio.com/docs/setup/linux
 log_info "Start install 'VSCode' and related packages"
 
-log_info "Install 'VSCode' dependency packages: ${_vscode_dep_pkgs[*]}"
 # coreutils => for 'install' command
 # lsb-release => for 'lsb_release' command
 # apt-transport-https => for https apt source
@@ -67,6 +66,7 @@ _vscode_dep_pkgs=(
     "wget"
     "gpg"
 )
+log_info "Install 'VSCode' dependency packages: ${_vscode_dep_pkgs[*]}"
 apt_pkg_manager --install -- "${_vscode_dep_pkgs[@]}"
 
 log_info "Setup 'VSCode' apt source"

@@ -50,7 +50,7 @@ if ! have_sudo_access; then
     fi
 fi
 
-_src_fonts_dir="${_script_path}/fonts"
+_src_fonts_dir="${_script_path}/config/fonts"
 if [[ ! -d "${_src_fonts_dir}" ]]; then
     if [[ "${MAIN_FILE}" == "true" ]]; then
         log_fatal "Not found: ${_src_fonts_dir}"

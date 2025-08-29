@@ -207,7 +207,7 @@ cp -r "${_nvimdots_sur_dir}" "${_nvimdots_conf_dir}"
 
 log_info "Neovim installation finished."
 
-log_info "Please"
+log_info "Please resource you shell source file or open a new terminal, continue to use."
     # fish -c "
     #     fisher install \
     #         kidonng/zoxide.fish \

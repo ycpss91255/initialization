@@ -7,7 +7,6 @@ MAIN_FILE="true"; [[ "${BASH_SOURCE[0]}" != "${0}" ]] && MAIN_FILE="false"
 
 if [[ "${MAIN_FILE}" == "true" ]]; then
     # shellcheck disable=SC2155
-    SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
     export USER="${USER:-"$(whoami)"}"
     export HOME="${HOME:-"/home/${USER}"}"
     export LANGUAGE="C:en"
@@ -22,35 +21,33 @@ if [[ "${MAIN_FILE}" == "true" ]]; then
     # shellcheck disable=SC2155
     # export DATETIME="$(date +"%Y-%m-%d-%T")"
     # export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
+
+    SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+    export FUNCTION_PATH="${SCRIPT_PATH}/function"
+    export CONFIG_PATH="${SCRIPT_PATH}/config"
+
     :
 fi
 
 # include sub script
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/function/logger.sh"
+source "${FUNCTION_PATH}/logger.sh"
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/function/general.sh"
-
-# the file used variables
-if [[ "${MAIN_FILE}" == "true" ]]; then
-    _script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-else
-    _script_path="${SCRIPT_PATH}"
-fi
+source "${FUNCTION_PATH}/general.sh"
 
 # main script
 log_info "Start setup process..."
 
 if ! have_sudo_access; then
     if [[ "${MAIN_FILE}" == "true" ]]; then
-        log_fatal "No sudo access. Cannot continue setup 'font'."
+        log_fatal "No sudo access. Cannot continue setup 'Font'."
     else
-        log_warn "Skip setup 'font' due to no sudo access."
+        log_warn "Skip setup 'Font' due to no sudo access."
         return 1
     fi
 fi
 
-_src_fonts_dir="${_script_path}/config/fonts"
+_src_fonts_dir="${CONFIG_PATH}/fonts"
 if [[ ! -d "${_src_fonts_dir}" ]]; then
     if [[ "${MAIN_FILE}" == "true" ]]; then
         log_fatal "Not found: ${_src_fonts_dir}"

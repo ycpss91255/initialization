@@ -7,7 +7,6 @@ MAIN_FILE="true"; [[ "${BASH_SOURCE[0]}" != "${0}" ]] && MAIN_FILE="false"
 
 if [[ "${MAIN_FILE}" == "true" ]]; then
     # shellcheck disable=SC2155
-    SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
     export USER="${USER:-"$(whoami)"}"
     export HOME="${HOME:-"/home/${USER}"}"
     export LANGUAGE="C:en"
@@ -20,32 +19,30 @@ if [[ "${MAIN_FILE}" == "true" ]]; then
     unset HAVE_SUDO_ACCESS
 
     # shellcheck disable=SC2155
-    export DATETIME="$(date +"%Y-%m-%d-%T")"
-    export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
+    # export DATETIME="$(date +"%Y-%m-%d-%T")"
+    # export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
+
+    SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+    export FUNCTION_PATH="${SCRIPT_PATH}/function"
+    export CONFIG_PATH="${SCRIPT_PATH}/config"
+
     :
 fi
 
 # include sub script
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/function/logger.sh"
+source "${FUNCTION_PATH}/logger.sh"
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/function/general.sh"
-
-# the file used variables
-if [[ "${MAIN_FILE}" == "true" ]]; then
-    _script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-else
-    _script_path="${SCRIPT_PATH}"
-fi
+source "${FUNCTION_PATH}/general.sh"
 
 # main script
 log_info "Start setup process..."
 
 if ! have_sudo_access; then
     if [[ "${MAIN_FILE}" == "true" ]]; then
-        log_fatal "No sudo access. Cannot continue setup 'font'."
+        log_fatal "No sudo access. Cannot continue install 'Neovim'."
     else
-        log_warn "Skip setup 'font' due to no sudo access."
+        log_warn "Skip install 'Neovim' due to no sudo access."
         return 1
     fi
 fi
@@ -131,20 +128,20 @@ log_info "Configure shell to use 'fnm'"
 # fish
 if [[ ! -f "${HOME}/.config/fish/conf.d/fnm.fish" ]]; then
     mkdir -p "${HOME}/.config/fish/conf.d"
-    _source_file="${_script_path}/config/neovim/fnm_shell_config/fnm.fish"
+    _source_file="${CONFIG_PATH}/neovim/fnm_shell_config/fnm.fish"
     log_info "Add fnm configuration to ${HOME}/.config/fish/conf.d/fnm.fish from ${_source_file}"
     exec_cmd "cp \"${_source_file}\" \"${HOME}/.config/fish/conf.d/fnm.fish\""
 fi
 # bash
 if [[ -f "${HOME}/.bashrc" ]]; then
     if ! grep -q 'fnm env' "${HOME}/.bashrc"; then
-        _source_file="${_script_path}/config/neovim/fnm_shell_config/config.bash"
+        _source_file="${CONFIG_PATH}/neovim/fnm_shell_config/config.bash"
         log_info "Add fnm configuration to ${HOME}/.bashrc from ${_source_file}"
         exec_cmd "cat \"${_source_file}\" >> \"${HOME}/.bashrc\""
     fi
 fi
 
-_source_file="${_script_path}/config/neovim/fnm_shell_config/config.bash"
+_source_file="${CONFIG_PATH}/neovim/fnm_shell_config/config.bash"
 _fnm_version="22"
 exec_cmd "source \"${_source_file}\" && \
     fnm install ${_fnm_version} && \
@@ -196,7 +193,7 @@ log_info "Remove lsp_signature.nvim doc tags to avoid error"
 exec_cmd "rm -f \"${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/doc/tags\" || true"
 
 log_info "Copy nvimdots configuration files"
-_nvimdots_sur_dir="${_script_path}/config/neovim/nvimdots_config"
+_nvimdots_sur_dir="${CONFIG_PATH}/neovim/nvimdots_config"
 _nvimdots_conf_dir="${HOME}/.config/nvim/lua/user"
 mkdir -p "${_nvimdots_conf_dir}"
 

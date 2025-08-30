@@ -7,12 +7,3 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     printf "To learn how to use it, please refer to './test/test_logger.sh'\n"
     return 0 2>/dev/null
 fi
-[[ -n "${TTY_COLORS_READY:-}" ]] && return 0
-
-# Support color output in the terminal
-#
-# Usage:
-#   _support_color
-#
-# Examples:
-#   _support_color

@@ -7,7 +7,6 @@ MAIN_FILE="true"; [[ "${BASH_SOURCE[0]}" != "${0}" ]] && MAIN_FILE="false"
 
 if [[ "${MAIN_FILE}" == "true" ]]; then
     # shellcheck disable=SC2155
-    SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
     export USER="${USER:-"$(whoami)"}"
     export HOME="${HOME:-"/home/${USER}"}"
     export LANGUAGE="C:en"
@@ -22,21 +21,19 @@ if [[ "${MAIN_FILE}" == "true" ]]; then
     # shellcheck disable=SC2155
     # export DATETIME="$(date +"%Y-%m-%d-%T")"
     # export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
+
+    SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+    export FUNCTION_PATH="${SCRIPT_PATH}/function"
+    export CONFIG_PATH="${SCRIPT_PATH}/config"
+
     :
 fi
 
 # include sub script
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/function/logger.sh"
+source "${FUNCTION_PATH}/logger.sh"
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/function/general.sh"
-
-# the file used variables
-if [[ "${MAIN_FILE}" == "true" ]]; then
-    _script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-else
-    _script_path="${SCRIPT_PATH}"
-fi
+source "${FUNCTION_PATH}/general.sh"
 
 # main script
 log_info "Start setup process..."
@@ -82,7 +79,7 @@ if [[ -f /etc/apt/sources.list.d/vscode.sources ]]; then
     fi
 fi
 log_info "Copy new 'vscode.sources' file"
-exec_cmd "sudo install -D -o root -g root -m 644 \"${_script_path}/config/vscode/vscode.sources\" \"/etc/apt/sources.list.d/vscode.sources\""
+exec_cmd "sudo install -D -o root -g root -m 644 \"${CONFIG_PATH}/vscode/vscode.sources\" \"/etc/apt/sources.list.d/vscode.sources\""
 
 # # for ubuntu 18.04
 # if [[ -f /etc/apt/sources.list.d/vscode.list ]]; then

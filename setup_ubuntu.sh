@@ -45,13 +45,16 @@ export DATETIME="$(date +"%Y-%m-%d-%T")"
 export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
 export SET_MIRRORS="false"
 
-# include sub script
-# shellcheck disable=SC2155
 SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+export MODULE_PATH="${SCRIPT_PATH}/module"
+export FUNCTION_PATH="${SCRIPT_PATH}/module/function"
+export CONFIG_PATH="${SCRIPT_PATH}/module/config"
+
+# include sub script
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/module/function/logger.sh"
+source "${FUNCTION_PATH}/logger.sh"
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/module/function/general.sh"
+source "${FUNCTION_PATH}/general.sh"
 
 # main script
 log_info "Start setup process..."
@@ -95,16 +98,16 @@ apt_pkg_manager --install -- "${_BASIC_PKGS[@]}"
 
 
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/module/setup_font.sh" || fatal_pkg+=("font")
+source "${MODULE_PATH}/setup_font.sh" || fatal_pkg+=("font")
 
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/module/setup_docker.sh" || fatal_pkg+=("docker")
+source "${MODULE_PATH}/setup_docker.sh" || fatal_pkg+=("docker")
 
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/module/setup_vscode.sh" || fatal_pkg+=("vscode")
+source "${MODULE_PATH}/setup_vscode.sh" || fatal_pkg+=("vscode")
 
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/module/setup_neovim.sh" || fatal_pkg+=("neovim")
+source "${MODULE_PATH}/setup_neovim.sh" || fatal_pkg+=("neovim")
 
 if [ "${#fatal_pkg[@]}" -ne 0 ]; then
     log_error "Some packages failed to install: ${fatal_pkg[*]}"

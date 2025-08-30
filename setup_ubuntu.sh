@@ -96,6 +96,7 @@ _BASIC_PKGS=(
 log_info "Install basic packages: ${_BASIC_PKGS[*]}..."
 apt_pkg_manager --install -- "${_BASIC_PKGS[@]}"
 
+fatal_pkg=()
 
 # shellcheck disable=SC1091
 source "${MODULE_PATH}/setup_font.sh" || fatal_pkg+=("font")

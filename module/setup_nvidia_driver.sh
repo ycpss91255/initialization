@@ -124,4 +124,6 @@ log_info "Install 'nvitop'"
 # for ubuntu 24.04 up
 pipx install git+https://github.com/XuehaiPan/nvitop.git#egg=nvitop
 
+apt_pkg_manager --install -- "gpustat"
+
 log_info "'NVIDIA-driver' installation finished. version: $(nvidia-smi --version | head -n1)"

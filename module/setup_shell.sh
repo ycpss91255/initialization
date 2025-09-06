@@ -51,7 +51,7 @@ log_info "Install basic packages..."
 _apt_dep_pkgs=(
     "curl"
     "openssh-client"
-    "openssh-server"
+    # "openssh-server"
     "ssh"
 )
 apt_pkg_manager --install "${_apt_dep_pkgs[@]}"
@@ -65,12 +65,7 @@ apt_pkg_manager --install -- fish
 
 # zoxide
 curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
-
-# shellcheck disable=SC1090
-zoxide init fish | source
-
-eval "$(zoxide init bash)"
-
+# eval "$(zoxide init bash)"
 # eval "$(zoxide init zsh)"
 
 # fzf
@@ -140,72 +135,52 @@ apt_pkg_manager --install -- curl
 curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | fish -c "source && fisher install jorgebucaran/fisher"j
 
 # Install fish plugin
-_tide_pkg="IlanCosman/tide@v6"
-_sponge_pkg="meaningful-ooo/sponge"
-_fzf_pkg="PatrickF1/fzf.fish"
-_pj_pkg="oh-my-fish/plugin-pj"
-
-fish -c "fisher install \
+# TODO: check ssh-agent
+exec_cmd "fish -c \"fisher install \
         jorgebucaran/autopair.fish \
         markcicl/upto \
         edc/bass \
-        ${_tide_pkg} \
-        ${_sponge_pkg} \
-        ${_pj_pkg} \
-        "
-
-if check_pkg_status --exec "bat" || check_pkg_status --exec "batcat"; then
-    if check_pkg_status --exec "fd" || check_pkg_status --exec "fdfind"; then
-        if check_pkg_status --exec "fzf" || fish -c "type -q fisher";then
-            exec_cmd "fish -c \"fisher install ${_fzf_pkg}\""
-        fi
-    fi
-fi
+        danhper/fish-ssh-agent \
+        kidonng/zoxide.fish \
+        PatrickF1/fzf.fish \
+        IlanCosman/tide@v6 \
+        meaningful-ooo/sponge \
+        oh-my-fish/plugin-pj \
+        \""
 
 # Configure tide
-if fish -c "fisher list | grep -q ${_tide_pkg}"; then
-    exec_cmd "fish -c \"
-        tide configure \
-            --auto \
-            --style=Classic \
-            --prompt_colors='True color' \
-            --classic_prompt_color=Light \
-            --show_time='24-hour format' \
-            --classic_prompt_separators=Angled \
-            --powerline_prompt_heads=Sharp \
-            --powerline_prompt_tails=Flat \
-            --powerline_prompt_style='Two lines, character' \
-            --prompt_connection=Solid \
-            --powerline_right_prompt_frame=No \
-            --prompt_connection_andor_frame_color=Light \
-            --prompt_spacing=Sparse \
-            --icons='Many icons' \
-            --transient=Yes
-    \""
-fi
-
-# Configure sponge
-if fish -c "fisher list | grep -q ${_sponge_pkg}"; then
-    set -xg sponge_purge_only_on_exit true
-fi
+exec_cmd "fish -c \"
+    tide configure \
+        --auto \
+        --style=Classic \
+        --prompt_colors='True color' \
+        --classic_prompt_color=Light \
+        --show_time='24-hour format' \
+        --classic_prompt_separators=Angled \
+        --powerline_prompt_heads=Sharp \
+        --powerline_prompt_tails=Flat \
+        --powerline_prompt_style='Two lines, character' \
+        --prompt_connection=Solid \
+        --powerline_right_prompt_frame=No \
+        --prompt_connection_andor_frame_color=Light \
+        --prompt_spacing=Sparse \
+        --icons='Many icons' \
+        --transient=Yes\""
 
 # Configure fzf.fish
-if fish -c "fisher list | grep -q ${_fzf_pkg}"; then
-    set -xg sponge_purge_only_on_exit true
-fi
+# TODO: check fzf config
+# set fzf_preview_dir_cmd eza --all --color=always
+# exec_cmd "fish -c \"set fzf_preview_dir_cmd eza --all --color=always\""
 
+# Configure sponge
+exec_cmd "fish -c \"set -xg sponge_purge_only_on_exit true\""
 # Configure pj
-if fish -c "fisher list | grep -q ${_pj_pkg}"; then
-    set -gx PROJECT_PATHS ~/workspace ~/src
-fi
+exec_cmd "fish -c \"set -gx PROJECT_PATHS ~/workspace ~/src\""
 
-if check_pkg_status --exec "ssh"; then
-    fish -c "set -gx \"SSH_ENV\" \"${HOME}/.ssh/environment\""
-fi
-# set fzf_preview_dir_cmd eza --all --color=always (not work?)
-
-# switch default shell to fish shell
-sudo chsh -s "$(which fish)" "${USER_NAME}"
+exec_cmd "fish -c \"set -gx \"SSH_ENV\" \"${HOME}/.ssh/environment\""
 
 # copy user config
-cp -r "${CONFIG_PATH}/fish" "${HOME}/.config/fish"
+exec_cmd "cp -r \"${CONFIG_PATH}/fish\" \"${HOME}/.config/fish\""
+
+# switch default shell to fish shell
+exec_cmd "sudo chsh -s \"$(which fish)\" \"${USER_NAME}\""

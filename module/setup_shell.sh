@@ -172,20 +172,8 @@ exec_cmd "fish -c \"
         --icons='Many icons' \
         --transient=Yes\""
 
-# Configure fzf.fish
-# TODO: check fzf config
-# set fzf_preview_dir_cmd eza --all --color=always
-# exec_cmd "fish -c \"set fzf_preview_dir_cmd eza --all --color=always\""
-
-# Configure sponge
-exec_cmd "fish -c \"set -xg sponge_purge_only_on_exit true\""
-# Configure pj
-exec_cmd "fish -c \"set -gx PROJECT_PATHS ~/workspace ~/src\""
-
-exec_cmd "fish -c \"set -gx \"SSH_ENV\" \"${HOME}/.ssh/environment\""
-
 # copy user config
 exec_cmd "cp -r \"${CONFIG_PATH}/fish\" \"${HOME}/.config/fish\""
 
 # switch default shell to fish shell
-exec_cmd "sudo chsh -s \"$(which fish)\" \"${USER_NAME}\""
+exec_cmd "sudo chsh -s \"$(which fish)\" \"${USER}\""

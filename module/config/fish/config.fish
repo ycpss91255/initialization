@@ -25,5 +25,34 @@ if status is-interactive
         alias xopen="xdg-open"
     end
 
+    if command -q -- "bat"
+        alias cat="bat"
+        alias c="bat"
+    end
+
+    if type -q "fisher"
+        if fisher list | grep -q "/sponge"
+            set -xg sponge_purge_only_on_exit true
+        end
+
+        if fisher list | grpe -q "/pj"
+            set -gx PROJECT_PATHS "{$HOME}/workspace" "{$HOME}/src"
+        end
+
+        if fisher list | grep -q "/fish-ssh-agent"
+            set -gx SSH_ENV "{$HOME}/.ssh/environment"
+            if ! test -d {$HOME}/.ssh
+                mkdir -p {$HOME}/.ssh
+                chmod 700 {$HOME}/.ssh
+            end
+            if ! test -f {$SSH_ENV}
+                touch {$SSH_ENV}
+            end
+        end
+
+        # # TODO: check fzf config
+        # if fisher list | grep -q "/fzf"
+        #     set fzf_preview_dir_cmd eza --all --color=always
+        # end
 end
 

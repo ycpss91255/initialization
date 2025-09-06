@@ -175,7 +175,7 @@ exec_cmd "fish -c \"
 #
 if [[ ! -d "${HOME}/.ssh" ]]; then
     mkdir -p -- "${HOME}/.ssh"
-    chomd 700 "${HOME}/.ssh"
+    chmod 700 "${HOME}/.ssh"
     touch "${HOME}/.ssh/enviroment"
 fi
 

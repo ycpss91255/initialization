@@ -69,6 +69,11 @@ curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh 
 # eval "$(zoxide init zsh)"
 
 # fzf
+if [[ -d "${HOME}/.fzf" ]]; then
+    log_info "Backup old fzf installation (${HOME}/.fzf) to ${BACKUP_DIR}/fzf"
+    backup_file "${HOME}/.fzf"
+    rm -rf "${HOME}/.fzf"
+fi
 exec_cmd "git clone --depth 1 \"https://github.com/junegunn/fzf.git\" \"${HOME}/.fzf\" && ${HOME}/.fzf/install --key-bindings --completion --no-update-rc"
 _fzf_bash_conf="[ -f ~/.fzf.bash ] && source ~/.fzf.bash"
 if [[ -f "${HOME}/.bashrc" ]]; then

@@ -41,13 +41,6 @@ if status is-interactive
 
         if fisher list | grep -q "/fish-ssh-agent"
             set -gx SSH_ENV "{$HOME}/.ssh/environment"
-            if ! test -d {$HOME}/.ssh
-                mkdir -p {$HOME}/.ssh
-                chmod 700 {$HOME}/.ssh
-            end
-            if ! test -f {$SSH_ENV}
-                touch {$SSH_ENV}
-            end
         end
 
         # # TODO: check fzf config

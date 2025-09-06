@@ -172,8 +172,15 @@ exec_cmd "fish -c \"
         --icons='Many icons' \
         --transient=Yes\""
 
+#
+if [[ ! -d "${HOME}/.ssh" ]]; then
+    mkdir -p -- "${HOME}/.ssh"
+    chomd 700 "${HOME}/.ssh"
+    touch "${HOME}/.ssh/enviroment"
+fi
+
 # copy user config
-exec_cmd "cp -r \"${CONFIG_PATH}/fish\" \"${HOME}/.config/fish\""
+exec_cmd "cp -r \"${CONFIG_PATH}/fish\" \"${HOME}/.config\""
 
 # switch default shell to fish shell
 exec_cmd "sudo chsh -s \"$(which fish)\" \"${USER}\""

@@ -35,7 +35,7 @@ if status is-interactive
             set -xg sponge_purge_only_on_exit true
         end
 
-        if fisher list | grpe -q "/pj"
+        if fisher list | grep -q "/pj"
             set -gx PROJECT_PATHS "{$HOME}/workspace" "{$HOME}/src"
         end
 
@@ -47,5 +47,6 @@ if status is-interactive
         # if fisher list | grep -q "/fzf"
         #     set fzf_preview_dir_cmd eza --all --color=always
         # end
+    end
 end
 

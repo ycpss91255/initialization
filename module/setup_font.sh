@@ -81,7 +81,8 @@ apt_pkg_manager --install -- "${_basic_dep_pkgs[@]}"
 _target_dir="${HOME}/.local/share/fonts"
 exec_cmd "mkdir -p -- \"${_target_dir}\""
 exec_cmd "chmod 755 -- \"${_target_dir}\""
-exec_cmd "cp -r -- \"${_fonts_dir[*]}\" \"${_target_dir}/\""
+_cp_cmd=(cp -r -- "${_fonts_dir[@]}" "${_target_dir}/")
+exec_cmd "${_cp_cmd[*]}"
 
 if [[ "${USER}" == "$(id -un)" ]]; then
     exec_cmd "fc-cache -f -v \"${_target_dir}\" >/dev/null"
@@ -90,7 +91,7 @@ else
 fi
 
 if check_pkg_status --exec "dconf"; then
-    exec_cmd "dconf dump /org/gnome/terminal/ < ${CONFIG_PATH}/gnome-terminal-backup.conf"
+    exec_cmd "dconf load /org/gnome/terminal/ < ${CONFIG_PATH}/gnome-terminal-backup.conf"
 fi
 
 log_info "Fonts installation finished for ${USER}."

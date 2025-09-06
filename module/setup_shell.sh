@@ -132,7 +132,7 @@ log_info "batcat v${_batcat_version} installed to ${_batcat_install_dir}."
 # install fisher
 apt_pkg_manager --install -- curl
 
-curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | fish -c "source && fisher install jorgebucaran/fisher"j
+curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | fish -c "source && fisher install jorgebucaran/fisher"
 
 # Install fish plugin
 # TODO: check ssh-agent

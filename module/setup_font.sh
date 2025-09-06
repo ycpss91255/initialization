@@ -71,21 +71,26 @@ if [[ ${#_fonts_dir[@]} -eq 0 ]]; then
 fi
 
 _basic_dep_pkgs=(
-    unzip
-    fontconfig
+    "unzip"
+    "fontconfig"
+    "dconf-cli"
 )
 
 apt_pkg_manager --install -- "${_basic_dep_pkgs[@]}"
 
 _target_dir="${HOME}/.local/share/fonts"
-mkdir -p -- "${_target_dir}"
-chmod 755 -- "${_target_dir}"
-cp -r -- "${_fonts_dir[@]}" "${_target_dir}/"
+exec_cmd "mkdir -p -- \"${_target_dir}\""
+exec_cmd "chmod 755 -- \"${_target_dir}\""
+exec_cmd "cp -r -- \"${_fonts_dir[*]}\" \"${_target_dir}/\""
 
 if [[ "${USER}" == "$(id -un)" ]]; then
-    fc-cache -f -v "${_target_dir}" >/dev/null
+    exec_cmd "fc-cache -f -v \"${_target_dir}\" >/dev/null"
 else
-    sudo -u "$USER" fc-cache -f -v "${_target_dir}" >/dev/null
+    exec_cmd "sudo -u \"${USER}\" fc-cache -f -v \"${_target_dir}\" >/dev/null"
+fi
+
+if check_pkg_status --exec "dconf"; then
+    exec_cmd "dconf dump /org/gnome/terminal/ < ${CONFIG_PATH}/gnome-terminal-backup.conf"
 fi
 
 log_info "Fonts installation finished for ${USER}."

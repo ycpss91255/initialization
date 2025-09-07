@@ -170,6 +170,10 @@ done
 
 log_info "Install nvimdots (Latest Release)"
 
+if [[ ! -d "${HOME}/.cache/nvim" ]]; then
+    exec_cmd "mkdir -p \"${HOME}/.cache/nvim\""
+fi
+
 # NOTE: enter is use default option
 if command -v curl >/dev/null 2>&1; then
     # shellcheck disable=SC1090

@@ -246,6 +246,7 @@ if [[ ! -d "${HOME}/.cache/nvim" ]]; then
 fi
 
 # NOTE: enter is use default option
+# NOTE: Close directly when enter for the first time. There is a problem with '.cache' path location.
 _tmp_nvimdots=""
 create_temp_file _tmp_nvimdots "nvimdots_install" "sh"
 _nvimdots_url="https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh"

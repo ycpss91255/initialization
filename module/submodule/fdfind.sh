@@ -23,8 +23,8 @@ if [[ "${MAIN_FILE}" == "true" ]]; then
     # export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
 
     SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-    export FUNCTION_PATH="${SCRIPT_PATH}/function"
-    export CONFIG_PATH="${SCRIPT_PATH}/config"
+    export FUNCTION_PATH="${SCRIPT_PATH}/../function"
+    export CONFIG_PATH="${SCRIPT_PATH}/../config"
 
     :
 fi

@@ -35,6 +35,13 @@ source "${FUNCTION_PATH}/logger.sh"
 # shellcheck disable=SC1091
 source "${FUNCTION_PATH}/general.sh"
 
+# the file used variables
+if [[ "${MAIN_FILE}" == "true" ]]; then
+    _script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+else
+    _script_path="${SCRIPT_PATH}"
+fi
+
 # main script
 log_info "Start setup process..."
 
@@ -64,13 +71,81 @@ _neovim_dep_pkgs=(
     "python3-pip"
     "python3-venv"
     "ripgrep"
-    "fd-find"
-    "zoxide"
     "yarn"
     "xclip"
 )
 log_info "Install 'Neovim' dependency packages: ${_neovim_dep_pkgs[*]}"
 apt_pkg_manager --install -- "${_neovim_dep_pkgs[@]}"
+
+# fzf
+if [[ -d "${HOME}/.fzf" ]]; then
+    log_info "Backup old fzf installation (${HOME}/.fzf) to ${BACKUP_DIR}/fzf"
+    backup_file "${HOME}/.fzf"
+    rm -rf "${HOME}/.fzf"
+fi
+exec_cmd "git clone --depth 1 \"https://github.com/junegunn/fzf.git\" \"${HOME}/.fzf\" && ${HOME}/.fzf/install --key-bindings --completion --no-update-rc"
+_fzf_bash_conf="[ -f ~/.fzf.bash ] && source ~/.fzf.bash"
+if [[ -f "${HOME}/.bashrc" ]]; then
+    if ! grep -q "${_fzf_bash_conf}" "${HOME}/.bashrc"; then
+        log_info "Add fzf configuration to ${HOME}/.bashrc"
+        exec_cmd "printf '\n%s\n' \"${_fzf_bash_conf}\" >> \"${HOME}/.bashrc\""
+    fi
+fi
+
+# zoxide
+curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+# shellcheck disable=SC2016
+_zoxide_bash_conf='eval "$(zoxide init bash)"'
+if [[ -f "${HOME}/.bashrc" ]]; then
+    if ! grep -q "${_zoxide_bash_conf}" "${HOME}/.bashrc"; then
+        log_info "Add zoxide configuration to ${HOME}/.bashrc"
+        exec_cmd "printf '\n%s\n' \"${_zoxide_bash_conf}\" >> \"${HOME}/.bashrc\""
+    fi
+fi
+# shellcheck disable=SC2016
+_zoxide_zsh_conf='eval "$(zoxide init zsh)"'
+if [[ -f "${HOME}/.zshrc" ]]; then
+    if ! grep -q "${_zoxide_zsh_conf}" "${HOME}/.zshrc"; then
+        log_info "Add zoxide configuration to ${HOME}/.zshrc"
+        exec_cmd "printf '\n%s\n' \"${_zoxide_bash_conf}\" >> \"${HOME}/.zshrc\""
+    fi
+fi
+
+# install fd-find
+log_info "Install fd-find (Github Releases)"
+log_info "Get latest fd-find release version from GitHub"
+_tmp_fdfind=""
+create_temp_file _tmp_fdfind "fdfind" "tar.gz"
+_fdfind_version=""
+_fdfind_repo="sharkdp/fd"
+get_github_pkg_latest_version _fdfind_version "${_fdfind_repo}"
+exec_cmd "curl -fsSL --retry 3 -o \"${_tmp_fdfind}\" \
+    \"https://github.com/${_fdfind_repo}/releases/download/v${_fdfind_version}/fd-v${_fdfind_version}-x86_64-unknown-linux-gnu.tar.gz\""
+
+_fdfind_install_dir="/opt/fdfind"
+_skip_fdfind_install="false"
+if [[ -e "${_fdfind_install_dir}" ]]; then
+    # system fd-find version check
+    if [[ -x "${_fdfind_install_dir}/fd" ]]; then
+        if [[ "$("${_fdfind_install_dir}/fd" --version | awk '{print $2}')" == "${_fdfind_version}" ]]; then
+            log_info "fd-find v${_fdfind_version} already installed to ${_fdfind_install_dir}."
+            _skip_fdfind_install="true"
+        fi
+    fi
+    if [[ "${_skip_fdfind_install}" == "false" ]]; then
+        log_info "Backup old fdfind installation (${_fdfind_install_dir}) to ${BACKUP_DIR}/fdfind"
+        backup_file "${_fdfind_install_dir}"
+        sudo rm -rf "${_fdfind_install_dir}"
+    fi
+fi
+
+if [[ "${_skip_fdfind_install}" == "false" ]]; then
+    log_info "Install fdfind v${_fdfind_version} to ${_fdfind_install_dir}"
+    exec_cmd "sudo mkdir -p -- \"${_fdfind_install_dir}\" && \
+        sudo tar -C \"${_fdfind_install_dir}\" --strip-components=1 -xzf \"${_tmp_fdfind}\" && \
+        sudo ln -sfn \"${_fdfind_install_dir}/fd\" \"/usr/local/bin/fd\""
+fi
+log_info "fdfind v${_fdfind_version} installed to ${_fdfind_install_dir}."
 
 log_info "Install Neovim (Github Releases)"
 log_info "Get latest Neovim release version from GitHub"
@@ -128,23 +203,23 @@ log_info "Configure shell to use 'fnm'"
 # fish
 if [[ ! -f "${HOME}/.config/fish/conf.d/fnm.fish" ]]; then
     mkdir -p "${HOME}/.config/fish/conf.d"
-    _source_file="${CONFIG_PATH}/neovim/fnm_shell_config/fnm.fish"
-    log_info "Add fnm configuration to ${HOME}/.config/fish/conf.d/fnm.fish from ${_source_file}"
-    exec_cmd "cp \"${_source_file}\" \"${HOME}/.config/fish/conf.d/fnm.fish\""
+    _fnm_fish_conf_file="${_script_path}/config/neovim/fnm_shell_config/fnm.fish"
+    log_info "Add fnm configuration to ${HOME}/.config/fish/conf.d/fnm.fish from ${_fnm_fish_conf_file}"
+    exec_cmd "cp \"${_fnm_fish_conf_file}\" \"${HOME}/.config/fish/conf.d/fnm.fish\""
 fi
 # bash
 if [[ -f "${HOME}/.bashrc" ]]; then
     if ! grep -q 'fnm env' "${HOME}/.bashrc"; then
-        _source_file="${CONFIG_PATH}/neovim/fnm_shell_config/config.bash"
-        log_info "Add fnm configuration to ${HOME}/.bashrc from ${_source_file}"
-        exec_cmd "cat \"${_source_file}\" >> \"${HOME}/.bashrc\""
+        _fnm_bash_conf_file="${_script_path}/config/neovim/fnm_shell_config/config.bash"
+        log_info "Add fnm configuration to ${HOME}/.bashrc from ${_fnm_bash_conf_file}"
+        exec_cmd "cat \"${_fnm_bash_conf_file}\" >> \"${HOME}/.bashrc\""
     fi
 fi
 
-_source_file="${CONFIG_PATH}/neovim/fnm_shell_config/config.bash"
+# shellcheck disable=SC1091
+source "${CONFIG_PATH}/neovim/fnm_shell_config/config.bash"
 _fnm_version="22"
-exec_cmd "source \"${_source_file}\" && \
-    fnm install ${_fnm_version} && \
+exec_cmd "fnm install ${_fnm_version} && \
     fnm use ${_fnm_version} && \
     fnm alias default ${_fnm_version}"
 
@@ -155,8 +230,7 @@ _npm_pkgs=(
     "tree-sitter-cli"
 )
 for _pkg in "${_npm_pkgs[@]}"; do
-    exec_cmd "source \"${_source_file}\" && \
-        npm install -g -- \"${_pkg}\""
+    exec_cmd "npm install -g -- \"${_pkg}\""
 done
 
 
@@ -167,26 +241,31 @@ done
 
 log_info "Install nvimdots (Latest Release)"
 
-# NOTE: enter is use default option
-if command -v curl >/dev/null 2>&1; then
-    # shellcheck disable=SC1090
-    bash -c "$(
-        source "${_source_file}" && \
-        curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh
-    )" || true
-else
-    # shellcheck disable=SC1090
-    bash -c "$(
-        source "${_source_file}" && \
-        wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh
-    )" || true
+if [[ ! -d "${HOME}/.cache/nvim" ]]; then
+    exec_cmd "mkdir -p \"${HOME}/.cache/nvim\""
 fi
+
+# NOTE: enter is use default option
+# NOTE: Close directly when enter for the first time. There is a problem with '.cache' path location.
+_tmp_nvimdots=""
+create_temp_file _tmp_nvimdots "nvimdots_install" "sh"
+_nvimdots_url="https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh"
+
+if check_pkg_status --exec -- "curl"; then
+    exec_cmd "curl -fsSL -o \"${_tmp_nvimdots}\" ${_nvimdots_url} "
+elif check_pkg_status --exec -- "wget"; then
+    exec_cmd "wget -q -O \"${_tmp_nvimdots}\" ${_nvimdots_url}"
+else
+    log_fatal "Neither 'curl' nor 'wget' found, cannot download nvimdots install script."
+fi
+bash "${_tmp_nvimdots}" || true
 
 # NOTE: ERROR List
 # go.nvim
 # NOTE: WARN list
 # codecompanion.nvim
 
+# NOTE: remove lsp_signature.nvim doc tags to avoid error
 # find ~/.local ~/.config/ -type f -path "*/lsp_signature*/doc/tags" -exec rm -f {} \;
 # rm ${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/doc/tags
 log_info "Remove lsp_signature.nvim doc tags to avoid error"

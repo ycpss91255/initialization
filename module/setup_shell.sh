@@ -110,7 +110,7 @@ exec_cmd "fish -c \"
         --prompt_connection_andor_frame_color=Light \
         --prompt_spacing=Sparse \
         --icons='Many icons' \
-        --transient=Yes\""
+        --transient=Yes\" &>/dev/null"
 
 #
 if [[ ! -d "${HOME}/.ssh" ]]; then

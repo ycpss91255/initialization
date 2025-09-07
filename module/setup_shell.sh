@@ -143,7 +143,7 @@ curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fi
 # TODO: check ssh-agent
 exec_cmd "fish -c \"fisher install \
         jorgebucaran/autopair.fish \
-        markcicl/upto \
+        markcial/upto \
         edc/bass \
         danhper/fish-ssh-agent \
         kidonng/zoxide.fish \

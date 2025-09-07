@@ -40,7 +40,7 @@ log_info "Start setup process..."
 
 if ! have_sudo_access; then
     if [[ "${MAIN_FILE}" == "true" ]]; then
-        log_fatal "No sudo access. Cannot continue install 'xxx'."
+        log_fatal "No sudo access. Cannot continue install 'zoxide'."
     else
         log_warn "Skip install 'xxx' due to no sudo access."
         return 1
@@ -48,19 +48,14 @@ if ! have_sudo_access; then
 fi
 
 curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
-# shellcheck disable=SC2016
-_zoxide_bash_conf='eval "$(zoxide init bash)"'
-if [[ -f "${HOME}/.bashrc" ]]; then
-    if ! grep -q "${_zoxide_bash_conf}" "${HOME}/.bashrc"; then
-        log_info "Add zoxide configuration to ${HOME}/.bashrc"
-        exec_cmd "printf '\n%s\n' \"${_zoxide_bash_conf}\" >> \"${HOME}/.bashrc\""
+
+for _shell in "bash" "zsh"; do
+    _zoxide_conf="eval \"\$(zoxide init ${_shell})\""
+
+    if [[ -f "${HOME}/.${_shell}rc" ]]; then
+        if ! grep -Fq "${_zoxide_conf}" "${HOME}/.${_shell}rc"; then
+            log_info "Add zoxide configuration to ${HOME}/.${_shell}rc"
+            exec_cmd "printf '\n%s\n' \"${_zoxide_conf}\" >> \"${HOME}/.${_shell}rc\""
+        fi
     fi
-fi
-# shellcheck disable=SC2016
-_zoxide_zsh_conf='eval "$(zoxide init zsh)"'
-if [[ -f "${HOME}/.zshrc" ]]; then
-    if ! grep -q "${_zoxide_zsh_conf}" "${HOME}/.zshrc"; then
-        log_info "Add zoxide configuration to ${HOME}/.zshrc"
-        exec_cmd "printf '\n%s\n' \"${_zoxide_bash_conf}\" >> \"${HOME}/.zshrc\""
-    fi
-fi
+done

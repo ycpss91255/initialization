@@ -53,16 +53,17 @@ for _shell in "bash" "zsh"; do
     _zoxide_conf="eval \"\$(zoxide init ${_shell})\""
 
     if [[ -f "${HOME}/.${_shell}rc" ]]; then
-        if ! grep -Fq "${_zoxide_conf}" "${HOME}/.${_shell}rc"; then
-            log_info "Add zoxide configuration to ${HOME}/.${_shell}rc"
-            exec_cmd "printf '\n%s\n' '${_zoxide_conf}' >> \"${HOME}/.${_shell}rc\""
-        fi
-
-        _add_path="${HOME}/.local/bin"
-
         if ! grep -Fq "export PATH=\"${_add_path}:\$PATH\"" "${HOME}/.${_shell}rc"; then
             log_info "Add local bin path to ${HOME}/.${_shell}rc"
             exec_cmd "printf '\n%s\n' 'export PATH=\"${_add_path}:\$PATH\"' >> \"${HOME}/.${_shell}rc\""
         fi
+
+        if ! grep -Fq "${_zoxide_conf}" "${HOME}/.${_shell}rc"; then
+            log_info "Add zoxide configuration to ${HOME}/.${_shell}rc"
+            exec_cmd "printf '\n%s\n' '${_zoxide_conf}' >> \"${HOME}/.j${_shell}rc\""
+        fi
+
+        _add_path="${HOME}/.local/bin"
+
     fi
 done

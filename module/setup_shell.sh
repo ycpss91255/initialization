@@ -57,6 +57,16 @@ _apt_dep_pkgs=(
 )
 apt_pkg_manager --install "${_apt_dep_pkgs[@]}"
 
+for _shell in "bash" "zsh"; do
+    if [[ -f "${HOME}/.${_shell}rc" ]]; then
+        _add_path="${HOME}/.local/bin"
+        if ! grep -Fq "export PATH=\"${_add_path}:\$PATH\"" "${HOME}/.${_shell}rc"; then
+            log_info "Add local bin path to ${HOME}/.${_shell}rc"
+            exec_cmd "printf '\n%s\n' 'export PATH=\"${_add_path}:\$PATH\"' >> \"${HOME}/.${_shell}rc\""
+        fi
+    fi
+done
+
 log_info "Add fish PPA repository..."
 exec_cmd "sudo apt-add-repository -y ppa:fish-shell/release-4"
 
@@ -75,6 +85,12 @@ source "${SUBMODULE_PATH}/fdfind.sh"
 
 log_info "Install batcat..."
 source "${SUBMODULE_PATH}/batcat.sh"
+
+if [[ ! -d "${HOME}/.ssh" ]]; then
+    mkdir -p -- "${HOME}/.ssh"
+    chmod 700 "${HOME}/.ssh"
+    touch "${HOME}/.ssh/enviroment"
+fi
 
 log_info "Install fish plugins and configure fish..."
 curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | fish -c "source && fisher install jorgebucaran/fisher"
@@ -111,23 +127,6 @@ exec_cmd "fish -c \"
         --prompt_spacing=Sparse \
         --icons='Many icons' \
         --transient=Yes\" &>/dev/null"
-
-#
-if [[ ! -d "${HOME}/.ssh" ]]; then
-    mkdir -p -- "${HOME}/.ssh"
-    chmod 700 "${HOME}/.ssh"
-    touch "${HOME}/.ssh/enviroment"
-fi
-
-for _shell in "bash" "zsh"; do
-    if [[ -f "${HOME}/.${_shell}rc" ]]; then
-        _add_path="${HOME}/.local/bin"
-        if ! grep -Fq "export PATH=\"${_add_path}:\$PATH\"" "${HOME}/.${_shell}rc"; then
-            log_info "Add local bin path to ${HOME}/.${_shell}rc"
-            exec_cmd "printf '\n%s\n' 'export PATH=\"${_add_path}:\$PATH\"' >> \"${HOME}/.${_shell}rc\""
-        fi
-    fi
-done
 
 # copy user config
 exec_cmd "cp -r \"${CONFIG_PATH}/fish\" \"${HOME}/.config\""

@@ -1,8 +1,8 @@
 function docker-build-run --description "Build and run the docker container"
     if test (count $argv) -gt 0
-        set SCRIPT_DIR $argv[1]
+        set _script_dir $argv[1]
     else
-        set SCRIPT_DIR (pwd)
+        set _script_dir (pwd)
     end
 
     if not docker system prune -f
@@ -10,14 +10,14 @@ function docker-build-run --description "Build and run the docker container"
         return 1
     end
 
-    if not $SCRIPT_DIR/build.sh
+    if not $_script_dir/build.sh
         echo "Build failed."
         return 1
     end
 
     clear
 
-    if not $SCRIPT_DIR/run.sh
+    if not $_script_dir/run.sh
         echo "Run failed."
         return 1
     end

@@ -35,12 +35,12 @@ if status is-interactive
             set -xg sponge_purge_only_on_exit true
         end
 
-        if fisher list | grep -q "/pj"
-            set -gx PROJECT_PATHS "{$HOME}/workspace" "{$HOME}/src"
+        if fisher list | grep -q "/plugin-pj"
+            set -gx PROJECT_PATHS "$HOME/workspace"
         end
 
         if fisher list | grep -q "/fish-ssh-agent"
-            set -gx SSH_ENV "{$HOME}/.ssh/environment"
+            set -gx SSH_ENV "$HOME/.ssh/environment"
         end
 
         # # TODO: check fzf config

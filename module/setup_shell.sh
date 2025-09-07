@@ -63,79 +63,17 @@ log_info "Install fish..."
 apt_pkg_manager --install -- fish
 #xsel
 
-# zoxide
-curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
-# eval "$(zoxide init bash)"
-# eval "$(zoxide init zsh)"
+log_info "Install zoxide..."
+bash "${SUBMODULE_PATH}/zoxide.sh"
 
-# fzf
-if [[ -d "${HOME}/.fzf" ]]; then
-    log_info "Backup old fzf installation (${HOME}/.fzf) to ${BACKUP_DIR}/fzf"
-    backup_file "${HOME}/.fzf"
-    rm -rf "${HOME}/.fzf"
-fi
-exec_cmd "git clone --depth 1 \"https://github.com/junegunn/fzf.git\" \"${HOME}/.fzf\" && ${HOME}/.fzf/install --key-bindings --completion --no-update-rc"
-_fzf_bash_conf="[ -f ~/.fzf.bash ] && source ~/.fzf.bash"
-if [[ -f "${HOME}/.bashrc" ]]; then
-    if ! grep -q "${_fzf_bash_conf}" "${HOME}/.bashrc"; then
-        log_info "Add fzf configuration to ${HOME}/.bashrc"
-        exec_cmd "printf '\n%s\n' \"${_fzf_bash_conf}\" >> \"${HOME}/.bashrc\""
-    fi
-fi
+log_info "Install fzf..."
+bash "${SUBMODULE_PATH}/fzf.sh"
 
-# install fd-find
-log_info "Install fd-find (Github Releases)"
-log_info "Get latest fd-find release version from GitHub"
-_tmp_fdfind=""
-create_temp_file _tmp_fdfind "fdfind" "tar.gz"
-_fdfind_version=""
-_fdfind_repo="sharkdp/fd"
-get_github_pkg_latest_version _fdfind_version "${_fdfind_repo}"
-exec_cmd "curl -fsSL --retry 3 -o \"${_tmp_fdfind}\" \
-    \"https://github.com/${_fdfind_repo}/releases/download/v${_fdfind_version}/fd-v${_fdfind_version}-x86_64-unknown-linux-gnu.tar.gz\""
+log_info "Install fdfind..."
+bash "${SUBMODULE_PATH}/fdfind.sh"
 
-_fdfind_install_dir="/opt/fdfind"
-if [[ -e "${_fdfind_install_dir}" ]]; then
-    log_info "Backup old fdfind installation (${_fdfind_install_dir}) to ${BACKUP_DIR}/fdfind"
-    backup_file "${_fdfind_install_dir}"
-    sudo rm -rf "${_fdfind_install_dir}"
-fi
-
-log_info "Install fdfind v${_fdfind_version} to ${_fdfind_install_dir}"
-exec_cmd "sudo mkdir -p -- \"${_fdfind_install_dir}\" && \
-    sudo tar -C \"${_fdfind_install_dir}\" --strip-components=1 -xzf \"${_tmp_fdfind}\" && \
-    sudo ln -sfn \"${_fdfind_install_dir}/fd\" \"/usr/local/bin/fd\""
-
-log_info "fdfind v${_fdfind_version} installed to ${_fdfind_install_dir}."
-
-# install batcat
-log_info "Install batcat (Github Releases)"
-log_info "Get latest batcat release version from GitHub"
-_tmp_batcat=""
-create_temp_file _tmp_batcat "batcat" "tar.gz"
-_batcat_version=""
-_batcat_repo="sharkdp/bat"
-get_github_pkg_latest_version _batcat_version "${_batcat_repo}"
-exec_cmd "curl -fsSL --retry 3 -o \"${_tmp_batcat}\" \
-    \"https://github.com/${_batcat_repo}/releases/download/v${_batcat_version}/bat-v${_batcat_version}-x86_64-unknown-linux-gnu.tar.gz\""
-
-_batcat_install_dir="/opt/batcat"
-if [[ -e "${_batcat_install_dir}" ]]; then
-    log_info "Backup old batcat installation (${_batcat_install_dir}) to ${BACKUP_DIR}/batcat"
-    backup_file "${_batcat_install_dir}"
-    sudo rm -rf "${_batcat_install_dir}"
-fi
-
-log_info "Install batcat v${_batcat_version} to ${_batcat_install_dir}"
-exec_cmd "sudo mkdir -p -- \"${_batcat_install_dir}\" && \
-    sudo tar -C \"${_batcat_install_dir}\" --strip-components=1 -xzf \"${_tmp_batcat}\" && \
-    sudo ln -sfn \"${_batcat_install_dir}/bat\" \"/usr/local/bin/bat\""
-
-log_info "batcat v${_batcat_version} installed to ${_batcat_install_dir}."
-
-
-# install fisher
-apt_pkg_manager --install -- curl
+log_info "Install batcat..."
+bash "${SUBMODULE_PATH}/batcat.sh"
 
 curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | fish -c "source && fisher install jorgebucaran/fisher"
 

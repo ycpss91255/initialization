@@ -55,7 +55,7 @@ for _shell in "bash" "zsh"; do
     if [[ -f "${HOME}/.${_shell}rc" ]]; then
         if ! grep -Fq "${_zoxide_conf}" "${HOME}/.${_shell}rc"; then
             log_info "Add zoxide configuration to ${HOME}/.${_shell}rc"
-            exec_cmd "printf '\n%s\n' '${_zoxide_conf}' >> \"./${_shell}rc\""
+            exec_cmd "printf '\n%s\n' '${_zoxide_conf}' >> \"${HOME}/.${_shell}rc\""
         fi
 
         _add_path="${HOME}/.local/bin"

@@ -7,7 +7,6 @@ MAIN_FILE="true"; [[ "${BASH_SOURCE[0]}" != "${0}" ]] && MAIN_FILE="false"
 
 if [[ "${MAIN_FILE}" == "true" ]]; then
     # shellcheck disable=SC2155
-    SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
     export USER="${USER:-"$(whoami)"}"
     export HOME="${HOME:-"/home/${USER}"}"
     export LANGUAGE="C:en"
@@ -20,16 +19,21 @@ if [[ "${MAIN_FILE}" == "true" ]]; then
     unset HAVE_SUDO_ACCESS
 
     # shellcheck disable=SC2155
-    export DATETIME="$(date +"%Y-%m-%d-%T")"
-    export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
+    # export DATETIME="$(date +"%Y-%m-%d-%T")"
+    # export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
+
+    SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+    export FUNCTION_PATH="${SCRIPT_PATH}/function"
+    export CONFIG_PATH="${SCRIPT_PATH}/config"
+
     :
 fi
 
 # include sub script
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/function/logger.sh"
+source "${FUNCTION_PATH}/logger.sh"
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/function/general.sh"
+source "${FUNCTION_PATH}/general.sh"
 
 # the file used variables
 if [[ "${MAIN_FILE}" == "true" ]]; then
@@ -199,23 +203,23 @@ log_info "Configure shell to use 'fnm'"
 # fish
 if [[ ! -f "${HOME}/.config/fish/conf.d/fnm.fish" ]]; then
     mkdir -p "${HOME}/.config/fish/conf.d"
-    _source_file="${_script_path}/config/neovim/fnm_shell_config/fnm.fish"
-    log_info "Add fnm configuration to ${HOME}/.config/fish/conf.d/fnm.fish from ${_source_file}"
-    exec_cmd "cp \"${_source_file}\" \"${HOME}/.config/fish/conf.d/fnm.fish\""
+    _fnm_fish_conf_file="${_script_path}/config/neovim/fnm_shell_config/fnm.fish"
+    log_info "Add fnm configuration to ${HOME}/.config/fish/conf.d/fnm.fish from ${_fnm_fish_conf_file}"
+    exec_cmd "cp \"${_fnm_fish_conf_file}\" \"${HOME}/.config/fish/conf.d/fnm.fish\""
 fi
 # bash
 if [[ -f "${HOME}/.bashrc" ]]; then
     if ! grep -q 'fnm env' "${HOME}/.bashrc"; then
-        _source_file="${_script_path}/config/neovim/fnm_shell_config/config.bash"
-        log_info "Add fnm configuration to ${HOME}/.bashrc from ${_source_file}"
-        exec_cmd "cat \"${_source_file}\" >> \"${HOME}/.bashrc\""
+        _fnm_bash_conf_file="${_script_path}/config/neovim/fnm_shell_config/config.bash"
+        log_info "Add fnm configuration to ${HOME}/.bashrc from ${_fnm_bash_conf_file}"
+        exec_cmd "cat \"${_fnm_bash_conf_file}\" >> \"${HOME}/.bashrc\""
     fi
 fi
 
-_source_file="${_script_path}/config/neovim/fnm_shell_config/config.bash"
+# shellcheck disable=SC1091
+source "${CONFIG_PATH}/neovim/fnm_shell_config/config.bash"
 _fnm_version="22"
-exec_cmd "source \"${_source_file}\" && \
-    fnm install ${_fnm_version} && \
+exec_cmd "fnm install ${_fnm_version} && \
     fnm use ${_fnm_version} && \
     fnm alias default ${_fnm_version}"
 
@@ -226,8 +230,7 @@ _npm_pkgs=(
     "tree-sitter-cli"
 )
 for _pkg in "${_npm_pkgs[@]}"; do
-    exec_cmd "source \"${_source_file}\" && \
-        npm install -g -- \"${_pkg}\""
+    exec_cmd "npm install -g -- \"${_pkg}\""
 done
 
 
@@ -246,13 +249,11 @@ fi
 if command -v curl >/dev/null 2>&1; then
     # shellcheck disable=SC1090
     bash -c "$(
-        source "${_source_file}" && \
         curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh
     )" || true
 else
     # shellcheck disable=SC1090
     bash -c "$(
-        source "${_source_file}" && \
         wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh
     )" || true
 fi

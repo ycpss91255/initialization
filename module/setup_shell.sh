@@ -129,7 +129,7 @@ fi
 log_info "Install batcat v${_batcat_version} to ${_batcat_install_dir}"
 exec_cmd "sudo mkdir -p -- \"${_batcat_install_dir}\" && \
     sudo tar -C \"${_batcat_install_dir}\" --strip-components=1 -xzf \"${_tmp_batcat}\" && \
-    sudo ln -sfn \"${_batcat_install_dir}/bin/bat\" \"/usr/local/bin/bat\""
+    sudo ln -sfn \"${_batcat_install_dir}/bat\" \"/usr/local/bin/bat\""
 
 log_info "batcat v${_batcat_version} installed to ${_batcat_install_dir}."
 

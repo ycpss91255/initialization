@@ -23,8 +23,8 @@ if [[ "${MAIN_FILE}" == "true" ]]; then
     # export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
 
     SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-    export FUNCTION_PATH="${SCRIPT_PATH}/function"
-    export CONFIG_PATH="${SCRIPT_PATH}/config"
+    export FUNCTION_PATH="${SCRIPT_PATH}/../function"
+    export CONFIG_PATH="${SCRIPT_PATH}/../config"
 
     :
 fi
@@ -55,7 +55,7 @@ for _shell in "bash" "zsh"; do
     if [[ -f "${HOME}/.${_shell}rc" ]]; then
         if ! grep -Fq "${_zoxide_conf}" "${HOME}/.${_shell}rc"; then
             log_info "Add zoxide configuration to ${HOME}/.${_shell}rc"
-            exec_cmd "printf '\n%s\n' \"${_zoxide_conf}\" >> \"${HOME}/.${_shell}rc\""
+            exec_cmd "printf '\n%s\n' '${_zoxide_conf}' >> \"./${_shell}rc\""
         fi
     fi
 done

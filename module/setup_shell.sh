@@ -65,17 +65,18 @@ apt_pkg_manager --install -- fish
 #xsel
 
 log_info "Install zoxide..."
-bash "${SUBMODULE_PATH}/zoxide.sh"
+source "${SUBMODULE_PATH}/zoxide.sh"
 
 log_info "Install fzf..."
-bash "${SUBMODULE_PATH}/fzf.sh"
+source "${SUBMODULE_PATH}/fzf.sh"
 
 log_info "Install fdfind..."
-bash "${SUBMODULE_PATH}/fdfind.sh"
+source "${SUBMODULE_PATH}/fdfind.sh"
 
 log_info "Install batcat..."
-bash "${SUBMODULE_PATH}/batcat.sh"
+source "${SUBMODULE_PATH}/batcat.sh"
 
+log_info "Install fish plugins and configure fish..."
 curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | fish -c "source && fisher install jorgebucaran/fisher"
 
 # Install fish plugin

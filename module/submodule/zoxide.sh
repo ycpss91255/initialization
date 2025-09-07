@@ -57,5 +57,12 @@ for _shell in "bash" "zsh"; do
             log_info "Add zoxide configuration to ${HOME}/.${_shell}rc"
             exec_cmd "printf '\n%s\n' '${_zoxide_conf}' >> \"./${_shell}rc\""
         fi
+
+        _add_path="${HOME}/.local/bin"
+
+        if ! grep -Fq "export PATH=\"${_add_path}:\$PATH\"" "${HOME}/.${_shell}rc"; then
+            log_info "Add local bin path to ${HOME}/.${_shell}rc"
+            exec_cmd "printf '\n%s\n' 'export PATH=\"${_add_path}:\$PATH\"' >> \"${HOME}/.${_shell}rc\""
+        fi
     fi
 done

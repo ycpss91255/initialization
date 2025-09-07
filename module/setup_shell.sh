@@ -119,6 +119,16 @@ if [[ ! -d "${HOME}/.ssh" ]]; then
     touch "${HOME}/.ssh/enviroment"
 fi
 
+for _shell in "bash" "zsh"; do
+    if [[ -f "${HOME}/.${_shell}rc" ]]; then
+        _add_path="${HOME}/.local/bin"
+        if ! grep -Fq "export PATH=\"${_add_path}:\$PATH\"" "${HOME}/.${_shell}rc"; then
+            log_info "Add local bin path to ${HOME}/.${_shell}rc"
+            exec_cmd "printf '\n%s\n' 'export PATH=\"${_add_path}:\$PATH\"' >> \"${HOME}/.${_shell}rc\""
+        fi
+    fi
+done
+
 # copy user config
 exec_cmd "cp -r \"${CONFIG_PATH}/fish\" \"${HOME}/.config\""
 

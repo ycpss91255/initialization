@@ -36,7 +36,7 @@ if status is-interactive
         end
 
         if fisher list | grep -q "/plugin-pj"
-            set -gx PROJECT_PATHS "$HOME/workspace"
+            set -gx PROJECT_PATHS "$HOME/workspace" $PROJECT_PATHS
         end
 
         if fisher list | grep -q "/fish-ssh-agent"
@@ -48,5 +48,8 @@ if status is-interactive
         #     set fzf_preview_dir_cmd eza --all --color=always
         # end
     end
-end
 
+    if not contains $HOME/.local/bin $PATH
+        set -Ux PATH $HOME/.local/bin $PATH
+    end
+end

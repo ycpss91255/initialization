@@ -246,17 +246,18 @@ if [[ ! -d "${HOME}/.cache/nvim" ]]; then
 fi
 
 # NOTE: enter is use default option
-if command -v curl >/dev/null 2>&1; then
-    # shellcheck disable=SC1090
-    bash -c "$(
-        curl -fsSL https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh
-    )" || true
+_tmp_nvimdots=""
+create_temp_file _tmp_nvimdots "nvimdots_install" "sh"
+_nvimdots_url="https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh"
+
+if check_pkg_status --exec -- "curl"; then
+    exec_cmd "curl -fsSL -o \"${_tmp_nvimdots}\" ${_nvimdots_url} "
+elif check_pkg_status --exec -- "wget"; then
+    exec_cmd "wget -q -O \"${_tmp_nvimdots}\" ${_nvimdots_url}"
 else
-    # shellcheck disable=SC1090
-    bash -c "$(
-        wget -O- https://raw.githubusercontent.com/ayamir/nvimdots/HEAD/scripts/install.sh
-    )" || true
+    log_fatal "Neither 'curl' nor 'wget' found, cannot download nvimdots install script."
 fi
+bash "${_tmp_nvimdots}" || true
 
 # NOTE: ERROR List
 # go.nvim

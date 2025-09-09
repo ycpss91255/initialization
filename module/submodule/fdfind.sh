@@ -47,41 +47,65 @@ if ! have_sudo_access; then
     fi
 fi
 
-log_info "Install fd-find (Github Releases)"
-log_info "Get latest fd-find release version from GitHub"
-# create temp file
-_tmp_fdfind=""
-create_temp_file _tmp_fdfind "fdfind" "tar.gz"
+function install_fdfind() {
+    local _github_repo="${1:?"${FUNCNAME[0]}: missing github repo"}"
+    local _run_alias="${2:?"${FUNCNAME[0]}: missing run alias"}"
+    local _strip_components="${3:-0}"
 
-# get latest version from github and download
-_fdfind_version=""
-_fdfind_repo="sharkdp/fd"
-get_github_pkg_latest_version _fdfind_version "${_fdfind_repo}"
-exec_cmd "curl -fsSL --retry 3 -o \"${_tmp_fdfind}\" \
-    \"https://github.com/${_fdfind_repo}/releases/download/v${_fdfind_version}/fd-v${_fdfind_version}-x86_64-unknown-linux-gnu.tar.gz\""
+    local _pkg_name="${_github_repo##*/}"
+    local _install_dir="/opt/${_pkg_name}"
+    local _tmp_file="" _latest_version="" _install_version="" _repo_url="" _download_file=""
 
-_fdfind_install_dir="/opt/fdfind"
-_skip_fdfind_install="false"
-if [[ -e "${_fdfind_install_dir}" ]]; then
-    # system fd-find version check
-    if [[ -x "${_fdfind_install_dir}/fd" ]]; then
-        if [[ "$("${_fdfind_install_dir}/fd" --version | awk '{print $2}')" == "${_fdfind_version}" ]]; then
-            log_info "fd-find v${_fdfind_version} already installed to ${_fdfind_install_dir}."
-            _skip_fdfind_install="true"
+    # create temp file
+    create_temp_file _tmp_file "${_pkg_name}" ".tar.gz"
+
+    # get latest version from Github
+    get_github_pkg_latest_version _latest_version "${_github_repo}"
+
+    # check if already installed
+    if [[ -x "$(command -v "${_run_alias}")" ]];then
+        # NOTE: please check the version command
+        _install_version="$("${_run_alias}" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')"
+
+        # The latest version is already installed
+        if [[ "${_install_version}" == "${_latest_version}" ]]; then
+            log_info "${_run_alias} v${_latest_version} lready installed to ${_install_dir}."
+            return 0
         fi
     fi
-    if [[ "${_skip_fdfind_install}" == "false" ]]; then
-        log_info "Backup old fdfind installation (${_fdfind_install_dir}) to ${BACKUP_DIR}/fdfind"
-        backup_file "${_fdfind_install_dir}"
-        sudo rm -rf "${_fdfind_install_dir}"
+
+    # backup old installation
+    if [[ -d "${_install_dir}" ]]; then
+        log_info "Backup old ${_pkg_name} installation ${_install_dir}) to ${BACKUP_DIR}/${_pkg_name}"
+        backup_file "${_install_dir}"
+        sudo rm -rf "${_install_dir}"
     fi
-fi
 
-if [[ "${_skip_fdfind_install}" == "false" ]]; then
-    log_info "Install fdfind v${_fdfind_version} to ${_fdfind_install_dir}"
-    exec_cmd "sudo mkdir -p -- \"${_fdfind_install_dir}\" && \
-        sudo tar -C \"${_fdfind_install_dir}\" --strip-components=1 -xzf \"${_tmp_fdfind}\" && \
-        sudo ln -sfn \"${_fdfind_install_dir}/fd\" \"/usr/local/bin/fd\""
-fi
+    # NOTE: This is example URL, please modify it according to your need
+    _download_file="${_pkg_name}-v${_latest_version}-x86_64-unknown-linux-gnu.tar.gz"
+    _repo_url="https://github.com/${_github_repo}/releases/latest/download/${_download_file}"
 
-log_info "fdfind v${_fdfind_version} installed to ${_fdfind_install_dir}."
+    log_info "Download ${_pkg_name} v${_latest_version} from ${_repo_url}"
+    exec_cmd "curl -fsSL --retry 3 -o \"${_tmp_file}\" \"${_repo_url}\""
+
+    # verify download file
+    if ! file "${_tmp_file}" | grep -q "gzip compressed data"; then
+        log_fatal "Downloaded file ${_tmp_file} is not a valid gzip file."
+        return 1
+    fi
+    if ! sudo tar -tzf "${_tmp_file}" &>/dev/null; then
+        log_fatal "Downloaded file ${_tmp_file} is not a valid tar.gz archive."
+        return 1
+    fi
+
+    # install package
+    log_info "Install ${_pkg_name} v${_latest_version} to ${_install_dir}"
+    exec_cmd "sudo mkdir -p -- \"${_install_dir}\" &&\
+        sudo tar -xzf \"${_tmp_file}\" -C \"${_install_dir}\" --strip-components=${_strip_components}"
+    # NOTE: please check the binary name or path
+    exec_cmd "sudo ln -sfn -- \"${_install_dir}/${_pkg_name}\" \"/usr/local/bin/${_run_alias}\""
+
+    log_info "Installed ${_pkg_name} v${_latest_version} to ${_install_dir}, run alias: ${_run_alias}"
+}
+
+install_fdfind "sharkdp/fd" "fd" "1"

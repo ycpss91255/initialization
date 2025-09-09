@@ -40,9 +40,9 @@ log_info "Start setup process..."
 
 if ! have_sudo_access; then
     if [[ "${MAIN_FILE}" == "true" ]]; then
-        log_fatal "No sudo access. Cannot continue install 'eza'."
+        log_fatal "No sudo access. Cannot continue install 'xxx'."
     else
-        log_warn "Skip install 'eza' due to no sudo access."
+        log_warn "Skip install 'xxx' due to no sudo access."
         return 1
     fi
 fi
@@ -50,12 +50,12 @@ fi
 # NOTE: Please modify the function name and parameters according to your need
 function install_xxx() {
     local _github_repo="${1:?"${FUNCNAME[0]}: missing github repo"}"
-    local _run_alias="${2:?"${FUNCNAME[0]}: missing run alias"}"
-    local _strip-components="${3:-0}"
+    local _bin_file="${2:?"${FUNCNAME[0]}: missing bin name"}"
+    local _strip_components="${3:-0}"
 
     local _pkg_name="${_github_repo##*/}"
     local _install_dir="/opt/${_pkg_name}"
-    local _tmp_file="" _latest_version="" _install_version="" _repo_url="" _download_file=""
+    local _tmp_file="" _latest_version="" _install_version="" _repo_url="" _download_file="" _no_download="false"
 
     # create temp file
     create_temp_file _tmp_file "${_pkg_name}" ".tar.gz"
@@ -64,49 +64,74 @@ function install_xxx() {
     get_github_pkg_latest_version _latest_version "${_github_repo}"
 
     # check if already installed
-    if [[ -x "$(command -v "${_run_alias}")" ]];then
-        # NOTE: please check the version command
-        _install_version="$("${_run_alias}" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')"
+    if command -v "${_bin_file}" ;then
+        # NOTE: check the version get command
+        _install_version="$("${_bin_file}" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')"
 
         # The latest version is already installed
-        if [[ "${_install_version}" == "${_latest_version}" ]]; then
-            log_info "${_run_alias} v${_latest_version} lready installed to ${_install_dir}."
-            return 0
+        [ "${_install_version}" == "${_latest_version}" ] && _no_download="true"
+    fi
+
+    # download and install latest version package
+    if [[ "${_no_download}" == "false" ]]; then
+        # backup old installation
+        if [[ -d "${_install_dir}" ]]; then
+            log_info "Backup old ${_pkg_name} installation ${_install_dir}) to ${BACKUP_DIR}/${_pkg_name}"
+            backup_file "${_install_dir}"
+            sudo rm -rf "${_install_dir}"
+        fi
+
+        # NOTE: Replace with the actual download file name format
+        _download_file="${_pkg_name}_x86_64-unknown-linux-gnu.tar.gz"
+        _repo_url="https://github.com/${_github_repo}/releases/latest/download/${_download_file}"
+
+        log_info "Download ${_pkg_name} v${_latest_version} from ${_repo_url}"
+        exec_cmd "curl -fsSL --retry 3 -o \"${_tmp_file}\" \"${_repo_url}\""
+
+        # verify download file
+        if ! file "${_tmp_file}" | grep -q "gzip compressed data"; then
+            log_fatal "Downloaded file ${_tmp_file} is not a valid gzip file."
+            return 1
+        fi
+        if ! sudo tar -tzf "${_tmp_file}" &>/dev/null; then
+            log_fatal "Downloaded file ${_tmp_file} is not a valid tar.gz archive."
+            return 1
+        fi
+
+        # install package
+        log_info "Install ${_pkg_name} v${_latest_version} to ${_install_dir}"
+        exec_cmd "sudo mkdir -p -- \"${_install_dir}\" &&\
+            sudo tar -xzf \"${_tmp_file}\" -C \"${_install_dir}\" --strip-components=${_strip_components}"
+        # NOTE: Replace with the actual binary file path
+        exec_cmd "sudo ln -sfn -- \"${_install_dir}/${_pkg_name}\" \"/usr/local/bin/${_bin_file}\""
+
+        _install_version="${_latest_version}"
+    fi
+
+    # NOTE: add config to user's shell profile and rc file (optional)
+    for _shell in "bash" "zsh"; do
+        # add to rc file
+        if [[ -f "${HOME}/.${_shell}rc" ]]; then
+            # NOTE: change to the command to be aliased
+            local _replace_cmd="xxx"
+            local _alias_cmd="${_bin_file}"
+            local _alias_full_cmd="command -v ${_alias_cmd} &>/dev/null && alias ${_replace_cmd}='${_alias_cmd}'"
+            if ! grep -q "${_alias_full_cmd}" "${HOME}/.${_shell}rc"; then
+                log_info "Add alias '${_alias_full_cmd}' to ${HOME}/.${_shell}rc"
+                exec_cmd "echo \"${_alias_full_cmd}\" >> \"${HOME}/.${_shell}rc\""
+            fi
+        fi
+    done
+    # add to profile
+    if [[ -f "${HOME}/.profile" ]]; then
+        local _xxx_env="export A='B'"
+        if ! grep -q "${_xxx_env}" "${HOME}/.profile"; then
+            echo "${_xxx_env}" >> "${HOME}/.profile"
         fi
     fi
 
-    # backup old installation
-    if [[ -d "${_install_dir}" ]]; then
-        log_info "Backup old ${_pkg_name} installation ${_install_dir}) to ${BACKUP_DIR}/${_pkg_name}"
-        backup_file "${_install_dir}"
-        sudo rm -rf "${_install_dir}"
-    fi
 
-    # NOTE: This is example URL, please modify it according to your need
-    _download_file="${_pkg_name}_x86_64-unknown-linux-gnu.tar.gz"
-    _repo_url="https://github.com/${_github_repo}/releases/latest/download/${_download_file}"
-
-    log_info "Download ${_pkg_name} v${_latest_version} from ${_repo_url}"
-    exec_cmd "curl -fsSL --retry 3 -o \"${_tmp_file}\" \"${_repo_url}\""
-
-    # verify download file
-    if ! file "${_tmp_file}" | grep -q "gzip compressed data"; then
-        log_fatal "Downloaded file ${_tmp_file} is not a valid gzip file."
-        return 1
-    fi
-    if ! sudo tar -tzf "${_tmp_file}" &>/dev/null; then
-        log_fatal "Downloaded file ${_tmp_file} is not a valid tar.gz archive."
-        return 1
-    fi
-
-    # install package
-    log_info "Install ${_pkg_name} v${_latest_version} to ${_install_dir}"
-    exec_cmd "sudo mkdir -p -- \"${_install_dir}\" &&\
-        sudo tar -xzf \"${_tmp_file}\" -C \"${_install_dir}\" --strip-components=${_strip-components}"
-    # NOTE: please check the binary name or path
-    exec_cmd "sudo ln -sfn -- \"${_install_dir}/${_pkg_name}\" \"/usr/local/bin/${_run_alias}\""
-
-    log_info "Installed ${_pkg_name} v${_latest_version} to ${_install_dir}, run alias: ${_run_alias}"
+    log_info "Installed ${_pkg_name} v${_install_version} to ${_install_dir}, run alias: ${_bin_file}"
 }
 
 install_xxx "" "" ""

@@ -40,8 +40,10 @@ log_info "Start setup process..."
 
 if ! have_sudo_access; then
     if [[ "${MAIN_FILE}" == "true" ]]; then
+        # NOTE: Replace 'xxx' with the actual tool name
         log_fatal "No sudo access. Cannot continue install 'xxx'."
     else
+        # NOTE: Replace 'xxx' with the actual tool name
         log_warn "Skip install 'xxx' due to no sudo access."
         return 1
     fi

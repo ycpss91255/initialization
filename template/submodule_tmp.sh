@@ -103,7 +103,7 @@ function install_xxx() {
         exec_cmd "sudo mkdir -p -- \"${_install_dir}\" &&\
             sudo tar -xzf \"${_tmp_file}\" -C \"${_install_dir}\" --strip-components=${_strip_components}"
         # NOTE: Replace with the actual binary file path
-        exec_cmd "sudo ln -sfn -- \"${_install_dir}/${_pkg_name}\" \"/usr/local/bin/${_bin_file}\""
+        exec_cmd "sudo ln -sfn -- \"${_install_dir}/${_bin_file}\" \"/usr/local/bin/${_bin_file}\""
 
         _install_version="${_latest_version}"
     fi

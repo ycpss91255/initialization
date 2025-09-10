@@ -1,0 +1,14 @@
+# Read more about SSH config files: https://linux.die.net/man/5/ssh_config
+
+Host github.com
+    User git
+    Hostname github.com
+    IdentityFile ~/.ssh/id_ed25519
+
+Host my_server
+    User user
+    HostName 127.0.0.1
+    Port 22
+    ForwardX11 yes
+    ForwardX11Trusted yes
+    IdentityFile ~/.ssh/id_ed25519

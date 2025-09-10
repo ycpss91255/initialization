@@ -180,8 +180,6 @@ ag replace grep
 tig [--all]
 tig status
 
-# tldr
-tldr <COMMAND>
 
 # tree
 tree [FOLDER_PATH]
@@ -213,3 +211,145 @@ chmod +x ./remove.sh
 * https://github.com/romner-set/btop-gpu[btop-gpu Github (*not install*, but can see the GPU, awesome!)]
 
 // TODO: segmentation all tool
+
+// NOTE: for teaching
+// tldr <COMMAND>
+// https://github.com/tldr-pages/tldr?tab=readme-ov-file
+// navi
+// https://github.com/denisidoro/navi?tab=readme-ov-file
+
+// TODO: replace repeated installation steps with "submodule"
+
+
+== 安裝
+
+[NOTE]
+====
+需要相應地轉換以下內容。
+
+`<this directory>` 更改為 *README* 所在的目錄。
+
+`<session name>` 更改為 tmux 的會話名。
+
+`<number>` 更改為 tmux 會話的數量。
+====
+
+[source, shell]
+----
+# 安裝 tmux
+cd <this directory>
+chmod +x install.sh
+./install.sh
+
+# 驗證安裝
+tmux -V
+----
+
+== 使用方法
+
+這個 tmux 配置使用了許多與 vim 相同的快捷鍵。
+
+=== 指令
+[source, shell]
+----
+# 啟動 tmux
+tmux
+# 創建一個新會話
+tmux new -s <session name>
+
+# 連接到一個會話
+tmux attach -t <session name>
+tmux a -t <session name>
+tmux attach -t <number>
+tmux a -t <number>
+tmux a # 最後一個會話
+
+# 分離會話，後台運行
+tmux detach
+
+# 列出所有會話
+tmux list-sessions
+tmux ls
+
+# 計算 tmux 會話數量
+tmux list-sessions | wc -l
+
+# 殺死 tmux 會話
+tmux kill-session -t <session name>
+tmux kill-session -t <number>
+tmux kill-server # 殺死伺服器（所有會話）
+tmux ls pkill tmux # 所有會話
+----
+
+=== 鍵盤快捷鍵
+
+[cols="3,7", options="header"]
+|===
+|快捷鍵 |描述
+
+2+^.^|*前綴*
+|kbd:[Ctrl], kbd:[s]
+|*前綴鍵*。
+
+2+^.^|*會話*
+|kbd:[前綴 + "]
+|選擇會話。
+|kbd:[前綴 + S]
+|新建會話。
+|kbd:[前綴] + kbd:[Alt], kbd:[r]
+|重命名會話。
+|kbd:[前綴] + <kbd:[H] 或 kbd:[L]>
+|切換客戶端 前一個 kbd:[H] 或下一個 kbd:[L]。
+
+2+^.^|*視窗*
+|kbd:[前綴] + <kbd:[c] 或 kbd:[Ctrl + c]>
+|新建視窗。
+|kbd:[前綴 + R]
+|重命名視窗。
+|kbd:[前綴] + <kbd:[h] 或 kbd:[l]> 或 <kbd:[Ctrl], kbd:[h] 或 kbd:[Ctrl], kbd:[l]>
+|切換視窗到前一個 kbd:[h] 或下一個 kbd:[l]。
+|kbd:[前綴 + ']
+|選擇視窗。
+
+2+^.^|*面板*
+|kbd:[前綴] + <kbd:[s] 或 kbd:[v]>
+|分割視窗 垂直 kbd:[s], 水平 kbd:[v]。
+|kbd:[前綴] + <kbd:[+] 或 kbd:[_]> 或 <kbd:[=] 或 kbd:[-]> 或 <kbd:[<] 或 kbd:[>]>
+|調整面板大小 向上 kbd:[+] 或向下 kbd:[_] 向上 kbd:[=] 或向下 kbd:[-] 向左 kbd:[<] 或向右 kbd:[>]。
+|kbd:[前綴] + <kbd:[j] 或 kbd:[k]> 或 <kbd:[Ctrl], kbd:[j] 或 kbd:[Ctrl], kbd:[k]>
+|切換面板到前一個 kbd:[j] 或下一個 kbd:[k]。
+|kbd:[前綴] + <kbd:[J] 或 kbd:[K]>
+|與前一個面板 kbd:[J] 或下一個面板 kbd:[K] 交換。
+
+2+^.^|*其他*
+|kbd:[前綴 + d] 或 kbd:[Ctrl], kbd:[d]
+|分離客戶端。
+|kbd:[前綴 + r]
+|重載 tmux 配置。
+|kbd:[前綴 + w]
+|選擇樹。
+|kbd:[前綴 + D]
+|選擇客戶端。
+|kbd:[前綴] + kbd:[Ctrl], kbd:[l]
+|清除視窗。
+|kbd:[prefix] + kbd:[[]
+|複製模式。
+|kbd:[前綴] + <kbd:[Ctrl], kbd:[s] 或 kbd:[Ctrl], kbd:[r]>
+|保存 kbd:[s] 或恢復 kbd:[r] 工作狀態。
+|kbd:[前綴 + F12]
+|垂直分割視窗並開啟 htop。
+
+|===
+
+== 移除
+
+[source, shell]
+----
+# 移除 tmux
+chmod +x ./remove.sh
+./remove.sh
+
+# 驗證移除
+tmux -V
+# tmux: command not found
+----

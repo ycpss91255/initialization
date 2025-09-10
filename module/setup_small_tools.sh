@@ -256,6 +256,27 @@ function install_spotify() {
     apt_pkg_manager --install -- "spotify-client"
 }
 
+function install_vim() {
+    apt_pkg_manager --install -- "vim"
+
+    if [[ -f "${HOME}/.vimrc" ]]; then
+        log_info "Backup old vim configuration (${HOME}/.vimrc) to ${BACKUP_DIR}/.vimrc"
+        backup_file "${HOME}/.vimrc"
+        exec_cmd "rm -f \"${HOME}/.vimrc\""
+    fi
+    exec_cmd "cp ${CONFIG_PATH}/vim_config ${HOME}/.vimrc"
+
+    if [[ -d "${HOME}/.vim" ]]; then
+        log_info "Backup old vim configuration (${HOME}/.vim) to ${BACKUP_DIR}/.vim"
+        backup_file "${HOME}/.vim"
+        exec_cmd "rm -rf \"${HOME}/.vim\""
+    fi
+    exec_cmd "mkdir -p \"${HOME}/.vim/autoload\""
+    exec_cmd "curl -fsSL --retry 3 --create-dirs -o ~/.vim/autoload/plug.vim \
+        \"https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim\""
+    exec_cmd "vim +PlugInstall +qall"
+}
+
 _install_base_pkgs
 install_submodule_tool
 _install_ssh_pkgs
@@ -264,3 +285,4 @@ _install_monitor_pkgs
 _install_ranger
 install_tmux
 install_spotify
+install_vim

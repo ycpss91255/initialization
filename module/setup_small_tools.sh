@@ -73,6 +73,7 @@ function _install_base_pkgs() {
         "cowsay"
         "cmatrix"
         "figlet"
+        "cheese"
     )
 
     log_info "Install basic packages..."

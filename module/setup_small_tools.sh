@@ -55,20 +55,23 @@ function _install_base_pkgs() {
         "curl"
         "wget"
         "jq"
-        # "apt-file"
+
         "python3"
         "python3-dev"
         "python3-pip"
         "python3-setuptools"
         "pipx"
+
         "xclip"
         # "xsel"
+
         "net-tools"
         "ncdu"
         "neofetch"
         "tree"
         "silversearcher-ag"
         "xdg-utils"
+        "gnome-shell-extension-manager"
 
         "cowsay"
         "cmatrix"

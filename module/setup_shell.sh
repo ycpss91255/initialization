@@ -57,31 +57,6 @@ _apt_dep_pkgs=(
 )
 apt_pkg_manager --install "${_apt_dep_pkgs[@]}"
 
-if ! echo ":${PATH}:" | grep -F ":${HOME}/bin:"; then
-    log_info "Add bin path to ${HOME}/.profile"
-    exec_cmd "printf '%s\n' \
-        '# set PATH so it includes user'\''s private bin if it exists' \
-        'if [ -d \"\${HOME}/bin\" ] ; then' \
-        '    PATH=\"\${HOME}/bin:\$PATH\"' \
-        'fi' >> \"${HOME}/.profile\""
-    # # set PATH so it includes user's private bin if it exists
-    # if [ -d "$HOME/bin" ] ; then
-    #     PATH="$HOME/bin:$PATH"
-    # fi
-fi
-if ! echo ":${PATH}:" | grep -F ":${HOME}/.local/bin:"; then
-    log_info "Add local bin path to ${HOME}/.profile"
-    exec_cmd "printf '%s\n' \
-        '# set PATH so it includes user'\''s private bin if it exists' \
-        'if [ -d \"\${HOME}/.local/bin\" ] ; then' \
-        '    PATH=\"\${HOME}/.local/bin:\$PATH\"' \
-        'fi' >> \"${HOME}/.profile\""
-    # # set PATH so it includes user's private bin if it exists
-    # if [ -d "$HOME/.local/bin" ] ; then
-    #     PATH="$HOME/.local/bin:$PATH"
-    # fi
-fi
-
 log_info "Install zoxide..."
 # shellcheck disable=SC1091
 source "${SUBMODULE_PATH}/zoxide.sh"
@@ -160,4 +135,4 @@ function install_fish_plugin_and_set_user_config() {
     exec_cmd "sudo chsh -s \"$(which fish)\" \"${USER}\""
 }
 
-_install_fisher_and_fish_plugin
+# install_fish_plugin_and_set_user_config

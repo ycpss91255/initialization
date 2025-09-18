@@ -47,38 +47,7 @@ if ! have_sudo_access; then
     fi
 fi
 
-# NOTE: Not using the public version function
 function install_fzf() {
-    local _github_repo="${1:?"${FUNCNAME[0]}: missing github repo"}"
-    local _run_alias="${2:?"${FUNCNAME[0]}: missing run alias"}"
-    local _install_dir="${3:-${HOME}/.fzf}"
-
-    local _pkg_name="${_github_repo##*/}"
-    local _latest_version="" _install_version="" _no_download="false"
-
-    get_github_pkg_latest_version _latest_version "${_github_repo}"
-
-
-    if [[ "${_no_download}" == "false" ]]; then
-        exec_cmd "git clone --depth 1 \"https://github.com/junegunn/fzf.git\" \"${_install_dir}\" && \
-        ${_install_dir}/install --key-bindings --completion --no-update-rc"
-    fi
-
-    for _shell in "bash" "zsh"; do
-        _fzf_conf="[ -f ~/.fzf.${_shell} ] && source ~/.fzf.${_shell}"
-        if [[ -f "${HOME}/.${_shell}rc" ]]; then
-            if ! grep -q "${_fzf_conf}" "${HOME}/.${_shell}rc"; then
-                log_info "Add fzf configuration to ${HOME}/.${_shell}rc"
-                exec_cmd "printf '\n%s\n' \"${_fzf_conf}\" >> \"${HOME}/.${_shell}rc\""
-            fi
-        fi
-    done
-
-    log_info "Installed ${_pkg_name} v${_latest_version} to ${_install_dir}, run alias: ${_run_alias}."
-}
-
-
-function install_xxx() {
     local _github_repo="${1:?"${FUNCNAME[0]}: missing github repo"}"
     local _bin_file="${2:?"${FUNCNAME[0]}: missing bin name"}"
     local _install_dir="${3:-${HOME}/.fzf}"
@@ -93,7 +62,7 @@ function install_xxx() {
     get_github_pkg_latest_version _latest_version "${_github_repo}"
 
     # check if already installed
-    if command -v "${_bin_file}" ;then
+    if check_pkg_status --exec -- "${_bin_file}" ;then
         _install_version="$("${_bin_file}" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')"
 
         # The latest version is already installed

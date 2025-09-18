@@ -66,7 +66,7 @@ function install_xxx() {
     get_github_pkg_latest_version _latest_version "${_github_repo}"
 
     # check if already installed
-    if command -v "${_bin_file}" ;then
+    if check_pkg_status --exec -- "${_bin_file}" ;then
         # NOTE: check the version get command
         _install_version="$("${_bin_file}" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')"
 

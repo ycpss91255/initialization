@@ -1,7 +1,7 @@
 if type -q "fisher"
     # sponge
     if fisher list | grep -q "/sponge"
-        if test $SHELL_SPOKE_PURGE_ONLY_ON_EXIT != "true"
+        if test "$SHELL_SPOKE_PURGE_ONLY_ON_EXIT" != "true"
             set -Ux SHELL_SPOKE_PURGE_ONLY_ON_EXIT true
         end
     else

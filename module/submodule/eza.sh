@@ -63,7 +63,7 @@ function install_eza() {
     get_github_pkg_latest_version _latest_version "${_github_repo}"
 
     # check if already installed
-    if command -v "${_bin_file}" ;then
+    if check_pkg_status --exec -- "${_bin_file}" ;then
         _install_version="$("${_bin_file}" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')"
 
         # The latest version is already installed

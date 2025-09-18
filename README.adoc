@@ -65,3 +65,9 @@ nvidia-container-toolkit -version
 * https://docs.docker.com/engine/install/ubuntu/[在 Ubuntu 上安裝 Docker 引擎]
 * https://docs.docker.com/engine/install/linux-postinstall/[Linux 後安裝步驟]
 * https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html[NVIDIA 容器工具包]
+
+== 字體安裝
+* Windows
+** https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/FiraCode.zip
+** https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/SourceCodePro.zip
+** https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/Meslo.zip

@@ -49,7 +49,6 @@ fi
 
 
 
-# NOTE: Please modify the function name and parameters according to your need
 function setup_font() {
     local _github_repo="${1:?"${FUNCNAME[0]}: missing github repo"}"; shift
     local _fonts=("$@")

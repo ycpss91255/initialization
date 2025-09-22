@@ -1,4 +1,4 @@
-function docker-exec --wraps docker --description "Execute docker container"
+function docker-exec --wraps "docker exec" --description "Execute docker container"
     if test (count $argv) -gt 0
         set _container $argv[1]
     else

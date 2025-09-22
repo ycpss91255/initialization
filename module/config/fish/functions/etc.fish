@@ -1,3 +1,3 @@
 function etc --description "Edit the fish configuration file"
-    vim "$HOME/.tmux.conf"
+    vim "$HOME/.config/tmux/tmux.conf"
 end

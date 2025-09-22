@@ -72,19 +72,9 @@ _docker_dep_pkgs=(
 apt_pkg_manager --install -- "${_docker_dep_pkgs[@]}"
 
 log_info "Create Docker GPG keyring directory and add GPG key"
-# # Official practice
-# sudo install -m 0755 -d /etc/apt/keyrings
-# sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-#     -o /etc/apt/keyrings/docker.asc
-# sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-# exec_cmd "curl -fsSL --retry 3 \"https://download.docker.com/linux/ubuntu/gpg\" -o \"docker.asc\""
-# exec_cmd "sudo install -D -o root -g root -m 644 \"docker.asc\" \"/etc/apt/keyrings/docker.asc\" && rm -f \"docker.asc\""
-
-# NOTE: test fun
 # Download and add the GPG key for the Docker repository
 exec_cmd "curl -fsSL --retry 3 \"https://download.docker.com/linux/ubuntu/gpg\" \
-    | sudo gpg --dearmor -o \"/usr/share/keyrings/docker.gpg\""
+    | sudo gpg --yes --dearmor -o \"/usr/share/keyrings/docker.gpg\""
 
 log_info "Install Docker and related packages"
 # Add the Docker repository to the system
@@ -115,7 +105,7 @@ if check_pkg_status --exec -- nvidia-smi; then
     # Install NVIDIA container toolkit
     log_info "Adding NVIDIA container toolkit GPG key"
     exec_cmd "curl -fsSL --retry 3 \"https://nvidia.github.io/libnvidia-container/gpgkey\" \
-    | sudo gpg --dearmor -o \"/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg\""
+    | sudo gpg --yes --dearmor -o \"/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg\""
     exec_cmd "curl -fsSL --retry 3 \
             \"https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list\" | \
         sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
@@ -126,8 +116,8 @@ if check_pkg_status --exec -- nvidia-smi; then
     _nvidia_apt_pkgs=(
         "nvidia-container-toolkit=${_nvidia_container_toolkit_version}"
         "nvidia-container-toolkit-base=${_nvidia_container_toolkit_version}"
-        "nvidia-container-tools=${_nvidia_container_toolkit_version}"
-        "nvidia-container1=${_nvidia_container_toolkit_version}"
+        "libnvidia-container-tools=${_nvidia_container_toolkit_version}"
+        "libnvidia-container1=${_nvidia_container_toolkit_version}"
     )
     apt_pkg_manager --install -- "${_nvidia_apt_pkgs[@]}"
 

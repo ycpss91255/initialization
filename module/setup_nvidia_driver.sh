@@ -51,7 +51,7 @@ if ! have_sudo_access; then
     fi
 fi
 
-if ! lspci | grep -q "VGA.*NVIDIA"; then
+if ! sudo lshw -C display | grep -qi "nvidia"; then
     if [[ "${MAIN_FILE}" == "true" ]]; then
         log_fatal "No NVIDIA GPU detected. Cannot continue install 'NVIDIA-driver'."
     else

@@ -104,6 +104,8 @@ if [[ "${_install_version:-}" != "${_recommend_version}" ]]; then
     fi
 
     apt_pkg_manager --install -- "${_recommend_version}"
+    # TODO: add cuda and cudnn
+    # apt_pkg_manager --install -- nvidia-cuda-toolkit nvidia-cudnn
 fi
 
 # Install 'nvitop'

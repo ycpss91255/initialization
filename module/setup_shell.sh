@@ -135,4 +135,4 @@ function install_fish_plugin_and_set_user_config() {
     exec_cmd "sudo chsh -s \"$(which fish)\" \"${USER}\""
 }
 
-# install_fish_plugin_and_set_user_config
+install_fish_plugin_and_set_user_config

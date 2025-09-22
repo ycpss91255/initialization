@@ -103,7 +103,7 @@ function _install_ssh_pkgs() {
     apt_pkg_manager --install -- "${_ssh_pkgs[@]}"
 
     # copy ssh config template to ~/.ssh/config
-    exec_cmd "cp ${CONFIG_PATH}/ssh/ssh_config ${HOME}/.ssh/config"
+    exec_cmd "cp ${CONFIG_PATH}/ssh_config ${HOME}/.ssh/config"
 
     function _ensure_ssh_config() {
         local key="${1:?"${FUNCNAME[0]}: missing key"}"
@@ -118,11 +118,11 @@ function _install_ssh_pkgs() {
     }
 
     # ensure ssh config
-    local _ssh_config_file="./ssh_config"
+    local _ssh_config_file="/etc/ssh/ssh_config"
     _ensure_ssh_config "ForwardAgent" "yes" "${_ssh_config_file}"
 
     # ensure sshd config
-    local _ssh_daemon_file="./sshd_config"
+    local _ssh_daemon_file="/etc/ssh/sshd_config"
     _ensure_ssh_config "AllowTcpForwarding" "yes" "${_ssh_daemon_file}"
     _ensure_ssh_config "X11Forwarding" "yes" "${_ssh_daemon_file}"
     _ensure_ssh_config "X11DisplayOffset" "10" "${_ssh_daemon_file}"
@@ -144,7 +144,7 @@ function _install_git_pkgs() {
 
     log_info "install git related packages..."
     apt_pkg_manager --install -- "${_git_pkgs[@]}"
-    cp "${CONFIG_PATH}/git/gitconfig" "${HOME}/.gitconfig"
+    cp "${CONFIG_PATH}/git_config" "${HOME}/.gitconfig"
 }
 
 function _install_monitor_pkgs() {
@@ -187,7 +187,7 @@ function _install_ranger() {
     log_info "Install ranger_devicons..."
     exec_cmd "git clone --depth 1 \
         \"https://github.com/alexanderjeurissen/ranger_devicons\" \
-        \"\"${_plugins_dir}/ranger_devicons\""
+        \"${_plugins_dir}/ranger_devicons\""
     # devicons config
     if ! grep -qxF "default_linemode devicons" "${_rc_file}"; then
         exec_cmd "echo \"default_linemode devicons\" >> \"${_rc_file}\""
@@ -281,12 +281,12 @@ function install_vim() {
     exec_cmd "vim +PlugInstall +qall"
 }
 
-_install_base_pkgs
-install_submodule_tool
+# _install_base_pkgs
+# install_submodule_tool
 _install_ssh_pkgs
-_install_git_pkgs
-_install_monitor_pkgs
-_install_ranger
-install_tmux
-install_spotify
-install_vim
+# _install_git_pkgs
+# _install_monitor_pkgs
+# _install_ranger
+# install_tmux
+# install_spotify
+# install_vim

@@ -10,11 +10,15 @@ if type -q "fisher"
     # plugin-pj
     if fisher list | grep -q "/plugin-pj"
         if not contains "$HOME/workspace" $PROJECT_PATHS
-            set -Ux PROJECT_PATHS "$HOME/workspace" $PROJECT_PATHS
+            if test -d "$HOME/workspace"
+                set -gx PROJECT_PATHS "$HOME/workspace" $PROJECT_PATHS
+            end
         end
 
         if not contains "$HOME/src" $PROJECT_PATHS
-            set -Ux PROJECT_PATHS "$HOME/src" $PROJECT_PATHS
+            if test -d "$HOME/src"
+                set -gx PROJECT_PATHS "$HOME/src" $PROJECT_PATHS
+            end
         end
     else
         set -eU PROJECT_PATHS

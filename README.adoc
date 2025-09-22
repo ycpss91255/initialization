@@ -1,6 +1,12 @@
 = README
 This repository is a tool I use in Ubuntu, It uses a script to complete the initialization action.
 
+== NVIDIA Related toolkit
+[source, shell]
+----
+nvidia-smi
+nvitop
+----
 
 // TODO: maybe delete some "font" files
 

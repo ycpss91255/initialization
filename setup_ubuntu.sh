@@ -105,6 +105,9 @@ source "${MODULE_PATH}/setup_font.sh" || fatal_pkg+=("font")
 source "${MODULE_PATH}/setup_docker.sh" || fatal_pkg+=("docker")
 
 # shellcheck disable=SC1091
+source "${SCRIPT_PATH}/module/setup_nvidia_driver.sh" || fatal_pkg+=("nvidia-driver")
+
+# shellcheck disable=SC1091
 source "${MODULE_PATH}/setup_vscode.sh" || fatal_pkg+=("vscode")
 
 # shellcheck disable=SC1091

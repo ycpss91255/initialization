@@ -28,11 +28,13 @@ if type -q "fisher"
         if test $SSH_ENV != "$HOME/.ssh/environment"
             set -Ux SSH_ENV "$HOME/.ssh/environment"
         end
+        # TODO: add ssh-add command
+        # ssh-add $key
     else
         set -eU SSH_ENV
     end
-    # # TODO: check fzf config
-    # if fisher list | grep -q "/fzf"
-    #     set fzf_preview_dir_cmd eza --all --color=always
-    # end
+    if fisher list | grep -q "/fzf"
+        set -gx PATH $HOME/.fzf/bin $PATH
+        # set fzf_preview_dir_cmd eza --all --color=always
+    end
 end

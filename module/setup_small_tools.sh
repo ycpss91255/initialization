@@ -213,6 +213,7 @@ function _install_ranger() {
 function install_tmux() {
     # tmux and tmuxp
     _tmux_pkgs=(
+        "xclip"
         "tmux"
         "tmuxp"
     )
@@ -281,12 +282,12 @@ function install_vim() {
     exec_cmd "vim +PlugInstall +qall"
 }
 
-# _install_base_pkgs
-# install_submodule_tool
+_install_base_pkgs
+install_submodule_tool
 _install_ssh_pkgs
-# _install_git_pkgs
-# _install_monitor_pkgs
-# _install_ranger
-# install_tmux
-# install_spotify
-# install_vim
+_install_git_pkgs
+_install_monitor_pkgs
+_install_ranger
+install_tmux
+install_spotify
+install_vim

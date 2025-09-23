@@ -55,6 +55,7 @@ function _install_base_pkgs() {
         "curl"
         "wget"
         "jq"
+        "apt-file"
 
         "python3"
         "python3-dev"
@@ -62,21 +63,23 @@ function _install_base_pkgs() {
         "python3-setuptools"
         "pipx"
 
-        "xclip"
-        # "xsel"
-
         "net-tools"
         "ncdu"
         "neofetch"
         "tree"
         "silversearcher-ag"
         "xdg-utils"
+        "xclip"
+        # "xsel"
         "gnome-shell-extension-manager"
 
         "cowsay"
         "cmatrix"
         "figlet"
         "cheese"
+
+        "ibus-rime"
+        "thunderbird"
     )
 
     log_info "Install basic packages..."
@@ -282,6 +285,16 @@ function install_vim() {
     exec_cmd "vim +PlugInstall +qall"
 }
 
+function install_notion() {
+    apt_pkg_manager --install -- "snapd"
+    exec_cmd "sudo snap install notion-desktop"
+}
+
+function install_obs() {
+    exec_cmd "sudo add-apt-repository -y ppa:obsproject/obs-studio"
+    apt_pkg_manager --install -- "obs-studio"
+}
+
 _install_base_pkgs
 install_submodule_tool
 _install_ssh_pkgs
@@ -291,3 +304,5 @@ _install_ranger
 install_tmux
 install_spotify
 install_vim
+install_notion
+install_obs

@@ -7,10 +7,10 @@ if status is-interactive
     # if dpkg-query -W -f='${db:Status-Abbrev}\n' -- 'snap' 2>/dev/null | grep -q '^ii'; then
 end
 
-if not contains $HOME/.local/bin $PATH and test -d $HOME/.local/bin
-    set -Ux PATH $HOME/.local/bin $PATH
-end
-
-if not contains $HOME/bin $PATH and test -d $HOME/bin
-    set -Ux PATH $HOME/.local/bin $PATH
+begin
+    for dir in $HOME/.local/bin $HOME/bin
+        if test -d $dir; and not contains -- $dir $PATH
+            set -gx PATH $dir $PATH
+        end
+    end
 end

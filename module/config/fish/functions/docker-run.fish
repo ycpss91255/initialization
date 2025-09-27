@@ -1,17 +1,18 @@
-function docker-run --description "Run the docker container"
-    if test (count $argv) -gt 0
-        set _script_dir $argv[1]
-    else
-        set _script_dir (pwd)
-    end
+function docker-run --description "Run the docker container" \
+    --wraps "bash" \
+    --argument-names _script_dir
+    # if no 'script_dir' argument, use current directory
+    test -z "$_script_dir"; or set -l _script_dir (pwd -P)
 
-    if not docker system prune -f
-        echo "Docker system prune failed."
+    set -l _run_script "$_script_dir/run.sh"
+
+    if ! test -x "$_run_script"
+        printf "%s is not found or not executable.\n" "$_run_script"
         return 1
     end
 
-    if not $_script_dir/run.sh
-        echo "Run failed."
+    if ! "$_run_script"
+        printf "%s script run failed.\n" "$_run_script"
         return 1
     end
 end

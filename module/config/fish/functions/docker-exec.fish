@@ -1,14 +1,15 @@
-function docker-exec --wraps "docker exec" --description "Execute docker container"
-    if test (count $argv) -gt 0
-        set _container $argv[1]
-    else
-        set _container (docker ps -q | head -n 1)
+function docker-exec --description "Execute docker container" \
+    --wraps "docker exec" \
+    --argument-names _container
+    # If no container is specified, get the first running container
+    test -z "$_container"; or set -l _container (docker ps -q | head -n 1)
+
+    # Check if the container is running
+    if test -z "$_container"
+        printf "No running container found\n"
+        return 1
     end
 
-    if test -z "$_container"
-        echo "No running container found"
-    else
-        docker exec -it $_container /bin/bash
-    end
+    docker exec -it "$_container" /usr/bin/env bash
 end
 

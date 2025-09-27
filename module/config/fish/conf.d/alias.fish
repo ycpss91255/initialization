@@ -19,7 +19,6 @@ end
 if command -q -- "nvim"
     alias vim="nvim"
     alias view="nvim -R"
-    set -gx EDITOR "nvim"
 end
 
 if command -q -- "xdg-open"

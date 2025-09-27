@@ -49,7 +49,7 @@ fi
 
 
 #--------------------------
-function _install_base_pkgs() {
+function _install_normal_pkgs() {
     local _install_pkgs=(
         "software-properties-common"
         "curl"
@@ -77,6 +77,8 @@ function _install_base_pkgs() {
         "cmatrix"
         "figlet"
         "cheese"
+        "v4l-utils"
+        "vlc"
 
         "ibus-rime"
         "thunderbird"
@@ -295,7 +297,7 @@ function _install_obs() {
     apt_pkg_manager --install -- "obs-studio"
 }
 
-_install_base_pkgs
+_install_normal_pkgs
 _install_submodule_tool
 _install_ssh_pkgs
 _install_git_pkgs

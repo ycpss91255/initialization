@@ -14,5 +14,6 @@ fi
 SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 export FUNCTION_PATH="${SCRIPT_PATH}/../function"
 export CONFIG_PATH="${SCRIPT_PATH}/../../config"
+export SUBMODULE_PATH="${SCRIPT_PATH}/../submodule"
 
 :

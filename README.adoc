@@ -72,6 +72,442 @@ nvidia-container-toolkit -version
 * https://docs.docker.com/engine/install/linux-postinstall/[Linux 後安裝步驟]
 * https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html[NVIDIA 容器工具包]
 
+== samll tools
+---
+link:./README_ch.adoc[繁體中文]
+
+== Install
+[NOTE]
+====
+The following content needs to be converted accordingly.
+
+* `<README_PATH>` is the directory where this *README.adoc* file is located.
+* `<FILE_PATH>` is the path of the file you want to view.
+* `<URL>` is the URL of the file you want to download.
+* `<WORKSPACE_PATH>` is the directory where you want to create a new repository.
+* `<JSON_PATH>` is the path of the JSON file you want to view.
+* `<IP>` is the IP address of the target.
+* `<MASK>` is the subnet mask of the target.
+* `[FOLDER_PATH]` is the path of the folder you want to navigate to. (optional)
+* `<COMMAND>` is the command you want to know more about.
+* `<NUM>` is the number of levels you want to display. (optional)
+====
+
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./install.sh
+./install.sh
+----
+
+== Usage
+.Monitor tools
+[source, shell]
+----
+# bashtop
+bashtop
+
+# bpytop
+bpytop
+
+# bmon
+bmon
+
+# htop
+htop
+
+# nmon
+nmon
+
+# powertop
+sudo powertop
+
+# iftop
+sudo iftop
+
+# iotop
+sudo iotop
+----
+
+.Other tools
+[source, shell]
+----
+# apt-file
+sudo apt-file search <COMMAND>
+
+# bat
+bat <FILE_PATH>
+
+# fish
+fish
+## if you want to use fish ssh-agent,
+## ssh key file name must be id_ed25519 (default name),
+## or modify config.fish youself.
+
+# git
+cd <WORKSPACE_PATH>
+git init
+## local（once per repository）
+git config --local init.defaultBranch "main"
+git config --local user.name "your name"
+git config --local user.email "email@example.com"
+## optional
+git config --local core.editor "editor"
+
+## global（once per computer）
+git config --global init.defaultBranch "main"
+git config --global user.name "your name"
+git config --global user.email "email@example.com"
+## optional
+git config --global core.editor "editor"
+
+# jq
+cat <JSON_PATH> | jq '.'
+
+# neofetch
+neofetch
+
+# net-tools
+ifconfig
+
+# nmap
+nmap <IP>/<MASK>
+
+# powerstat
+sudo powerstat
+
+# ranger
+ranger [FOLDER_PATH]
+
+# silversearcher-ag
+ag replace grep
+
+# tig
+tig [--all]
+tig status
+
+
+# tree
+tree [FOLDER_PATH]
+tree [-C] [-L <NUM>] [FOLDER_PATH]
+
+# wget
+wget -O <FILE_PATH> <URL>
+
+# zoxide
+z <FOLDER_PATH>
+----
+
+.ssh
+[source, shell]
+----
+# 修改 config
+<EDITOR> ~/.ssh/config
+----
+
+== Remove
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./remove.sh
+./remove.sh
+----
+
+== Interesting
+* https://github.com/romner-set/btop-gpu[btop-gpu Github (*not install*, but can see the GPU, awesome!)]
+
+// TODO: segmentation all tool
+
+// NOTE: for teaching
+// tldr <COMMAND>
+// https://github.com/tldr-pages/tldr?tab=readme-ov-file
+// navi
+// https://github.com/denisidoro/navi?tab=readme-ov-file
+
+// TODO: replace repeated installation steps with "submodule"
+
+
+== 安裝
+
+[NOTE]
+====
+需要相應地轉換以下內容。
+
+`<this directory>` 更改為 *README* 所在的目錄。
+
+`<session name>` 更改為 tmux 的會話名。
+
+`<number>` 更改為 tmux 會話的數量。
+====
+
+[source, shell]
+----
+# 安裝 tmux
+cd <this directory>
+chmod +x install.sh
+./install.sh
+
+# 驗證安裝
+tmux -V
+----
+
+== 使用方法
+
+這個 tmux 配置使用了許多與 vim 相同的快捷鍵。
+
+=== 指令
+[source, shell]
+----
+# 啟動 tmux
+tmux
+# 創建一個新會話
+tmux new -s <session name>
+
+# 連接到一個會話
+tmux attach -t <session name>
+tmux a -t <session name>
+tmux attach -t <number>
+tmux a -t <number>
+tmux a # 最後一個會話
+
+# 分離會話，後台運行
+tmux detach
+
+# 列出所有會話
+tmux list-sessions
+tmux ls
+
+# 計算 tmux 會話數量
+tmux list-sessions | wc -l
+
+# 殺死 tmux 會話
+tmux kill-session -t <session name>
+tmux kill-session -t <number>
+tmux kill-server # 殺死伺服器（所有會話）
+tmux ls pkill tmux # 所有會話
+----
+
+=== 鍵盤快捷鍵
+
+[cols="3,7", options="header"]
+|===
+|快捷鍵 |描述
+
+2+^.^|*前綴*
+|kbd:[Ctrl], kbd:[s]
+|*前綴鍵*。
+
+2+^.^|*會話*
+|kbd:[前綴 + "]
+|選擇會話。
+|kbd:[前綴 + S]
+|新建會話。
+|kbd:[前綴] + kbd:[Alt], kbd:[r]
+|重命名會話。
+|kbd:[前綴] + <kbd:[H] 或 kbd:[L]>
+|切換客戶端 前一個 kbd:[H] 或下一個 kbd:[L]。
+
+2+^.^|*視窗*
+|kbd:[前綴] + <kbd:[c] 或 kbd:[Ctrl + c]>
+|新建視窗。
+|kbd:[前綴 + R]
+|重命名視窗。
+|kbd:[前綴] + <kbd:[h] 或 kbd:[l]> 或 <kbd:[Ctrl], kbd:[h] 或 kbd:[Ctrl], kbd:[l]>
+|切換視窗到前一個 kbd:[h] 或下一個 kbd:[l]。
+|kbd:[前綴 + ']
+|選擇視窗。
+
+2+^.^|*面板*
+|kbd:[前綴] + <kbd:[s] 或 kbd:[v]>
+|分割視窗 垂直 kbd:[s], 水平 kbd:[v]。
+|kbd:[前綴] + <kbd:[+] 或 kbd:[_]> 或 <kbd:[=] 或 kbd:[-]> 或 <kbd:[<] 或 kbd:[>]>
+|調整面板大小 向上 kbd:[+] 或向下 kbd:[_] 向上 kbd:[=] 或向下 kbd:[-] 向左 kbd:[<] 或向右 kbd:[>]。
+|kbd:[前綴] + <kbd:[j] 或 kbd:[k]> 或 <kbd:[Ctrl], kbd:[j] 或 kbd:[Ctrl], kbd:[k]>
+|切換面板到前一個 kbd:[j] 或下一個 kbd:[k]。
+|kbd:[前綴] + <kbd:[J] 或 kbd:[K]>
+|與前一個面板 kbd:[J] 或下一個面板 kbd:[K] 交換。
+
+2+^.^|*其他*
+|kbd:[前綴 + d] 或 kbd:[Ctrl], kbd:[d]
+|分離客戶端。
+|kbd:[前綴 + r]
+|重載 tmux 配置。
+|kbd:[前綴 + w]
+|選擇樹。
+|kbd:[前綴 + D]
+|選擇客戶端。
+|kbd:[前綴] + kbd:[Ctrl], kbd:[l]
+|清除視窗。
+|kbd:[prefix] + kbd:[[]
+|複製模式。
+|kbd:[前綴] + <kbd:[Ctrl], kbd:[s] 或 kbd:[Ctrl], kbd:[r]>
+|保存 kbd:[s] 或恢復 kbd:[r] 工作狀態。
+|kbd:[前綴 + F12]
+|垂直分割視窗並開啟 htop。
+
+|===
+
+== 移除
+
+[source, shell]
+----
+# 移除 tmux
+chmod +x ./remove.sh
+./remove.sh
+
+# 驗證移除
+tmux -V
+# tmux: command not found
+----
+
+---
+link:./README.adoc[English]
+
+== 安裝
+[NOTE]
+====
+以下內容需要進行對應轉換。
+
+* `<README_PATH>` 是 *README.adoc* 檔案的所在目錄。
+* `<FILE_PATH>` 是要顯示的檔案路徑。
+* `<URL>` 是要下載的網址。
+* `<WORKSPACE_PATH>` 是要初始化的工作區路徑。
+* `<JSON_PATH>` 是要顯示的 JSON 檔案路徑。
+* `<IP>` 是要掃描的 IP。
+* `<MASK>` 是要掃描的子網路遮罩。
+* `[FOLDER_PATH]` 是要顯示的資料夾路徑。(可選)
+* `<COMMAND>` 是要查詢的指令。
+* `<NUM>` 是要顯示的層級數。(可選)
+====
+
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./install.sh
+./install.sh
+----
+
+== 使用方法
+.監控工具
+[source, shell]
+----
+# bashtop
+bashtop
+
+# bpytop
+bpytop
+
+# bmon
+bmon
+
+# htop
+htop
+
+# nmon
+nmon
+
+# powertop
+sudo powertop
+
+# iftop
+sudo iftop
+
+# iotop
+sudo iotop
+----
+
+.其他工具
+[source, shell]
+----
+# bat
+bat <FILE_PATH>
+
+# fish
+fish
+
+## 如果要用 fish ssh-agent 的話，ssh key 檔案名稱必需爲 id_ed25519
+（默認名稱）,或你自己修改 config.fish 檔案。
+
+# git
+cd <WORKSPACE_PATH>
+git init
+## 區域性（每個存儲庫一次）
+git config --local init.defaultBranch "main"
+git config --local user.name "your name"
+git config --local user.email "email@example.com"
+## 可選
+git config --local core.editor "editor"
+
+## 全域性（每台電腦一次）
+git config --global init.defaultBranch "main"
+git config --global user.name "your name"
+git config --global user.email "email@example.com"
+## 可選
+git config --global core.editor "editor"
+
+# jq
+cat <JSON_PATH> | jq '.'
+
+# neofetch
+neofetch
+
+# gpustat
+gpustat
+gpustat -i
+
+# net-tools
+ifconfig
+
+# nmap
+nmap <IP>/<MASK>
+
+# powerstat
+sudo powerstat
+
+# ranger
+ranger [FOLDER_PATH]
+
+# silversearcher-ag
+ag 取代 grep
+
+# tig
+tig [--all]
+tig status
+
+# tldr
+tldr <COMMAND>
+
+# tree
+tree [FOLDER_PATH]
+tree [-C] [-L <NUM>] [FOLDER_PATH]
+
+# wget
+wget -O <FILE_PATH> <URL>
+
+# zoxide
+z <FOLDER_PATH>
+----
+
+.ssh
+[source, shell]
+----
+# 修改 config
+<EDITOR> ~/.ssh/config
+----
+
+== 移除
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./remove.sh
+./remove.sh
+----
+
+== 有趣的
+* https://github.com/romner-set/btop-gpu[btop-gpu Github (*沒有安裝*, 但是可以看到 GPU, 超棒的!)]
+
+ibus-rime config in ${HOME}/.config/ibus/rime
+
 == 字體安裝
 * Windows
 ** https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/FiraCode.zip

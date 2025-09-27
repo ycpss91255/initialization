@@ -1,0 +1,25 @@
+[init]
+    defaultBranch = main
+[core]
+    editor = nvim
+    pager = delta
+[interactive]
+    diffFilter = delta --color-only
+[color]
+        ui = auto
+[format]
+        pretty = format:%C(yellow)%h%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset %C(red)%d%Creset
+[alias]
+        st = status
+        sw = "!f() { git switch \"$1\" 2>/dev/null || git switch -c \"$1\"; }; f"
+        br = branch
+        cm = commit -m
+        lg = log --graph --decorate --all
+[delta]
+    navigate = true
+    line-numbers = true
+    side-by-side = true
+    syntax-theme = OneHalfDark
+[merge]
+    conflictStyle = zdiff3
+

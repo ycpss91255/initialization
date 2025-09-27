@@ -213,7 +213,7 @@ function _install_ranger() {
     fi
 }
 
-function install_tmux() {
+function _install_tmux() {
     # tmux and tmuxp
     _tmux_pkgs=(
         "xclip"
@@ -285,24 +285,24 @@ function install_vim() {
     exec_cmd "vim +PlugInstall +qall"
 }
 
-function install_notion() {
+function _install_notion() {
     apt_pkg_manager --install -- "snapd"
     exec_cmd "sudo snap install notion-desktop"
 }
 
-function install_obs() {
+function _install_obs() {
     exec_cmd "sudo add-apt-repository -y ppa:obsproject/obs-studio"
     apt_pkg_manager --install -- "obs-studio"
 }
 
 _install_base_pkgs
-install_submodule_tool
+_install_submodule_tool
 _install_ssh_pkgs
 _install_git_pkgs
 _install_monitor_pkgs
 _install_ranger
-install_tmux
-install_spotify
-install_vim
-install_notion
-install_obs
+_install_tmux
+_install_spotify
+_install_vim
+_install_notion
+_install_obs

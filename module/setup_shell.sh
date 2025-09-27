@@ -107,6 +107,7 @@ function install_fish_plugin_and_set_user_config() {
             PatrickF1/fzf.fish \
             IlanCosman/tide@v6 \
             meaningful-ooo/sponge \
+            2m/fish-history-merge \
             oh-my-fish/plugin-pj \""
 
     # Configure tide

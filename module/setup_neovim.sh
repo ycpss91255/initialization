@@ -47,9 +47,9 @@ log_info "Start setup process..."
 
 if ! have_sudo_access; then
     if [[ "${MAIN_FILE}" == "true" ]]; then
-        log_fatal "No sudo access. Cannot continue setup 'font'."
+        log_fatal "No sudo access. Cannot continue install 'Neovim'."
     else
-        log_warn "Skip setup 'font' due to no sudo access."
+        log_warn "Skip install 'Neovim' due to no sudo access."
         return 1
     fi
 fi
@@ -272,7 +272,7 @@ log_info "Remove lsp_signature.nvim doc tags to avoid error"
 exec_cmd "rm -f \"${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/doc/tags\" || true"
 
 log_info "Copy nvimdots configuration files"
-_nvimdots_sur_dir="${_script_path}/config/neovim/nvimdots_config"
+_nvimdots_sur_dir="${CONFIG_PATH}/neovim/nvimdots_config"
 _nvimdots_conf_dir="${HOME}/.config/nvim/lua/user"
 mkdir -p "${_nvimdots_conf_dir}"
 

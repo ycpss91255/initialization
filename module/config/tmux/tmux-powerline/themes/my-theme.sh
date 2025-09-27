@@ -101,24 +101,24 @@ fi
 
 # shellcheck disable=SC1143,SC2128
 if [ -z "$TMUX_POWERLINE_LEFT_STATUS_SEGMENTS" ]; then
-	TMUX_POWERLINE_LEFT_STATUS_SEGMENTS=(
-		"tmux_session_info 148 234"
-		"hostname 33 0"
-		"lan_ip 24 255 ${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
-		# "wan_ip 24 255"
-		# "vpn 24 255 ${TMUX_POWERLINE_SEPARATOR_RIGHT_THIN}"
-		"now_playing 234 37 ${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
-		"mailcount 9 255"
-	)
+    TMUX_POWERLINE_LEFT_STATUS_SEGMENTS=(
+        "tmux_session_info 148 234"
+        "hostname 33 0"
+        "lan_ip 24 255 ${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
+        # "wan_ip 24 255"
+        # "vpn 24 255 ${TMUX_POWERLINE_SEPARATOR_RIGHT_THIN}"
+        "now_playing 234 37 ${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
+        "mailcount 9 255"
+    )
 fi
 
 # shellcheck disable=SC1143,SC2128
 if [ -z "$TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS" ]; then
-	TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS=(
-		# "tmux_mem_cpu_load 234 136"
-		"mode_indicator 46 0 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}"
-		"battery 137 127"
-		"date 235 136 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}"
-		"tmux_mem_cpu_load 234 136 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD} no_sep_bg_color no_sep_fg_color left_disable separator_disable"
-	)
+    TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS=(
+        # "tmux_mem_cpu_load 234 136"
+        "mode_indicator 46 0 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}"
+        "battery 137 127"
+        "date 235 136 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}"
+        "tmux_mem_cpu_load 234 136 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD} no_sep_bg_color no_sep_fg_color left_disable separator_disable"
+    )
 fi

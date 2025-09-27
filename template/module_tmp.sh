@@ -19,12 +19,13 @@ if [[ "${MAIN_FILE}" == "true" ]]; then
     unset HAVE_SUDO_ACCESS
 
     # shellcheck disable=SC2155
-    # export DATETIME="$(date +"%Y-%m-%d-%T")"
-    # export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
+    export DATETIME="$(date +"%Y-%m-%d-%T")"
+    export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
 
     SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
     export FUNCTION_PATH="${SCRIPT_PATH}/function"
     export CONFIG_PATH="${SCRIPT_PATH}/config"
+    export SUBMODULE_PATH="${SCRIPT_PATH}/submodule"
 
     :
 fi

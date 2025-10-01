@@ -157,12 +157,14 @@ function _install_monitor_pkgs() {
         "bashtop"
         "htop"
         "iftop"
+        "ifstat"
         "iotop"
         "powertop"
         "powerstat"
         "bmon"
         "nmon"
         "nmap"
+        "dstat"
     )
 
     log_info "install monitoring packages..."

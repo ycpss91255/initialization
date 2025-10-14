@@ -102,10 +102,11 @@ if [[ "${_install_version:-}" != "${_recommend_version}" ]]; then
     if [[ -n "${_install_version:-}" ]]; then
         apt_pkg_manager --purge -- "${_install_version}"
     fi
-
     apt_pkg_manager --install -- "${_recommend_version}"
-    # TODO: add cuda and cudnn
-    # apt_pkg_manager --install -- nvidia-cuda-toolkit nvidia-cudnn
+    # if 'nvidia-smi' display 'No devices were found' error, need to purge all 'nvidia-driver-*' packages, and then install open version
+    # apt_pkg_manager --install -- "${_recommend_version}-open"
+
+    apt_pkg_manager --install -- nvidia-cuda-toolkit nvidia-cudnn
 fi
 
 # Install 'nvitop'

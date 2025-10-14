@@ -88,7 +88,7 @@ function _install_normal_pkgs() {
     apt_pkg_manager --install -- "${_install_pkgs[@]}"
 }
 
-function install_submodule_tool() {
+function _install_submodule_tool() {
     find "${SUBMODULE_PATH}" -maxdepth 1 -type f -name "*.sh" | while read -r file; do
         log_info "Install tool from ${file##*/}..."
         # shellcheck disable=SC1090
@@ -143,7 +143,9 @@ function _install_git_pkgs() {
         "git-lfs"
         # https://dandavison.github.io/delta/choosing-colors-styles.html
         # https://github.com/dandavison/delta?tab=readme-ov-file
-        "git-delta"
+        # BUG: ubunntu 22.04 not found delta package
+        # change to install from github release
+        # "git-delta"
         "tig"
     )
 
@@ -230,6 +232,8 @@ function _install_tmux() {
     local _powerline_dir="${HOME}/.config/tmux-powerline"
     local _tpm_dir="${HOME}/.tmux/plugins/tpm"
 
+    export TMUX_PLUGIN_MANAGER_PATH="${HOME}/.tmux/plugins"
+
     # backup and delete old tmux config
     if [[ -d "${_conf_dir}" ]]; then
         log_info "Backup old tmux configuration (${_conf_dir}) to ${BACKUP_DIR}/${_conf_dir##*/}"
@@ -261,14 +265,14 @@ function _install_tmux() {
         \"${_tpm_dir}/scripts/install_plugins.sh\""
 }
 
-function install_spotify() {
+function _install_spotify() {
     exec_cmd "curl -sS \"https://download.spotify.com/debian/pubkey_C85668DF69375001.gpg\" \
         | sudo gpg --dearmor --yes -o \"/etc/apt/trusted.gpg.d/spotify.gpg\""
     exec_cmd "echo \"deb https://repository.spotify.com stable non-free\" | sudo tee /etc/apt/sources.list.d/spotify.list"
     apt_pkg_manager --install -- "spotify-client"
 }
 
-function install_vim() {
+function _install_vim() {
     apt_pkg_manager --install -- "vim"
 
     if [[ -f "${HOME}/.vimrc" ]]; then

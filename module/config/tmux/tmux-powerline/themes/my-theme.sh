@@ -3,15 +3,15 @@
 # If changes made here does not take effect, then try to re-create the tmux session to force reload.
 
 if patched_font_in_use; then
-	TMUX_POWERLINE_SEPARATOR_LEFT_BOLD=""
-	TMUX_POWERLINE_SEPARATOR_LEFT_THIN=""
-	TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD=""
-	TMUX_POWERLINE_SEPARATOR_RIGHT_THIN=""
+    TMUX_POWERLINE_SEPARATOR_LEFT_BOLD=""
+    TMUX_POWERLINE_SEPARATOR_LEFT_THIN=""
+    TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD=""
+    TMUX_POWERLINE_SEPARATOR_RIGHT_THIN=""
 else
-	TMUX_POWERLINE_SEPARATOR_LEFT_BOLD="◀"
-	TMUX_POWERLINE_SEPARATOR_LEFT_THIN="❮"
-	TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD="▶"
-	TMUX_POWERLINE_SEPARATOR_RIGHT_THIN="❯"
+    TMUX_POWERLINE_SEPARATOR_LEFT_BOLD="◀"
+    TMUX_POWERLINE_SEPARATOR_LEFT_THIN="❮"
+    TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD="▶"
+    TMUX_POWERLINE_SEPARATOR_RIGHT_THIN="❯"
 fi
 
 # See Color formatting section below for details on what colors can be used here.
@@ -28,32 +28,32 @@ TMUX_POWERLINE_DEFAULT_RIGHTSIDE_SEPARATOR=${TMUX_POWERLINE_DEFAULT_RIGHTSIDE_SE
 
 # shellcheck disable=SC2128
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_CURRENT" ]; then
-	TMUX_POWERLINE_WINDOW_STATUS_CURRENT=(
-		"#[$(format inverse)]"
-		"$TMUX_POWERLINE_DEFAULT_LEFTSIDE_SEPARATOR"
-		" #I#F "
-		"$TMUX_POWERLINE_SEPARATOR_RIGHT_THIN"
-		" #W "
-		"#[$(format regular)]"
-		"$TMUX_POWERLINE_DEFAULT_LEFTSIDE_SEPARATOR"
-	)
+    TMUX_POWERLINE_WINDOW_STATUS_CURRENT=(
+	"#[$(format inverse)]"
+	"$TMUX_POWERLINE_DEFAULT_LEFTSIDE_SEPARATOR"
+	" #I#F "
+	"$TMUX_POWERLINE_SEPARATOR_RIGHT_THIN"
+	" #W "
+	"#[$(format regular)]"
+	"$TMUX_POWERLINE_DEFAULT_LEFTSIDE_SEPARATOR"
+    )
 fi
 
 # shellcheck disable=SC2128
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_STYLE" ]; then
-	TMUX_POWERLINE_WINDOW_STATUS_STYLE=(
-		"$(format regular)"
-	)
+    TMUX_POWERLINE_WINDOW_STATUS_STYLE=(
+	"$(format regular)"
+    )
 fi
 
 # shellcheck disable=SC2128
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_FORMAT" ]; then
-	TMUX_POWERLINE_WINDOW_STATUS_FORMAT=(
-		"#[$(format regular)]"
-		"  #I#{?window_flags,#F, } "
-		"$TMUX_POWERLINE_SEPARATOR_RIGHT_THIN"
-		" #W "
-	)
+    TMUX_POWERLINE_WINDOW_STATUS_FORMAT=(
+	"#[$(format regular)]"
+	# "  #I#{?window_flags,#F, } "
+	"$TMUX_POWERLINE_SEPARATOR_RIGHT_THIN"
+	" #W "
+    )
 fi
 
 # Format: segment_name [background_color|default_bg_color] [foreground_color|default_fg_color] [non_default_separator|default_separator] [separator_background_color|no_sep_bg_color]
@@ -104,7 +104,7 @@ if [ -z "$TMUX_POWERLINE_LEFT_STATUS_SEGMENTS" ]; then
     TMUX_POWERLINE_LEFT_STATUS_SEGMENTS=(
         "tmux_session_info 148 234"
         "hostname 33 0"
-        "lan_ip 24 255 ${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
+        # "lan_ip 24 255 ${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
         # "wan_ip 24 255"
         # "vpn 24 255 ${TMUX_POWERLINE_SEPARATOR_RIGHT_THIN}"
         "now_playing 234 37 ${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"

@@ -3,6 +3,12 @@
 #	 vi: foldmarker={,} foldmethod=marker foldlevel=0 tabstop=4 filetype=sh
 # }
 
+# Load untracked local secrets if present (e.g. TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_PASSWORD).
+# Create at ${XDG_CONFIG_HOME:-$HOME/.config}/tmux-powerline/secrets.sh; chmod 600.
+_tmux_pl_secrets="${XDG_CONFIG_HOME:-$HOME/.config}/tmux-powerline/secrets.sh"
+[ -f "$_tmux_pl_secrets" ] && . "$_tmux_pl_secrets"
+unset _tmux_pl_secrets
+
 # General {
 # Show which segment fails and its exit code.
 export TMUX_POWERLINE_DEBUG_MODE_ENABLED="false"
@@ -51,7 +57,7 @@ export TMUX_POWERLINE_SEG_BATTERY_NUM_HEARTS="5"
 
 # date.sh {
 # date(1) format for the date. If you don't, for some reason, like ISO 8601 format you might want to have "%D" or "%m/%d/%Y".
-export TMUX_POWERLINE_SEG_DATE_FORMAT="%H:%M %y/%m/%d %a"
+export TMUX_POWERLINE_SEG_DATE_FORMAT="%y/%m/%d %H:%M %a"
 # }
 
 # date_week.sh {
@@ -177,7 +183,8 @@ export TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_USERNAME="ycpss91255"
 # Account name : <username-below>@<server-below>
 # Password : Your password ( Once again, try to use 2 step-verification and application-specific password)
 # See http://support.google.com/accounts/bin/answer.py?hl=en&answer=185833 for more info.
-export TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_PASSWORD="zkld bkbg mefc hpfv"
+# Injected via ~/.config/tmux-powerline/secrets.sh (untracked); empty if absent.
+export TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_PASSWORD="${TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_PASSWORD:-}"
 # Domain name that will complete your email. For normal GMail users it probably is "gmail.com but can be "foo.tld" for Google Apps users.
 export TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_SERVER="gmail.com"
 # How often in minutes to check for new mails.
@@ -306,7 +313,8 @@ export TMUX_POWERLINE_SEG_TMUX_MEM_CPU_LOAD_ARGS="-c -q -r 136 -i 2 -v -a 0"
 # tmux_session_info.sh {
 # Session info format to feed into the command: tmux display-message -p
 # For example, if FORMAT is '[ #S ]', the command is: tmux display-message -p '[ #S ]'
-export TMUX_POWERLINE_SEG_TMUX_SESSION_INFO_FORMAT="#S:#I.#P"
+# export TMUX_POWERLINE_SEG_TMUX_SESSION_INFO_FORMAT="#S:#I.#P"
+export TMUX_POWERLINE_SEG_TMUX_SESSION_INFO_FORMAT="#S"
 # }
 
 # utc_time.sh {

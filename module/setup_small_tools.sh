@@ -157,6 +157,7 @@ function _install_git_pkgs() {
 function _install_monitor_pkgs() {
     local _monitor_pkgs=(
         "bashtop"
+        "btop"
         "htop"
         "iftop"
         "ifstat"
@@ -167,6 +168,8 @@ function _install_monitor_pkgs() {
         "nmon"
         "nmap"
         "dstat"
+        # 23.10 up
+        "gping"
     )
 
     log_info "install monitoring packages..."
@@ -174,6 +177,8 @@ function _install_monitor_pkgs() {
     exec_cmd "pipx install bpytop"
 }
 
+# TODO: add yazi
+# sudo apt install ffmpegthumbnailer jq
 function _install_ranger() {
     log_info "Install and configure ranger..."
     apt_pkg_manager --install -- "pipx"
@@ -225,6 +230,9 @@ function _install_tmux() {
         "xclip"
         "tmux"
         "tmuxp"
+        # tmux-plugins/tmux-logging dependency
+        "ansifilter"
+        # dep fzf
     )
     apt_pkg_manager --install -- "${_tmux_pkgs[@]}"
 
@@ -267,7 +275,7 @@ function _install_tmux() {
 
 function _install_spotify() {
     exec_cmd "curl -sS \"https://download.spotify.com/debian/pubkey_C85668DF69375001.gpg\" \
-        | sudo gpg --dearmor --yes -o \"/etc/apt/trusted.gpg.d/spotify.gpg\""
+        | sudo gpg --dearmor --yes -o \"/etc/apt/keyrings.gpg.d/spotify.gpg\""
     exec_cmd "echo \"deb https://repository.spotify.com stable non-free\" | sudo tee /etc/apt/sources.list.d/spotify.list"
     apt_pkg_manager --install -- "spotify-client"
 }

@@ -211,7 +211,7 @@ function backup_file() {
     mkdir -p -- "${BACKUP_DIR}"
 
     local _file="" _original_file=""
-    for _file in "${@:?"${FUNCNAME[0] need files to backup.}"}"; do
+    for _file in "${@:?"${FUNCNAME[0]} need files to backup."}"; do
         if [[ -e "${_file}" ]]; then
             log_debug "Backup file: ${_file}"
             cp -aL -- "${_file}" "${BACKUP_DIR}"

@@ -49,19 +49,23 @@ if ! have_sudo_access; then
 fi
 
 function _install_qmk_firmware() {
-    local -ar _pkgs=(
-        "python3"
-        "python3-pip"
-        "pipx"
-    )
-    apt_pkg_manager --install -- "${_pkgs[@]}"
-    pipx install qmk
-    qmk setup -y
+    # local -ar _pkgs=(
+    #     "python3"
+    #     "python3-pip"
+    #     "pipx"
+    # )
+    # apt_pkg_manager --install -- "${_pkgs[@]}"
+    # pipx install qmk
 
+    curl -fsSL https://install.qmk.fm | sh
+
+    qmk setup -y
+    # fail
 }
 
 qmk list-keyboards
-# my keyboard boardsource/unicorne (test)
+# my keyboard boardsource/unicorne
+# my keymap cyc_keymap
 qmk compile -kb "<keyboard>" -km "default"
 
 # ${HOME}/.config/qmk/qmk.ini

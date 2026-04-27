@@ -1,0 +1,207 @@
+= README
+:experimental:
+:toc: right
+:imagesdir: images
+
+---
+link:./README_ch.adoc[繁體中文]
+
+== Install
+[NOTE]
+====
+The following content needs to be converted accordingly.
+
+* `<README_PATH>` is the directory where this *README.adoc* file is located.
+* `<FILE_PATH>` is the path of the file you want to view.
+* `<URL>` is the URL of the file you want to download.
+* `<WORKSPACE_PATH>` is the directory where you want to create a new repository.
+* `<JSON_PATH>` is the path of the JSON file you want to view.
+* `<IP>` is the IP address of the target.
+* `<MASK>` is the subnet mask of the target.
+* `[FOLDER_PATH]` is the path of the folder you want to navigate to. (optional)
+* `<COMMAND>` is the command you want to know more about.
+* `<NUM>` is the number of levels you want to display. (optional)
+====
+
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./install.sh
+./install.sh
+----
+
+== Usage
+.Monitor tools
+[source, shell]
+----
+# bashtop
+bashtop
+
+# bpytop
+bpytop
+
+# bmon
+bmon
+
+# htop
+htop
+
+# nmon
+nmon
+
+# powertop
+sudo powertop
+
+# iftop
+sudo iftop
+
+# iotop
+sudo iotop
+----
+
+.Other tools
+[source, shell]
+----
+# apt-file
+sudo apt-file search <COMMAND>
+
+# bat
+bat <FILE_PATH>
+
+# fish
+fish
+## if you want to use fish ssh-agent,
+## ssh key file name must be id_ed25519 (default name),
+## or modify config.fish youself.
+
+# git
+cd <WORKSPACE_PATH>
+git init
+## local（once per repository）
+git config --local init.defaultBranch "main"
+git config --local user.name "your name"
+git config --local user.email "email@example.com"
+## optional
+git config --local core.editor "editor"
+
+## global（once per computer）
+git config --global init.defaultBranch "main"
+git config --global user.name "your name"
+git config --global user.email "email@example.com"
+## optional
+git config --global core.editor "editor"
+
+# jq
+cat <JSON_PATH> | jq '.'
+
+# neofetch
+neofetch
+
+# net-tools
+ifconfig
+
+# nmap
+nmap <IP>/<MASK>
+
+# fping
+fping -q -a -g <IP>/<MASK>
+
+
+1. nmap (網路掃描的瑞士軍刀)
+nmap 功能最強，但也最複雜。若只想快速確認主機存活，請務必搭配 -sn。
+
+
+  * `-sn` (或舊版 -sP)：主機發現 (Ping Sweep)。只確認主機是否活著，不掃描 Port（最快）。
+  * `-p <Port>`：指定掃描特定 Port（例如 -p 80,443 或 -p 1-1024）。
+  * `-sV`：偵測服務版本（例如辨識 80 Port 跑的是 Apache 還是 Nginx）。
+  * `-O`：偵測作業系統（OS Detection）。
+  * `-T<0-5>`：設定掃描速度。T4 是常用的快速模式，T5 極速但容易被防火牆阻擋。
+  * `-oN/-oG`：將結果輸出成一般文字檔或 grep 友善格式。
+
+---
+
+2. fping (極速 Ping 工具)
+專門用於對大量 IP 進行存活檢查，效能優於標準 ping。
+
+
+  * `-a`：僅顯示活著的 (Alive) 主機。
+  * `-u`：僅顯示不通的 (Unreachable) 主機。
+  * `-g`：生成網段。後接 IP/遮罩（如 192.168.1.0/24）或起訖範圍。
+  * `-s`：掃描結束後顯示統計數據（共掃描多少個、活著多少個）。
+  * `-q`：安靜模式 (Quiet)。不顯示每一行的回應，通常搭配腳本使用。
+  * `-t <ms>`：設定等待回應的逾時時間（預設 500ms）。
+
+---
+
+
+3. arp-scan (區網最強偵測)
+利用 ARP 協定，即便對方開啟防火牆阻擋 ICMP (Ping)，在同網域下依然無所遁形。
+
+
+  * `--localnet`：自動根據當前網卡設定掃描整個區網。
+  * `--interface` (或 `-I`)：指定使用的網路卡（如 eth0, wlan0）。
+  * `--timeout` (或 `-t`)：設定每個封包等待的毫秒數。縮短此值可加速，但可能漏掉反應慢的裝置。
+  * `--retry` (或 `-r`)：掃描重試次數，預設為 2。
+  * `--ignoredups`：忽略重複的 ARP 回應。
+
+---
+
+  2. arping 常用參數
+  arping 通常一次只能針對 一個 IP 進行測試，不像 arp-scan 可以掃描整個網段。
+
+
+   * `-I <interface>`：（必填） 指定網路卡（例如 eth0 或 enp0s31f6）。
+   * `-c <count>`：發送請求的次數（例如 -c 3）。
+   * `-d`：Duplicate 偵測。用於檢查是否有 IP 衝突（如果有兩個不同的 MAC 位址回應同一個 IP，它會報警）。
+   * `-w <timeout>`：設定等待時間。
+
+# arp-scan
+arp-scan <IP>/<MASK>
+sudo arp-scan --interface=<DERVICE> --localnet
+
+# powerstat
+sudo powerstat
+
+# ranger
+ranger [FOLDER_PATH]
+
+# silversearcher-ag
+ag replace grep
+
+# tig
+tig [--all]
+tig status
+
+# tldr
+tldr <COMMAND>
+
+# tree
+tree [FOLDER_PATH]
+tree [-C] [-L <NUM>] [FOLDER_PATH]
+
+# wget
+wget -O <FILE_PATH> <URL>
+
+# zoxide
+z <FOLDER_PATH>
+----
+
+.ssh
+[source, shell]
+----
+# 修改 config
+<EDITOR> ~/.ssh/config
+----
+
+== Remove
+[source, shell]
+----
+cd <README_PATH>
+chmod +x ./remove.sh
+./remove.sh
+----
+
+== Interesting
+* https://github.com/romner-set/btop-gpu[btop-gpu Github (*not install*, but can see the GPU, awesome!)]
+
+// TODO: segmentation all tool

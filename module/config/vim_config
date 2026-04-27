@@ -1,4 +1,4 @@
- set number                         " Display line numbers
+set number                         " Display line numbers
 set nocompatible                    " Do not use vi compatibility mode
 syntax on                           " Enable syntax highlighting
 set noshowmode                      " Don't show mode since lightline displays it.
@@ -11,7 +11,7 @@ set tabstop=4                       " Set tab key to 4 spaces
 set softtabstop=4                   " Set soft tab key to 4 spaces
 set shiftwidth=4                    " Set >> key to 4 spaces
 set cursorline                      " Highlight the current line
-set textwidth=80                    " Set the number of characters for automatic line break
+set textwidth=120                   " Set the number of characters for automatic line break
 set wrap                            " Enable automatic line wrapping
 set linebreak                       " Break lines at word boundaries
 set wrapmargin=2                    " Set the margin for automatic line wrapping
@@ -236,7 +236,7 @@ nmap <unique> <leader>fr <Plug>LeaderfRgPrompt
 nmap <unique> <leader>fra <Plug>LeaderfRgCwordLiteralNoBoundary
 nmap <unique> <leader>frb <Plug>LeaderfRgCwordLiteralBoundary
 nmap <unique> <leader>frc <Plug>LeaderfRgCwordRegexNoBoundary
-nmap <unique> <leader>frd <jlug>LeaderfRgCwordRegexBoundary
+nmap <unique> <leader>frd <Plug>LeaderfRgCwordRegexBoundary
 
 vmap <unique> <leader>fra <Plug>LeaderfRgVisualLiteralNoBoundary
 vmap <unique> <leader>frb <Plug>LeaderfRgVisualLiteralBoundary

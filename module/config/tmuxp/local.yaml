@@ -1,0 +1,14 @@
+session_name: "local"
+windows:
+  - window_name: "normal"
+    panes:
+      - focus: true
+  - window_name: "monitor"
+    layout: main-horizontal
+    options:
+      main-pane-height: "73%"
+    panes:
+      - shell_command: cmatrix -b
+      - shell_command: nvtop
+        focus: true
+      - shell_command: btop

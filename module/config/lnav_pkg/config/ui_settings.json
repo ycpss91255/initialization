@@ -1,0 +1,11 @@
+{
+    "$schema": "https://lnav.org/schemas/config-v1.schema.json",
+    "ui": {
+        "theme": "solarized-dark",
+        "word-wrap": true,
+        "show-hidden": false,
+        "mouse": {
+            "mode": "enabled"
+        }
+    }
+}

@@ -1,0 +1,27 @@
+{
+  "env": {
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1"
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "/home/yunchien/.claude/run-statusline.sh",
+    "refreshInterval": 30
+  },
+  "extraKnownMarketplaces": {
+    "cc-statusline": {
+      "source": {
+        "source": "github",
+        "repo": "NYCU-Chung/cc-statusline"
+      }
+    }
+  },
+  "language": "zh-TW",
+  "verbose": true,
+  "enabledPlugins": {
+    "cc-statusline@cc-statusline": true
+  }
+}

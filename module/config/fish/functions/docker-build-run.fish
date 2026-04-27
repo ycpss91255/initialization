@@ -2,7 +2,7 @@ function docker-build-run --description "Build and run the docker container" \
     --wraps "bash" \
     --argument-names _script_dir
     # if no 'script_dir' argument, use current directory
-    test -z "$_script_dir"; or set -l _script_dir (pwd -P)
+    test -z "$_script_dir"; and set -l _script_dir (pwd -P)
 
     set -l _script_name "build.sh" "run.sh"
 
@@ -28,7 +28,7 @@ function docker-build-run --description "Build and run the docker container" \
 
     clear
 
-    set -l run_script "$_script_dir/$_script_name[2]"
+    set -l _run_script "$_script_dir/$_script_name[2]"
 
     if ! "$_run_script"
         printf "%s run failed.\n" "$_run_script"

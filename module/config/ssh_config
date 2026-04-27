@@ -1,6 +1,6 @@
 # Read more about SSH config files: https://linux.die.net/man/5/ssh_config
 
-Host github.com
+Host github
     User git
     Hostname github.com
     IdentityFile ~/.ssh/id_ed25519
@@ -12,3 +12,97 @@ Host my_server
     ForwardX11 yes
     ForwardX11Trusted yes
     IdentityFile ~/.ssh/id_ed25519
+
+Host local_server
+    User yunchien
+    HostName 127.0.0.1
+    Port 22
+    ForwardX11 yes
+    ForwardX11Trusted yes
+    IdentityFile ~/.ssh/coretronic
+
+
+# --- Coretronic Servers ---
+Host core.old_gitlab
+    User git
+    Port 10022
+    IdentityFile ~/.ssh/coretronic
+# Check WiFi
+Match Host core.old_gitlab exec "iwgetid -r | grep -q '^Coretronic_Staff$'"
+    HostName 10.2.23.69
+# Check Ethernet
+Match Host core.old_gitlab exec "grep -q 'up' /sys/class/net/en*/operstate 2>/dev/null"
+    HostName 10.2.23.69
+
+Host core.yunchien-server
+    User yunchien
+    ForwardX11 yes
+    ForwardX11Trusted yes
+    IdentityFile ~/.ssh/coretronic
+
+# Check WiFi
+Match Host core.yunchien-server exec "iwgetid -r | grep -q '^Coretronic_Staff$'"
+    HostName 10.2.23.83
+# Check Ethernet
+Match Host core.yunchien-server exec "grep -q 'up' /sys/class/net/en*/operstate 2>/dev/null"
+    HostName 10.2.23.83
+
+Host core.yulin-server
+    User yulin
+    ForwardX11 yes
+    ForwardX11Trusted yes
+    IdentityFile ~/.ssh/coretronic
+# Check WiFi
+Match Host core.yulin-server exec "iwgetid -r | grep -q '^Coretronic_Staff$'"
+    HostName 10.2.23.84
+# Check Ethernet
+Match Host core.yulin-server exec "grep -q 'up' /sys/class/net/en*/operstate 2>/dev/null"
+    HostName 10.2.23.84
+
+
+# --- CiLS-AMR ---
+# TODO: copy key to vms
+Host guotai.*
+    User myuser
+    ForwardX11 yes
+    ForwardX11Trusted yes
+    IdentityFile ~/.ssh/coretronic
+
+Host guotai.vms guotai.tpmlm3045-02 guotai.safety-01 guotai.circ2
+
+Match Host guotai.vms exec "iwgetid -r | grep -q '^CiLS-AMR$'"
+    HostName 192.168.11.102
+Match Host guotai.tpmlm3045-02 exec "iwgetid -r | grep -q '^CiLS-AMR$'"
+    HostName 192.168.11.130
+Match Host guotai.safety-01 exec "iwgetid -r | grep -q '^CiLS-AMR$'"
+    HostName 192.168.11.140
+Match Host guotai.circ2 exec "iwgetid -r | grep -q '^CiLS-AMR$'"
+    HostName 192.168.11.114
+
+
+# --- TP-Link_A6A8 ---
+Host lixing.*
+    User myuser
+    ForwardX11 yes
+    ForwardX11Trusted yes
+    IdentityFile ~/.ssh/coretronic
+
+Host lixing.vms lixing.kimb-01 lixing.core-03
+
+Match Host lixing.vms exec "iwgetid -r | grep -q '^TP-Link_A6A8$'"
+    HostName 192.168.11.210
+Match Host lixing.kimb-01 exec "iwgetid -r | grep -q '^TP-Link_A6A8$'"
+    HostName 192.168.11.166
+Match Host lixing.core-03 exec "iwgetid -r | grep -q '^TP-Link_A6A8$'"
+    HostName 192.168.11.161
+
+# --- Panasonic ---
+Host pana.*
+    User myuser
+    # ForwardX11 yes
+    # ForwardX11Trusted yes
+    IdentityFile ~/.ssh/coretronic
+Host pana.vms
+
+Match Host pana.vms exec "iwgetid -r | grep -q '^AMR_AP$'"
+    HostName 172.25.5.101

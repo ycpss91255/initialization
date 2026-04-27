@@ -1,0 +1,12 @@
+session_name: core.yunchien-server
+environment:
+  SSH_TARGET: core.yunchien-server
+  REMOTE_WORKSPACE: ~/workspace
+  REMOTE_SHELL: fish
+options:
+  default-command: 'ssh -t $SSH_TARGET "cd $REMOTE_WORKSPACE; exec $REMOTE_SHELL -l"'
+
+windows:
+  - window_name: normal
+    panes:
+      - focus: true

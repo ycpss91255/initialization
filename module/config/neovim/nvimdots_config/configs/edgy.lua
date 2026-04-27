@@ -28,11 +28,13 @@ return function()
 			["<A-h>"] = function(win)
 				win:resize("width", -2)
 			end,
-			["<A-l>"] = function(win)
-				win:resize("width", 2)
-			end,
-		},
-		left = {
+			                        ["<A-l>"] = function(win)
+			                                win:resize("width", 2)
+			                        end,
+			                        ["<C-n>"] = function()
+			                                require("edgy").toggle("right")
+			                        end,
+			                },		left = {
 			{
 				ft = "codecompanion",
 				pinned = true,

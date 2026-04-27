@@ -1,5 +1,5 @@
 function stc --description "Source tmux config"
-    # soured file path
+    # sourced file path
     set -l _file "$HOME/.config/tmux/tmux.conf"
 
     # check installed tmux

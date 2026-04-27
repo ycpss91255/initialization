@@ -10,13 +10,7 @@ function _wsl_func --description 'WSL use function'
 end
 
 function _user_bin_path --description 'Add user bin path to PATH'
-    set -l _user_bin_dir "$HOME/.local/bin" "$HOME/bin"
-
-    for _dir in $_user_bin_dir
-        if test -d "$_dir"; and ! contains -- "$_dir" $PATH
-            set -gx PATH "$_dir" $PATH
-        end
-    end
+    fish_add_path "$HOME/.local/bin" "$HOME/bin"
 end
 
 function _setup_editor --description 'Setup default editor'
@@ -25,7 +19,11 @@ function _setup_editor --description 'Setup default editor'
 
     for _cmd in $_editor_cmd
         if command -q -- "$_cmd"
-            set -gx EDITOR "$_cmd"
+            if test "$_cmd" = "nvim"
+                set -gx EDITOR "$_cmd -p"
+            else
+                set -gx EDITOR "$_cmd"
+            end
             break
         end
     end

@@ -1,0 +1,17 @@
+{
+  ;; 介面語言 (顯示訊息用的語言)
+  :hl "zh-TW"
+
+  ;; 預設目標語言 (當你輸入英文時，預設轉成繁中)
+  ; :tl ["en" "zh-TW"]
+  :tl ["zh-TW"]
+
+  ;; 翻譯引擎 (預設為 google，也可換成 bing, yandex 等)
+  :engine "google"
+
+  ;; 顯示偏好
+  :verbose false         ; 顯示詳細資訊（含字典、詞性、例句）
+  :show-original false   ; 顯示原文
+  :indent 2              ; 縮排空格數
+  :theme "default"       ; 使用預設配色方案
+}

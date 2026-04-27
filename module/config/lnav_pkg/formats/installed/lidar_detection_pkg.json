@@ -1,0 +1,32 @@
+{
+    "$schema": "https://lnav.org/schemas/format-v1.schema.json",
+    "lidar_detection_pkg": {
+        "title": "Lidar Detection Package (Custom ROS Format)",
+        "description": "Standard Glog Style with Fixed Level visibility",
+        "regex": {
+            "std": {
+                "pattern": "^(?<level>[IWECF])(?<timestamp>\\d{4} \\d{2}:\\d{2}:\\d{2}\\.\\d{6})\\s+(?<thread>\\d+)\\s+(?<src_file>[^:]+):(?<src_line>\\d+)\\]\\s+(?<ros_time>\\[[^\\]]+\\])\\s+(?<ros_level>\\[[^\\]]+\\])\\s+(?<func_name>[^ ]+\\(\\))\\s+-\\s+(?<body>.*)"
+            }
+        },
+        "level-field": "level",
+        "level": {
+            "error": "E",
+            "warning": "W",
+            "info": "I",
+            "fatal": "F",
+            "critical": "C"
+        },
+        "value": {
+            "level": { "kind": "string", "identifier": true, "hidden": true },
+            "thread": { "kind": "integer", "identifier": true, "hidden": true },
+            "src_file": { "kind": "string", "identifier": true, "hidden": true },
+            "src_line": { "kind": "integer", "hidden": true },
+            "ros_time": { "kind": "string", "hidden": true },
+            "ros_level": { "kind": "string", "hidden": true },
+            "func_name": { "kind": "string", "identifier": true, "hidden": true }
+        },
+        "sample": [
+            { "line": "I0303 11:02:31.338442 1990335 detect_shelf.cpp:297] [1772506951.338] [ INFO] detect_shelf_callback() - Reverse Storage yaw: 1.570797" }
+        ]
+    }
+}

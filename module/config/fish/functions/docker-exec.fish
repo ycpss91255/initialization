@@ -2,7 +2,7 @@ function docker-exec --description "Execute docker container" \
     --wraps "docker exec" \
     --argument-names _container
     # If no container is specified, get the first running container
-    test -z "$_container"; or set -l _container (docker ps -q | head -n 1)
+    test -z "$_container"; and set -l _container (docker ps -q | head -n 1)
 
     # Check if the container is running
     if test -z "$_container"

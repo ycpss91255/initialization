@@ -1,0 +1,12 @@
+session_name: ${SESSION_NAME}
+environment:
+  SSH_TARGET: ${SSH_TARGET}
+  REMOTE_WORKSPACE: ${REMOTE_WORKSPACE}
+  REMOTE_SHELL: bash
+options:
+  default-command: 'ssh -t $SSH_TARGET "cd ~/$REMOTE_WORKSPACE && exec $REMOTE_SHELL -l"'
+
+windows:
+  - window_name: normal
+    panes:
+      - focus: true

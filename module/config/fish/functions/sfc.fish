@@ -1,5 +1,5 @@
 function sfc --description 'Source fish config'
-    # soured file path
+    # sourced file path
     set -l _file "$HOME/.config/fish/config.fish"
 
     if ! test -f "$_file"

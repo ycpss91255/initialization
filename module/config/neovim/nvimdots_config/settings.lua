@@ -25,6 +25,7 @@ settings["lsp_deps"] = function(defaults)
     "jsonls",
     "lua_ls",
     "pylsp",
+    "dockerls",
     -- "gopls",
 	}
 end
@@ -39,6 +40,9 @@ settings["null_ls_deps"] = function(defaults)
     "shfmt",
     "stylua",
     "vint",
+    "shellcheck",
+    "hadolint",
+    "checkmake",
 	}
 end
 
@@ -58,6 +62,7 @@ settings["treesitter_deps"] = function(defaults)
 	"c",
 	"cpp",
 	"css",
+	"dockerfile",
 	-- "go",
 	-- "gomod",
 	"html",

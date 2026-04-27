@@ -1,0 +1,34 @@
+[[mgr.prepend_keymap]]
+on   = "l"
+run  = "plugin smart-enter"
+desc = "Enter the child directory, or open the file"
+
+[[mgr.prepend_keymap]]
+on   = "<Enter>"
+run  = "plugin smart-enter"
+desc = "Enter the child directory, or open the file"
+
+[[mgr.prepend_keymap]]
+on   = "z"
+run  = "plugin zoxide"
+desc = "Jump to a directory using zoxide"
+
+[[mgr.prepend_keymap]]
+on   = "Z"
+run  = "cd --interactive"
+desc = "Jump to a directory using zoxide (interactive)"
+
+[[mgr.prepend_keymap]]
+on   = "p"
+run  = "paste --force"
+desc = "Paste (overwrite if exists)"
+
+[[mgr.prepend_keymap]]
+on   = ["g", "g"]
+run  = "shell 'lazygit' --block --confirm"
+desc = "Open lazygit"
+
+[[mgr.prepend_keymap]]
+on   = ["g", "d"]
+run  = "shell 'lazydocker' --block --confirm"
+desc = "Open lazydocker"

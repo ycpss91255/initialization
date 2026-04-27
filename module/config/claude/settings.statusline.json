@@ -1,0 +1,7 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "/home/yunchien/.claude/run-statusline.sh",
+    "refreshInterval": 30
+  }
+}

@@ -28,13 +28,13 @@ enum layers {
   _VIM,
   _MOUSE,
   _GUI_F,
+  _GUI_F_UDLR,
 };
 
 enum tab_dances {
   MP_LY_NT,
   DUAL_DEL,
   LGUI_E_3,
-  LGUI_R_L,
   LGUI_I_8,
 };
 
@@ -155,7 +155,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   * ┌───────┬───────┬───────┬───────┬───────┬───────┐     ┌───────┬───────┬───────┬───────┬───────┬───────┐
   * │       │ Win+1 │ Win+2 │Win+E 3│ Win+4 │ Win+5 │     │ Win+6 │ Win+7 │Win+I 8│ Win+9 │       │       │
   * ├───────┼───────┼───────┼───────┼───────┼───────┤     ├───────┼───────┼───────┼───────┼───────┼───────┤
-  * │Win+Spc│       │       │       │       │       │     │Win+←  │Win+↓  │Win+↑  │Win+→ L│       │       │
+  * │Win+Spc│       │       │       │       │       │     │Win+H  │Win+J  │Win+K  │Win+L  │       │       │
   * ├───────┼───────┼───────┼───────┼───────┼───────┤     ├───────┼───────┼───────┼───────┼───────┼───────┤
   * │       │       │       │       │       │       │     │       │       │       │       │       │       │
   * └───────┴───────┴───────┼───────┼───────┼───────┤     ├───────┼───────┼───────┼───────┴───────┴───────┘
@@ -163,10 +163,10 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   *                         └───────┴───────┴───────┘     └───────┴───────┴───────┘
   */
   [_GUI_F] = LAYOUT_split_3x6_3(
-    _______,   LGUI(KC_1), LGUI(KC_2), TD(LGUI_E_3), LGUI(KC_4), LGUI(KC_5),     LGUI(KC_6),    LGUI(KC_7),    TD(LGUI_I_8),  LGUI(KC_9), _______, _______,
-    LGUI(KC_SPC), _______,    _______,      _______,    _______,    _______,     LGUI(KC_LEFT), LGUI(KC_DOWN), LGUI(KC_UP), TD(LGUI_R_L), _______, _______,
-    _______,   LGUI(KC_X),    _______,      _______,    _______,    _______,     _______,       _______,       _______,     _______,      _______, _______,
-                                            _______,    _______,    _______,     _______,       _______,       _______),
+         _______, LGUI(KC_1), LGUI(KC_2), TD(LGUI_E_3), LGUI(KC_4), LGUI(KC_5),     LGUI(KC_6), LGUI(KC_7), TD(LGUI_I_8), LGUI(KC_9), _______, _______,
+    LGUI(KC_SPC),    _______,    _______,      _______,    _______,    _______,     LGUI(KC_H), LGUI(KC_J),   LGUI(KC_K), LGUI(KC_L), _______, _______,
+         _______, LGUI(KC_X),    _______,      _______,    _______,    _______,        _______,    _______,      _______,    _______, _______, _______,
+                                               _______,    _______,    _______,        _______,    _______,      _______),
 };
 
 /* ============================ Joystick Module ============================ */
@@ -207,7 +207,6 @@ tap_dance_action_t tap_dance_actions[] = {
   [MP_LY_NT] = ACTION_TAP_DANCE_DOUBLE(KC_MPLY, KC_MNXT) ,
   [DUAL_DEL] = ACTION_TAP_DANCE_DOUBLE(KC_DEL, LCTL(KC_DEL)),
   [LGUI_E_3] = ACTION_TAP_DANCE_DOUBLE(LGUI(KC_E), LGUI(KC_3)),
-  [LGUI_R_L] = ACTION_TAP_DANCE_DOUBLE(LGUI(KC_RGHT), LGUI(KC_L)),
   [LGUI_I_8] = ACTION_TAP_DANCE_DOUBLE(LGUI(KC_I), LGUI(KC_8)),
 };
 

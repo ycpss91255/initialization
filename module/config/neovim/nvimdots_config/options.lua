@@ -10,13 +10,13 @@ local options = {
     expandtab = true, -- Expand tabs to spaces
     foldmethod = 'indent', -- Use indentation level for folding
     hlsearch = true, -- Highlight search matches
-    tabstop = 4, -- Number of spaces that a <Tab> in the file counts for highlighting
-    textwidth = 80, -- Set the maximum number of characters for automatic line break
+    tabstop = 2, -- Number of spaces that a <Tab> in the file counts for highlighting
+    textwidth = 120, -- Set the maximum number of characters for automatic line break
     scrolloff = 10, -- Keep 15 lines visible when scrolling
-    shiftwidth = 4, -- Number of spaces to use for each step of (auto)indent
+    shiftwidth = 2, -- Number of spaces to use for each step of (auto)indent
     showmatch = true, -- When a bracket is inserted, briefly jump to the matching one
     smartindent = true, -- Enable smart indentation
-    softtabstop = 4, -- Number of spaces that a <Tab> counts for while editing
+    softtabstop = 2, -- Number of spaces that a <Tab> counts for while editing
     wrap = true, -- Wrap lines
     wrapmargin = 2, -- Margin for line wrapping
 }

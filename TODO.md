@@ -171,6 +171,70 @@ ExecStart=/usr/bin/gnome-keyring-daemon --foreground --components=secrets --cont
 
 主修是 secrets.sh 的 cache，這個 override 是雙保險，可選擇要不要在新機器套用。
 
+## Trash 自動維護（2026-04-27 設定）
+
+`rm` 在 fish 走 `trash-put`（`module/config/fish/functions/rm.fish`），垃圾桶 trash-cli 沒有原生容量上限，需要靠排程清理。
+
+### 維護腳本
+`module/tools/trash-maintenance.sh`：
+1. `trash-empty -f $MAX_DAYS` 砍掉超過 N 天的項目
+2. 若 `~/.local/share/Trash/files` 仍超過 `$MAX_GB`，從 `info/*.trashinfo` 的 mtime 最舊的開始砍直到低於上限
+3. 預設 `MAX_DAYS=90`、`MAX_GB=50`，可用環境變數覆蓋
+
+### 部署位置
+| 機器 | 腳本 | 排程 | 額外 |
+|---|---|---|---|
+| local (這台) | `~/.local/bin/trash-maintenance.sh` → repo symlink | crontab 每日 03:00 | GNOME Privacy 也開了 90 天 auto-delete（`gsettings set org.gnome.desktop.privacy {remove-old-trash-files true, old-files-age uint32 90}`）|
+| `core.yunchien-server` | `~/.local/bin/trash-maintenance.sh`（實體 copy）| crontab 每日 03:00 | 無 GUI，純靠 cron |
+
+兩邊 cron 一致：
+```
+0 3 * * * $HOME/.local/bin/trash-maintenance.sh >> $HOME/.local/state/trash-maintenance.log 2>&1
+```
+
+### 手動驗證 / 操作
+```bash
+# 看目前大小（files/ = 真實垃圾，info/ = metadata，expunged/ = 砍不掉的殘骸）
+du -sh ~/.local/share/Trash/{files,info,expunged}
+
+# 立刻跑一次（dry-run 看會做什麼）
+MAX_GB=50 MAX_DAYS=90 bash -x ~/.local/bin/trash-maintenance.sh
+
+# 看 cron 紀錄
+tail -f ~/.local/state/trash-maintenance.log
+
+# 改容量上限：直接編 crontab 或在 cron 行前加環境變數
+# 例：MAX_GB=20 ~/.local/bin/trash-maintenance.sh
+```
+
+### 注意：expunged/ 不在維護範圍
+`~/.local/share/Trash/expunged/` 是 trash-cli 想刪但因檔案權限 / 持有失敗的殘骸（local 上目前約 10GB，主要是 isaac-sim docker cache 在 root 名下）。腳本不碰這塊，要清需要：
+```bash
+sudo rm -rf ~/.local/share/Trash/expunged
+```
+
+### 新機器部署步驟
+```bash
+# 1. 確認 trash-cli 已裝
+sudo apt-get install -y trash-cli
+
+# 2. 部署 fish rm function
+mkdir -p ~/.config/fish/functions
+cp module/config/fish/functions/rm.fish ~/.config/fish/functions/
+
+# 3. 部署維護腳本（headless 機器用 copy；有 repo 的機器可 symlink）
+mkdir -p ~/.local/bin ~/.local/state
+cp module/tools/trash-maintenance.sh ~/.local/bin/
+chmod +x ~/.local/bin/trash-maintenance.sh
+
+# 4. 安裝 crontab
+(crontab -l 2>/dev/null; echo "0 3 * * * \$HOME/.local/bin/trash-maintenance.sh >> \$HOME/.local/state/trash-maintenance.log 2>&1") | crontab -
+
+# 5.（有 GNOME 的話）開 Privacy 90 天 auto-delete
+gsettings set org.gnome.desktop.privacy remove-old-trash-files true
+gsettings set org.gnome.desktop.privacy old-files-age 'uint32 90'
+```
+
 ## ADD items
 [] sudo apt install ripgrep
 [] NAS mount

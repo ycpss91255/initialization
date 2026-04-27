@@ -117,7 +117,11 @@ if [ -z "$TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS" ]; then
     TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS=(
         # "tmux_mem_cpu_load 234 136"
         "mode_indicator 46 0 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}"
-        "battery 137 127"
+    )
+    if compgen -G "/sys/class/power_supply/BAT*" > /dev/null 2>&1; then
+        TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS+=("battery 137 127")
+    fi
+    TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS+=(
         "date 235 136 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}"
         "tmux_mem_cpu_load 234 136 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD} no_sep_bg_color no_sep_fg_color left_disable separator_disable"
     )

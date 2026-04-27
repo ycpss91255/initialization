@@ -1,1 +1,14 @@
 tmp
+
+# Yazi: ignore `ya pkg` auto-installed packages, keep only manually-tracked plugins
+module/config/yazi/plugins/*
+!module/config/yazi/plugins/dockerfile.yazi
+module/config/yazi/flavors/
+
+# Fish: ignore auto-generated completions, keep only manually-tracked ones
+module/config/fish/completions/*
+!module/config/fish/completions/tmuxp-ssh.fish
+
+# Fish runtime state (per-machine)
+module/config/fish/fish_history
+module/config/fish/fish_variables*

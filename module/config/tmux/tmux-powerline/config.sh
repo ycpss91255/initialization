@@ -3,8 +3,9 @@
 #	 vi: foldmarker={,} foldmethod=marker foldlevel=0 tabstop=4 filetype=sh
 # }
 
-# Load untracked local secrets if present (e.g. TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_PASSWORD).
-# Create at ${XDG_CONFIG_HOME:-$HOME/.config}/tmux-powerline/secrets.sh; chmod 600.
+# Load local secrets if present (e.g. TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_PASSWORD).
+# Deploy with: cp module/config/tmux/tmux-powerline/secrets.sh ~/.config/tmux-powerline/ ; chmod 600
+# (Tracked in repo — file holds no plaintext, just looks values up via secret-tool.)
 _tmux_pl_secrets="${XDG_CONFIG_HOME:-$HOME/.config}/tmux-powerline/secrets.sh"
 [ -f "$_tmux_pl_secrets" ] && . "$_tmux_pl_secrets"
 unset _tmux_pl_secrets
@@ -183,7 +184,7 @@ export TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_USERNAME="ycpss91255"
 # Account name : <username-below>@<server-below>
 # Password : Your password ( Once again, try to use 2 step-verification and application-specific password)
 # See http://support.google.com/accounts/bin/answer.py?hl=en&answer=185833 for more info.
-# Injected via ~/.config/tmux-powerline/secrets.sh (untracked); empty if absent.
+# Injected via ~/.config/tmux-powerline/secrets.sh (see secrets.sh for setup); empty if absent.
 export TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_PASSWORD="${TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_PASSWORD:-}"
 # Domain name that will complete your email. For normal GMail users it probably is "gmail.com but can be "foo.tld" for Google Apps users.
 export TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_SERVER="gmail.com"

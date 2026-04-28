@@ -58,12 +58,14 @@ run_segment() {
 	fi
 
 	if [ -n "$stats" ]; then
-		# Strip the binary's leading mem token (one of "X/YMB", "XMB/YGB",
-		# "X/YGB") and prepend our own. Skip the rewrite if the prefix
-		# doesn't match — e.g. if the user enables -c and color escapes
-		# come first — to stay safe.
-		if [[ "$stats" =~ ^[0-9]+(MB)?/[0-9]+(MB|GB) ]]; then
-			stats="$(__mem_token)${stats#"${BASH_REMATCH[0]}"}"
+		# Replace the binary's mem token (one of "X/YMB", "XMB/YGB",
+		# "X/YGB") wherever it appears in the output. Not anchored: when
+		# -c is enabled, the binary prefixes the token with #[fg=...]
+		# color escapes. Color escapes don't contain "/", load averages
+		# don't contain "MB|GB" and CPU% has no slash, so this pattern
+		# uniquely identifies the mem token.
+		if [[ "$stats" =~ [0-9]+(MB)?/[0-9]+(MB|GB) ]]; then
+			stats="${stats/${BASH_REMATCH[0]}/$(__mem_token)}"
 		fi
 		echo "$stats" | tr -s ' '
 	fi

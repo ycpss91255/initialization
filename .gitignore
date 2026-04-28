@@ -8,6 +8,7 @@ module/config/yazi/flavors/
 # Fish: ignore auto-generated completions, keep only manually-tracked ones
 module/config/fish/completions/*
 !module/config/fish/completions/tmuxp-ssh.fish
+!module/config/fish/completions/claude-rm.fish
 
 # Fish runtime state (per-machine)
 module/config/fish/fish_history

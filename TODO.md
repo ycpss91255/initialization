@@ -283,6 +283,21 @@ cc-statusline 的 README 建議 `statusLine.command` 寫 `node ${CLAUDE_PLUGIN_R
   - [] 建立 `module/setup_claude.sh`：自動處理 plugin 安裝、symlink 部署、settings.json 注入（與 `Config sync 腳本` 章節整合）
   - [] 確認 settings.json 是否要進 repo（含 enabledPlugins / env 等可能敏感設定）
 
+## Claude Code session 管理（claude-rm / claude-ls）
+
+`~/.claude/projects/<encoded-cwd>/<session-id>.jsonl` 累積太多會難管理。`/resume` picker 顯示的名稱來自 session 開頭的 `customTitle` 欄位（用 `claude -n <name>` 啟動或 `/name` 設定），沒命名的就是自動摘要，容易撞名。
+
+工具放 `module/config/fish/`：
+
+- `_claude_sessions.py` — 共用 helper，掃描 `~/.claude/projects/` 萃取 customTitle、forkedFrom、首句訊息，輸出 JSONL
+- `functions/claude-ls.fish` — 樹狀列出所有 session，標示 fork 父子關係
+- `functions/claude-rm.fish` — 依 customTitle 完全比對或 sessionId 前綴比對，`gio trash` 移到垃圾桶；偵測到待刪 session 有 fork 依賴時要求大寫 `YES` 確認
+- `completions/claude-rm.fish` — Tab 補完顯示 customTitle、所在 project、`[fork of <parent>]`
+
+`.gitignore` 忽略所有 fish completions 但對 `claude-rm.fish` 加例外。`setup_shell.sh` 第 133 行 `cp -r ${CONFIG_PATH}/fish ~/.config` 會一併部署。
+
+依賴：`gio`（GNOME, Ubuntu 預裝）、`python3`。
+
 https://gist.github.com/coodoo/4ccb8e9ab3f5b586f9beb8b7ef5f6d75
 
 - KVM stack

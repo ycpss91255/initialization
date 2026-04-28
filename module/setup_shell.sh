@@ -54,6 +54,7 @@ _apt_dep_pkgs=(
     # "openssh-client"
     # "openssh-server"
     "ssh"
+    "keychain"
 )
 apt_pkg_manager --install "${_apt_dep_pkgs[@]}"
 
@@ -102,7 +103,6 @@ function install_fish_plugin_and_set_user_config() {
             jorgebucaran/autopair.fish \
             markcial/upto \
             edc/bass \
-            danhper/fish-ssh-agent \
             kidonng/zoxide.fish \
             PatrickF1/fzf.fish \
             IlanCosman/tide@v6 \

@@ -35,6 +35,10 @@ source "${LIB_DIR}/logger.sh"
 # shellcheck disable=SC1091
 source "${LIB_DIR}/general.sh"
 # shellcheck disable=SC1091
+source "${LIB_DIR}/detect.sh"
+# shellcheck disable=SC1091
+source "${LIB_DIR}/platform.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/registry.sh"
 # shellcheck disable=SC1091
 source "${LIB_DIR}/resolver.sh"
@@ -42,6 +46,11 @@ source "${LIB_DIR}/resolver.sh"
 source "${LIB_DIR}/runner.sh"
 # shellcheck disable=SC1091
 source "${LIB_DIR}/dispatcher.sh"
+
+# ── Compute & export form_factor for module sub-shells ──────────────────────
+# Modules' is_recommended() and platform-aware install() read this. We
+# export once at startup so all sub-shells inherit a consistent value.
+platform_export_env || true
 
 # ── Load module registry (silent on missing module/ dir) ─────────────────────
 registry_load_all "${MODULE_DIR}" || true

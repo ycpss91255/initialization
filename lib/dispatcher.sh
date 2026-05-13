@@ -34,11 +34,12 @@ Subcommands (Phase 2 MVP):
   purge   <module>...    Remove modules + their config
   list                   List registered modules
   show    <module>       Print a module's metadata
+  detect                 Print host environment (use --json for machine output)
   help    [<subcmd>]     Show this help
   version                Show tool version
 
 Subcommands (stubbed, Phase 3+):
-  update / upgrade / search / detect / doctor
+  update / upgrade / search / doctor
   config load|set|get|unset|show
   sync / import / export
 
@@ -188,6 +189,59 @@ _dispatcher_lifecycle() {
     esac
 }
 
+# ── detect ───────────────────────────────────────────────────────────────────
+
+_dispatcher_detect() {
+    local _json_only="false"
+    local _arg
+    for _arg in "$@"; do
+        case "${_arg}" in
+            --json) _json_only="true" ;;
+            -*)
+                printf "[dispatcher] ERROR: unknown flag %s\n" "${_arg}" >&2
+                return 2
+                ;;
+            *)
+                printf "[dispatcher] ERROR: detect takes no positional args (got '%s')\n" "${_arg}" >&2
+                return 2
+                ;;
+        esac
+    done
+
+    if ! declare -F detect_environment >/dev/null 2>&1; then
+        printf "[dispatcher] ERROR: detect_environment not loaded\n" >&2
+        return 1
+    fi
+
+    local _env_json _form
+    _env_json="$(detect_environment)"
+    _form="$(platform_classify "${_env_json}")"
+
+    if [[ "${_json_only}" == "true" ]]; then
+        # Splice form_factor into the JSON by replacing the closing '}'.
+        # This keeps lib/detect.sh free of any platform.sh coupling.
+        printf '%s,"form_factor":"%s"}\n' "${_env_json%\}}" "${_form}"
+        return 0
+    fi
+
+    # Human-readable: "<dotted key>: <value>" per line.
+    printf '%s\n' "----- init_ubuntu environment ------"
+    printf 'os.id:           %s\n' "$(detect_get_field os.id)"
+    printf 'os.version:      %s\n' "$(detect_get_field os.version)"
+    printf 'os.codename:     %s\n' "$(detect_get_field os.codename)"
+    printf 'arch:            %s\n' "$(detect_get_field arch)"
+    printf 'cpu.vendor:      %s\n' "$(detect_get_field cpu.vendor)"
+    printf 'gpu.vendor:      %s\n' "$(detect_get_field gpu.vendor)"
+    printf 'gpu.model:       %s\n' "$(detect_get_field gpu.model)"
+    printf 'desktop:         %s\n' "$(detect_get_field desktop)"
+    printf 'session_type:    %s\n' "$(detect_get_field session_type)"
+    printf 'virt.container:  %s\n' "$(detect_get_field virt.container)"
+    printf 'virt.vm:         %s\n' "$(detect_get_field virt.vm)"
+    printf 'wsl:             %s\n' "$(detect_get_field wsl)"
+    printf 'board:           %s\n' "$(detect_get_field board)"
+    printf 'form_factor:     %s\n' "${_form}"
+}
+
 # ── Stub group ───────────────────────────────────────────────────────────────
 
 _dispatcher_stub() {
@@ -216,10 +270,11 @@ dispatcher_dispatch() {
         version) _dispatcher_version ;;
         list)    _dispatcher_list "$@" ;;
         show)    _dispatcher_show "$@" ;;
+        detect)  _dispatcher_detect "$@" ;;
         install|remove|purge)
             _dispatcher_lifecycle "${_sub}" "$@"
             ;;
-        update|upgrade|search|detect|doctor|sync|import|export|config|self-upgrade)
+        update|upgrade|search|doctor|sync|import|export|config|self-upgrade)
             _dispatcher_stub "${_sub}"
             ;;
         *)

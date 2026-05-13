@@ -112,9 +112,13 @@ _load_engine() {
     assert_output --partial "noop"
 }
 
-@test "dispatcher_dispatch install <module> succeeds" {
+@test "dispatcher_dispatch install <module> --dry-run succeeds" {
+    # Use --dry-run because the test-tools container runs as root and the
+    # dispatcher refuses real install/remove/purge under root (PRD §10).
+    # Dry-run is the right surface for testing dispatcher -> resolver wiring
+    # without depending on container user identity.
     _load_engine
-    run dispatcher_dispatch install noop
+    run dispatcher_dispatch install noop --dry-run
     assert_success
 }
 

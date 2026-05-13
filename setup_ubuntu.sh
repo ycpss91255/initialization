@@ -11,12 +11,10 @@
 set -euo pipefail
 shopt -s inherit_errexit 2>/dev/null || true
 
-# ── Refuse to run as root (PRD §10) ──────────────────────────────────────────
-if [[ "${EUID:-0}" -eq 0 ]]; then
-    printf "ERROR: Do not run setup_ubuntu as root.\n" >&2
-    printf "Run as a regular user; sudo will be requested per-module.\n" >&2
-    exit 4
-fi
+# Root rejection is enforced inside lib/dispatcher.sh _dispatcher_lifecycle
+# only for non-dry-run install/remove/purge. Read-only subcommands
+# (list / show / help / version / detect) and --dry-run are root-safe so
+# bats can run them under the test container's default user.
 
 # ── Path resolution ──────────────────────────────────────────────────────────
 SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"

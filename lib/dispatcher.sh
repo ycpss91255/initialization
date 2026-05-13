@@ -163,6 +163,15 @@ _dispatcher_lifecycle() {
         done <<< "${_resolved}"
     fi
 
+    # Refuse root only when we'll actually mutate the system (PRD §10).
+    # Resolved AFTER resolver so unknown-module / cycle errors still surface
+    # their own exit codes (2 / 5) rather than getting masked by exit 4.
+    # Dry-run + read-only paths stay root-safe so CI and bats can drive them.
+    if [[ "${INIT_UBUNTU_DRY_RUN}" != "true" && "${EUID:-0}" -eq 0 ]]; then
+        printf "[dispatcher] ERROR: do not run %s as root. Re-run as a regular user; sudo will be requested per-module.\n" "${_phase}" >&2
+        return 4
+    fi
+
     if [[ "${INIT_UBUNTU_DRY_RUN}" == "true" ]]; then
         printf "[dispatcher] DRY-RUN: would %s in this order:\n" "${_phase}"
         local _n

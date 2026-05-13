@@ -265,3 +265,87 @@ EOF
     assert_failure 2
     assert_output --partial "version"
 }
+
+# ── M5: update / search / upgrade / doctor / config / sync ──────────────────
+
+@test "setup_ubuntu update re-scans module/ and reports count" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" update
+    assert_success
+    assert_output --partial "update complete"
+}
+
+@test "setup_ubuntu search docker finds the docker module" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" search docker
+    assert_success
+    assert_output --partial "docker"
+}
+
+@test "setup_ubuntu search nonexistent reports no match" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" search zzznonsense
+    assert_success
+    assert_output --partial "no module matches"
+}
+
+@test "setup_ubuntu upgrade with no installed modules is a no-op" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" upgrade
+    assert_success
+    assert_output --partial "nothing recorded"
+}
+
+@test "setup_ubuntu upgrade <module> --dry-run prints the action list" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" upgrade docker --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+    assert_output --partial "- docker"
+}
+
+@test "setup_ubuntu doctor with empty state reports consistency" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" doctor
+    assert_success
+    assert_output --partial "consistent"
+}
+
+@test "setup_ubuntu config set ui.lang writes the value" {
+    bash "${REPO_ROOT}/setup_ubuntu.sh" config set ui.lang zh-TW
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" config get ui.lang
+    assert_success
+    assert_output "zh-TW"
+}
+
+@test "setup_ubuntu config show --json prints structured config" {
+    bash "${REPO_ROOT}/setup_ubuntu.sh" config set ui.lang zh-TW
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" config show --json
+    assert_success
+    echo "${output}" | jq -e '.ui.lang == "zh-TW"' > /dev/null
+}
+
+@test "setup_ubuntu config unset removes the key" {
+    bash "${REPO_ROOT}/setup_ubuntu.sh" config set ui.lang en
+    bash "${REPO_ROOT}/setup_ubuntu.sh" config unset ui.lang
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" config get ui.lang
+    assert_success
+    assert_output ""
+}
+
+@test "setup_ubuntu sync without target returns exit 2" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" sync
+    assert_failure 2
+}
+
+@test "setup_ubuntu sync user@host --dry-run does not call ssh" {
+    # Provide PATH-stubs but they should not be invoked.
+    local _stubdir="${INIT_UBUNTU_TEST_SCRATCH}/stubs"
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/stub.log"
+    mkdir -p "${_stubdir}"; : > "${_log}"
+    for b in ssh scp; do
+        cat > "${_stubdir}/${b}" <<EOF
+#!/usr/bin/env bash
+echo "${b} CALLED" >> "${_log}"
+exit 0
+EOF
+        chmod +x "${_stubdir}/${b}"
+    done
+    PATH="${_stubdir}:${PATH}" run bash "${REPO_ROOT}/setup_ubuntu.sh" sync user@host --dry-run
+    assert_success
+    [[ ! -s "${_log}" ]]
+}

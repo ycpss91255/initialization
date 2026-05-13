@@ -43,6 +43,10 @@ source "${LIB_DIR}/state.sh"
 # shellcheck disable=SC1091
 source "${LIB_DIR}/state_io.sh"
 # shellcheck disable=SC1091
+source "${LIB_DIR}/config.sh"
+# shellcheck disable=SC1091
+source "${LIB_DIR}/sync.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/registry.sh"
 # shellcheck disable=SC1091
 source "${LIB_DIR}/resolver.sh"
@@ -56,8 +60,9 @@ source "${LIB_DIR}/dispatcher.sh"
 # export once at startup so all sub-shells inherit a consistent value.
 platform_export_env || true
 
-# ── Initialize state.json (idempotent) ──────────────────────────────────────
+# ── Initialize state.json + config.ini (both idempotent) ──────────────────
 state_init || true
+config_init || true
 
 # ── Load module registry (silent on missing module/ dir) ─────────────────────
 registry_load_all "${MODULE_DIR}" || true

@@ -134,9 +134,9 @@ _load_engine() {
     assert_failure 2
 }
 
-@test "dispatcher_dispatch stubbed subcommand (sync/import/export) returns non-zero with message" {
+@test "dispatcher_dispatch stubbed subcommand (self-upgrade) returns non-zero with 'not implemented'" {
     _load_engine
-    run dispatcher_dispatch sync
+    run dispatcher_dispatch self-upgrade
     assert_failure
     assert_output --partial "not implemented"
 }

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # 更新基本套件
 sudo apt update
 sudo apt install -y ca-certificates curl apt-transport-https gnupg

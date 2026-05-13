@@ -1,0 +1,127 @@
+# Dockerfile.test-tools — pre-built lint/test tools for init_ubuntu
+#
+# Borrowed from ycpss91255-docker/base v0.28.0 (commit ade915a)
+# Customizations vs upstream:
+#   - Added fish + fishtape (for fish script testing per PRD §5.1)
+#   - Added dialog + whiptail (host installer TUI testing per PRD §8)
+#   - Removed docker-cli / docker-cli-buildx (no behavioural tests on
+#     this repo — we don't ship Docker images, see PRD §2 Non-Goals)
+#
+# Note on kcov: kcov is NOT packaged in alpine main/community/edge/testing
+# (as of 2026-05). To keep the test-tools image lean we kept it OUT of
+# this image and use the official `kcov/kcov` debian image for the
+# coverage workflow instead (see compose.yaml `coverage` service).
+# Same split as base v0.28.0.
+#
+# Usage:
+#   docker build -t test-tools:local -f dockerfile/Dockerfile.test-tools .
+#
+# Sync upstream: see docs/TESTING.md "Borrowed from base repo" section.
+
+FROM bats/bats:latest AS bats-src
+
+FROM alpine:latest AS bats-extensions
+RUN apk add --no-cache git && \
+    git clone --depth 1 -b v0.3.0 \
+        https://github.com/bats-core/bats-support /bats/bats-support && \
+    git clone --depth 1 -b v2.1.0 \
+        https://github.com/bats-core/bats-assert  /bats/bats-assert && \
+    git clone --depth 1 -b v1.2.5 \
+        https://github.com/jasonkarns/bats-mock   /bats/bats-mock
+
+FROM alpine:latest AS lint-tools
+# TARGETARCH is auto-populated by BuildKit (docker 23+) with "amd64" /
+# "arm64" / etc. Do NOT set a default — a default value shadows
+# BuildKit's auto-inject (moby/buildkit#3403). If invoked outside
+# BuildKit, pass `--build-arg TARGETARCH=<arch>`.
+ARG TARGETARCH
+RUN apk add --no-cache curl xz && \
+    case "${TARGETARCH}" in \
+      amd64)  sc_arch="x86_64";  hd_arch="x86_64" ;; \
+      arm64)  sc_arch="aarch64"; hd_arch="arm64"  ;; \
+      *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    curl -fsSL \
+        "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.${sc_arch}.tar.xz" \
+        | tar -xJ -C /tmp && \
+    mv "/tmp/shellcheck-v0.10.0/shellcheck" /usr/local/bin/shellcheck && \
+    curl -fsSL -o /usr/local/bin/hadolint \
+        "https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-${hd_arch}" && \
+    chmod +x /usr/local/bin/hadolint
+
+# Final stage.
+#
+# Base: alpine:latest (same as upstream's test-tools image).
+#
+# Apk packages:
+#   - bash               required by /opt/bats/bin/bats (#!/usr/bin/env bash)
+#   - parallel           bats --jobs N delegates to GNU parallel
+#   - git                test fixtures init/commit git repos
+#   - git-subtree        (kept for forward compatibility)
+#   - ca-certificates    for `curl` over HTTPS in test fixtures
+#   - grep + coreutils   GNU variants override busybox so `grep -P` etc. work
+#   - make               integration tests exercise `make` recipes
+#   - fish               [init_ubuntu addition] required by `fish -n` syntax
+#                        checks against module/config/fish/*.fish and any
+#                        future fish-based modules
+#   - dialog + ncurses-terminfo
+#                        [init_ubuntu addition] for TUI unit tests that
+#                        exercise the dialog backend; ncurses-terminfo
+#                        ships TERM=xterm definitions so dialog actually
+#                        draws under non-tty bats test harness
+#   - newt               [init_ubuntu addition] provides `whiptail`, the
+#                        fallback TUI backend; alpine packages it under
+#                        "newt"
+FROM alpine:latest
+RUN apk add --no-cache \
+        bash \
+        parallel \
+        git git-subtree \
+        ca-certificates \
+        grep coreutils \
+        make \
+        fish \
+        dialog ncurses-terminfo \
+        newt
+
+# bats core + extensions (bats-support / bats-assert / bats-mock)
+COPY --from=bats-src /opt/bats /opt/bats
+COPY --from=bats-src /usr/lib/bats /usr/lib/bats
+COPY --from=bats-extensions /bats /usr/lib/bats
+
+# shellcheck + hadolint
+COPY --from=lint-tools /usr/local/bin/shellcheck /usr/local/bin/
+COPY --from=lint-tools /usr/local/bin/hadolint /usr/local/bin/
+
+# /opt/bats/bin/bats is the canonical entry; alpine bats image puts a
+# symlink under /opt/bats/bin only, not on PATH. Expose it.
+RUN ln -sf /opt/bats/bin/bats /usr/local/bin/bats
+
+# fishtape (fish test runner, PRD §5.1)
+# fishtape is a fisher plugin; install via plain git clone + symlink so
+# the image doesn't depend on fisher's network bootstrap at runtime.
+RUN git clone --depth 1 \
+        https://github.com/jorgebucaran/fishtape /opt/fishtape && \
+    mkdir -p /usr/share/fish/vendor_functions.d && \
+    ln -sf /opt/fishtape/functions/fishtape.fish \
+        /usr/share/fish/vendor_functions.d/fishtape.fish && \
+    if [ -d /opt/fishtape/completions ]; then \
+        mkdir -p /usr/share/fish/vendor_completions.d && \
+        for f in /opt/fishtape/completions/*.fish; do \
+            [ -f "$f" ] && ln -sf "$f" "/usr/share/fish/vendor_completions.d/$(basename "$f")"; \
+        done; \
+    fi
+
+# Smoke check baked into the image so a corrupted build fails fast at
+# CI rather than discovering missing tools mid-test-run.
+RUN bash --version >/dev/null && \
+    bats --version >/dev/null && \
+    shellcheck --version >/dev/null && \
+    hadolint --version >/dev/null && \
+    fish --version >/dev/null && \
+    fish -c 'functions -q fishtape; or exit 1' && \
+    (dialog --version 2>&1 | head -1 >/dev/null || true) && \
+    (whiptail --version 2>&1 | head -1 >/dev/null || true)
+
+WORKDIR /source
+ENTRYPOINT ["/bin/bash"]

@@ -1,0 +1,66 @@
+# compose.yaml — Docker Compose for init_ubuntu test runner
+#
+# Borrowed from ycpss91255-docker/base v0.28.0 (commit ade915a) compose.yaml
+# Customizations vs upstream:
+#   - Default image is `test-tools:local` (built via `make build-test-tools`)
+#     instead of `ghcr.io/ycpss91255-docker/test-tools:latest` — we don't
+#     publish this repo's image to ghcr (PRD §2 Non-Goals)
+#   - Removed `ci-behavioural` service (no Docker image build/publish tests)
+#   - Kept the separate `coverage` service backed by kcov/kcov debian image:
+#     kcov is not in alpine main/community/edge/testing (2026-05), so
+#     test-tools:local can't bundle it. This mirrors base's split image
+#     strategy — fast lint/bats in alpine, slow coverage in debian.
+
+services:
+  # Fast CI: ShellCheck + fish syntax + Hadolint + Bats (+ Kcov if $COVERAGE=1).
+  # Image is built locally by `make build-test-tools` (or
+  # `docker build -t test-tools:local -f dockerfile/Dockerfile.test-tools .`)
+  # so it's reproducible without depending on an upstream registry.
+  ci:
+    image: ${TEST_TOOLS_IMAGE:-test-tools:local}
+    security_opt:
+      # kcov needs to attach via ptrace; alpine default seccomp blocks it.
+      - seccomp=unconfined
+    volumes:
+      - .:/source
+    working_dir: /source
+    environment:
+      # Forwarded by ci.sh `_run_in_container` so kcov output ownership
+      # matches the host user (otherwise root-owned files block git diff).
+      - HOST_UID=${HOST_UID:-1000}
+      - HOST_GID=${HOST_GID:-1000}
+      # COVERAGE=1 switches the in-container `--ci` path to run kcov.
+      - COVERAGE=${COVERAGE:-0}
+    entrypoint: /bin/bash
+    # Default to full pipeline. Override per-target via `-c` from
+    # script/ci/ci.sh `_run_in_container`:
+    #   command: ["-c", "./script/ci/ci.sh --ci-lint"]   (lint only)
+    #   command: ["-c", "./script/ci/ci.sh --ci-unit"]   (bats unit only)
+    #   etc.
+    command:
+      - -c
+      - ./script/ci/ci.sh --ci
+
+  # Coverage: kcov instrumentation wraps bats. Uses upstream kcov/kcov
+  # debian image because kcov is not in any alpine repo (main / community
+  # / edge / testing) as of 2026-05. ci.sh `_install_deps_for_coverage`
+  # apt-installs bats + shellcheck + bats-mock inside this container on
+  # demand (slower path, kept for the slow `make coverage` workflow only;
+  # fast lint/bats stays on test-tools:local).
+  coverage:
+    image: kcov/kcov
+    security_opt:
+      - seccomp=unconfined
+    volumes:
+      - .:/source
+    working_dir: /source
+    environment:
+      - HOST_UID=${HOST_UID:-1000}
+      - HOST_GID=${HOST_GID:-1000}
+      # Override deb.debian.org if your network can't reach it (regional
+      # outage / captive portal); ci.sh rewrites sources.list before apt.
+      - APT_MIRROR_DEBIAN=${APT_MIRROR_DEBIAN:-deb.debian.org}
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - COVERAGE=1 ./script/ci/ci.sh --ci

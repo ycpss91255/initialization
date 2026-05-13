@@ -1,0 +1,18 @@
+---
+# .hadolint.yaml — Hadolint config for init_ubuntu
+#
+# Borrowed verbatim from ycpss91255-docker/base v0.28.0 (commit ade915a)
+# .hadolint.yaml — same exclusion list. Rationale: our Dockerfile.test-tools
+# is derived from base's, so the same rules that are intentionally relaxed
+# upstream remain relaxed here. See docs/TESTING.md §5 for sync rules.
+
+ignored:
+  - DL3003  # Use WORKDIR to switch to a directory
+  - DL3004  # Do not use sudo (we need it for user setup)
+  - DL3006  # Always tag the version of an image explicitly
+  - DL3007  # Using latest is prone to errors
+  - DL3008  # Pin versions in apt get install
+  - DL3013  # Pin versions in pip install
+  - DL3018  # Pin versions in apk add
+  - DL3046  # useradd without flag -l
+  - DL4006  # Set SHELL option -o pipefail (alpine stages use default shell)

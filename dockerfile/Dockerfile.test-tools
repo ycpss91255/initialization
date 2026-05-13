@@ -82,7 +82,8 @@ RUN apk add --no-cache \
         make \
         fish \
         dialog ncurses-terminfo \
-        newt
+        newt \
+        jq
 
 # bats core + extensions (bats-support / bats-assert / bats-mock)
 COPY --from=bats-src /opt/bats /opt/bats

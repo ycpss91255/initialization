@@ -35,10 +35,13 @@ Subcommands (Phase 2 MVP):
   list                   List registered modules
   show    <module>       Print a module's metadata
   detect                 Print host environment (use --json for machine output)
+  status                 Print modules recorded as installed (use --json)
+  export  <file>         Export installed-state payload (use --modules=<csv>)
+  import  <file>         Import payload and install the listed modules
   help    [<subcmd>]     Show this help
   version                Show tool version
 
-Subcommands (stubbed, Phase 3+):
+Subcommands (stubbed, later phases):
   update / upgrade / search / doctor
   config load|set|get|unset|show
   sync / import / export
@@ -182,11 +185,140 @@ _dispatcher_lifecycle() {
         return 0
     fi
 
+    # Mark user-requested top-level modules so runner can flag them as
+    # manual=true in state.json. Space-padded for substring match.
+    export INIT_UBUNTU_REQUESTED_MODULES=" ${_modules[*]} "
+
     case "${_phase}" in
         install) runner_install "${_order[@]}" ;;
         remove)  runner_remove  "${_order[@]}" ;;
         purge)   runner_purge   "${_order[@]}" ;;
     esac
+}
+
+# ── status / import / export ─────────────────────────────────────────────────
+
+_dispatcher_status() {
+    local _json="false"
+    local _arg
+    for _arg in "$@"; do
+        case "${_arg}" in
+            --json) _json="true" ;;
+            -*)
+                printf "[dispatcher] ERROR: unknown flag %s\n" "${_arg}" >&2
+                return 2
+                ;;
+            *)
+                printf "[dispatcher] ERROR: status takes no positional args (got '%s')\n" "${_arg}" >&2
+                return 2
+                ;;
+        esac
+    done
+
+    if ! declare -F state_list_installed >/dev/null 2>&1; then
+        printf "[dispatcher] ERROR: state lib not loaded\n" >&2
+        return 1
+    fi
+
+    local _state_path; _state_path="$(state_get_path)"
+    if [[ "${_json}" == "true" ]]; then
+        if [[ -f "${_state_path}" ]]; then
+            cat "${_state_path}"
+        else
+            printf '{"version":"0.1.0","installed":{}}\n'
+        fi
+        return 0
+    fi
+
+    local _names; _names="$(state_list_installed)"
+    if [[ -z "${_names}" ]]; then
+        printf "(no modules recorded as installed)\n"
+        return 0
+    fi
+    printf "%-30s  %-7s  %-12s  %s\n" "MODULE" "MANUAL" "VERSION" "INSTALLED AT"
+    local _n _manual _ver _at
+    while IFS= read -r _n; do
+        _manual="$(state_get_field "${_n}" manual)"
+        _ver="$(state_get_field "${_n}" version_provided)"
+        _at="$(state_get_field "${_n}" installed_at)"
+        printf "%-30s  %-7s  %-12s  %s\n" "${_n}" "${_manual}" "${_ver}" "${_at}"
+    done <<< "${_names}"
+}
+
+_dispatcher_export() {
+    local _out=""
+    local -a _passthrough=()
+    local _arg
+    for _arg in "$@"; do
+        case "${_arg}" in
+            --modules=*) _passthrough+=("${_arg}") ;;
+            -*) printf "[dispatcher] ERROR: unknown flag %s\n" "${_arg}" >&2; return 2 ;;
+            *)
+                if [[ -z "${_out}" ]]; then
+                    _out="${_arg}"
+                else
+                    printf "[dispatcher] ERROR: export takes one <out-file>\n" >&2
+                    return 2
+                fi
+                ;;
+        esac
+    done
+    if [[ -z "${_out}" ]]; then
+        printf "[dispatcher] ERROR: export needs <out-file>\n" >&2
+        return 2
+    fi
+
+    state_io_export "${_out}" "${_passthrough[@]}"
+    local _rc=$?
+    if [[ "${_rc}" -eq 0 ]]; then
+        printf "[dispatcher] state exported to %s\n" "${_out}"
+    fi
+    return "${_rc}"
+}
+
+_dispatcher_import() {
+    local _in=""
+    local _arg
+    for _arg in "$@"; do
+        case "${_arg}" in
+            -y|--yes) export INIT_UBUNTU_YES=true ;;
+            --dry-run) export INIT_UBUNTU_DRY_RUN=true ;;
+            -*) printf "[dispatcher] ERROR: unknown flag %s\n" "${_arg}" >&2; return 2 ;;
+            *)
+                if [[ -z "${_in}" ]]; then
+                    _in="${_arg}"
+                else
+                    printf "[dispatcher] ERROR: import takes one <in-file>\n" >&2
+                    return 2
+                fi
+                ;;
+        esac
+    done
+    if [[ -z "${_in}" ]]; then
+        printf "[dispatcher] ERROR: import needs <in-file>\n" >&2
+        return 2
+    fi
+
+    local _modules
+    _modules="$(state_io_payload_modules "${_in}")"
+    local _rc=$?
+    if [[ "${_rc}" -ne 0 ]]; then
+        return "${_rc}"
+    fi
+    if [[ -z "${_modules}" ]]; then
+        printf "[dispatcher] payload has no modules; nothing to do.\n"
+        return 0
+    fi
+
+    # Hand the names to the install lifecycle path so deps are resolved
+    # and the user's per-flag choices (dry-run, yes) are honored.
+    local -a _names=()
+    local _line
+    while IFS= read -r _line; do
+        [[ -n "${_line}" ]] && _names+=("${_line}")
+    done <<< "${_modules}"
+
+    _dispatcher_lifecycle install "${_names[@]}"
 }
 
 # ── detect ───────────────────────────────────────────────────────────────────
@@ -271,10 +403,13 @@ dispatcher_dispatch() {
         list)    _dispatcher_list "$@" ;;
         show)    _dispatcher_show "$@" ;;
         detect)  _dispatcher_detect "$@" ;;
+        status)  _dispatcher_status "$@" ;;
+        export)  _dispatcher_export "$@" ;;
+        import)  _dispatcher_import "$@" ;;
         install|remove|purge)
             _dispatcher_lifecycle "${_sub}" "$@"
             ;;
-        update|upgrade|search|doctor|sync|import|export|config|self-upgrade)
+        update|upgrade|search|doctor|sync|config|self-upgrade)
             _dispatcher_stub "${_sub}"
             ;;
         *)

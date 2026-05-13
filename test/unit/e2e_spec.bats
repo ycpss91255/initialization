@@ -170,3 +170,98 @@ EOF
         return 1
     fi
 }
+
+# ── detect ──────────────────────────────────────────────────────────────────
+
+@test "setup_ubuntu detect prints human-readable env summary" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" detect
+    assert_success
+    assert_output --partial "form_factor:"
+    assert_output --partial "os.id:"
+    assert_output --partial "arch:"
+}
+
+@test "setup_ubuntu detect --json includes form_factor inside JSON" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" detect --json
+    assert_success
+    assert_output --partial '"form_factor":'
+    # Result should be parseable JSON.
+    echo "${output}" | jq . > /dev/null
+}
+
+# ── status / export / import (M4) ────────────────────────────────────────────
+
+@test "setup_ubuntu status with empty state says 'no modules'" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" status
+    assert_success
+    assert_output --partial "no modules"
+}
+
+@test "setup_ubuntu status --json prints valid state.json shape" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" status --json
+    assert_success
+    echo "${output}" | jq -r '.version' | grep -q "0.1.0"
+    echo "${output}" | jq -r '.installed | length' | grep -q "^0$"
+}
+
+@test "setup_ubuntu export <file> writes a valid payload" {
+    local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" export "${_out}"
+    assert_success
+    [[ -f "${_out}" ]]
+    jq -r '.version' "${_out}" | grep -q "0.1.0"
+    jq -e '.modules | type == "array"' "${_out}" > /dev/null
+}
+
+@test "setup_ubuntu export with empty state emits empty modules list" {
+    local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    bash "${REPO_ROOT}/setup_ubuntu.sh" export "${_out}"
+    run jq -r '.modules | length' "${_out}"
+    assert_success
+    assert_output "0"
+}
+
+@test "setup_ubuntu export --modules filters to requested list" {
+    # Seed state.json directly via the lib (faster than running real installs).
+    source "${LIB_DIR}/state.sh"
+    state_record_install docker true
+    state_record_install neovim true
+    state_record_install fzf false
+
+    local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" export "${_out}" --modules=docker,fzf
+    assert_success
+    run jq -r '.modules | length' "${_out}"
+    assert_output "2"
+    run jq -r '.modules[].name' "${_out}"
+    [[ "${lines[0]}" == "docker" ]]
+    [[ "${lines[1]}" == "fzf" ]]
+}
+
+@test "setup_ubuntu import <file> --dry-run prints the install order without writing" {
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    cat > "${_payload}" <<'EOF'
+{
+  "version": "0.1.0",
+  "modules": [{"name":"docker","manual":true}]
+}
+EOF
+    # State must stay empty — verify nothing landed in installed{} after.
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" import "${_payload}" --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+    assert_output --partial "- docker"
+    # state.json should still report 0 installed.
+    local _state="${INIT_UBUNTU_STATE_DIR}/state.json"
+    run jq -r '.installed | length' "${_state}"
+    assert_success
+    assert_output "0"
+}
+
+@test "setup_ubuntu import rejects payload missing version" {
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    echo '{"modules":[]}' > "${_payload}"
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" import "${_payload}"
+    assert_failure 2
+    assert_output --partial "version"
+}

@@ -77,6 +77,28 @@ _runner_run_phase() {
     if [[ "${_rc}" -eq 0 ]]; then
         log_event info "${_name}" "${_phase}_done" "duration_s=${_duration}"
         log_info "[${_name}] ${_phase} completed (${_duration}s)"
+        # Mirror successful lifecycle to state.json (unless dry-run).
+        # Manual flag: true if the user named this module explicitly via
+        # the CLI; false if it landed here as a transitive dep. dispatcher
+        # exports INIT_UBUNTU_REQUESTED_MODULES (space-padded for substring
+        # match) before invoking the runner.
+        if [[ "${INIT_UBUNTU_DRY_RUN:-false}" != "true" ]] \
+            && declare -F state_record_install >/dev/null 2>&1; then
+            case "${_phase}" in
+                install)
+                    local _manual="false"
+                    if [[ " ${INIT_UBUNTU_REQUESTED_MODULES:-} " == *" ${_name} "* ]]; then
+                        _manual="true"
+                    fi
+                    state_record_install "${_name}" "${_manual}" "${VERSION_PROVIDED:-unknown}" || \
+                        log_warn "[${_name}] state_record_install failed (continuing)"
+                    ;;
+                remove|purge)
+                    state_record_remove "${_name}" || \
+                        log_warn "[${_name}] state_record_remove failed (continuing)"
+                    ;;
+            esac
+        fi
     else
         log_event error "${_name}" "${_phase}_failed" \
             "duration_s=${_duration}" "exit_code=${_rc}"

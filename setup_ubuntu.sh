@@ -39,6 +39,10 @@ source "${LIB_DIR}/detect.sh"
 # shellcheck disable=SC1091
 source "${LIB_DIR}/platform.sh"
 # shellcheck disable=SC1091
+source "${LIB_DIR}/state.sh"
+# shellcheck disable=SC1091
+source "${LIB_DIR}/state_io.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/registry.sh"
 # shellcheck disable=SC1091
 source "${LIB_DIR}/resolver.sh"
@@ -51,6 +55,9 @@ source "${LIB_DIR}/dispatcher.sh"
 # Modules' is_recommended() and platform-aware install() read this. We
 # export once at startup so all sub-shells inherit a consistent value.
 platform_export_env || true
+
+# ── Initialize state.json (idempotent) ──────────────────────────────────────
+state_init || true
 
 # ── Load module registry (silent on missing module/ dir) ─────────────────────
 registry_load_all "${MODULE_DIR}" || true

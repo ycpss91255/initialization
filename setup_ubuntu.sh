@@ -1,127 +1,52 @@
 #!/usr/bin/env bash
-# ==============================================================================
+# setup_ubuntu.sh — init_ubuntu CLI entry point
 #
-# Usage: bash setup_ubuntu.sh [--help]
-# TODO: default = install all
-# option:
-#   (default): dialog
-#   --All
-#   --nvidia
-#   --fish
-#   --docker
-
-#   --help: show this help message and exit
+# Thin dispatcher: sources lib/* helpers, loads the module registry, then
+# routes to lib/dispatcher.sh based on argv.
 #
-# ==============================================================================
+# Lineage: replaces the monolithic Phase 0 setup_ubuntu.sh which sourced
+# module/setup_<topic>.sh directly. Those legacy scripts remain on disk
+# until Phase 7 (module migration) where each becomes module/<n>.module.sh.
 
 set -euo pipefail
+shopt -s inherit_errexit 2>/dev/null || true
 
-shopt -s inherit_errexit &>/dev/null || true
-
-
-MAIN_FILE="true"; [[ "${BASH_SOURCE[0]}" != "${0}" ]] && MAIN_FILE="false"
-
-if [[ "${MAIN_FILE}" != "true" ]]; then
-    printf "Warn: %s is a executable script, not a library.\n" "${BASH_SOURCE[0]##*/}"
-    printf "Please run this file.\n"
-    return 0 2>/dev/null
+# ── Refuse to run as root (PRD §10) ──────────────────────────────────────────
+if [[ "${EUID:-0}" -eq 0 ]]; then
+    printf "ERROR: Do not run setup_ubuntu as root.\n" >&2
+    printf "Run as a regular user; sudo will be requested per-module.\n" >&2
+    exit 4
 fi
 
+# ── Path resolution ──────────────────────────────────────────────────────────
+SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+export REPO_ROOT="${SCRIPT_PATH}"
+export LIB_DIR="${REPO_ROOT}/lib"
+export MODULE_DIR="${REPO_ROOT}/module"
+export TEMPLATE_DIR="${REPO_ROOT}/template"
+
+# ── Defaults for logging / env-driven flags ──────────────────────────────────
 export USER="${USER:-"$(whoami)"}"
 export HOME="${HOME:-"/home/${USER}"}"
+export LOG_LEVEL="${LOG_LEVEL:-INFO}"
+export LOG_COLOR="${LOG_COLOR:-true}"
 
-export LANGUAGE="C:en"
-
-# logger.sh variables
-export LOG_LEVEL="DEBUG"
-# export LOG_COLOR="true"
-
-# sub_func.sh variables
-unset HAVE_SUDO_ACCESS
-
-# main.sh variables
-# shellcheck disable=SC2155
-export DATETIME="$(date +"%Y-%m-%d-%T")"
-export BACKUP_DIR="${HOME}/.backup/${DATETIME}"
-export SET_MIRRORS="false"
-
-SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-export MODULE_PATH="${SCRIPT_PATH}/module"
-export FUNCTION_PATH="${SCRIPT_PATH}/module/function"
-export CONFIG_PATH="${SCRIPT_PATH}/module/config"
-
-# include sub script
+# ── Source engine ────────────────────────────────────────────────────────────
 # shellcheck disable=SC1091
-source "${FUNCTION_PATH}/logger.sh"
+source "${LIB_DIR}/logger.sh"
 # shellcheck disable=SC1091
-source "${FUNCTION_PATH}/general.sh"
-
-# main script
-log_info "Start setup process..."
-
-if ! have_sudo_access; then
-    log_fatal "This script requires sudo access. Please run as a user with sudo privileges."
-fi
-
-
-log_info "Start"
-# # Update ca-certificates
-# log_info "Update ca-certificates..."
-# apt_pkg_manager --install --only-upgrade -- "ca-certificates"
-
-# Setup APT source mirror
-if [[ "${SET_MIRRORS}" == "true" ]]; then
-    log_info "Setup APT source mirror..."
-    log_info "Not action now."
-
-    # setup_apt_mirror "tw.packages.microsoft.com" "packages.microsoft.com"
-    # setup_apt_mirror "tw.archive.ubuntu.com" "archive.ubuntu.com"
-    # log_info "Test: update apt-get..."
-    # if ! exec_cmd "sudo apt-get update"; then
-    #     log_error "Failed to update apt-get."
-    #     log_info "Rollback APT source mirror changes..."
-    #     # rollback to backup
-    # fi
-fi
-
-_BASIC_PKGS=(
-    "software-properties-common"
-    # NOTE: maybe first run upgrade ca-certificates
-    "ca-certificates"
-    "apt-transport-https"
-    "curl"
-    "wget"
-)
-
-log_info "Install basic packages: ${_BASIC_PKGS[*]}..."
-apt_pkg_manager --install -- "${_BASIC_PKGS[@]}"
-
-fatal_pkg=()
-
+source "${LIB_DIR}/general.sh"
 # shellcheck disable=SC1091
-source "${MODULE_PATH}/setup_font.sh" || fatal_pkg+=("font")
-
+source "${LIB_DIR}/registry.sh"
 # shellcheck disable=SC1091
-source "${MODULE_PATH}/setup_docker.sh" || fatal_pkg+=("docker")
-
+source "${LIB_DIR}/resolver.sh"
 # shellcheck disable=SC1091
-source "${SCRIPT_PATH}/module/setup_nvidia_driver.sh" || fatal_pkg+=("nvidia-driver")
-
+source "${LIB_DIR}/runner.sh"
 # shellcheck disable=SC1091
-source "${MODULE_PATH}/setup_vscode.sh" || fatal_pkg+=("vscode")
+source "${LIB_DIR}/dispatcher.sh"
 
-# shellcheck disable=SC1091
-source "${MODULE_PATH}/setup_neovim.sh" || fatal_pkg+=("neovim")
+# ── Load module registry (silent on missing module/ dir) ─────────────────────
+registry_load_all "${MODULE_DIR}" || true
 
-if [ "${#fatal_pkg[@]}" -ne 0 ]; then
-    log_error "Some packages failed to install: ${fatal_pkg[*]}"
-fi
-
-log_info "Done yayayaya"
-
-
-exit 0
-
-# NVIDIA driver
-# shellcheck disable=SC2317
-exec_cmd 'sudo add-apt-repository ppa:graphics-drivers/ppa --yes'
+# ── Dispatch ─────────────────────────────────────────────────────────────────
+dispatcher_dispatch "$@"

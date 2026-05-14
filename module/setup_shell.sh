@@ -58,6 +58,15 @@ _apt_dep_pkgs=(
 )
 apt_pkg_manager --install "${_apt_dep_pkgs[@]}"
 
+log_info "Configure keychain for bash..."
+_keychain_bash_conf_file="${CONFIG_PATH}/bash/keychain.bash"
+if [[ -f "${HOME}/.bashrc" ]]; then
+    if ! grep -q 'SHELL=/bin/bash keychain' "${HOME}/.bashrc"; then
+        log_info "Add keychain configuration to ${HOME}/.bashrc"
+        exec_cmd "printf '\n' >> \"${HOME}/.bashrc\" && cat \"${_keychain_bash_conf_file}\" >> \"${HOME}/.bashrc\""
+    fi
+fi
+
 log_info "Install zoxide..."
 # shellcheck disable=SC1091
 source "${SUBMODULE_PATH}/zoxide.sh"

@@ -5,6 +5,14 @@ Host github
     Hostname github.com
     IdentityFile ~/.ssh/id_ed25519
 
+Host tku_server
+    User cyc
+    HostName 163.13.243.135
+    Port 22
+    ForwardX11 yes
+    ForwardX11Trusted yes
+    IdentityFile ~/.ssh/id_ed25519
+
 Host my_server
     User user
     HostName 127.0.0.1
@@ -29,10 +37,13 @@ Host core.old_gitlab
     IdentityFile ~/.ssh/coretronic
 # Check WiFi
 Match Host core.old_gitlab exec "iwgetid -r | grep -q '^Coretronic_Staff$'"
-    HostName 10.2.23.69
+    HostName 10.2.35.69
 # Check Ethernet
 Match Host core.old_gitlab exec "grep -q 'up' /sys/class/net/en*/operstate 2>/dev/null"
-    HostName 10.2.23.69
+    HostName 10.2.35.69
+# Check F5 VPN (coretronic VPN)
+Match Host core.old_gitlab exec "pgrep -x svpn >/dev/null"
+    HostName 10.2.35.69
 
 Host core.yunchien-server
     User yunchien
@@ -46,9 +57,12 @@ Match Host core.yunchien-server exec "iwgetid -r | grep -q '^Coretronic_Staff$'"
 # Check Ethernet
 Match Host core.yunchien-server exec "grep -q 'up' /sys/class/net/en*/operstate 2>/dev/null"
     HostName 10.2.23.83
+# Check F5 VPN (coretronic VPN)
+Match Host core.yunchien-server exec "pgrep -x svpn >/dev/null"
+    HostName 10.2.23.83
 
 Host core.yulin-server
-    User yulin
+    User yulin # Ab-123456
     ForwardX11 yes
     ForwardX11Trusted yes
     IdentityFile ~/.ssh/coretronic
@@ -57,6 +71,9 @@ Match Host core.yulin-server exec "iwgetid -r | grep -q '^Coretronic_Staff$'"
     HostName 10.2.23.84
 # Check Ethernet
 Match Host core.yulin-server exec "grep -q 'up' /sys/class/net/en*/operstate 2>/dev/null"
+    HostName 10.2.23.84
+# Check F5 VPN (coretronic VPN)
+Match Host core.yulin-server exec "pgrep -x svpn >/dev/null"
     HostName 10.2.23.84
 
 

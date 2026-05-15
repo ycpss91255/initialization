@@ -119,6 +119,29 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   status / source-mode / no-side-effects) across all 4 archetypes.
 - Test count: 255 → 267 (8 new archetype-iterating smoke + 11 consistency).
 
+#### apt archetype: is_outdated default via apt list --upgradable (issue #11)
+
+- `lib/module_helper.sh`: new `module_default_apt_is_outdated` —
+  returns 0 (outdated) if any package in `APT_PKGS` appears in
+  `apt list --upgradable` output, 1 otherwise. No sudo required;
+  graceful on hosts without apt (`apt -> empty -> 1`).
+- `module_use_apt_archetype` macro now binds `is_outdated()` too
+  (was 6 fns → 7 fns). Module authors get the default for free; can
+  still override after the macro.
+- Test: `module_use_apt_archetype` function-list assertion updated
+  to include `is_outdated` (now 7).
+- Test: `template_smoke_spec`'s `is-outdated` case split per
+  archetype — apt returns 1 (macro-provided, empty APT_PKGS = not
+  outdated); github-release / config / custom still return 2 (not
+  implemented). 267 ok.
+
+Follow-ups (not in this PR):
+- github-release archetype `is_outdated` default — needs a
+  `module_sidecar_get_version` helper to read
+  `${XDG_STATE_HOME}/init_ubuntu/versions/<name>`. Separate task.
+- config archetype `is_outdated` default — sha256sum-based diff;
+  ~15-line stub but ships cleanly in its own PR.
+
 #### Release workflow — port from docker_harness#22 + #106 (commit 1b40cfb)
 
 Alignment with `ycpss91255-docker/docker_harness` release infrastructure:

@@ -159,12 +159,24 @@ _assert_phase_dry_run_all() {
     done
 }
 
-@test "template smoke: is-outdated returns exit 2 (optional, not implemented) (all archetypes)" {
+@test "template smoke: is-outdated has archetype-appropriate exit code" {
+    # apt provides is_outdated via macro (returns 1 with empty APT_PKGS).
+    # github-release / config / custom leave is_outdated commented out in
+    # the template (return 2 = not implemented).
     local _arch
     for _arch in "${ARCHETYPES[@]}"; do
         run bash "$(_smoke "${_arch}")" is-outdated
-        [[ "${status}" -eq 2 ]] || { printf 'archetype=%s is-outdated exit=%s\n' "${_arch}" "${status}" >&2; return 1; }
-        [[ "${output}" == *"is_outdated"* ]] || { printf 'archetype=%s missing is_outdated msg\n' "${_arch}" >&2; return 1; }
+        case "${_arch}" in
+            apt)
+                # macro-provided: empty APT_PKGS → return 1 (not outdated)
+                [[ "${status}" -eq 1 ]] || { printf 'archetype=%s is-outdated exit=%s (want 1)\n' "${_arch}" "${status}" >&2; return 1; }
+                ;;
+            *)
+                # not implemented (commented stub) → standalone CLI returns 2
+                [[ "${status}" -eq 2 ]] || { printf 'archetype=%s is-outdated exit=%s (want 2)\n' "${_arch}" "${status}" >&2; return 1; }
+                [[ "${output}" == *"is_outdated"* ]] || { printf 'archetype=%s missing is_outdated msg\n' "${_arch}" >&2; return 1; }
+                ;;
+        esac
     done
 }
 

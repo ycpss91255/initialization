@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lib/detect.sh — environment probes for init_ubuntu
 #
-# Per doc/architecture.md §3.3 / §14. Probes the host and emits a JSON
+# Per docs/architecture.md §3.3 / §14. Probes the host and emits a JSON
 # document describing OS, CPU, GPU, desktop session, virt, WSL, and SBC
 # board. Pairs with lib/platform.sh which derives form_factor.
 #

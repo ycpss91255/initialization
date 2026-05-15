@@ -20,10 +20,10 @@ paths:
 
 | Type | Tool | Location | When to Write |
 |------|------|----------|---------------|
-| Unit | `dart:test` | `test/unit/` | All domain logic, state managers, repositories |
-| Widget | `flutter_test` | `test/widget/` | All widgets with meaningful behavior |
-| Golden | `flutter_test` | `test/golden/` | Design-critical UI components |
-| Integration | `integration_test` | `integration_test/` | Critical user flows on real device/emulator |
+| Unit | `dart:test` | `tests/unit/` | All domain logic, state managers, repositories |
+| Widget | `flutter_test` | `tests/widget/` | All widgets with meaningful behavior |
+| Golden | `flutter_test` | `tests/golden/` | Design-critical UI components |
+| Integration | `integration_test` | `integration_tests/` | Critical user flows on real device/emulator |
 
 ## Unit Tests: State Managers
 
@@ -189,7 +189,7 @@ testWidgets('disables submit button while form is invalid', (tester) async { ...
 ## Test Organization
 
 ```
-test/
+tests/
 ├── unit/
 │   ├── domain/
 │   │   └── usecases/
@@ -201,7 +201,7 @@ test/
 └── golden/
     └── widgets/
 
-integration_test/
+integration_tests/
 └── flows/
     ├── login_flow_test.dart
     └── checkout_flow_test.dart

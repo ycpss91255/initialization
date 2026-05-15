@@ -33,13 +33,13 @@ services:
       - COVERAGE=${COVERAGE:-0}
     entrypoint: /bin/bash
     # Default to full pipeline. Override per-target via `-c` from
-    # script/ci/ci.sh `_run_in_container`:
-    #   command: ["-c", "./script/ci/ci.sh --ci-lint"]   (lint only)
-    #   command: ["-c", "./script/ci/ci.sh --ci-unit"]   (bats unit only)
+    # scripts/ci/ci.sh `_run_in_container`:
+    #   command: ["-c", "./scripts/ci/ci.sh --ci-lint"]   (lint only)
+    #   command: ["-c", "./scripts/ci/ci.sh --ci-unit"]   (bats unit only)
     #   etc.
     command:
       - -c
-      - ./script/ci/ci.sh --ci
+      - ./scripts/ci/ci.sh --ci
 
   # Coverage: kcov instrumentation wraps bats. Uses upstream kcov/kcov
   # debian image because kcov is not in any alpine repo (main / community
@@ -63,4 +63,4 @@ services:
     entrypoint: /bin/bash
     command:
       - -c
-      - COVERAGE=1 ./script/ci/ci.sh --ci
+      - COVERAGE=1 ./scripts/ci/ci.sh --ci

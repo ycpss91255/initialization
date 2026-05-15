@@ -16,14 +16,14 @@ paths:
 ## Test Organization
 
 ```
-src/test/java/com/example/app/
+src/tests/java/com/example/app/
   service/           # Unit tests for service layer
   controller/        # Web layer / API tests
   repository/        # Data access tests
   integration/       # Cross-layer integration tests
 ```
 
-Mirror the `src/main/java` package structure in `src/test/java`.
+Mirror the `src/main/java` package structure in `src/tests/java`.
 
 ## Unit Test Pattern
 

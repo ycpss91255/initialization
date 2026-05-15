@@ -4,7 +4,7 @@
 # Customizations vs upstream:
 #   - target changed from "auto" to "80%" (PRD G5: v0.1 起始覆蓋率 80%)
 #   - ignore[] expanded to cover small-tools/ (deprecated, PRD §6.6) and
-#     module/tools/ (pending relocation, PRD §6.5) so they don't drag the
+#     modules/tools/ (pending relocation, PRD §6.5) so they don't drag the
 #     headline number down before they're modernized
 
 coverage:
@@ -13,7 +13,7 @@ coverage:
       default:
         # v0.1 floor: 80% (PRD G5 / AC-17)
         # Roadmap: 90% at v0.5, 95% at v1.0, 99% from there
-        # See doc/architecture.md §8.4 Coverage gate
+        # See docs/architecture.md §8.4 Coverage gate
         target: 80%
         threshold: 1%
     patch:
@@ -26,12 +26,12 @@ coverage:
         informational: true
 
 ignore:
-  - "test/**/*"
+  - "tests/**/*"
   - ".github/**/*"
   - "small-tools/**/*"
-  - "module/tools/**/*"
+  - "modules/tools/**/*"
   - "dockerfile/**/*"
-  - "template/**/*"
+  - "templates/**/*"
 
 comment:
   layout: "reach,diff,flags,files"

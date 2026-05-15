@@ -45,7 +45,7 @@
 
 ## Config sync 腳本
 
-目前 `module/config/` 是透過 `cp` / `cp -r` 一次性複製到 `~/.config/`、`~/.ssh/` 等位置（見 `setup_shell.sh:133`、`setup_small_tools.sh:111/154/268/291`、`setup_neovim.sh:208/282`），部署後 local 編輯不會反映回 repo，兩邊會漂移。曾考慮改 symlink，但顧慮以下問題後放棄：
+目前 `modules/config/` 是透過 `cp` / `cp -r` 一次性複製到 `~/.config/`、`~/.ssh/` 等位置（見 `setup_shell.sh:133`、`setup_small_tools.sh:111/154/268/291`、`setup_neovim.sh:208/282`），部署後 local 編輯不會反映回 repo，兩邊會漂移。曾考慮改 symlink，但顧慮以下問題後放棄：
 
 - SSH 嚴格權限檢查（target 需 600、repo 目錄權限）
 - 編輯器 atomic write 會把 symlink 換回普通檔案
@@ -54,8 +54,8 @@
 
 改為寫一支雙向 sync 腳本處理：
 
-- [] `module/tool/sync_config.sh`
-  - [] `--check` / `status`：掃描 `module/config/` 下所有受管檔案，比對 local 對應路徑，列出 diff（identical / local-newer / repo-newer / missing）
+- [] `modules/tools/sync_config.sh`
+  - [] `--check` / `status`：掃描 `modules/config/` 下所有受管檔案，比對 local 對應路徑，列出 diff（identical / local-newer / repo-newer / missing）
   - [] `--pull`：local → repo（把 local 修改抓回 repo，給 commit 用）
   - [] `--push`：repo → local（把 repo 版本套到 local，給新機器或還原用）
   - [] 支援 dry-run，實際寫入前先顯示將變更的檔案
@@ -97,7 +97,7 @@ secret-tool clear service tmux-powerline account gmail
 ```
 
 repo 端：
-- `module/config/tmux/tmux-powerline/config.sh` 已改成從 `${XDG_CONFIG_HOME:-$HOME/.config}/tmux-powerline/secrets.sh` source，後者呼叫 `secret-tool lookup` 查 keyring
+- `modules/config/tmux/tmux-powerline/config.sh` 已改成從 `${XDG_CONFIG_HOME:-$HOME/.config}/tmux-powerline/secrets.sh` source，後者呼叫 `secret-tool lookup` 查 keyring
 - `secrets.sh` 不追蹤、per-machine，於 `chmod 600`
 
 > 舊 app password `zkld bkbg mefc hpfv` 已撤銷，但仍在 git 歷史 commit `d83af7f` 中。若在意可用 `git filter-repo` 重寫歷史 + force push；不處理也 ok（密碼已失效）。
@@ -118,7 +118,7 @@ tmux-powerline 的 `config.sh` 會在**每次狀態列刷新**（每秒多次，
 journal 裡的線索：`asked to register item /org/freedesktop/secrets/collection/login/<N>, but it's already registered` — 同一個 Gmail item 被反覆碰觸的副作用。
 
 ### 修復
-`module/config/tmux/tmux-powerline/secrets.sh`（已追蹤）改用 `tmux setenv -g` 把首次查到的密碼快取在 **tmux global session env**：
+`modules/config/tmux/tmux-powerline/secrets.sh`（已追蹤）改用 `tmux setenv -g` 把首次查到的密碼快取在 **tmux global session env**：
 
 - 首次 source：empty → secret-tool lookup 一次 → `tmux setenv -g` 寫入 → export
 - 後續 source：env var 已存在 → 直接 export，**完全不碰 D-Bus**
@@ -131,7 +131,7 @@ journal 裡的線索：`asked to register item /org/freedesktop/secrets/collecti
 
 ```bash
 mkdir -p ~/.config/tmux-powerline
-cp module/config/tmux/tmux-powerline/secrets.sh ~/.config/tmux-powerline/
+cp modules/config/tmux/tmux-powerline/secrets.sh ~/.config/tmux-powerline/
 chmod 600 ~/.config/tmux-powerline/secrets.sh
 # 然後再做 secret-tool store / verify / reload
 ```
@@ -173,10 +173,10 @@ ExecStart=/usr/bin/gnome-keyring-daemon --foreground --components=secrets --cont
 
 ## Trash 自動維護（2026-04-27 設定）
 
-`rm` 在 fish 走 `trash-put`（`module/config/fish/functions/rm.fish`），垃圾桶 trash-cli 沒有原生容量上限，需要靠排程清理。
+`rm` 在 fish 走 `trash-put`（`modules/config/fish/functions/rm.fish`），垃圾桶 trash-cli 沒有原生容量上限，需要靠排程清理。
 
 ### 維護腳本
-`module/tool/trash-maintenance.sh`：
+`modules/tools/trash-maintenance.sh`：
 1. `trash-empty -f $MAX_DAYS` 砍掉超過 N 天的項目
 2. 若 `~/.local/share/Trash/files` 仍超過 `$MAX_GB`，從 `info/*.trashinfo` 的 mtime 最舊的開始砍直到低於上限
 3. 預設 `MAX_DAYS=90`、`MAX_GB=50`，可用環境變數覆蓋
@@ -220,11 +220,11 @@ sudo apt-get install -y trash-cli
 
 # 2. 部署 fish rm function
 mkdir -p ~/.config/fish/functions
-cp module/config/fish/functions/rm.fish ~/.config/fish/functions/
+cp modules/config/fish/functions/rm.fish ~/.config/fish/functions/
 
 # 3. 部署維護腳本（headless 機器用 copy；有 repo 的機器可 symlink）
 mkdir -p ~/.local/bin ~/.local/state
-cp module/tool/trash-maintenance.sh ~/.local/bin/
+cp modules/tools/trash-maintenance.sh ~/.local/bin/
 chmod +x ~/.local/bin/trash-maintenance.sh
 
 # 4. 安裝 crontab
@@ -266,11 +266,11 @@ cc-statusline 的 README 建議 `statusLine.command` 寫 `node ${CLAUDE_PLUGIN_R
 
 解法：用 wrapper script 自己解析 plugin 路徑。
 
-- 已建立 `module/config/claude/run-statusline.sh`，glob `~/.claude/plugins/cache/cc-statusline/cc-statusline/*/` 取最新版本目錄後 `exec node`
+- 已建立 `modules/config/claude/run-statusline.sh`，glob `~/.claude/plugins/cache/cc-statusline/cc-statusline/*/` 取最新版本目錄後 `exec node`
 - 新機器手動步驟：
   1. `claude plugin marketplace add NYCU-Chung/cc-statusline`
   2. `claude plugin install cc-statusline@cc-statusline`
-  3. `ln -s "$REPO/module/config/claude/run-statusline.sh" ~/.claude/run-statusline.sh`
+  3. `ln -s "$REPO/modules/config/claude/run-statusline.sh" ~/.claude/run-statusline.sh`
   4. `~/.claude/settings.json` 加入：
      ```json
      "statusLine": {
@@ -280,14 +280,14 @@ cc-statusline 的 README 建議 `statusLine.command` 寫 `node ${CLAUDE_PLUGIN_R
      }
      ```
 - TODO
-  - [] 建立 `module/setup_claude.sh`：自動處理 plugin 安裝、symlink 部署、settings.json 注入（與 `Config sync 腳本` 章節整合）
+  - [] 建立 `modules/setup_claude.sh`：自動處理 plugin 安裝、symlink 部署、settings.json 注入（與 `Config sync 腳本` 章節整合）
   - [] 確認 settings.json 是否要進 repo（含 enabledPlugins / env 等可能敏感設定）
 
 ## Claude Code session 管理（claude-rm / claude-ls）
 
 `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl` 累積太多會難管理。`/resume` picker 顯示的名稱來自 session 開頭的 `customTitle` 欄位（用 `claude -n <name>` 啟動或 `/name` 設定），沒命名的就是自動摘要，容易撞名。
 
-工具放 `module/config/fish/`：
+工具放 `modules/config/fish/`：
 
 - `_claude_sessions.py` — 共用 helper，掃描 `~/.claude/projects/` 萃取 customTitle、forkedFrom、首句訊息，輸出 JSONL
 - `functions/claude-ls.fish` — 樹狀列出所有 session，標示 fork 父子關係

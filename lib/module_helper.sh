@@ -208,7 +208,7 @@ _module_github_release_fetch_and_install() {
     fi
     [[ -n "${_ver}" ]] && log_info "[${NAME}] target: ${GITHUB_REPO} v${_ver}"
 
-    _url="https://github.com/${GITHUB_REPO}/releases/latest/download/${GITHUB_ASSET_PATTERN}"
+    _url="https://github.com/${GITHUB_REPO}/releases/latests/download/${GITHUB_ASSET_PATTERN}"
     _tmp="$(mktemp 2>/dev/null || printf '/tmp/%s-%s' "${NAME}" "$$")"
     log_info "[${NAME}] download ${_url}"
     if ! curl -fsSL --retry 3 -o "${_tmp}" "${_url}"; then
@@ -355,7 +355,7 @@ module_use_config_archetype() {
 module_standalone_usage() {
     local _name="${NAME:-?}"
     cat <<EOF
-Usage: bash module/${_name}.module.sh <phase> [options]
+Usage: bash modules/${_name}.module.sh <phase> [options]
 
 Phases:
   install            run install()

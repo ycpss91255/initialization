@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lib/runner.sh — execute module lifecycle (install / remove / purge)
 #
-# Per doc/architecture.md §3.1 sequence and doc/module-spec.md §4 contract.
+# Per docs/architecture.md §3.1 sequence and docs/module-spec.md §4 contract.
 #
 # Public API:
 #   runner_install <module> [<module> ...]

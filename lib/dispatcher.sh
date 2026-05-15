@@ -38,7 +38,7 @@ Subcommands (Phase 2 MVP):
   status                 Print modules recorded as installed (use --json)
   export  <file>         Export installed-state payload (use --modules=<csv>)
   import  <file>         Import payload and install the listed modules
-  update                 Re-scan module/ + refresh registry
+  update                 Re-scan modules/ + refresh registry
   upgrade [<module>...]  Re-run install() for given modules (or all installed)
   search  <keyword>      Search modules by name / category / tag
   doctor                 Diff state.json vs system reality
@@ -389,7 +389,7 @@ _dispatcher_update() {
         return 1
     fi
     log_info "[dispatcher] re-scanning ${MODULE_DIR:-module}/..."
-    if registry_load_all "${MODULE_DIR:-${REPO_ROOT}/module}"; then
+    if registry_load_all "${MODULE_DIR:-${REPO_ROOT}/modules}"; then
         local _count
         _count="$(registry_list_names | wc -l)"
         log_info "[dispatcher] update complete: ${_count} module(s) registered"
@@ -534,7 +534,7 @@ _dispatcher_config() {
     local _action="${1:-}"; shift || true
     case "${_action}" in
         load)
-            # config load — placeholder: re-apply module/config-*  modules
+            # config load — placeholder: re-apply modules/config-*  modules
             # in v0.1 has no automatic config-load list. Stub-warn until M7.
             printf "[dispatcher] config load is staged for M7 (module migration). Skipping.\n" >&2
             return 0

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lib/registry.sh — module metadata scanner / registry
 #
-# Per doc/architecture.md §5 (Module Dynamic Loading) and doc/module-spec.md.
+# Per docs/architecture.md §5 (Module Dynamic Loading) and docs/module-spec.md.
 #
 # Public API:
 #   registry_load_all [<module-dir>]
@@ -72,7 +72,7 @@ _registry_parse_one() {
 # ── Public: scan and register all modules ────────────────────────────────────
 
 registry_load_all() {
-    local _dir="${1:-${MODULE_DIR:-${REPO_ROOT:-.}/module}}"
+    local _dir="${1:-${MODULE_DIR:-${REPO_ROOT:-.}/modules}}"
     local _file _line _key _val _failed=0
 
     MODULES_NAME=()

@@ -3,7 +3,7 @@ paths:
   - "**/*.rb"
   - "**/*.rake"
   - "**/Gemfile"
-  - "**/test/**/*.rb"
+  - "**/tests/**/*.rb"
   - "**/spec/**/*.rb"
   - "**/config/routes.rb"
 ---
@@ -36,7 +36,7 @@ Prefer project-local commands:
 
 ```bash
 bin/rails test
-bin/rails test test/models/user_test.rb
+bin/rails test tests/models/user_test.rb
 bundle exec rspec
 bundle exec rspec spec/models/user_spec.rb
 ```

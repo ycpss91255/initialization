@@ -14,7 +14,7 @@ paths:
 
 ## Framework
 
-Use **GoogleTest** (gtest/gmock) with **CMake/CTest**.
+Use **GoogleTest** (gtests/gmock) with **CMake/CTest**.
 
 ## Running Tests
 

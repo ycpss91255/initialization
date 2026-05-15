@@ -4,7 +4,7 @@
 # Borrowed verbatim from ycpss91255-docker/base v0.28.0 (commit ade915a)
 # .hadolint.yaml — same exclusion list. Rationale: our Dockerfile.test-tools
 # is derived from base's, so the same rules that are intentionally relaxed
-# upstream remain relaxed here. See doc/TESTING.md §5 for sync rules.
+# upstream remain relaxed here. See docs/TESTING.md §5 for sync rules.
 
 ignored:
   - DL3003  # Use WORKDIR to switch to a directory

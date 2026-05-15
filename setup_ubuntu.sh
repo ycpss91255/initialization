@@ -5,8 +5,8 @@
 # routes to lib/dispatcher.sh based on argv.
 #
 # Lineage: replaces the monolithic Phase 0 setup_ubuntu.sh which sourced
-# module/setup_<topic>.sh directly. Those legacy scripts remain on disk
-# until Phase 7 (module migration) where each becomes module/<n>.module.sh.
+# modules/setup_<topic>.sh directly. Those legacy scripts remain on disk
+# until Phase 7 (module migration) where each becomes modules/<n>.module.sh.
 
 set -euo pipefail
 shopt -s inherit_errexit 2>/dev/null || true
@@ -20,8 +20,8 @@ shopt -s inherit_errexit 2>/dev/null || true
 SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 export REPO_ROOT="${SCRIPT_PATH}"
 export LIB_DIR="${REPO_ROOT}/lib"
-export MODULE_DIR="${REPO_ROOT}/module"
-export TEMPLATE_DIR="${REPO_ROOT}/template"
+export MODULE_DIR="${REPO_ROOT}/modules"
+export TEMPLATE_DIR="${REPO_ROOT}/templates"
 
 # ── Defaults for logging / env-driven flags ──────────────────────────────────
 export USER="${USER:-"$(whoami)"}"
@@ -69,7 +69,7 @@ config_init || true
 # ── Resolve INIT_UBUNTU_LANG (env > config.ini > auto-detect from $LANG) ────
 i18n_resolve_init_ubuntu_lang
 
-# ── Load module registry (silent on missing module/ dir) ─────────────────────
+# ── Load module registry (silent on missing modules/ dir) ─────────────────────
 registry_load_all "${MODULE_DIR}" || true
 
 # ── Dispatch ─────────────────────────────────────────────────────────────────

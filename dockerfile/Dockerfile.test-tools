@@ -62,7 +62,7 @@ RUN apk add --no-cache curl xz && \
 #   - grep + coreutils   GNU variants override busybox so `grep -P` etc. work
 #   - make               integration tests exercise `make` recipes
 #   - fish               [init_ubuntu addition] required by `fish -n` syntax
-#                        checks against module/config/fish/*.fish and any
+#                        checks against modules/config/fish/*.fish and any
 #                        future fish-based modules
 #   - dialog + ncurses-terminfo
 #                        [init_ubuntu addition] for TUI unit tests that

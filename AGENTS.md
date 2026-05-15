@@ -11,31 +11,35 @@ to `~/.claude/rules/` via `install.sh`).
 - **Personal-use modular Ubuntu environment initialization tool** — bash +
   bats, Docker-only testing.
 - Single-context repo; domain glossary lives in `CONTEXT.md`.
-- Folder names are singular (hard rule). `doc/`, not `docs/`. `module/`, not
-  `modules/`. Exceptions: upstream-imposed plural layouts (e.g. fish's
-  `completions/`).
+- Folder naming follows **plural-for-collections + singular-for-concepts**
+  (see `docs/adr/0005-folder-naming-plural-for-collections.md`):
+  collection dirs (`tests/`, `scripts/`, `hooks/`, `docs/`, `modules/`,
+  `templates/`) are plural; concept / role / uncountable dirs (`lib/`,
+  `config/`, `changelog/`) and acronyms (`adr/`, `prd/`, `ci/`) are
+  singular; upstream-imposed layouts (fish `completions/`, QMK
+  `keyboards/`, etc.) keep whatever the upstream uses.
 
 ## Hard rules
 
-1. **Tests run inside Docker only.** Use `make test-unit` / `make test-integration` / `make coverage`. See `doc/adr/0004-tests-must-run-in-docker-only.md`. Enforced by `script/hook/test-must-use-docker.sh` (PreToolUse).
+1. **Tests run inside Docker only.** Use `make test-unit` / `make test-integration` / `make coverage`. See `docs/adr/0004-tests-must-run-in-docker-only.md`. Enforced by `.claude/hooks/test-must-use-docker.sh` (PreToolUse).
 2. **No host package installs.** Module Action Phases (install / upgrade / remove / purge) must not run on the host.
-3. **Bash + Docker scope.** Language migration triggers documented in `doc/adr/0003-language-choice-and-migration-triggers.md`.
+3. **Bash + Docker scope.** Language migration triggers documented in `docs/adr/0003-language-choice-and-migration-triggers.md`.
 
 ## Agent skills
 
 ### Issue tracker
 
 GitHub issues on `github.com/ycpss91255/initialization`, accessed via the `gh`
-CLI. See `doc/agent/issue-tracker.md`.
+CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
 Default canonical vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`,
 `ready-for-human`, `wontfix`). Labels auto-created on first apply. See
-`doc/agent/triage-labels.md`.
+`docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context. Glossary at `CONTEXT.md`; ADRs at `doc/adr/`; module contract
-at `doc/module-spec.md`; product spec at `doc/prd/init-ubuntu.prd.md`. See
-`doc/agent/domain.md`.
+Single-context. Glossary at `CONTEXT.md`; ADRs at `docs/adr/`; module contract
+at `docs/module-spec.md`; product spec at `docs/prd/init-ubuntu.prd.md`. See
+`docs/agents/domain.md`.

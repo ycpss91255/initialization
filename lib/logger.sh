@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # lib/logger.sh — init_ubuntu logger
 #
-# Lineage: copied from module/function/logger.sh (kept identical to preserve
-# behavior for existing module/setup_*.sh which still sources the old path).
-# Phase 7 will delete module/function/logger.sh in favor of this.
+# Lineage: copied from modules/function/logger.sh (kept identical to preserve
+# behavior for existing modules/setup_*.sh which still sources the old path).
+# Phase 7 will delete modules/function/logger.sh in favor of this.
 #
 # Extensions vs upstream (init_ubuntu addition):
 #   - log_event() emits JSONL structured log entries to $INIT_UBUNTU_LOG_FILE
 #     (no-op when env var unset; see PRD §10.2 schema)
 #
 # Note: this library does NOT declare `set -euo pipefail` at top level —
-# the original module/function/logger.sh did, but that leaks strict mode
+# the original modules/function/logger.sh did, but that leaks strict mode
 # into every caller and forces them to fight bash's `set -u` rules. The
 # convention in lib/ is: callers (setup_ubuntu.sh, bats test, module
 # sub-shells) set strict mode themselves.
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
-    printf "To learn how to use it, please refer to '%s'\n" "../../test/unit/logger_spec.bats"
+    printf "To learn how to use it, please refer to '%s'\n" "../../tests/unit/logger_spec.bats"
     return 0 2>/dev/null
 fi
 

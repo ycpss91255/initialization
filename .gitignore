@@ -1,18 +1,18 @@
 tmp
 
 # Yazi: ignore `ya pkg` auto-installed packages, keep only manually-tracked plugins
-module/config/yazi/plugins/*
-!module/config/yazi/plugins/dockerfile.yazi
-module/config/yazi/flavors/
+modules/config/yazi/plugins/*
+!modules/config/yazi/plugins/dockerfile.yazi
+modules/config/yazi/flavors/
 
 # Fish: ignore auto-generated completions, keep only manually-tracked ones
-module/config/fish/completions/*
-!module/config/fish/completions/tmuxp-ssh.fish
-!module/config/fish/completions/claude-rm.fish
+modules/config/fish/completions/*
+!modules/config/fish/completions/tmuxp-ssh.fish
+!modules/config/fish/completions/claude-rm.fish
 
 # Fish runtime state (per-machine)
-module/config/fish/fish_history
-module/config/fish/fish_variables*
+modules/config/fish/fish_history
+modules/config/fish/fish_variables*
 
 # Claude Code local-only settings (machine-specific permission allow-list).
 # Project-wide config (hooks, enabled plugins) lives in tracked .claude/settings.json.

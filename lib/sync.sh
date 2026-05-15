@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lib/sync.sh — SSH push / pull of the install state across machines
 #
-# Per PRD §16 (Sync mechanism) and doc/architecture.md §16.
+# Per PRD §16 (Sync mechanism) and docs/architecture.md §16.
 #
 # Public API:
 #   sync_push <user@host> [--modules=<csv>] [--dry-run]

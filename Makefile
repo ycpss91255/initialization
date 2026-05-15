@@ -19,19 +19,19 @@
 # ── Development ──────────────────────────────────────────────────────────────
 
 test: build-test-tools ## Run ShellCheck + Bats (unit + integration; no kcov — fast dev loop)
-	./script/ci/ci.sh
+	./scripts/ci/ci.sh
 
 test-unit: build-test-tools ## Run unit bats only (fastest feedback loop)
-	./script/ci/ci.sh --unit-only
+	./scripts/ci/ci.sh --unit-only
 
 test-integration: build-test-tools ## Run integration bats only (slower; container-based)
-	./script/ci/ci.sh --integration-only
+	./scripts/ci/ci.sh --integration-only
 
 lint: build-test-tools ## Run ShellCheck + fish syntax + hadolint
-	./script/ci/ci.sh --lint-only
+	./scripts/ci/ci.sh --lint-only
 
 coverage: build-test-tools ## Run ShellCheck + Bats + kcov coverage report
-	./script/ci/ci.sh --coverage
+	./scripts/ci/ci.sh --coverage
 
 # ── Image build ──────────────────────────────────────────────────────────────
 

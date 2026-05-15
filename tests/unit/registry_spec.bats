@@ -153,3 +153,102 @@ EOF
     run registry_has docker
     assert_success
 }
+
+# ── User-local module discovery (issue #13, PRD §13.2 Q35) ──────────────────
+
+@test "registry_load_all also scans INIT_UBUNTU_USER_MODULE_DIR" {
+    local _user_dir="${INIT_UBUNTU_TEST_SCRATCH}/user-modules"
+    mkdir -p "${_user_dir}"
+    cat > "${_user_dir}/personal-tool.module.sh" <<'EOF'
+NAME="personal-tool"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+EOF
+
+    source "${LIB_DIR}/logger.sh"
+    source "${LIB_DIR}/registry.sh"
+    INIT_UBUNTU_USER_MODULE_DIR="${_user_dir}" \
+        registry_load_all "${FAKE_MODULE_DIR}"
+
+    # Bundled modules still present
+    run registry_has alpha
+    assert_success
+    # User-local module discovered
+    run registry_has personal-tool
+    assert_success
+}
+
+@test "registry_load_all: user-local module wins on NAME collision" {
+    local _user_dir="${INIT_UBUNTU_TEST_SCRATCH}/user-modules"
+    mkdir -p "${_user_dir}"
+    # Override the bundled 'alpha' (category=base in fixture) with category=experimental
+    cat > "${_user_dir}/alpha.module.sh" <<'EOF'
+NAME="alpha"
+CATEGORY="experimental"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+EOF
+
+    source "${LIB_DIR}/logger.sh"
+    source "${LIB_DIR}/registry.sh"
+    INIT_UBUNTU_USER_MODULE_DIR="${_user_dir}" \
+        registry_load_all "${FAKE_MODULE_DIR}" 2>/dev/null
+
+    # registry_get_field returns the user-local entry's category
+    run registry_get_field alpha category
+    assert_success
+    assert_output "experimental"
+
+    # The file path resolves to the user-local copy, not the bundled one
+    run registry_get_field alpha file
+    assert_success
+    [[ "${output}" == "${_user_dir}/alpha.module.sh" ]] || { echo "got: ${output}"; return 1; }
+}
+
+@test "registry_load_all: collision emits a WARN" {
+    local _user_dir="${INIT_UBUNTU_TEST_SCRATCH}/user-modules"
+    mkdir -p "${_user_dir}"
+    cat > "${_user_dir}/alpha.module.sh" <<'EOF'
+NAME="alpha"
+CATEGORY="experimental"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+EOF
+
+    source "${LIB_DIR}/logger.sh"
+    source "${LIB_DIR}/registry.sh"
+    run bash -c "
+        source '${LIB_DIR}/logger.sh'
+        source '${LIB_DIR}/registry.sh'
+        INIT_UBUNTU_USER_MODULE_DIR='${_user_dir}' \
+            registry_load_all '${FAKE_MODULE_DIR}'
+    "
+    [[ "${output}" =~ user-local[[:space:]]override ]] || {
+        echo "missing override warn in output: ${output}"
+        return 1
+    }
+}
+
+@test "registry_load_all is a no-op when INIT_UBUNTU_USER_MODULE_DIR points at nothing" {
+    local _empty="${INIT_UBUNTU_TEST_SCRATCH}/no-such-dir"
+    source "${LIB_DIR}/logger.sh"
+    source "${LIB_DIR}/registry.sh"
+    INIT_UBUNTU_USER_MODULE_DIR="${_empty}" \
+        registry_load_all "${FAKE_MODULE_DIR}"
+    # Just the 3 bundled modules; no error
+    run registry_list_names
+    assert_success
+    assert_output --partial "alpha"
+    assert_output --partial "bravo"
+    assert_output --partial "charlie"
+}

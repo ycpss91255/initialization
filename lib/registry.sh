@@ -71,21 +71,17 @@ _registry_parse_one() {
 
 # ── Public: scan and register all modules ────────────────────────────────────
 
-registry_load_all() {
-    local _dir="${1:-${MODULE_DIR:-${REPO_ROOT:-.}/modules}}"
+# Internal helper: scan one dir into the global MODULES_* maps.
+# Args: <dir> <is_user_local: 0|1>
+# When is_user_local=1, name collisions with an already-registered bundled
+# module emit a warn (the user-local entry wins by overwriting). Returns the
+# failure count for callers to aggregate.
+_registry_load_one_dir() {
+    local _dir="${1:?_registry_load_one_dir needs <dir>}"
+    local _is_user_local="${2:-0}"
     local _file _line _key _val _failed=0
 
-    MODULES_NAME=()
-    MODULES_CATEGORY=()
-    MODULES_DEPS=()
-    MODULES_TAGS=()
-    MODULES_SUPPORTED_UBUNTU=()
-    MODULES_SUPPORTED_PLATFORMS=()
-    MODULES_CONFLICTS=()
-
-    if [[ ! -d "${_dir}" ]]; then
-        return 0
-    fi
+    [[ -d "${_dir}" ]] || return 0
 
     # Collect *.module.sh entries without depending on `shopt -s nullglob`
     # (which would require save/restore via `shopt -p nullglob` — that exits
@@ -117,7 +113,7 @@ registry_load_all() {
 
         if [[ -z "${_name_parsed}" ]]; then
             printf "[registry] WARN: skipping %s (missing NAME)\n" "${_file##*/}" >&2
-            _failed=1
+            _failed=$(( _failed + 1 ))
             continue
         fi
 
@@ -126,8 +122,20 @@ registry_load_all() {
         if [[ "${_name_parsed}" != "${_expected_name}" ]]; then
             printf "[registry] WARN: %s declares NAME=%s; expected %s (skipping)\n" \
                 "${_file##*/}" "${_name_parsed}" "${_expected_name}" >&2
-            _failed=1
+            _failed=$(( _failed + 1 ))
             continue
+        fi
+
+        # User-local override: emit log_warn when overwriting a bundled entry.
+        # PRD §13.2 Q35 — user-local wins on collision.
+        if (( _is_user_local == 1 )) && [[ -n "${MODULES_NAME[${_name_parsed}]:-}" ]]; then
+            local _bundled_path="${MODULES_NAME[${_name_parsed}]}"
+            if declare -F log_warn >/dev/null 2>&1; then
+                log_warn "[registry] user-local override of bundled module '${_name_parsed}' (bundled=${_bundled_path}, user=${_file})"
+            else
+                printf "[registry] WARN: user-local override of bundled module '%s' (bundled=%s, user=%s)\n" \
+                    "${_name_parsed}" "${_bundled_path}" "${_file}" >&2
+            fi
         fi
 
         MODULES_NAME["${_name_parsed}"]="${_file}"
@@ -140,6 +148,27 @@ registry_load_all() {
     done
 
     return "${_failed}"
+}
+
+registry_load_all() {
+    local _bundled_dir="${1:-${MODULE_DIR:-${REPO_ROOT:-.}/modules}}"
+    local _user_dir="${INIT_UBUNTU_USER_MODULE_DIR:-${XDG_CONFIG_HOME:-${HOME}/.config}/init_ubuntu/modules}"
+
+    MODULES_NAME=()
+    MODULES_CATEGORY=()
+    MODULES_DEPS=()
+    MODULES_TAGS=()
+    MODULES_SUPPORTED_UBUNTU=()
+    MODULES_SUPPORTED_PLATFORMS=()
+    MODULES_CONFLICTS=()
+
+    # Bundled first (so user-local wins on collision via overwrite + warn).
+    # Per PRD §13.2 Q35 (user-local module discovery).
+    local _failed_bundled=0 _failed_user=0
+    _registry_load_one_dir "${_bundled_dir}" 0 || _failed_bundled=$?
+    _registry_load_one_dir "${_user_dir}"    1 || _failed_user=$?
+
+    return $(( _failed_bundled + _failed_user ))
 }
 
 # ── Public: get a specific field ─────────────────────────────────────────────

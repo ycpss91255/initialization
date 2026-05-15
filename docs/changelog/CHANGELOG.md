@@ -119,6 +119,25 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   status / source-mode / no-side-effects) across all 4 archetypes.
 - Test count: 255 → 267 (8 new archetype-iterating smoke + 11 consistency).
 
+#### CI workflow — GitHub Actions (issue #2)
+
+- `.github/workflows/ci.yaml` with 5 jobs:
+  - `lint` — `make lint` (shellcheck + hadolint + fish syntax),
+    always runs even on doc-only PRs.
+  - `test-unit` — `make test-unit`, skipped on doc-only PRs.
+  - `test-integration` — `make test-integration`, skipped on doc-only.
+  - `coverage` — `make coverage` (kcov), uploaded as artefact;
+    skipped on doc-only.
+  - `ci-passed` — aggregator that succeeds iff lint passed and the
+    heavy three either passed or skipped. Single check name for
+    `required_status_checks` to anchor on (#3).
+- Path filter via `dorny/paths-filter@v3`: `code` output is `false`
+  for changes touching only `docs/**`, `**/*.md`, `LICENSE*`,
+  `.gitignore`, `.codecov.yaml`.
+- Triggers: PR to `main`, push to `main`, push to `v*` tags (so
+  `release-tag.sh`'s CI-conclusion query for RC tags works).
+- `concurrency` group cancels in-flight PR runs on new pushes.
+
 #### Release workflow — port from docker_harness#22 + #106 (commit 1b40cfb)
 
 Alignment with `ycpss91255-docker/docker_harness` release infrastructure:

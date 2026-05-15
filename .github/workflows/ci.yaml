@@ -1,0 +1,142 @@
+# .github/workflows/ci.yaml — init_ubuntu CI
+#
+# Aligns with ycpss91255-docker/docker_harness CI conventions:
+# - All test workflows run inside Docker (ADR-0004 hard rule).
+# - Path-filtered: doc-only PRs skip test/coverage; lint still runs.
+# - Job names match Makefile targets so `required_status_checks` can
+#   pin them by name (see issue #3).
+#
+# Triggers:
+#   - PRs to main (the primary gating path)
+#   - Pushes to main (final safety net; matches what gets tagged)
+#   - Tag pushes vX.Y.Z* (so release-tag.sh's CI conclusion query works)
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
+
+# Cancel in-flight runs on the same ref when a new commit lands.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # ── Path filter ────────────────────────────────────────────────────────────
+  # Detect whether the change is doc-only. Other jobs key on this to skip
+  # heavy work for pure markdown / license updates.
+  changes:
+    name: detect-changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          # `code` = anything that could affect runtime behaviour.
+          # Doc-only = `code` false → heavy jobs skip.
+          filters: |
+            code:
+              - '!docs/**'
+              - '!**/*.md'
+              - '!LICENSE'
+              - '!LICENSE.*'
+              - '!.gitignore'
+              - '!.codecov.yaml'
+
+  # ── Lint (always runs, including doc-only PRs) ─────────────────────────────
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build test-tools image
+        run: make build-test-tools
+      - name: run lint (shellcheck + hadolint + fish syntax)
+        run: make lint
+
+  # ── Unit tests (skipped on doc-only changes) ───────────────────────────────
+  test-unit:
+    name: test-unit
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build test-tools image
+        run: make build-test-tools
+      - name: run unit bats specs
+        run: make test-unit
+
+  # ── Integration tests (skipped on doc-only changes) ────────────────────────
+  test-integration:
+    name: test-integration
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build test-tools image
+        run: make build-test-tools
+      - name: run integration bats specs
+        run: make test-integration
+
+  # ── Coverage (skipped on doc-only changes) ─────────────────────────────────
+  coverage:
+    name: coverage
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build test-tools image
+        run: make build-test-tools
+      - name: run coverage (kcov)
+        run: make coverage
+      - name: upload coverage artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+  # ── Aggregator (single check for required_status_checks) ───────────────────
+  # docker_harness pattern: ci-passed depends on all real jobs so the
+  # ruleset can require a single name and still cover the whole matrix.
+  # We expose individual job names AND ci-passed so the ruleset can pick
+  # either approach (#3 will decide).
+  ci-passed:
+    name: ci-passed
+    needs: [changes, lint, test-unit, test-integration, coverage]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: assert all upstream jobs passed (or skipped on doc-only)
+        run: |
+          set -euo pipefail
+          echo "changes.code=${{ needs.changes.outputs.code }}"
+          echo "lint=${{ needs.lint.result }}"
+          echo "test-unit=${{ needs.test-unit.result }}"
+          echo "test-integration=${{ needs.test-integration.result }}"
+          echo "coverage=${{ needs.coverage.result }}"
+          # lint must succeed; the heavy three must succeed-or-skipped.
+          for r in "${{ needs.lint.result }}"; do
+            case "$r" in success) ;; *) echo "lint=$r"; exit 1 ;; esac
+          done
+          for r in \
+              "${{ needs.test-unit.result }}" \
+              "${{ needs.test-integration.result }}" \
+              "${{ needs.coverage.result }}"; do
+            case "$r" in success|skipped) ;; *) echo "heavy job=$r"; exit 1 ;; esac
+          done

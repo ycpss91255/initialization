@@ -143,6 +143,43 @@ state_record_remove() {
     _state_locked_write "del(.installed[\"${_name}\"])"
 }
 
+# state_record_upgrade <name> <version>
+#   Updates an existing installed entry's version_provided + last_upgraded_at.
+#   No-op (jq |= leaves untouched) if the module is not in .installed —
+#   upgrade is meant to run on already-installed modules; engine refuses
+#   upgrade for absent ones at the dispatcher layer.
+state_record_upgrade() {
+    local _name="${1:?state_record_upgrade needs <name>}"
+    local _version="${2:-unknown}"
+    local _ts; _ts="$(_state_iso8601)"
+
+    _state_locked_write \
+        ".installed[\"${_name}\"] |= (
+             if . == null then null
+             else . + {
+                 \"version_provided\": \"${_version}\",
+                 \"last_upgraded_at\": \"${_ts}\"
+             }
+             end
+         )"
+}
+
+# state_record_verify <name>
+#   Stamps last_verified_at on an existing installed entry. No-op when the
+#   module is not in .installed (verify on uninstalled is a CLI-layer error,
+#   but the state write should still degrade gracefully).
+state_record_verify() {
+    local _name="${1:?state_record_verify needs <name>}"
+    local _ts; _ts="$(_state_iso8601)"
+
+    _state_locked_write \
+        ".installed[\"${_name}\"] |= (
+             if . == null then null
+             else . + { \"last_verified_at\": \"${_ts}\" }
+             end
+         )"
+}
+
 # ── public read API ─────────────────────────────────────────────────────────
 
 state_is_recorded() {

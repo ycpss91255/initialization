@@ -119,6 +119,39 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   status / source-mode / no-side-effects) across all 4 archetypes.
 - Test count: 255 → 267 (8 new archetype-iterating smoke + 11 consistency).
 
+#### Engine: upgrade / verify subcommands + state.json fields (issue #7)
+
+- `setup_ubuntu upgrade [<module>...] [-y] [--dry-run]` — calls each
+  module's `upgrade()` (was previously misrouted to `runner_install`).
+  No args = upgrade every module recorded in `state.json` as
+  installed. Engine refuses root for the real-run path
+  (PRD §10), dry-run + empty-modules paths stay root-safe.
+- `setup_ubuntu verify [<module>...] [--dry-run]` — new subcommand,
+  calls each module's `verify()`. No args = verify all installed.
+  Safe to invoke as root (no apt mutation).
+- `lib/runner.sh`: `runner_upgrade` / `runner_verify` / `runner_doctor`
+  added on top of the generic `_runner_run_phase`. All three
+  hand off to module's `upgrade()` / `verify()` / `doctor()` per
+  ADR-0002.
+- `lib/state.sh`:
+  - `state_record_upgrade <name> <version>` — stamps
+    `version_provided` + `last_upgraded_at` (ISO 8601 UTC).
+    No-op if the module isn't in `.installed`.
+  - `state_record_verify <name>` — stamps `last_verified_at`.
+- Runner state-recording switch (`_runner_run_phase`) updated:
+  on successful `upgrade` → `state_record_upgrade`; on successful
+  `verify` → `state_record_verify`. Existing `install` /
+  `remove` / `purge` recording unchanged.
+- Tests: 267 → 278 (5 new runner phase tests + 6 state-record
+  tests).
+
+`setup_ubuntu doctor` per-module behaviour (running each module's
+`doctor()` instead of the existing state-drift detection) is
+deferred to a follow-up — `runner_doctor` is implemented but the
+existing `_dispatcher_doctor` keeps its current state-drift
+semantics until the design question (state-drift vs per-module
+doctor()) is decided.
+
 #### Release workflow — port from docker_harness#22 + #106 (commit 1b40cfb)
 
 Alignment with `ycpss91255-docker/docker_harness` release infrastructure:

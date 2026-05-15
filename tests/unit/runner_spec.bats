@@ -23,6 +23,9 @@ CONFLICTS_WITH=()
 install() { echo "INSTALL-RAN" >&2; return 0; }
 remove()  { echo "REMOVE-RAN" >&2;  return 0; }
 purge()   { echo "PURGE-RAN" >&2;   return 0; }
+upgrade() { echo "UPGRADE-RAN" >&2; return 0; }
+verify()  { echo "VERIFY-RAN" >&2;  return 0; }
+doctor()  { echo "DOCTOR-RAN" >&2;  return 0; }
 EOF
 
     cat > "${FAKE_MODULE_DIR}/fails.module.sh" <<'EOF'
@@ -129,4 +132,41 @@ EOF
     grep -q '"event":"install_start"' "${_log}"
     grep -q '"event":"install_done"' "${_log}"
     grep -q '"event":"session_end"' "${_log}"
+}
+
+# ── upgrade / verify / doctor phase ─────────────────────────────────────────
+
+@test "runner_upgrade runs upgrade() of the named module" {
+    _load_engine
+    run runner_upgrade echo-mod
+    assert_success
+    assert_output --partial "UPGRADE-RAN"
+}
+
+@test "runner_verify runs verify() of the named module" {
+    _load_engine
+    run runner_verify echo-mod
+    assert_success
+    assert_output --partial "VERIFY-RAN"
+}
+
+@test "runner_doctor runs doctor() of the named module" {
+    _load_engine
+    run runner_doctor echo-mod
+    assert_success
+    assert_output --partial "DOCTOR-RAN"
+}
+
+@test "runner_upgrade on empty list is a no-op" {
+    _load_engine
+    run runner_upgrade
+    assert_success
+    assert_output --partial "No modules"
+}
+
+@test "runner_verify on empty list is a no-op" {
+    _load_engine
+    run runner_verify
+    assert_success
+    assert_output --partial "No modules"
 }

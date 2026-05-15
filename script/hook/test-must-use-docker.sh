@@ -44,6 +44,22 @@ _cmd="$(_extract_cmd "${_stdin_payload}")"
 # Empty command (or non-Bash invocation that still routed here) — allow.
 [[ -z "${_cmd}" ]] && exit 0
 
+# Whitelist: commands whose first token is a known-safe binary that never
+# runs Module Action Phases. This avoids false positives when commit
+# messages, git diff output, or grep arguments contain literal substrings
+# like "host bats" or "apt-get install".
+_first_tok="${_cmd%%[[:space:]]*}"
+case "${_first_tok}" in
+    git|gh|docker|make|grep|find|ls|cat|sed|awk|tr|sort|uniq|wc|head|tail|\
+    cd|pwd|true|false|echo|printf|test|chmod|chown|mkdir|rm|cp|mv|ln|touch|\
+    stat|file|which|command|type|tee|date|env|export|unset|history|jq|\
+    python3|python|node|npm|pnpm|yarn|cargo|rustc|go|hadolint|shellcheck|\
+    fish|fishtape|kcov|fc-cache|fc-list|sleep|wait|kill|ps|pgrep|pkill|\
+    diff|patch|xargs|basename|dirname|realpath|readlink|tar|gzip|gunzip|\
+    zip|unzip|7z|curl|wget)
+        exit 0 ;;
+esac
+
 # ── Block patterns ──────────────────────────────────────────────────────────
 _block() {
     local _reason="$1"

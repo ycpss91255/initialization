@@ -28,3 +28,10 @@ module/config/fish/fish_variables*
 # Other agent CLIs' local state
 .agents/
 skills-lock.json
+
+# git worktree workspaces — per-branch checkouts for fix/feature work.
+# Convention: worktree/<N>-<slug>/ where N is the issue/task number.
+# The directory itself is tracked (worktree/.gitkeep) so the convention is
+# discoverable on fresh clone; contents are ignored.
+worktree/*
+!worktree/.gitkeep

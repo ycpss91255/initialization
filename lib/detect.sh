@@ -264,6 +264,7 @@ _detect_extract_str() {
     if [[ "${_rest}" == "${_json}" ]]; then
         return 0
     fi
+    # shellcheck disable=SC1083  # literal `}` matches JSON `null}` (object close)
     case "${_rest}" in
         null,*|null}*|null)
             return 0

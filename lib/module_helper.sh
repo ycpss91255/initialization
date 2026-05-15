@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2119,SC2120,SC2317
+# SC2119/SC2120: archetype macros wire `is_installed/install/upgrade/...`
+#   as inner functions; callers invoke them without arguments by design.
+# SC2317: the inner wrappers are dispatched indirectly by the engine via
+#   ${_phase} (lib/runner.sh), so ShellCheck cannot see the call sites.
 # lib/module_helper.sh — Reusable lifecycle helpers + i18n + archetype macros.
 #
 # Module authors declare DATA (APT_PKGS / GITHUB_REPO / CONFIG_DEST / ...) and

@@ -1,0 +1,13 @@
+# Project-wide ShellCheck config.
+#
+# SC2034 — module metadata pattern: every modules/*.module.sh and
+# templates/module-*.template.sh declares NAME / DESCRIPTION / CATEGORY /
+# TAGS / SUPPORTED_UBUNTU / ... as top-level vars. The engine sources the
+# module then reads them via parameter expansion. ShellCheck flags them
+# "appears unused" because it can't see the engine-side reads.
+disable=SC2034
+
+# Treat `source ./../foo.sh` paths that escape the repo as informational
+# (SC1091 default) rather than failing. ci.sh's shellcheck call uses -x to
+# follow sourced files; missing-source errors should not block CI.
+external-sources=true

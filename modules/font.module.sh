@@ -80,7 +80,9 @@ install() {
         fi
         rm -rf "${_tmp}"
     done
-    command -v fc-cache >/dev/null 2>&1 && fc-cache -f "${_FONTS_DIR}" >/dev/null || true
+    if command -v fc-cache >/dev/null 2>&1; then
+        fc-cache -f "${_FONTS_DIR}" >/dev/null || true
+    fi
 }
 
 upgrade() {
@@ -99,7 +101,9 @@ remove() {
     for _f in "${_NERD_FONTS[@]}"; do
         rm -rf "${_FONTS_DIR:?}/${_f}"
     done
-    command -v fc-cache >/dev/null 2>&1 && fc-cache -f "${_FONTS_DIR}" >/dev/null || true
+    if command -v fc-cache >/dev/null 2>&1; then
+        fc-cache -f "${_FONTS_DIR}" >/dev/null || true
+    fi
 }
 
 purge() {

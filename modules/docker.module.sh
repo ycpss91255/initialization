@@ -83,6 +83,10 @@ is_recommended() {
     return 0
 }
 
+# shellcheck disable=SC2032,SC2033
+# SC2032/SC2033: `install` shadows the system binary; inside this function
+#   `sudo install -m 0755 -d ...` runs /usr/bin/install (sudo clears the
+#   function table before exec), so the shadowing is harmless here.
 install() {
     module_dryrun_guard install "apt-repo setup + apt-install ${APT_PKGS[*]} + usermod -aG docker" && return 0
     module_skip_if_installed && return 0

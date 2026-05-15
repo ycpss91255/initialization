@@ -138,6 +138,28 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `release-tag.sh`'s CI-conclusion query for RC tags works).
 - `concurrency` group cancels in-flight PR runs on new pushes.
 
+#### ShellCheck baseline — make `make lint` pass on existing tree
+
+- `.shellcheckrc` at repo root: `disable=SC2034` (every module/template
+  declares sourced metadata vars the engine reads via parameter
+  expansion; ShellCheck can't see the engine-side reads) +
+  `external-sources=true` (let `shellcheck -x` follow library sources).
+- `scripts/ci/ci.sh`: fix exclude-path typo `modules/tool` →
+  `modules/tools` (post-ADR-0005 plural rename had not been propagated;
+  deprecated tools were being linted).
+- Per-file disable directives with rationale comments:
+  - `lib/module_helper.sh`: SC2119/SC2120/SC2317 — archetype-macro
+    wrappers dispatched indirectly via `${_phase}`.
+  - `lib/sync.sh`: SC2029 — SSH commands intentionally expand
+    `${_remote_path}` client-side.
+  - `lib/detect.sh:268`, `lib/platform.sh:42`: SC1083 — literal `}` in
+    case patterns matches JSON `null}` (object close).
+  - `modules/docker.module.sh`: SC2032/SC2033 — `install()` shadows
+    `/usr/bin/install`; harmless inside `sudo install ...` because sudo
+    clears the function table before exec.
+- `modules/font.module.sh`: rewrite `command -v X && X || true` →
+  `if ... then ... fi` for clarity (SC2015).
+
 #### Release workflow — port from docker_harness#22 + #106 (commit 1b40cfb)
 
 Alignment with `ycpss91255-docker/docker_harness` release infrastructure:

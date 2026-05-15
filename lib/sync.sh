@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2029
+# SC2029: SSH command strings intentionally expand `${_remote_path}` client-side
+#   so the remote `setup_ubuntu import/export` receives the local path verbatim
+#   (the value is a controlled tmpfile name, never user-tainted).
 # lib/sync.sh — SSH push / pull of the install state across machines
 #
 # Per PRD §16 (Sync mechanism) and docs/architecture.md §16.

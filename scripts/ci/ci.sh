@@ -108,7 +108,7 @@ _find_lintable_sh() {
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
-           -path "${REPO_ROOT}/modules/tool" -o \
+           -path "${REPO_ROOT}/modules/tools" -o \
            -path "${REPO_ROOT}/modules/config" \) -prune -o \
         -type f -name "*.sh" -print0
 }
@@ -119,7 +119,7 @@ _find_lintable_fish() {
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
-           -path "${REPO_ROOT}/modules/tool" -o \
+           -path "${REPO_ROOT}/modules/tools" -o \
            -path "${REPO_ROOT}/modules/config" \) -prune -o \
         -type f -name "*.fish" -print0
 }

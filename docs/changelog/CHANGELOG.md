@@ -146,7 +146,9 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `external-sources=true` (let `shellcheck -x` follow library sources).
 - `scripts/ci/ci.sh`: fix exclude-path typo `modules/tool` →
   `modules/tools` (post-ADR-0005 plural rename had not been propagated;
-  deprecated tools were being linted).
+  deprecated tools were being linted). Also add `jq` to
+  `_install_deps_for_coverage` apt-get install (kcov/kcov image lacks
+  it; `lib/state.sh` requires jq for state.json mutation).
 - Per-file disable directives with rationale comments:
   - `lib/module_helper.sh`: SC2119/SC2120/SC2317 — archetype-macro
     wrappers dispatched indirectly via `${_phase}`.

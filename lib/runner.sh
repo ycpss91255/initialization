@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lib/runner.sh — execute module lifecycle (install / remove / purge)
 #
-# Per docs/architecture.md §3.1 sequence and docs/module-spec.md §4 contract.
+# Per doc/architecture.md §3.1 sequence and doc/module-spec.md §4 contract.
 #
 # Public API:
 #   runner_install <module> [<module> ...]
@@ -61,6 +61,11 @@ _runner_run_phase() {
         source '${_lib_dir}/logger.sh'
         # shellcheck disable=SC1090
         source '${_lib_dir}/general.sh'
+        # shellcheck disable=SC1090
+        source '${_lib_dir}/module_helpers.sh'
+        # The module's dual-mode header detects \$0 != \$BASH_SOURCE[0] and
+        # skips its own standalone-mode source block, so we don't re-source
+        # the helpers above (idempotent if it did).
         # shellcheck disable=SC1090
         source '${_file}'
         if ! declare -F '${_phase}' >/dev/null 2>&1; then

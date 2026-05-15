@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # test/unit/runner_spec.bats — lib/runner.sh
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lib/state.sh — state.json read / write with flock
 #
-# Per PRD §10.1 (state schema) and docs/architecture.md §6 (state cache vs
+# Per PRD §10.1 (state schema) and doc/architecture.md §6 (state cache vs
 # real system state).
 #
 # Public API:

@@ -13,3 +13,8 @@ module/config/fish/completions/*
 # Fish runtime state (per-machine)
 module/config/fish/fish_history
 module/config/fish/fish_variables*
+
+ CLAUDE.md
+.claude
+.agents
+skills-lock.json

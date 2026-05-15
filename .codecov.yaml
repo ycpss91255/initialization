@@ -13,7 +13,7 @@ coverage:
       default:
         # v0.1 floor: 80% (PRD G5 / AC-17)
         # Roadmap: 90% at v0.5, 95% at v1.0, 99% from there
-        # See docs/architecture.md §8.4 Coverage gate
+        # See doc/architecture.md §8.4 Coverage gate
         target: 80%
         threshold: 1%
     patch:

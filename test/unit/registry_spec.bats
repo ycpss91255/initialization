@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # test/unit/registry_spec.bats — lib/registry.sh
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

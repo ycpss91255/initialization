@@ -1,6 +1,31 @@
 # Testing Guide — init_ubuntu
 
-> 本文檔說明如何跑測試、CI 框架的組成、以及這些檔案的**借用來源與 sync 流程**。閱讀 PRD §11 / `docs/architecture.md` §7 了解測試策略。
+> 本文檔說明如何跑測試、CI 框架的組成、以及這些檔案的**借用來源與 sync 流程**。閱讀 PRD §11 / `doc/architecture.md` §7 了解測試策略。
+
+---
+
+## ⚠️ HARD RULE — Tests MUST run in Docker (no exceptions)
+
+**`bats` / module lifecycle 函式絕不直接在 host 跑。**只准透過 `make test-unit` /
+`make test-integration` / `make coverage`(內部都走 `docker compose run --rm ci ...`)。
+
+**禁止行為:**
+- ❌ `bats test/unit/...`(host bats)
+- ❌ `bash module/<name>.module.sh install`(host module Action Phase)
+- ❌ `sudo apt-get install ...` 直接驗證 module 邏輯(host apt)
+
+**允許行為:**
+- ✅ `make test-unit` / `make test-integration` / `make coverage`
+- ✅ `make lint`
+- ✅ `docker compose -f compose.yaml run --rm ci bash -c "..."`(明確 in-container 一次性 debug)
+
+**為什麼這是 hard rule:** Module Action Phase 真的會跑 `sudo apt-get` / `curl` /
+`rm -rf` / `chsh` 等指令對「呼叫端的系統」生效。在 host 直接跑(就算 `--dry-run`)
+只差一個忘記的 flag 就清掉 dev 機。Docker 是唯一安全隔離邊界。
+
+**強制機制:** 完整理由與例外處理見 [ADR-0004](./adr/0004-tests-must-run-in-docker-only.md)。
+`script/hook/test-must-use-docker.sh` 是 Claude PreToolUse hook,自動 block 違規
+Bash 呼叫。
 
 ---
 
@@ -68,7 +93,7 @@ test/
     └── help_output_spec.bats
 ```
 
-`docs/architecture.md` §7 與 PRD §11 是權威來源。
+`doc/architecture.md` §7 與 PRD §11 是權威來源。
 
 ---
 
@@ -120,7 +145,7 @@ test/
 
 `ycpss91255-docker/base` 的 `init.sh` 預設你的 repo 是「會 build/publish Docker image」的 container repo(會建 `build.sh` / `run.sh` / `exec.sh` symlinks 與 `Dockerfile` 等)。本 repo 是 **Ubuntu host installer**,不打算發佈 image(PRD §2 Non-Goals)。所以我們**只借 5 個檔案**,不做 `git subtree add` / `init.sh`。
 
-詳見 `docs/architecture.md` §13.2 與 PRD §17.2。
+詳見 `doc/architecture.md` §13.2 與 PRD §17.2。
 
 ### 5.3 怎麼同步 upstream 更新
 
@@ -154,7 +179,7 @@ test/
 | 階段 | 門檻 | 來源 |
 |---|---|---|
 | v0.1 | >= 80% | PRD AC-17;`.codecov.yaml` target |
-| v0.5 | >= 90% | `docs/architecture.md` §8.4 |
+| v0.5 | >= 90% | `doc/architecture.md` §8.4 |
 | v1.0 | >= 95% | 同上 |
 | 之後 | >= 99% | 同上(允許 1% 硬體相關不可測) |
 
@@ -171,7 +196,7 @@ A: 在 build `test-tools:local`,需要下載 alpine + bats + fishtape 等(~150 M
 A: Phase 1 只建測試框架,實際 bats spec 從 Phase 2 才開始加。Lint 部分(shellcheck + fish syntax + hadolint)會跑。
 
 ### Q: 我的覆蓋率被低估?(明明測了卻顯示沒覆蓋)
-A: 確認 `script/ci/ci.sh` 的 `_run_coverage` 中 `--include-path` 與 `--exclude-path` 有沒有把你的檔案放對位置。`small-tools/` 與 `module/tools/` 是有意排除的(deprecated)。
+A: 確認 `script/ci/ci.sh` 的 `_run_coverage` 中 `--include-path` 與 `--exclude-path` 有沒有把你的檔案放對位置。`small-tools/` 與 `module/tool/` 是有意排除的(deprecated)。
 
 ### Q: 為什麼 ANSI 色彩在 CI log 內看不到?
 A: ci.sh 預設不主動加色;CI runner 的 terminal 一般是非 tty,符合 PRD §7.5 `--color=auto` 設計。要強制色彩用 `--color=always`(實作後)。

@@ -1,6 +1,6 @@
 # Architecture: init_ubuntu
 
-> 本文檔說明 `init_ubuntu` 工具的內部結構、資料流、與測試邊界。閱讀 PRD(`docs/prd/init-ubuntu.prd.md`)以了解產品需求,本文則聚焦於**如何實現**。
+> 本文檔說明 `init_ubuntu` 工具的內部結構、資料流、與測試邊界。閱讀 PRD(`doc/prd/init-ubuntu.prd.md`)以了解產品需求,本文則聚焦於**如何實現**。
 >
 > **本版整合 PRD 補充的 N1-N19 新需求**(apt-style subcommand、Ubuntu 26.04、敏感工具、non-sudo fallback、server/desktop 雙模式、多平台、sync、ANSI 自動偵測、tag 分組 TUI、import/export 提前等)。每個新增/修訂段落會以 `[N#]` 標出對應的需求編號,便於追溯。
 
@@ -85,7 +85,7 @@ graph TB
 ### 設計原則
 
 1. **CLI、TUI、Secrets-tool 三個前端共用同一個 Engine** — 業務邏輯絕不分散在前端
-2. **Module 是 plug-in** — Engine 只認契約(`docs/module-spec.md`),module 增刪不需要改 engine
+2. **Module 是 plug-in** — Engine 只認契約(`doc/module-spec.md`),module 增刪不需要改 engine
 3. **狀態無副作用** — state.json 是真實狀態的**快取**,實況以 `is_installed()` 為準
 4. **Sudo 集中在 module 內** — Engine 不直接 `sudo`;module 若無 sudo 走 user-home fallback [N6]
 5. **可測試性優先** — 所有 module 內呼叫的系統 helper 都可被 `bats-mock` 攔截
@@ -193,7 +193,7 @@ initialization/
 ├── script/
 │   └── ci/
 │       └── ci.sh                       # 從 base repo 借用 + 客製
-├── docs/
+├── doc/
 │   ├── architecture.md                 # 本檔
 │   ├── module-spec.md
 │   ├── TESTING.md
@@ -201,7 +201,7 @@ initialization/
 │   ├── SYNC.md                         # [N8] sync 設計與安全性
 │   ├── SECRETS.md                      # [N4] setup_secrets 使用手冊
 │   └── PLATFORMS.md                    # [N9] 支援平台與差異
-├── docs/prd/init-ubuntu.prd.md       # (was .claude/prds/ before)
+├── doc/prd/init-ubuntu.prd.md       # (was .claude/prds/ before)
 ├── .github/workflows/ci.yaml
 ├── Makefile
 ├── compose.yaml
@@ -675,8 +675,11 @@ flowchart LR
 
 ```bash
 # module/nvidia-driver.module.sh
-RISK_LEVEL="high"          # 標記為高風險
-RECOVERY_FALLBACK="nouveau" # 失敗時的回復目標
+RISK_LEVEL="high"          # 標記為高風險;engine pre-install 顯示 WARN_MESSAGE
+declare -gA WARN_MESSAGE=(
+    [en]="If install fails, manually switch back to 'nouveau' via the kernel command-line."
+    [zh-TW]="若安裝失敗,請從 grub 切回 'nouveau' 驅動進入系統。"
+)
 
 install() {
     _snapshot_kernel_modules > "${BACKUP_DIR}/lsmod.before"
@@ -687,6 +690,8 @@ install() {
     }
 }
 ```
+
+> v0.1 不要求自動回滾(複雜度過高,見 §18 與 PRD §13 Q12);`RECOVERY_FALLBACK` metadata 欄位已砍,fallback hint 改用 `WARN_MESSAGE`(pre-install)與 `POST_INSTALL_MESSAGE`(install 後)i18n list 表達。
 
 `RISK_LEVEL=high` 的 module 必須:
 - 在 install 前快照可回復狀態
@@ -940,7 +945,7 @@ Engine 啟動時:
 | `font` | 推薦 | 不裝 | 不裝 | 不裝 |
 | `docker` | 推薦 | 推薦 | 推薦(NVIDIA Container Toolkit 變體) | 推薦(用 Docker Desktop integration) |
 
-詳見 `docs/PLATFORMS.md`(將於 Phase 7 補齊)。
+詳見 `doc/PLATFORMS.md`(將於 Phase 7 補齊)。
 
 ---
 
@@ -989,7 +994,7 @@ setup_secrets remove <name>
 - 加密用的 key 從使用者 passphrase 推導(`argon2id` KDF)
 - 對 `--dry-run` 仍提示但不寫入
 
-詳見 `docs/SECRETS.md`(將於 Phase 後段補齊)。
+詳見 `doc/SECRETS.md`(將於 Phase 後段補齊)。
 
 ---
 
@@ -1030,43 +1035,13 @@ setup_ubuntu sync <user@host> --pull
 
 詳見 §3.5。
 
-詳見 `docs/SYNC.md`(將於後續補齊)。
+詳見 `doc/SYNC.md`(將於後續補齊)。
 
 ---
 
-## 17. Parallel Install [N3]
+## 17. Parallel Install [N3 — 不做]
 
-### 17.1 限制
-
-`dpkg` / `apt-get` 用 `/var/lib/dpkg/lock-frontend`,**不可並行**。
-
-### 17.2 可並行的工作
-
-- `curl` / `wget` 下載 GitHub release
-- `git clone`
-- Config 檔複製
-- 非 apt 來源的 install(`cargo install`、`npm install -g`、自編 script)
-
-### 17.3 分組策略
-
-`lib/parallel.sh` 在 install order 上做標籤:
-
-```bash
-# 每個 module metadata 可宣告
-PARALLEL_GROUP="apt"        # 預設:跟 apt 同組,序列化
-# 或
-PARALLEL_GROUP="download"   # 屬於下載組,可平行
-```
-
-Runner 把同名 group 分成 batch,batch 內可並行,batch 間序列。
-
-### 17.4 v0.1 預設
-
-**全部序列**,不啟用 parallel。在所有 install 流程穩定後(v0.3+)再開啟。
-
-### 17.5 並行下的 logging
-
-`flock` 保護 log 寫入,避免兩個 worker 同時 append 造成行錯亂。
+v0.1+ 一律序列。`dpkg` lock + sudo 互斥讓 apt module 無法並行;非 apt module 並行收益不足以抵 scheduler 複雜度。`PARALLEL_GROUP` metadata 欄位已從 module spec 移除(見 PRD §5.2 / §13.2 Q22)。
 
 ---
 

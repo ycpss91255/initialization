@@ -6,7 +6,7 @@
 #   - Replaced `_log_err` from base's _lib.sh with inline `_die`
 #     (we don't borrow base's docker/_lib.sh per PRD §13.2)
 #   - shellcheck path glob: lint all *.sh under repo; exclude small-tools/
-#     (deprecated, PRD §6.6) and module/tools/ (pending relocation, §6.5)
+#     (deprecated, PRD §6.6) and module/tool/ (pending relocation, §6.5)
 #   - Added fish syntax check (`fish -n`) for all *.fish
 #   - Added hadolint on dockerfile/Dockerfile.test-tools
 #   - Removed `--behavioural` mode (no Docker image build per PRD §2)
@@ -108,7 +108,7 @@ _find_lintable_sh() {
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
-           -path "${REPO_ROOT}/module/tools" -o \
+           -path "${REPO_ROOT}/module/tool" -o \
            -path "${REPO_ROOT}/module/config" \) -prune -o \
         -type f -name "*.sh" -print0
 }
@@ -119,7 +119,7 @@ _find_lintable_fish() {
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
-           -path "${REPO_ROOT}/module/tools" -o \
+           -path "${REPO_ROOT}/module/tool" -o \
            -path "${REPO_ROOT}/module/config" \) -prune -o \
         -type f -name "*.fish" -print0
 }
@@ -226,7 +226,7 @@ _run_coverage() {
         "${REPO_ROOT}/dockerfile/"
         "${REPO_ROOT}/.github/"
         "${REPO_ROOT}/small-tools/"
-        "${REPO_ROOT}/module/tools/"
+        "${REPO_ROOT}/module/tool/"
     )
     local _exclude_path
     _exclude_path="$(IFS=,; printf '%s' "${_excludes[*]}")"

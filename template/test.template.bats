@@ -1,13 +1,13 @@
 #!/usr/bin/env bats
-# test/unit/modules/<NAME>_spec.bats — bats spec for module/<NAME>.module.sh
+# test/unit/module/<NAME>_spec.bats — bats spec for module/<NAME>.module.sh
 #
 # Quick start:
-#   1. cp template/test.template.bats test/unit/modules/<your-name>_spec.bats
+#   1. cp template/test.template.bats test/unit/module/<your-name>_spec.bats
 #   2. Replace every <MODULE-NAME> below with your module name (no quotes).
 #   3. Search for <TODO> markers and fill them in.
 #   4. Run: make test-unit
 #
-# What this template covers (the docs/module-spec.md §7 minimum):
+# What this template covers (the doc/module-spec.md §7 minimum):
 #   - Metadata sanity (NAME / CATEGORY match)
 #   - is_installed reports the right state under stub conditions
 #   - install / remove / purge are no-ops in --dry-run mode
@@ -17,7 +17,7 @@
 # Use bats-mock when you need to intercept apt-get / curl / sudo. Real
 # system-changing calls should never happen inside a unit test.
 
-load "${BATS_TEST_DIRNAME}/../../helpers/common"
+load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
     setup_test_env
@@ -35,7 +35,15 @@ _load_module() {
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
+    source "${LIB_DIR}/module_helpers.sh"
+    # shellcheck disable=SC1091
     source "${MODULE_DIR}/<MODULE-NAME>.module.sh"
+}
+
+# _standalone_module runs the module as a self-contained CLI (the same
+# entry users hit when they type `bash module/<x>.module.sh ...`).
+_standalone_module() {
+    bash "${MODULE_DIR}/<MODULE-NAME>.module.sh" "$@"
 }
 
 # ── Metadata sanity ──────────────────────────────────────────────────────────
@@ -91,7 +99,7 @@ _load_module() {
     is_installed() { return 0; }
     run install
     assert_success
-    # docs/module-spec.md §4.2 lets install() either skip or re-install;
+    # doc/module-spec.md §4.2 lets install() either skip or re-install;
     # most modules log a "already installed" hint we can grep for.
     assert_output --partial "already installed"
 }
@@ -103,6 +111,42 @@ _load_module() {
     is_installed() { return 0; }
     run is_recommended
     assert_failure
+}
+
+# ── Dual-mode standalone ─────────────────────────────────────────────────────
+# These ensure `bash module/<x>.module.sh ...` works as a self-contained CLI.
+# DO NOT delete — they guard against accidentally breaking the standalone
+# entry footer (template/module.template.sh).
+
+@test "standalone: with no args prints usage + exits 2" {
+    run _standalone_module
+    assert_failure 2
+    assert_output --partial "Usage:"
+}
+
+@test "standalone: install --dry-run prints DRY-RUN + exits 0" {
+    run _standalone_module install --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: --version prints NAME + VERSION_PROVIDED" {
+    run _standalone_module --version
+    assert_success
+    assert_output --partial "<MODULE-NAME>"
+}
+
+@test "standalone: --help shows phases" {
+    run _standalone_module --help
+    assert_success
+    assert_output --partial "install"
+    assert_output --partial "remove"
+    assert_output --partial "purge"
+}
+
+@test "standalone: unknown phase returns exit 2" {
+    run _standalone_module nope
+    assert_failure 2
 }
 
 # ── TODO: module-specific behavior ───────────────────────────────────────────

@@ -5,7 +5,7 @@
 # (StrictHostKeyChecking=yes, BatchMode=yes), target string, remote
 # commands. Real ssh end-to-end testing lives in integration (Phase 9).
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

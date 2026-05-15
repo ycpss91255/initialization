@@ -9,7 +9,7 @@
 # Per PRD §11 AC-11 (--dry-run does not write fs) — this file holds the
 # bats assertions backing that.
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lib/registry.sh — module metadata scanner / registry
 #
-# Per docs/architecture.md §5 (Module Dynamic Loading) and docs/module-spec.md.
+# Per doc/architecture.md §5 (Module Dynamic Loading) and doc/module-spec.md.
 #
 # Public API:
 #   registry_load_all [<module-dir>]

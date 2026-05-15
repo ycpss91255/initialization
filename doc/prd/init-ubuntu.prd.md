@@ -4,7 +4,7 @@ version: 0.1.0-draft
 status: draft
 owner: ycpss91255
 created: 2026-05-13
-updated: 2026-05-13
+updated: 2026-05-16
 ---
 
 # PRD: init_ubuntu — Ubuntu 環境初始化工具
@@ -25,7 +25,7 @@ updated: 2026-05-13
 |---|---|---|
 | G1 | 一鍵安裝預設工具集 | `setup_ubuntu install --recommended` 在 Ubuntu 22.04 / 24.04 / **26.04** 乾淨機上 30 分鐘內裝完 |
 | G2 | 環境感知推薦 | 偵測到 NVIDIA GPU / WSL / 容器 / VM / SBC 時自動調整推薦清單 |
-| G3 | 完整生命週期 | 每個 module 都有 `install` / `remove` / `purge` 行為,可重複呼叫(idempotent) |
+| G3 | 完整生命週期 | 每個 module 都有完整 10 個 mandatory lifecycle(`detect` / `is_recommended` / `is_installed` / `install` / `upgrade` / `remove` / `purge` / `verify` / `is_outdated` / `doctor`),全部 idempotent(見 ADR-0002) |
 | G4 | CLI 與 TUI 雙前端共享同一 engine | 兩個前端的行為完全一致 |
 | G5 | 高測試覆蓋率 | 起始 80%,目標 100%,全部在 Docker 內驗證 |
 | G6 | CI/CD 可整合 | GitHub Actions 上 `ubuntu-22.04` / `ubuntu-24.04` / **`ubuntu-26.04`** 矩陣全綠 |
@@ -101,19 +101,19 @@ updated: 2026-05-13
 - Module engine(loader + registry + dispatcher + dependency resolver)
 - 環境偵測引擎(JSON 輸出,含 form_factor 平台分類)
 - 依賴解析(拓樸排序、循環偵測)
-- 狀態追蹤(`~/.local/state/init_ubuntu/state.json`)
-- 日誌(`~/.local/state/init_ubuntu/logs/<ts>.log`)
-- Module 生命週期:`install` / `remove` / `purge` / `is_installed` / `detect` / `is_recommended`
+- 狀態追蹤(`${XDG_STATE_HOME}/init_ubuntu/state.json`)+ per-module Sidecar(`versions/<name>`)
+- 日誌(`${XDG_STATE_HOME}/init_ubuntu/logs/<ts>.jsonl`)
+- Module 生命週期:**全 10 個 mandatory** — `detect` / `is_recommended` / `is_installed` / `install` / `upgrade` / `remove` / `purge` / `verify` / `is_outdated` / `doctor`(ADR-0002)
 - Sudo 偵測 + non-sudo fallback(user-home install,可由 `--install-target` 覆寫)
 - 4 層分類:`base` / `recommended` / `optional` / `experimental`
+- User-local module 區:除了 repo `module/`,Engine 額外掃 `${XDG_CONFIG_HOME}/init_ubuntu/module/`(使用者私有模組,同 NAME 撞名時 user-local 勝)
 
 **CLI subcommands(對標 apt 的常用使用方式)**
-- `install` / `remove` / `purge`
-- `update`(刷新 module 清單與 GitHub release 快取)
-- `upgrade [<m>]`(重裝 latest 版的 module)
+- `install` / `remove` / `purge` / `upgrade` / `verify` / `doctor`
+- `update`(rescan `module/` + 重建 registry,對標 `apt update`)
 - `search <kw>` / `show <m>`
-- `list` / `status` / `detect` / `doctor`
-- `config load`(批次套用 module/config/* 的 dotfile)
+- `list` / `detect`(`list --installed` / `--upgradable` / `--available` / `--json` 都實作;`status` deprecated → `list --installed`)
+- `config get|set|unset|show|load`(讀寫 `${XDG_CONFIG_HOME}/init_ubuntu/config.ini`)
 - `sync <user@host>`(跨機 SSH push/pull,見 §16)
 - `import <file>` / `export <file>`(state 匯出入,**v0.1 就要有**)
 - `--version` / `--help`
@@ -126,9 +126,11 @@ updated: 2026-05-13
 - 安裝完成後仍能用 CLI / TUI 管理(見 §17)
 
 **輸出與 i18n**
-- i18n(en + zh-TW),**對標 `ycpss91255-docker/base` 的 i18n 設計**(`_detect_lang` + `_t` 函式)
+- i18n 支援語系白名單:`{en, zh-TW, zh-CN, ja}`
+- `lib/i18n.sh` 提供 `i18n_detect_lang`(讀 `$LANG`)+ `i18n_sanitize_lang`(typo 驗證,bilingual warning),對標 `ycpss91255-docker/base`
+- Module-level i18n 訊息用 `declare -A`(關聯陣列)宣告 `DESCRIPTION` / `POST_INSTALL_MESSAGE` / `WARN_MESSAGE`;`module_i18n_get <ARR> [lang]` 查表(fallback `en`)
 - ANSI 色彩**自動偵測**(後台 / 非 tty / `NO_COLOR=1` 自動關閉)
-- `--color=auto|always|never`(預設 `auto`)
+- `--color=auto|always|never`(預設 `auto`);`--verbose`/`-v` 設 `LOG_LEVEL=DEBUG`;`--quiet` 設 `LOG_LEVEL=WARN`
 
 **測試 / CI**
 - Docker 內完整測試框架(bats + bats-mock + fishtape + kcov)
@@ -139,13 +141,15 @@ updated: 2026-05-13
 
 ### 5.2 nice-to-have(v0.3 / v1.x)
 
-- **並行安裝**(v0.3+ 啟用):對 non-apt module 用 worker pool;apt 操作仍受 `dpkg` lock 序列化
-- `setup_ubuntu upgrade <module>`(同 apt upgrade,但走各 module 自己的 `install()` 重跑)
-- `setup_ubuntu self-upgrade`(從 GitHub release 拉最新工具)
+- `setup_ubuntu self-upgrade`(從 GitHub release 拉最新工具本身)
+- `setup_ubuntu reinstall <m>`(便利動詞 = `remove` + `install`)
+- `setup_ubuntu autoremove`(清未被 `manual=true` module 依賴的 orphan)
 - Module repository(`setup_ubuntu module add <git-url>`,第三方 module)
 - `setup_ubuntu doctor --fix`(自動修復狀態檔失真)
 - `setup_secrets sync ...`(secrets 跨機,GPG 簽章保護)
 - Sync payload 簽章(防 MITM)
+
+> **並行安裝不做** — v0.1 起始終 sequential。`dpkg` lock 與 sudo 互斥讓 apt module 無法並行;非 apt module 並行收益不足以抵 scheduler 複雜度。`PARALLEL_GROUP` metadata 也已從 module spec 移除。
 
 ### 5.3 未來(v2+)
 
@@ -234,7 +238,7 @@ updated: 2026-05-13
 | `lnav.module.sh` | `module/config/lnav_pkg/` | log navigator | — | logs |
 | `qmk-firmware.module.sh` | `module/setup_qmk_firmware.sh` | QMK 韌體開發環境 | apt-essentials, build-essential | hardware |
 | `anydesk.module.sh` | `module/anydesk.sh` | AnyDesk 遠端桌面 | 有桌面環境 | remote |
-| `gnome-terminal-config.module.sh` | `module/tools/copy_gnome_terminal_config.sh` | gnome-terminal 設定 | 桌面 = GNOME | desktop |
+| `gnome-terminal-config.module.sh` | `module/tool/copy_gnome_terminal_config.sh` | gnome-terminal 設定 | 桌面 = GNOME | desktop |
 
 > TUI 在 §6.3.3 內進一步按 `TAGS[0]` 子分組顯示(`editor` / `filemgr` / `logs` / `hardware` / `remote` / `desktop`)。
 
@@ -242,23 +246,23 @@ updated: 2026-05-13
 
 `experimental` 分類保留,作為未來不穩定 module 的入口。**目前無 module 在此類**(`dual-system-time-sync` / `trash-maintenance` 為一次性腳本,不放 TUI / module pipeline 內,見 §6.5)。
 
-### 6.5 module/tools/* 處理
+### 6.5 module/tool/* 處理
 
-> **v0.1 整個 `module/tools/` 不處理**;一次性腳本(如 `trash.sh`)不放在 TUI 內 / 不模組化。
+> **v0.1 整個 `module/tool/` 不處理**;一次性腳本(如 `trash.sh`)不放在 TUI 內 / 不模組化。
 
 **v0.1 操作**:
-- `module/tools/*` 整個目錄**搬遷到 repo 根目錄**(如 `tools/`),作為臨時存放區
+- `module/tool/*` 整個目錄**搬遷到 repo 根目錄**(如 `tools/`),作為臨時存放區
 - 不進 module catalog、不出現在 TUI、不走 install pipeline
 - 各檔案後續(v0.2+)再個別討論去向
 
 涵蓋的檔案:
-- `module/tools/setup_terminal_font_size.sh`
-- `module/tools/copy_neovim_local_config.sh`
-- `module/tools/copy_gnome_terminal_config.sh`
-- `module/tools/dual_system_time_sync.sh`
-- `module/tools/trash-maintenance.sh`(原規劃 experimental,撤回)
-- `module/tools/ros1/*`
-- `module/tools/remove/*.sh`
+- `module/tool/setup_terminal_font_size.sh`
+- `module/tool/copy_neovim_local_config.sh`
+- `module/tool/copy_gnome_terminal_config.sh`
+- `module/tool/dual_system_time_sync.sh`
+- `module/tool/trash-maintenance.sh`(原規劃 experimental,撤回)
+- `module/tool/ros1/*`
+- `module/tool/remove/*.sh`
 
 ### 6.6 small-tools/ 退場路徑
 
@@ -286,14 +290,15 @@ setup_ubuntu <subcommand> [args] [flags]
 | `install` | `<module>...` | `-y / --yes`、`--dry-run`、`--no-deps`、`--base`、`--recommended`、`--all-base`、`--category=<n>`、`--install-target=auto\|sudo\|user-home`、`--force` | 安裝指定 module(自動帶 dep) | `apt install` |
 | `remove` | `<module>...` | `-y / --yes`、`--dry-run`、`--with-orphans` | 移除 module(保留 config) | `apt remove` |
 | `purge` | `<module>...` | `-y / --yes`、`--dry-run`、`--with-orphans` | 完整移除 module + config | `apt purge` |
-| `update` | — | — | 刷新 module 清單與 GitHub release 版本快取 | `apt update` |
-| `upgrade` | `[<module>...]` | `-y`、`--dry-run` | 重跑各 module `install()` 升級到 latest | `apt upgrade` |
+| `update` | — | — | Rescan `module/` + 重建 registry(對應 apt-aligned「index 重整」,**非**升級) | `apt update` |
+| `upgrade` | `[<module>...]` | `-y`、`--dry-run` | 呼叫各 module `upgrade()` 升級到 latest(不帶名 = 升級所有 `state.json` 已裝) | `apt upgrade` |
+| `verify` | `[<module>...]` | `--dry-run` | 跑 module `verify()` 做裝後驗收(不帶名 = 驗證所有 installed) | — |
 | `search` | `<keyword>` | — | 在 NAME / DESCRIPTION / TAGS 內搜尋 | `apt search` |
 | `show` | `<module>` | — | 印出 module 完整 metadata | `apt show` |
-| `list` | — | `--category=<n>`、`--installed`、`--available`、`--tag=<t>`、`--json` | 列出 module | `apt list` |
-| `status` | `[<module>]` | `--json` | 顯示已裝 module 與版本 | — |
-| `detect` | — | `--json` | 環境偵測結果 | — |
-| `doctor` | — | `--fix`(v1.x) | 健康檢查(state 檔 vs 實況) | — |
+| `list` | — | `--category=<n>`、`--installed`、`--upgradable`、`--available`、`--tag=<t>`、`--json` | 列出 module(`--installed` 取代 `status`) | `apt list` |
+| `status` | `[<module>]` | `--json` | **deprecated**(forward 到 `list --installed`,印 warn 提示) | — |
+| `detect` | — | `--json` | 環境偵測結果(也是 `doctor` 開頭印出的一部分) | — |
+| `doctor` | `[<module>...]` | `--validate-modules`、`--fix`(v1.x) | 不帶名 = 印 env detect + 跑所有 installed 的 `doctor()`;帶名 = 跑該 module;`--validate-modules` 跑 metadata lint | — |
 | `config load` | `[<module>]` | `-y` | 批次套用 module/config/*(對映 module 的 config 部分,不裝主程式) | — |
 | `config set` | `<key>` `<value>` | — | 修改 `~/.config/init_ubuntu/config.ini` 的單一鍵值(取代手動編輯) | — |
 | `config get` | `<key>` | — | 讀取單一鍵值 | — |
@@ -357,14 +362,19 @@ setup_ubuntu config load git-config
 
 | Code | 意義 |
 |---|---|
-| 0 | 成功 |
-| 1 | 一般錯誤 |
-| 2 | 引數錯誤(unknown subcommand / module 名拼錯) |
+| 0 | 成功 / Query 答案=yes |
+| 1 | 一般錯誤 / Query 答案=no |
+| 2 | 引數錯誤(unknown subcommand / module 名拼錯 / **metadata 不合法**) |
 | 3 | 環境不支援(non-Ubuntu / 不支援的 Ubuntu 版本) |
 | 4 | sudo 不可用且 module 不支援 user-home |
-| 5 | 依賴循環 / 依賴解析失敗 |
+| 5 | 依賴循環 / 依賴解析失敗 / **CONFLICTS_WITH 觸發** |
 | 6 | 部分 module 失敗(其他成功) |
-| 7 | sync / SSH 失敗 |
+| 7 | **遠端 / 網路操作失敗**(sync/SSH、GitHub release download、apt repo 不通) |
+
+> Lifecycle 函式分三類使用 exit code:
+> - **Query 類**(`detect` / `is_installed` / `is_recommended` / `is_outdated`):0=yes,1=no
+> - **Action 類**(`install` / `upgrade` / `remove` / `purge`):0=成功,1=一般失敗,3=env 不支援,4=sudo 缺,5=dep 缺(standalone),7=網路
+> - **Diag 類**(`verify` / `doctor`):0=通過,1=不通過,7=網路失敗(如 is_outdated 走網路)
 
 ### 7.5 Global flags
 
@@ -512,72 +522,114 @@ fi
 
 ## 9. Module Contract(完整定義)
 
-> 完整 spec 在 `docs/module-spec.md`。此處為摘要。
+> 完整 spec 在 `doc/module-spec.md`。Author 操作指南在 `doc/guides/module-authoring.md`。此處為摘要。
 
 ### 9.1 Required metadata(放檔頭)
 
 ```bash
 NAME="docker"
 VERSION_PROVIDED="apt-managed"
-DESCRIPTION_EN="Docker Engine + Compose plugin"
-DESCRIPTION_ZH_TW="Docker 容器引擎 + Compose 外掛"
-CATEGORY="recommended"                  # base | recommended | optional | experimental
-TAGS=("container" "devops")             # TAGS[0] 決定 TUI 分組
+CATEGORY="recommended"                   # base | recommended | optional | experimental
+TAGS=("container" "devops")              # TAGS[0] 決定 TUI 分組
+HOMEPAGE="https://docs.docker.com/engine/"
+
+# i18n 用 declare -A(關聯陣列),helper module_i18n_get 查表
+declare -A DESCRIPTION=(
+    [en]="Docker Engine + Compose plugin"
+    [zh-TW]="Docker 容器引擎 + Compose 外掛"
+)
+declare -A POST_INSTALL_MESSAGE=(        # 裝完後 engine 印給使用者(optional)
+    [en]="Run 'newgrp docker' or re-login to use docker without sudo."
+    [zh-TW]="執行 'newgrp docker' 或重新登入以免 sudo 使用 docker。"
+)
+declare -A WARN_MESSAGE=()               # RISK_LEVEL=high 時 install 前顯示(optional)
+
 SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")
 SUPPORTED_PLATFORMS=("desktop" "server" "wsl")
 DEPENDS_ON=("apt-essentials")
 CONFLICTS_WITH=()
-SUPPORTS_USER_HOME=false                # 是否支援 non-sudo 安裝
-RISK_LEVEL="low"                        # low | medium | high
-PARALLEL_GROUP="apt"                    # apt | download | config | custom
+SUPPORTS_USER_HOME=false                 # 是否支援 non-sudo 安裝
+RISK_LEVEL="low"                         # low | medium | high
+REBOOT_REQUIRED=false                    # bool — install 後是否需重開
+INSTALL_TARGET_DEFAULT="sudo"            # sudo | user-home | auto
+TEST_VERIFY_CMD="docker --version"       # verify() 預設執行(idempotent + 快)
 ```
 
-### 9.2 Required functions
+砍除欄位(v0.1 不再用):`DESCRIPTION_EN` / `DESCRIPTION_ZH_TW`(改 `declare -A DESCRIPTION`)、`MAINTAINER`、`RECOVERY_FALLBACK`、`PARALLEL_GROUP`、`INSTALL_TIME_ESTIMATE`、`DISK_SPACE_ESTIMATE`。
+
+### 9.2 Required functions(10 個全 mandatory,ADR-0002)
 
 ```bash
 detect()          # 0 = 此 module 可在當前環境執行
 is_recommended()  # 0 = 在當前環境建議勾選(會看 INIT_UBUNTU_FORM_FACTOR)
 is_installed()    # 0 = 已安裝
 install()         # 安裝(idempotent;會看 INIT_UBUNTU_INSTALL_TARGET)
+upgrade()         # 升級到 latest(idempotent;archetype 預設可用)
 remove()          # 移除(保留 config,idempotent)
 purge()           # 完整移除(含 config,idempotent)
+verify()          # 0 = 裝後驗收通過(預設 = is_installed && TEST_VERIFY_CMD)
+is_outdated()     # 0 = 有新版可裝(GitHub 用 Sidecar 比對;APT 用 `apt list --upgradable`)
+doctor()          # 0 = 健檢通過(預設 = verify;可覆寫加深度檢查)
 ```
 
-### 9.3 Module 範本
+Archetype A/B/C(apt / github-release / config-drop)的 `module_use_*_archetype` macro 一次綁定全部 10 個 lifecycle;只有 archetype D(custom)需作者自寫。覆寫 archetype 預設用 super-call pattern:`install() { module_default_apt_install || return $?; _extra_step; }`。
+
+### 9.3 Module 範本(v2 dual-mode)
 
 ```bash
 #!/usr/bin/env bash
 # module/docker.module.sh
 
-NAME="docker"
-DESCRIPTION_EN="Docker Engine + Compose plugin"
-DESCRIPTION_ZH_TW="Docker 容器引擎 + Compose 外掛"
-CATEGORY="recommended"
-TAGS=("container" "devops")
-SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")
-DEPENDS_ON=("apt-essentials")
-SUPPORTS_USER_HOME=false
+# ── Dual-mode header(standalone vs engine 自動切換)─────────
+MODULE_STANDALONE="true"
+[[ "${BASH_SOURCE[0]}" != "${0}" ]] && MODULE_STANDALONE="false"
+if [[ "${MODULE_STANDALONE}" == "true" ]]; then
+    set -euo pipefail
+    shopt -s inherit_errexit 2>/dev/null || true
+    MODULE_DIR="${MODULE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)}"
+    REPO_ROOT="${REPO_ROOT:-$(cd -- "${MODULE_DIR}/.." && pwd -P)}"
+    LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
+    source "${LIB_DIR}/logger.sh"
+    source "${LIB_DIR}/general.sh"
+    source "${LIB_DIR}/module_helpers.sh"
+fi
 
-detect()         { command -v lsb_release >/dev/null && [[ "$(lsb_release -is)" == "Ubuntu" ]]; }
-is_recommended() { ! is_installed && ! systemd-detect-virt --container --quiet; }
-is_installed()   { dpkg -l docker-ce 2>/dev/null | grep -q '^ii'; }
+# ── Metadata(見 §9.1)──────────────────────────────────────
+NAME="docker"
+VERSION_PROVIDED="apt-managed"
+CATEGORY="recommended"
+declare -A DESCRIPTION=(
+    [en]="Docker Engine + Compose plugin"
+    [zh-TW]="Docker 容器引擎 + Compose 外掛"
+)
+# ... 其餘 metadata 省略
+
+# ── Lifecycle:hand-written(docker 需特殊 apt repo 設定,不套 archetype)──
+APT_PKGS=("docker-ce" "docker-ce-cli" "containerd.io" "docker-buildx-plugin" "docker-compose-plugin")
+
+is_installed() { dpkg -l docker-ce 2>/dev/null | grep -q '^ii'; }
+detect()       { command -v lsb_release >/dev/null && [[ "$(lsb_release -is)" == "Ubuntu" ]]; }
+is_recommended() {
+    is_installed && return 1
+    systemd-detect-virt --container --quiet 2>/dev/null && return 1
+    return 0
+}
 
 install() {
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-    sudo usermod -aG docker "${USER}"
+    module_dryrun_guard install "apt repo setup + apt-install ${APT_PKGS[*]}" && return 0
+    module_skip_if_installed && return 0
+    # ... apt repo 設定 + apt-get install + usermod -aG docker
 }
+# upgrade / remove / purge / verify / is_outdated / doctor 同上 pattern
+# 完整範例見 doc/modules/docker.md
 
-remove() {
-    sudo apt-get remove -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-}
-
-purge() {
-    sudo apt-get purge -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-    sudo rm -rf /var/lib/docker /etc/docker
-    rm -rf "${HOME}/.docker"
-}
+# ── Standalone footer ───────────────────────────────────────
+if [[ "${MODULE_STANDALONE:-false}" == "true" ]]; then
+    module_standalone_main "$@"
+fi
 ```
+
+**Pure archetype 範例(neovim)** 用 `module_use_github_release_archetype` 一行綁定 10 個 lifecycle,作者只填 metadata + GITHUB_REPO/INSTALL_DIR 等資料欄位 + 寫 detect/is_recommended。完整範例見 `doc/guides/archetype-cookbook.md`。
 
 ---
 
@@ -618,6 +670,18 @@ purge() {
 | `installed.<name>.installed_by` | string | 安裝工具版本 |
 | `installed.<name>.manual` | boolean | 是否使用者手動指定(非作為 dep) |
 | `installed.<name>.dependents_of` | string[] | 此 module 是哪些 module 的 dep(用於 `--with-orphans` 判斷) |
+
+#### 10.1.1 Sidecar(per-module 版本記錄)
+
+`${XDG_STATE_HOME:-$HOME/.local/state}/init_ubuntu/versions/<name>` — 一個檔記一個 module 安裝當下的版本字串(`apt-managed` / `v0.10.2` / ...)。
+
+| 欄位 | 結構 |
+|---|---|
+| 內容 | 單行字串(`VERSION_PROVIDED` 的當下值,如 `v0.10.2`) |
+| 用途 | `is_outdated()` 比對「裝的版本 vs upstream latest」(主要 GitHub release archetype) |
+| Engine 寫入 | ✅ install / upgrade 成功時寫 |
+| Standalone 寫入 | ✅ 同上(ADR-0001) — Sidecar 是「裝了什麼版本」的單純事實,跨模式一致 |
+| `state.json` 寫入 | Engine 寫;Standalone **不寫**(ADR-0001) |
 
 ### 10.2 Log
 
@@ -677,8 +741,14 @@ install_target = auto                  # auto | sudo | user-home
 [platform]
 override =                             # 留空為自動;否則填 server / desktop / jetson 等
 
-[modules]
-disabled = ["qmk-firmware"]            # 永遠不推薦這個 module
+[modules.qmk-firmware]
+enabled = false                        # 三態 enabled:Quick Setup / --recommended 過濾時
+                                       #   true  = 強制納入,不管 is_recommended() 結果
+                                       #   false = 強制排除,不管 is_recommended() 結果
+                                       #   未設 = 讓 module 自己的 is_recommended() 決定
+
+[modules.docker]
+enabled = true                         # 強制納入 Quick Setup,即使 is_recommended() 回 1
 
 [secrets]
 backend = auto                         # auto | pass | gnome-keyring | encrypted-file
@@ -713,15 +783,19 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | AC-19 | 寫一個新的 dummy module(<10 行)能被 engine 自動發現並列入 `list` |
 | AC-20 | `setup_secrets ssh-key generate` 互動產 key 不入 shell history |
 | AC-21 | nvidia-driver install 失敗時自動回復 nouveau,系統仍可開機進入桌面 |
+| AC-22 | `setup_ubuntu upgrade neovim` 跑完,Sidecar `${XDG_STATE_HOME}/init_ubuntu/versions/neovim` 內版本與 GitHub release latest 對齊 |
+| AC-23 | `bash module/docker.module.sh install --dry-run` 跑完,Sidecar 寫入正確(Standalone 模式)但 `state.json` 完全沒變(ADR-0001) |
+| AC-24 | `setup_ubuntu doctor` 印出 env detect 結果 + 所有 installed module 的 `doctor()` 結果;`--validate-modules` flag 額外驗證每個 module 的 metadata 合法 |
+| AC-25 | 全 10 個 lifecycle 函式對每個 module 都能跑(`bash module/<m>.module.sh <phase>` 都 exit 0 或預期 Query-no 的 exit 1,絕無「not implemented」exit 2) |
 
 ### 11.2 v1.0 — 額外要求
 
 | ID | 條件 |
 |---|---|
-| AC-22 | 覆蓋率 100% |
-| AC-23 | `small-tools/` 已移除,README 內保留歷史說明 |
-| AC-24 | `.adoc` 全部換為 `.md` |
-| AC-25 | i18n en + zh-TW 全覆蓋(無 untranslated string) |
+| AC-26 | 覆蓋率 100% |
+| AC-27 | `small-tools/` 已移除,README 內保留歷史說明 |
+| AC-28 | `.adoc` 全部換為 `.md` |
+| AC-29 | i18n 全覆蓋(en + zh-TW + zh-CN + ja 四種語系皆無 untranslated 字串) |
 
 ---
 
@@ -729,22 +803,22 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 
 | Milestone | Plan | Status |
 |---|---|---|
-| M0 - Discovery | `.claude/prds/init-ubuntu.prd.md` + `docs/architecture.md` + `docs/module-spec.md` | in-progress |
-| M1 - Test harness | 借用 base 的 `Dockerfile.test-tools` + 客製 + `Makefile` + `script/ci/ci.sh` | pending |
-| M2 - Engine core | `lib/dispatcher.sh` + `lib/registry.sh` + `lib/runner.sh` + 1 reference module(`docker`) | pending |
-| M3 - Detect engine | `lib/detect.sh` + `lib/platform.sh` + `setup_ubuntu detect` | pending |
-| M4 - State + log | `lib/state.sh` + `lib/state_io.sh` + `lib/log.sh` | pending |
-| M5 - CLI | `setup_ubuntu.sh` 所有 subcommand(含 update/upgrade/search/show/import/export) | pending |
-| M6 - TUI | `setup_ubuntu_tui.sh` + `lib/tui_backend.sh`(含 tag 分組) | pending |
-| M7 - Module migration | 將現有 ~15 module 改寫為新介面(neovim 拆 dep) | pending |
-| M8 - i18n + color | `lib/i18n.sh` + `lib/color.sh`(對標 base) | pending |
-| M9 - Sync + Secrets | `lib/sync.sh` + `setup_secrets.sh` | pending |
-| M10 - Unit tests 80% | bats + bats-mock + fishtape | pending |
+| M0 - Discovery | `doc/prd/` + `doc/architecture.md` + `doc/module-spec.md` + `CONTEXT.md` + `doc/adr/` | **completed** |
+| M1 - Test harness | 借用 base 的 `Dockerfile.test-tools` + `Makefile` + `script/ci/ci.sh`(bats + bats-assert + bats-mock) | **completed** |
+| M2 - Engine core | `lib/dispatcher.sh` + `lib/registry.sh` + `lib/runner.sh` + `lib/resolver.sh` + `lib/module_helpers.sh` + 10 v2 modules | **completed** |
+| M3 - Detect engine | `lib/detect.sh` + `lib/platform.sh` + `setup_ubuntu detect` | **completed** |
+| M4 - State + log | `lib/state.sh` + `lib/state_io.sh` + `lib/logger.sh`(JSONL)+ flock concurrency | **completed** |
+| M5 - CLI(部分) | `setup_ubuntu.sh` subcommands;待補 `upgrade` / `verify` / `doctor` 入口 + `list` 各 flag 實作 + `--verbose/--quiet/--color` wire | **in-progress** |
+| M6 - TUI | `setup_ubuntu_tui.sh` + `lib/tui_backend.sh`(含 tag 分組 / Quick Setup 多 step) | pending |
+| M7 - Module migration | Batch A(10 個 v2 module + helpers + template)完成;待 Batch B(cli-essentials 8 個)/ Batch C(agent + 其他 optional 11 個) | **in-progress** |
+| M8 - i18n + color | `lib/i18n.sh`(`i18n_detect_lang` / `i18n_sanitize_lang`,對標 base)+ `lib/color.sh`;module 用 `declare -A` + `module_i18n_get` | pending |
+| M9 - Sync + Secrets | `lib/sync.sh`(SSH push/pull)+ `setup_secrets.sh`(SSH key / GPG / token) | partial(sync 完成,secrets pending) |
+| M10 - Unit tests 80% | 239 + 8 modules × ~50 tests ≈ 600+ unit tests(per-module CI layer support) | **in-progress**(239/239 綠) |
 | M11 - Integration tests | `ubuntu:22.04` + `ubuntu:24.04` + `ubuntu:26.04` 矩陣 | pending |
 | M12 - Coverage + CI | kcov + GitHub Actions | pending |
 | M13 - Code review | code-reviewer x 2 + security-reviewer 並行 | pending |
-| M14 - Docs + .adoc->.md | README 改寫,docs/ 補齊 | pending |
-| M15 - Post-install management 驗收 | 確認裝完後 CLI + TUI 仍可管理(install / remove / sync / status) | pending |
+| M14 - Docs + .adoc->.md | `doc/guides/` 4 篇手寫 + `doc/modules/` 自動 INDEX + per-module 文件;README 改寫 | pending |
+| M15 - Post-install management 驗收 | 確認裝完後 CLI + TUI 仍可管理(install / upgrade / remove / verify / doctor / sync) | pending |
 | M16 - Coverage 100% | 後續迭代 | pending |
 
 ---
@@ -761,18 +835,48 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | Q6 | `module/config/` 內的 config 檔該怎麼套用? | 每個有對應的 `<name>-config.module.sh` 含 install / remove;**另加 subcommand `config load`** 做批次套用 |
 | Q7 | `experimental` 分類是否保留? | **保留**作為未來不穩定 module 入口;但 `dual-system-time-sync` 不該放這層,後續重新分類 |
 | Q8 | 是否要在 v0.1 就支援 import / export state? | **v0.1 就要有**(已從 nice-to-have 提前到必備) |
-| Q9 | `setup_ubuntu install --recommended` 是否包含 `nvidia-driver`? | **可包含**,但需使用者 dual-check 確認;若是 CI 測試或偵測到會改 kernel module,**install 失敗時必須自動回復**到可開機狀態(`RISK_LEVEL=high` + `RECOVERY_FALLBACK=nouveau`) |
+| Q9 | `setup_ubuntu install --recommended` 是否包含 `nvidia-driver`? | **可包含**,但需使用者 dual-check 確認(`RISK_LEVEL=high` 觸發 `WARN_MESSAGE` 顯示在 install 之前);failure recovery 透過 `POST_INSTALL_MESSAGE` 提示使用者手動切回 nouveau,**v0.1 不自動回滾**(複雜度過高,v1.x 評估;見 §13.2 Q22 metadata 收斂) |
 | Q10 | `purge` 是否要連 dep 一起 purge? | **不要**;純 purge 自己。要清 dep 用 `--with-orphans`(只清沒被其他 module 依賴的 dep) |
 | Q11 | Module 檔名 kebab-case 還是 snake_case? | **kebab-case** |
 | Q12 | 是否要支援 `setup_ubuntu rollback`? | **v0.1 不做**,v1.x 評估 |
 
-> 設計細節層次的決定(parallel 預設、sync 簽章、secrets backend 選擇、平台 allowlist 策略、高風險 module snapshot 範圍、non-sudo 模式 apt-essentials 處理)收斂進 `docs/architecture.md` §18 開放問題與決定。
+> 設計細節層次的決定(parallel 預設、sync 簽章、secrets backend 選擇、平台 allowlist 策略、高風險 module snapshot 範圍、non-sudo 模式 apt-essentials 處理)收斂進 `doc/architecture.md` §18 開放問題與決定。
+
+### 13.2 v2 contract 細則決議(2026-05 grilling)
+
+| # | Question | **決定** |
+|---|---|---|
+| Q13 | Engine 是否補 `upgrade` / `verify` / `doctor` 入口? | **補**;state.json 在 upgrade 成功時 bump version + timestamp(同 install) |
+| Q14 | `setup_ubuntu doctor` 不帶名語意? | 印 env detect + 跑所有 `installed=true` 的 `doctor()`;`--validate-modules` flag 跑 metadata lint |
+| Q15 | install→verify 是否自動跑? | **自動跑**;verify 失敗 → log warn 但 state.json 照記 installed(module 自己 log,terminal 直接看得到) |
+| Q16 | `setup_ubuntu update` 不帶參? | rescan registry(對應 `apt update`,不是升級) |
+| Q17 | `purge` mandatory? | **是**;後升級為 10 個 lifecycle 全 mandatory(ADR-0002) |
+| Q18 | `is_outdated` / `doctor` mandatory? | **是**(同 Q17,全 10 mandatory) |
+| Q19 | GitHub release `is_outdated` 如何判? | 用 Sidecar(`${XDG_STATE_HOME}/init_ubuntu/versions/<name>`)記安裝版本,跟 GitHub API latest 比對 |
+| Q20 | `doctor` 預設行為? | delegate `verify`(後宣告者勝可覆寫加深度檢查) |
+| Q21 | CLI 對標 apt 整理範圍? | rename lifecycle `update()` → `upgrade()`;`status` deprecate 到 `list --installed`;`detect` 保留並整合進 `doctor` 開頭 |
+| Q22 | Metadata 欄位收斂? | 砍 5(`MAINTAINER` / `RECOVERY_FALLBACK` / `PARALLEL_GROUP` / `INSTALL_TIME_ESTIMATE` / `DISK_SPACE_ESTIMATE`),留 4 forward-compat(`INSTALL_TARGET_DEFAULT` / `SUPPORTED_PLATFORMS` / `SUPPORTS_USER_HOME` / `RISK_LEVEL`) |
+| Q23 | i18n 儲存格式? | `declare -A` 關聯陣列;新增 `lib/i18n.sh`(`i18n_detect_lang` / `i18n_sanitize_lang`,對標 base);白名單 `{en, zh-TW, zh-CN, ja}` |
+| Q24 | Template 結構? | 拆 4 檔:`module-apt` / `module-github-release` / `module-config` / `module-custom`,各對應一個 archetype;共有 header 用 hash spec 比對防漂移 |
+| Q25 | `TEST_VERIFY_CMD` 安全性? | personal-use 信任 metadata 寫死,用 `bash -c` 直接跑(無防注入) |
+| Q26 | Sidecar 位置? | `${XDG_STATE_HOME}/init_ubuntu/versions/<name>`(跟 `state.json` 同層,XDG-正解) |
+| Q27 | Archetype 覆寫慣例? | super-call pattern:macro 後重寫函式,內部先呼叫 `module_default_*_<phase>` 再加 extra |
+| Q28 | Standalone vs Engine 狀態分界? | Standalone 寫 Sidecar + 印 messages,**不**寫 `state.json` / 不解 DEPENDS_ON(ADR-0001) |
+| Q29 | bats spec 範圍? | 每 module ~50 tests(smoke / metadata / 10 lifecycle dry-run / no-side-fx / idempotency / standalone CLI / module 特化);CI 之後切 per-module layer |
+| Q30 | Exit code 設計? | 沿用 PRD §7.4;code 2 擴語意「metadata 不合法」,code 7 擴語意「任何遠端/網路操作失敗」 |
+| Q31 | APT `is_outdated` 實作? | `apt list --upgradable | grep "^pkg/"` 對每個 `APT_PKGS` 檢查;不主動 `apt update`,把 freshness 責任推給使用者 |
+| Q32 | `CONFLICTS_WITH` 檢查時機? | install + upgrade 兩處都檢查;觸發時 exit 5 |
+| Q33 | Module cwd 規範? | 只准 subshell `(cd ...; cmd)`,禁 `cd` / `pushd` |
+| Q34 | Parallel install? | **不做**;`dpkg` lock + sudo 互斥讓 apt 不可並行;非 apt 並行收益不足 |
+| Q35 | User-local module 區? | Engine 額外掃 `${XDG_CONFIG_HOME}/init_ubuntu/module/`,撞名時 user-local 勝(log_warn 提示) |
+| Q36 | Module 「disable / 強制裝」機制? | `[modules.<name>] enabled = true|false|未設` 三態;影響 Quick Setup / `--recommended` 過濾 |
+| Q37 | 文件分層? | `doc/guides/` 4 篇手寫 + `doc/modules/INDEX.md` 自動生成 + 每 module 一個 `doc/modules/<name>.md` 寫架構流程 |
 
 ---
 
 ## 14. Sensitive Tools sub-tool [N4]
 
-> 完整設計見 `docs/architecture.md` §15。
+> 完整設計見 `doc/architecture.md` §15。
 
 ### 14.1 範疇
 
@@ -813,7 +917,7 @@ setup_secrets remove <name>
 
 ## 15. Multi-Platform Support [N9]
 
-> 完整設計見 `docs/architecture.md` §14。
+> 完整設計見 `doc/architecture.md` §14。
 
 ### 15.1 支援的 form factor
 
@@ -835,13 +939,13 @@ setup_secrets remove <name>
 
 ### 15.3 Module 平台支援宣告
 
-Module metadata 加 `SUPPORTED_PLATFORMS`(string[],見 `docs/module-spec.md` §3.3):
+Module metadata 加 `SUPPORTED_PLATFORMS`(string[],見 `doc/module-spec.md` §3.3):
 
 ```bash
 SUPPORTED_PLATFORMS=("desktop" "server")    # 不支援 SBC
 ```
 
-不在 allowlist 的平台:`is_recommended()` 永遠 false,但允許 `--force` 強裝。
+不在 allowlist 的平台:engine 在 Quick Setup / `--recommended` 過濾時**先**檢查 `SUPPORTED_PLATFORMS` ⊇ 當前 `INIT_UBUNTU_FORM_FACTOR`,平台不合就排除(不再 call `is_recommended()`);**再**對通過平台檢查的 module 看 `[modules.<name>] enabled` 三態(Q36),最後對「未設 enabled」的 module call `is_recommended()`。`--force` 可跨過全部過濾強裝。
 
 ### 15.4 平台差異化的 module 範例
 
@@ -856,7 +960,7 @@ SUPPORTED_PLATFORMS=("desktop" "server")    # 不支援 SBC
 
 ## 16. Sync 機制 [N8]
 
-> 完整設計見 `docs/architecture.md` §16。
+> 完整設計見 `doc/architecture.md` §16。
 
 ### 16.1 目標
 
@@ -904,10 +1008,13 @@ setup_ubuntu sync <user@host> --pull
 
 ```bash
 setup_ubuntu list --installed         # 看裝了什麼
+setup_ubuntu list --upgradable        # 看哪些有新版
 setup_ubuntu install eza              # 隨時新增
+setup_ubuntu upgrade neovim           # 升級單一 module
 setup_ubuntu purge nvidia-driver -y   # 隨時移除
 setup_ubuntu sync user@laptop         # 推到別台
-setup_ubuntu doctor                   # 健康檢查
+setup_ubuntu verify docker            # 檢查裝得對不對
+setup_ubuntu doctor                   # 健康檢查(env detect + 所有 module doctor)
 setup_ubuntu_tui                      # 互動式管理
 ```
 
@@ -949,17 +1056,17 @@ setup_ubuntu_tui                      # 互動式管理
 | `module/function/logger.sh` | `lib/logger.sh` | 整理(可能拆 file logging 出去) |
 | `module/function/general.sh` | `lib/general.sh` + `lib/detect.sh` + `lib/platform.sh` | 拆分(平台分類抽到獨立檔) |
 | `module/function/test/test_*.sh` | `test/unit/logger_spec.bats` 與 `general_spec.bats` | 重寫為 bats |
-| `module/tools/*`(整個目錄) | **搬遷到 repo 根目錄 `tools/`** | v0.1 不處理,僅搬遷;v0.2+ 個別決定 |
-| └ `module/tools/remove/*.sh` | (隨上面整個目錄搬遷) | v0.1 不處理(改寫 remove/purge 邏輯延後) |
-| └ `module/tools/trash-maintenance.sh` | (隨上面搬遷) | **不放 module pipeline / 不放 TUI**(一次性腳本) |
-| └ `module/tools/setup_terminal_font_size.sh` | (隨上面搬遷) | v0.1 不處理 |
-| └ `module/tools/dual_system_time_sync.sh` | (隨上面搬遷) | v0.1 不處理 |
-| └ `module/tools/copy_*.sh` | (隨上面搬遷) | v0.1 不處理 |
-| └ `module/tools/ros1/*` | (隨上面搬遷) | v0.1 不處理 |
+| `module/tool/*`(整個目錄) | **搬遷到 repo 根目錄 `tools/`** | v0.1 不處理,僅搬遷;v0.2+ 個別決定 |
+| └ `module/tool/remove/*.sh` | (隨上面整個目錄搬遷) | v0.1 不處理(改寫 remove/purge 邏輯延後) |
+| └ `module/tool/trash-maintenance.sh` | (隨上面搬遷) | **不放 module pipeline / 不放 TUI**(一次性腳本) |
+| └ `module/tool/setup_terminal_font_size.sh` | (隨上面搬遷) | v0.1 不處理 |
+| └ `module/tool/dual_system_time_sync.sh` | (隨上面搬遷) | v0.1 不處理 |
+| └ `module/tool/copy_*.sh` | (隨上面搬遷) | v0.1 不處理 |
+| └ `module/tool/ros1/*` | (隨上面搬遷) | v0.1 不處理 |
 | `module/config/*` | 不動 — 由各對應 module 引用 | 保留 |
 | `template/*_tmp.sh` | `template/module.template.sh` + `template/test.template.bats` | 改寫為新契約模板 |
 | `small-tools/*` | v0.5 移除,內容已分散到對應 module | deprecation 路徑 |
-| `gh-upgrade-README.md` | 評估歸入 `docs/` 或保留 | 評估 |
+| `gh-upgrade-README.md` | 評估歸入 `doc/` 或保留 | 評估 |
 | `install-nvidia-driver.sh` | 與 `module/nvidia-driver.module.sh` 整合 | 整合 |
 | `run_claude.sh` | 不動 | 保留 |
 | `*.adoc` | `*.md`(rewrite,不只是改副檔名) | 全改 |

@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# test/unit/modules/docker_spec.bats — module/docker.module.sh
+# test/unit/module/docker_spec.bats — module/docker.module.sh
 
-load "${BATS_TEST_DIRNAME}/../../helpers/common"
+load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
     setup_test_env
@@ -19,6 +19,8 @@ _load_module() {
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
+    source "${LIB_DIR}/module_helpers.sh"
+    # shellcheck disable=SC1091
     source "${MODULE_DIR}/docker.module.sh"
 }
 
@@ -27,6 +29,15 @@ _load_module() {
 @test "docker module declares NAME=docker" {
     _load_module
     [[ "${NAME}" == "docker" ]]
+}
+
+@test "docker DESCRIPTION is associative and module_get_description returns text" {
+    _load_module
+    # Must be associative — `declare -A` (possibly with -g flag).
+    local _decl; _decl="$(declare -p DESCRIPTION 2>/dev/null)"
+    [[ "${_decl}" == 'declare -'*A* ]]
+    [[ "$(module_get_description en)" == "Docker Engine + Compose plugin" ]]
+    [[ "$(module_get_description zh-TW)" == "Docker 容器引擎 + Compose 外掛" ]]
 }
 
 @test "docker module CATEGORY=recommended" {

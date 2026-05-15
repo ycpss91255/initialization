@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lib/platform.sh — derive form_factor from lib/detect.sh output
 #
-# Per docs/architecture.md §14. Reads the JSON environment description
+# Per doc/architecture.md §14. Reads the JSON environment description
 # produced by detect_environment() and returns a single form_factor token:
 #
 #   desktop / server / rpi-4 / rpi-5 / jetson-orin / wsl / container / vm

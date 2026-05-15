@@ -4,7 +4,7 @@ set -euo pipefail
 shopt -s inherit_errexit &>/dev/null || true
 
 
-# NOTE: https://github.com/sxyazi/yazi/releases/tag/v26.1.22
+# NOTE: https://github.com/sxyazi/yazi/releases
 # https://github.com/hankertrix/bluloco-yazi/tree/main/bluloco-dark.yazi
 # https://yazi-rs.github.io/docs/configuration/yazi/
 # https://github.com/yazi-rs/plugins/tree/main/smart-enter.yazi
@@ -56,14 +56,19 @@ fi
 function install_yazi() {
     local _github_repo="${1:?"${FUNCNAME[0]}: missing github repo"}"
     local _bin_file="${2:?"${FUNCNAME[0]}: missing bin name"}"
-    local _strip_components="${3:-0}"
 
     local _pkg_name="${_github_repo##*/}"
     local _install_dir="/opt/${_pkg_name}"
-    local _tmp_file="" _latest_version="" _install_version="" _repo_url="" _download_file="" _no_download="false"
+    local _tmp_file="" _latest_version="" _install_version="" _repo_url="" _download_file="" _archive_base="" _no_download="false"
+
+    # ensure unzip is available (yazi releases ship as .zip)
+    if ! command -v unzip &>/dev/null; then
+        log_fatal "'unzip' is required to install ${_pkg_name} but was not found in PATH."
+        return 1
+    fi
 
     # create temp file
-    create_temp_file _tmp_file "${_pkg_name}" ".tar.gz"
+    create_temp_file _tmp_file "${_pkg_name}" ".zip"
 
     # get latest version from Github
     get_github_pkg_latest_version _latest_version "${_github_repo}"
@@ -85,26 +90,33 @@ function install_yazi() {
             sudo rm -rf "${_install_dir}"
         fi
 
-        _download_file="${_pkg_name}-v${_latest_version}-x86_64-unknown-linux-gnu.tar.gz"
+        # yazi release assets are version-less and zip-formatted:
+        #   yazi-x86_64-unknown-linux-gnu.zip
+        # which extracts to a single top-level dir of the same base name.
+        _archive_base="${_pkg_name}-x86_64-unknown-linux-gnu"
+        _download_file="${_archive_base}.zip"
         _repo_url="https://github.com/${_github_repo}/releases/latest/download/${_download_file}"
 
         log_info "Download ${_pkg_name} v${_latest_version} from ${_repo_url}"
         exec_cmd "curl -fsSL --retry 3 -o \"${_tmp_file}\" \"${_repo_url}\""
 
         # verify download file
-        if ! file "${_tmp_file}" | grep -q "gzip compressed data"; then
-            log_fatal "Downloaded file ${_tmp_file} is not a valid gzip file."
+        if ! file "${_tmp_file}" | grep -q "Zip archive data"; then
+            log_fatal "Downloaded file ${_tmp_file} is not a valid zip file."
             return 1
         fi
-        if ! sudo tar -tzf "${_tmp_file}" &>/dev/null; then
-            log_fatal "Downloaded file ${_tmp_file} is not a valid tar.gz archive."
+        if ! unzip -tq "${_tmp_file}" &>/dev/null; then
+            log_fatal "Downloaded file ${_tmp_file} is not a valid zip archive."
             return 1
         fi
 
         # install package
+        # unzip into _install_dir, then flatten the single top-level dir
+        # (equivalent to tar's --strip-components=1)
         log_info "Install ${_pkg_name} v${_latest_version} to ${_install_dir}"
         exec_cmd "sudo mkdir -p -- \"${_install_dir}\" &&\
-            sudo tar -xzf \"${_tmp_file}\" -C \"${_install_dir}\" --strip-components=${_strip_components}"
+            sudo unzip -q -o \"${_tmp_file}\" -d \"${_install_dir}\" &&\
+            sudo sh -c \"mv '${_install_dir}/${_archive_base}'/* '${_install_dir}/' && rmdir '${_install_dir}/${_archive_base}'\""
         exec_cmd "sudo ln -sfn -- \"${_install_dir}/${_bin_file}\" \"/usr/local/bin/${_bin_file}\""
 
         _install_version="${_latest_version}"
@@ -126,4 +138,4 @@ function install_yazi() {
     log_info "Installed ${_pkg_name} v${_install_version} to ${_install_dir}, run alias: ${_bin_file}"
 }
 
-install_yazi "sxyazi/yazi" "yazi" "1"
+install_yazi "sxyazi/yazi" "yazi"

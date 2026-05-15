@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # test/unit/resolver_spec.bats — lib/resolver.sh (Kahn topo sort + cycle detect)
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

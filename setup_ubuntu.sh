@@ -35,6 +35,8 @@ source "${LIB_DIR}/logger.sh"
 # shellcheck disable=SC1091
 source "${LIB_DIR}/general.sh"
 # shellcheck disable=SC1091
+source "${LIB_DIR}/i18n.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/detect.sh"
 # shellcheck disable=SC1091
 source "${LIB_DIR}/platform.sh"
@@ -63,6 +65,9 @@ platform_export_env || true
 # ── Initialize state.json + config.ini (both idempotent) ──────────────────
 state_init || true
 config_init || true
+
+# ── Resolve INIT_UBUNTU_LANG (env > config.ini > auto-detect from $LANG) ────
+i18n_resolve_init_ubuntu_lang
 
 # ── Load module registry (silent on missing module/ dir) ─────────────────────
 registry_load_all "${MODULE_DIR}" || true

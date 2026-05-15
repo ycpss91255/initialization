@@ -6,7 +6,7 @@
 # get_github_pkg_latest_version land in Phase 7 (module migration), when
 # we also split out lib/detect.sh / lib/platform.sh / lib/install_target.sh.
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

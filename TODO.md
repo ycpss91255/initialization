@@ -54,7 +54,7 @@
 
 改為寫一支雙向 sync 腳本處理：
 
-- [] `module/tools/sync_config.sh`
+- [] `module/tool/sync_config.sh`
   - [] `--check` / `status`：掃描 `module/config/` 下所有受管檔案，比對 local 對應路徑，列出 diff（identical / local-newer / repo-newer / missing）
   - [] `--pull`：local → repo（把 local 修改抓回 repo，給 commit 用）
   - [] `--push`：repo → local（把 repo 版本套到 local，給新機器或還原用）
@@ -176,7 +176,7 @@ ExecStart=/usr/bin/gnome-keyring-daemon --foreground --components=secrets --cont
 `rm` 在 fish 走 `trash-put`（`module/config/fish/functions/rm.fish`），垃圾桶 trash-cli 沒有原生容量上限，需要靠排程清理。
 
 ### 維護腳本
-`module/tools/trash-maintenance.sh`：
+`module/tool/trash-maintenance.sh`：
 1. `trash-empty -f $MAX_DAYS` 砍掉超過 N 天的項目
 2. 若 `~/.local/share/Trash/files` 仍超過 `$MAX_GB`，從 `info/*.trashinfo` 的 mtime 最舊的開始砍直到低於上限
 3. 預設 `MAX_DAYS=90`、`MAX_GB=50`，可用環境變數覆蓋
@@ -224,7 +224,7 @@ cp module/config/fish/functions/rm.fish ~/.config/fish/functions/
 
 # 3. 部署維護腳本（headless 機器用 copy；有 repo 的機器可 symlink）
 mkdir -p ~/.local/bin ~/.local/state
-cp module/tools/trash-maintenance.sh ~/.local/bin/
+cp module/tool/trash-maintenance.sh ~/.local/bin/
 chmod +x ~/.local/bin/trash-maintenance.sh
 
 # 4. 安裝 crontab

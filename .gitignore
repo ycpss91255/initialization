@@ -14,7 +14,17 @@ module/config/fish/completions/*
 module/config/fish/fish_history
 module/config/fish/fish_variables*
 
- CLAUDE.md
-.claude
-.agents
+# Claude Code local-only settings (machine-specific permission allow-list).
+# Project-wide config (hooks, enabled plugins) lives in tracked .claude/settings.json.
+.claude/settings.local.json
+.claude/cache/
+
+# Claude Code session state: ignore everything under projects/ EXCEPT memory/.
+# JSONL transcripts and session sidecar dirs are large + contain privacy data.
+.claude/projects/*
+!.claude/projects/memory/
+!.claude/projects/memory/**
+
+# Other agent CLIs' local state
+.agents/
 skills-lock.json

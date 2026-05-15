@@ -2,7 +2,7 @@
 # shellcheck disable=SC2034  # module metadata vars (NAME / DESCRIPTION / CATEGORY / TAGS / ...) consumed by engine post-source — https://www.shellcheck.net/wiki/SC2034
 # modules/<NAME>.module.sh — <one-line summary>  [archetype: config]
 #
-# Authoring guide (docs/module-spec.md §3, §4; cookbook: docs/guide/archetype-cookbook.md):
+# Authoring guide (docs/module-spec.md §3, §4; cookbook: docs/guides/archetype-cookbook.md):
 #   1. cp templates/module-config.template.sh modules/<your-name>.module.sh
 #   2. Fill metadata (NAME / DESCRIPTION / CATEGORY / DEPENDS_ON / ...).
 #   3. Fill CONFIG_TEMPLATE_SRC / CONFIG_DEST in the archetype block below.
@@ -129,7 +129,7 @@ is_recommended() {
 
 # is_outdated: OPTIONAL. 0 = newer version available. Engine uses this for
 # `setup_ubuntu status <m>` and to decide whether `upgrade` actually does work.
-# See docs/guide/archetype-cookbook.md for archetype-specific examples.
+# See docs/guides/archetype-cookbook.md for archetype-specific examples.
 # is_outdated() {
 #     return 1
 # }

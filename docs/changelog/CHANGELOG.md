@@ -119,6 +119,37 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   status / source-mode / no-side-effects) across all 4 archetypes.
 - Test count: 255 → 267 (8 new archetype-iterating smoke + 11 consistency).
 
+#### Release workflow — port from docker_harness#22 + #106 (commit 1b40cfb)
+
+Alignment with `ycpss91255-docker/docker_harness` release infrastructure:
+
+- `.claude/scripts/release-tag.sh` — canonical primitive for cutting
+  version tags. Decision tree: RC tag short-circuits; `Z>0` patch
+  short-circuits; `Y` bump requires passing `vX.Y.0-rcN` CI; `X` bump
+  also requires `RELEASE_X_BUMP_ACK=<tag>`. Verifies `.version`
+  literal matches the tag.
+- `.claude/skills/semver-bump/SKILL.md` — agent-facing companion.
+- `.claude/hooks/enforce_semver_tag_via_script.sh` — DENIES ad-hoc
+  `git tag v*` / `git push origin v*` / `git push --tags`; forces
+  callers through `release-tag.sh`.
+- `.claude/hooks/check_main_fresh_before_worktree.sh` — BLOCKs
+  `git worktree add ... main` when local main is behind origin/main.
+- `.claude/hooks/remind_main_sync.sh` — non-blocking reminder on
+  `gh pr merge` to `git pull --ff-only origin main` after merge.
+- `.claude/hooks/check_changelog_drift.sh` — non-blocking reminder when
+  `git commit` stages non-doc code without a CHANGELOG entry.
+- `.claude/hooks/enforce_gh_body_file.sh` — enforces `--body-file`
+  convention on `gh issue/pr create/comment` (docker_harness
+  gh-artifact-format skill rules 1-8).
+- `.claude/hooks/enforce_gh_english.sh` — **new (not in docker_harness)**:
+  DENIES `gh issue/pr create/comment` whose title / body contains CJK
+  characters. Project rule: GitHub interaction is English-only.
+- `docs/processes/release.md` — release workflow documentation.
+- `docs/processes/worktree.md` — already in [Unreleased] under Phase 1
+  (commit 6e840d1).
+- `.version` — `v0.0.0` baseline (commit 6e840d1).
+- All 7 hooks registered in `.claude/settings.json`.
+
 ### Changed
 
 - **Folder naming reverted to plural-for-collections + singular-for-concepts**

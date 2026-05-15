@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/module_helpers.sh — Reusable lifecycle helpers + i18n + archetype macros.
+# lib/module_helper.sh — Reusable lifecycle helpers + i18n + archetype macros.
 #
 # Module authors declare DATA (APT_PKGS / GITHUB_REPO / CONFIG_DEST / ...) and
 # call ONE archetype macro (module_use_apt_archetype etc.) to wire up all
@@ -77,8 +77,11 @@ module_skip_if_not_installed() {
 #   CONFIG_PATHS  string[]  (optional, dirs to rm on purge)
 
 module_default_apt_is_installed() {
+    # ${#APT_PKGS[@]:-0} is a bad-substitution under strict mode (set -u);
+    # use declare -p to check the array is declared, then count elements.
+    declare -p APT_PKGS >/dev/null 2>&1 || return 1
+    [[ "${#APT_PKGS[@]}" -gt 0 ]] || return 1
     local _p
-    [[ "${#APT_PKGS[@]:-0}" -gt 0 ]] || return 1
     for _p in "${APT_PKGS[@]}"; do
         [[ -n "${_p}" ]] || continue
         dpkg -l "${_p}" 2>/dev/null | grep -q '^ii' || return 1
@@ -110,8 +113,8 @@ module_default_apt_install() {
     sudo apt-get install -y --no-install-recommends "${APT_PKGS[@]}"
 }
 
-module_default_apt_update() {
-    module_dryrun_guard update "apt-install --only-upgrade ${APT_PKGS[*]:-}" && return 0
+module_default_apt_upgrade() {
+    module_dryrun_guard upgrade "apt-install --only-upgrade ${APT_PKGS[*]:-}" && return 0
     if ! is_installed 2>/dev/null; then
         log_info "[${NAME}] not installed yet — running install instead"
         install
@@ -157,7 +160,7 @@ module_default_verify() {
 module_use_apt_archetype() {
     is_installed() { module_default_apt_is_installed "$@"; }
     install()      { module_default_apt_install "$@"; }
-    update()       { module_default_apt_update "$@"; }
+    upgrade()       { module_default_apt_upgrade "$@"; }
     remove()       { module_default_apt_remove "$@"; }
     purge()        { module_default_apt_purge "$@"; }
     verify()       { module_default_verify "$@"; }
@@ -239,8 +242,8 @@ module_default_github_release_install() {
     _module_github_release_fetch_and_install
 }
 
-module_default_github_release_update() {
-    module_dryrun_guard update "force re-download ${GITHUB_REPO:-?} latest" && return 0
+module_default_github_release_upgrade() {
+    module_dryrun_guard upgrade "force re-download ${GITHUB_REPO:-?} latest" && return 0
     # GitHub releases: easiest "update" is a fresh download (latest URL
     # always points to newest). Skip the is_installed guard.
     _module_github_release_fetch_and_install
@@ -270,7 +273,7 @@ module_default_github_release_purge() {
 module_use_github_release_archetype() {
     is_installed() { module_default_github_release_is_installed "$@"; }
     install()      { module_default_github_release_install "$@"; }
-    update()       { module_default_github_release_update "$@"; }
+    upgrade()       { module_default_github_release_upgrade "$@"; }
     remove()       { module_default_github_release_remove "$@"; }
     purge()        { module_default_github_release_purge "$@"; }
     verify()       { module_default_verify "$@"; }
@@ -319,9 +322,9 @@ module_default_config_install() {
     return 0
 }
 
-module_default_config_update() {
+module_default_config_upgrade() {
     : "${CONFIG_DEST:?[${NAME:-?}] CONFIG_DEST required}"
-    module_dryrun_guard update "backup + re-drop config -> ${CONFIG_DEST}" && return 0
+    module_dryrun_guard upgrade "backup + re-drop config -> ${CONFIG_DEST}" && return 0
     if [[ -f "${CONFIG_DEST}" ]] && declare -F backup_file >/dev/null 2>&1; then
         backup_file "${CONFIG_DEST}" || true
     fi
@@ -341,7 +344,7 @@ module_default_config_purge() {
 module_use_config_archetype() {
     is_installed() { module_default_config_is_installed "$@"; }
     install()      { module_default_config_install "$@"; }
-    update()       { module_default_config_update "$@"; }
+    upgrade()       { module_default_config_upgrade "$@"; }
     remove()       { module_default_config_remove "$@"; }
     purge()        { module_default_config_purge "$@"; }
     verify()       { module_default_verify "$@"; }
@@ -356,7 +359,7 @@ Usage: bash module/${_name}.module.sh <phase> [options]
 
 Phases:
   install            run install()
-  update             run update()
+  upgrade            run upgrade()
   remove             run remove()
   purge              run purge()
   verify             run verify()
@@ -421,7 +424,7 @@ module_standalone_main() {
     local _phase=""
     while [[ $# -gt 0 ]]; do
         case "${1}" in
-            install|update|remove|purge|verify|doctor|detect|status|info)
+            install|upgrade|remove|purge|verify|doctor|detect|status|info)
                 _phase="${1}"; shift ;;
             is-installed)   _phase="is_installed"; shift ;;
             is-recommended) _phase="is_recommended"; shift ;;
@@ -451,7 +454,7 @@ module_standalone_main() {
     if ! declare -F "${_phase}" >/dev/null 2>&1; then
         # is_outdated / doctor / verify are optional — fail gracefully.
         case "${_phase}" in
-            is_outdated|doctor|verify|update)
+            is_outdated|doctor|verify|upgrade)
                 printf '[%s] %s() not implemented by this module\n' "${NAME:-?}" "${_phase}" >&2
                 return 2 ;;
             *)

@@ -15,7 +15,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
 
 # ── Metadata ────────────────────────────────────────────────────────────────
@@ -62,9 +62,9 @@ install() {
     _switch_default_shell_to_fish
 }
 
-update() {
-    module_default_apt_update || return $?
-    module_dryrun_guard update "re-install fisher plugins" && return 0
+upgrade() {
+    module_default_apt_upgrade || return $?
+    module_dryrun_guard upgrade "re-install fisher plugins" && return 0
     _install_fisher_plugins
 }
 

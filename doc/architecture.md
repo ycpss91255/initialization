@@ -155,7 +155,10 @@ initialization/
 │       ├── fish/
 │       └── ...
 ├── template/
-│   ├── module.template.sh              # 新 module 範本
+│   ├── module-apt.template.sh         # archetype A: apt packages
+│   ├── module-github-release.template.sh # archetype B: GitHub release tarball
+│   ├── module-config.template.sh      # archetype C: config file drop
+│   ├── module-custom.template.sh      # archetype D: hand-written lifecycle
 │   ├── test.template.bats              # 新 test 範本
 │   └── README.md
 ├── test/

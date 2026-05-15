@@ -591,7 +591,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
     source "${LIB_DIR}/logger.sh"
     source "${LIB_DIR}/general.sh"
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
 
 # ── Metadata(見 §9.1)──────────────────────────────────────
@@ -805,7 +805,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 |---|---|---|
 | M0 - Discovery | `doc/prd/` + `doc/architecture.md` + `doc/module-spec.md` + `CONTEXT.md` + `doc/adr/` | **completed** |
 | M1 - Test harness | 借用 base 的 `Dockerfile.test-tools` + `Makefile` + `script/ci/ci.sh`(bats + bats-assert + bats-mock) | **completed** |
-| M2 - Engine core | `lib/dispatcher.sh` + `lib/registry.sh` + `lib/runner.sh` + `lib/resolver.sh` + `lib/module_helpers.sh` + 10 v2 modules | **completed** |
+| M2 - Engine core | `lib/dispatcher.sh` + `lib/registry.sh` + `lib/runner.sh` + `lib/resolver.sh` + `lib/module_helper.sh` + 10 v2 modules | **completed** |
 | M3 - Detect engine | `lib/detect.sh` + `lib/platform.sh` + `setup_ubuntu detect` | **completed** |
 | M4 - State + log | `lib/state.sh` + `lib/state_io.sh` + `lib/logger.sh`(JSONL)+ flock concurrency | **completed** |
 | M5 - CLI(部分) | `setup_ubuntu.sh` subcommands;待補 `upgrade` / `verify` / `doctor` 入口 + `list` 各 flag 實作 + `--verbose/--quiet/--color` wire | **in-progress** |
@@ -1064,7 +1064,7 @@ setup_ubuntu_tui                      # 互動式管理
 | └ `module/tool/copy_*.sh` | (隨上面搬遷) | v0.1 不處理 |
 | └ `module/tool/ros1/*` | (隨上面搬遷) | v0.1 不處理 |
 | `module/config/*` | 不動 — 由各對應 module 引用 | 保留 |
-| `template/*_tmp.sh` | `template/module.template.sh` + `template/test.template.bats` | 改寫為新契約模板 |
+| `template/*_tmp.sh` | `template/module-{apt,github-release,config,custom}.template.sh` + `template/test.template.bats` | 改寫為新契約模板(4 個 archetype 各一,共用 shared sections,drift 由 `template_consistency_spec.bats` 把關) |
 | `small-tools/*` | v0.5 移除,內容已分散到對應 module | deprecation 路徑 |
 | `gh-upgrade-README.md` | 評估歸入 `doc/` 或保留 | 評估 |
 | `install-nvidia-driver.sh` | 與 `module/nvidia-driver.module.sh` 整合 | 整合 |

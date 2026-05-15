@@ -20,7 +20,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
 
 # ── Metadata (doc/module-spec.md §3) ───────────────────────────────────────
@@ -117,8 +117,8 @@ install() {
     sudo usermod -aG docker "${USER}"
 }
 
-update() {
-    module_dryrun_guard update "apt-get install --only-upgrade ${APT_PKGS[*]}" && return 0
+upgrade() {
+    module_dryrun_guard upgrade "apt-get install --only-upgrade ${APT_PKGS[*]}" && return 0
     if ! is_installed; then
         log_info "[${NAME}] not installed yet — running install instead"
         install

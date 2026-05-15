@@ -62,7 +62,7 @@ _runner_run_phase() {
         # shellcheck disable=SC1090
         source '${_lib_dir}/general.sh'
         # shellcheck disable=SC1090
-        source '${_lib_dir}/module_helpers.sh'
+        source '${_lib_dir}/module_helper.sh'
         # The module's dual-mode header detects \$0 != \$BASH_SOURCE[0] and
         # skips its own standalone-mode source block, so we don't re-source
         # the helpers above (idempotent if it did).

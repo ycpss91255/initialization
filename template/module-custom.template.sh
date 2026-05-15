@@ -1,35 +1,36 @@
 #!/usr/bin/env bash
-# module/<NAME>.module.sh — <one-line summary>
+# module/<NAME>.module.sh — <one-line summary>  [archetype: custom (hand-written)]
 #
-# Authoring guide (doc/module-spec.md §3, §4):
-#   1. cp template/module.template.sh module/<your-name>.module.sh
+# Authoring guide (doc/module-spec.md §3, §4; cookbook: doc/guide/archetype-cookbook.md):
+#   1. cp template/module-custom.template.sh module/<your-name>.module.sh
 #   2. Fill metadata (NAME / DESCRIPTION / CATEGORY / DEPENDS_ON / ...).
-#   3. Pick an ARCHETYPE (one line):
-#         module_use_apt_archetype             — apt packages
-#         module_use_github_release_archetype  — GitHub tarball
-#         module_use_config_archetype          — config file drop
-#      Or remove the archetype line and hand-write install/update/remove/purge.
+#   3. Implement all 6 lifecycle functions yourself:
+#         is_installed / install / upgrade / remove / purge / verify
+#      Use this template when none of the apt / github-release / config
+#      archetypes fits (e.g. docker's repo+key flow, nvidia-driver's
+#      ubuntu-drivers integration, font's manual extraction).
 #   4. Implement detect() and is_recommended() — these are always module-specific.
 #   5. Optionally implement is_outdated() / doctor() for richer engine support.
 #   6. cp template/test.template.bats test/unit/module/<your-name>_spec.bats
-#   7. Run: make test-unit
+#   7. Run: make test-unit   (Docker-only; see ADR-0004)
 #
 # Standalone usage:
 #   bash module/<x>.module.sh install [--dry-run]
-#   bash module/<x>.module.sh update / remove / purge / verify
+#   bash module/<x>.module.sh upgrade / remove / purge / verify
 #   bash module/<x>.module.sh detect / is-installed / is-recommended / is-outdated
 #   bash module/<x>.module.sh info / status        (read-only metadata views)
 #
 # Engine usage (resolves DEPENDS_ON, batches with state.json):
 #   setup_ubuntu install <x>
-#   setup_ubuntu update  <x>
+#   setup_ubuntu upgrade <x>
 #   setup_ubuntu remove  <x>
 #
 # Standalone mode does NOT resolve DEPENDS_ON. If your tool needs other
 # modules installed first, the user must run those manually, or use
 # setup_ubuntu for the full flow.
 
-# ── Dual-mode entry detection ───────────────────────────────────────────────
+# ── BEGIN: shared-bootstrap ─────────────────────────────────────────────────
+# Dual-mode entry detection.
 # When invoked directly (`bash module/<x>.module.sh ...`), MODULE_STANDALONE
 # becomes "true": we bootstrap env + source lib helpers, then the footer
 # below dispatches to module_standalone_main "$@".
@@ -55,11 +56,11 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
+# ── END: shared-bootstrap ───────────────────────────────────────────────────
 
-# ── Metadata ────────────────────────────────────────────────────────────────
-#
+# ── BEGIN: shared-metadata ──────────────────────────────────────────────────
 # 1. Identity
 NAME="<TODO-kebab-case-name>"
 VERSION_PROVIDED="<TODO: apt-managed | latest | v1.2.3>"
@@ -98,44 +99,18 @@ REBOOT_REQUIRED=false                             # bool — install needs a reb
 INSTALL_TARGET_DEFAULT="auto"                     # sudo | user-home | auto
 
 # 5. TUI / doctor hints
-TEST_VERIFY_CMD=""                                # e.g. "docker run --rm hello-world"
+TEST_VERIFY_CMD=""                                # e.g. "command -v <tool>" (see cookbook for archetype examples)
+# ── END: shared-metadata ────────────────────────────────────────────────────
 
-# ── Archetype data + binding (PICK ONE) ─────────────────────────────────────
-#
-# Uncomment one archetype block and delete the others. Each block declares
-# the archetype's data fields and then calls one macro that defines all
-# lifecycle functions (is_installed / install / update / remove / purge /
-# verify) in one line. You can still override individual lifecycle functions
-# below the macro if your tool needs special handling.
+# ── BEGIN: archetype-data ───────────────────────────────────────────────────
+# Archetype D: Custom (hand-written) — no archetype macro.
+# Add any tool-specific data variables here that your lifecycle functions
+# below need. Examples:
+#   CONFIG_PATHS=("${HOME}/.config/<tool>")
+#   UPSTREAM_REPO_URL="https://download.docker.com/linux/ubuntu"
+# ── END: archetype-data ─────────────────────────────────────────────────────
 
-# ── Archetype A: APT packages ───────────────────────────────────────────────
-# APT_PKGS=(curl ssh keychain)
-# APT_PPA=""                                       # e.g. "ppa:fish-shell/release-4"
-# CONFIG_PATHS=()                                  # e.g. ("${HOME}/.config/<tool>")
-# module_use_apt_archetype
-
-# ── Archetype B: GitHub-release tarball ─────────────────────────────────────
-# GITHUB_REPO="neovim/neovim"
-# GITHUB_ASSET_PATTERN="nvim-linux-x86_64.tar.gz"
-# INSTALL_DIR="/opt/nvim"
-# BIN_NAME="nvim"
-# # BIN_PATH_IN_TAR="bin/nvim"                     # default: bin/${BIN_NAME}
-# # BIN_LINK="/usr/local/bin/nvim"                 # default: /usr/local/bin/${BIN_NAME}
-# # STRIP_COMPONENTS=1
-# # USE_SUDO=true
-# CONFIG_PATHS=("${HOME}/.config/nvim")
-# module_use_github_release_archetype
-
-# ── Archetype C: Config-drop ────────────────────────────────────────────────
-# CONFIG_TEMPLATE_SRC="${MODULE_DIR}/config/<tool>/<file>"
-# CONFIG_DEST="${HOME}/.config/<tool>/<file>"
-# # CONFIG_MARKER="# init_ubuntu managed"
-# # CONFIG_MODE="600"
-# # CONFIG_DIR_MODE="700"
-# module_use_config_archetype
-
-# ── Lifecycle: always hand-written ──────────────────────────────────────────
-#
+# ── BEGIN: shared-lifecycle-stubs ───────────────────────────────────────────
 # detect() and is_recommended() depend on each module's environment logic.
 # is_outdated() and doctor() are OPTIONAL — implement only if useful.
 
@@ -154,8 +129,8 @@ is_recommended() {
 }
 
 # is_outdated: OPTIONAL. 0 = newer version available. Engine uses this for
-# `setup_ubuntu status <m>` and to decide whether `update` actually does work.
-# Delete this stub if your tool has no meaningful version concept.
+# `setup_ubuntu status <m>` and to decide whether `upgrade` actually does work.
+# See doc/guide/archetype-cookbook.md for archetype-specific examples.
 # is_outdated() {
 #     return 1
 # }
@@ -166,12 +141,12 @@ is_recommended() {
 # doctor() {
 #     is_installed
 # }
+# ── END: shared-lifecycle-stubs ─────────────────────────────────────────────
 
-# ── Custom lifecycle (only if you did NOT use an archetype macro) ───────────
-#
-# Delete this block entirely if you used module_use_*_archetype above. Keep
-# it as a starting point for hand-written tools (docker, nvidia-driver,
-# font, etc. where the archetype doesn't fit).
+# ── BEGIN: custom-lifecycle ─────────────────────────────────────────────────
+# Hand-written lifecycle. All 6 functions are REQUIRED.
+# See doc/guide/archetype-cookbook.md for super-call patterns and examples
+# from docker / nvidia-driver / font / neovim.
 
 is_installed() {
     # TODO
@@ -191,9 +166,9 @@ install() {
     log_info "[${NAME}] install complete"
 }
 
-update() {
+upgrade() {
     # Default: re-run install (idempotent). Override if your tool has a
-    # cheaper update path (e.g. apt install --only-upgrade).
+    # cheaper upgrade path (e.g. apt install --only-upgrade).
     install
 }
 
@@ -223,12 +198,14 @@ purge() {
 verify() {
     module_default_verify "$@"
 }
+# ── END: custom-lifecycle ───────────────────────────────────────────────────
 
-# ── Standalone entry footer ─────────────────────────────────────────────────
-# DO NOT REMOVE. Lets `bash module/<name>.module.sh install --dry-run` work
-# as a self-contained command. Skipped automatically when source'd by
-# lib/runner.sh.
+# ── BEGIN: shared-footer ────────────────────────────────────────────────────
+# Standalone entry footer — DO NOT REMOVE.
+# Lets `bash module/<name>.module.sh install --dry-run` work as a
+# self-contained command. Skipped automatically when source'd by lib/runner.sh.
 
 if [[ "${MODULE_STANDALONE:-false}" == "true" ]]; then
     module_standalone_main "$@"
 fi
+# ── END: shared-footer ──────────────────────────────────────────────────────

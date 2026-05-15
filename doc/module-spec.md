@@ -34,7 +34,7 @@
 
 ### 2.1 完整模板(archetype 版,推薦)
 
-`template/module.template.sh` 已含完整骨架。範例 — 一個用 archetype A(apt)的 module:
+`template/module-apt.template.sh`(+ `-github-release` / `-config` / `-custom`)已含完整骨架。範例 — 一個用 archetype A(apt)的 module:
 
 ```bash
 #!/usr/bin/env bash
@@ -51,7 +51,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
     source "${LIB_DIR}/logger.sh"
     source "${LIB_DIR}/general.sh"
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
 
 # ── Metadata ────────────────────────────────────────────────
@@ -117,7 +117,7 @@ fi
 
 - bash 陣列,每個元素為 `"<lang>:<text>"` 字串
 - 至少**必須**包含 `"en:..."`(fallback);其他語言可選
-- engine 透過 `module_get_description [lang]` 讀取(`lib/module_helpers.sh` §2)
+- engine 透過 `module_get_description [lang]` 讀取(`lib/module_helper.sh` §2)
 - 範例:
   ```bash
   DESCRIPTION=(
@@ -191,7 +191,7 @@ fi
 
 ### 3.2.1 Helper-driven 模組(archetype)
 
-當 module 適用 `lib/module_helpers.sh` 提供的標準 lifecycle 樣板時,**只需宣告資料欄位 + 呼叫一行 archetype macro**,macro 一次定義
+當 module 適用 `lib/module_helper.sh` 提供的標準 lifecycle 樣板時,**只需宣告資料欄位 + 呼叫一行 archetype macro**,macro 一次定義
 `is_installed / install / update / remove / purge / verify` 六個 lifecycle。Macro 之後可重新宣告任一函式以覆寫(例:apt module 自行覆寫 `verify()` 跑 smoke test)。
 
 #### Archetype A — APT-only
@@ -429,7 +429,7 @@ install() {
 
 ### 4.4 函式可用的 helper
 
-從 `lib/logger.sh`、`lib/general.sh`、`lib/module_helpers.sh` 載入(engine sub-shell + standalone bootstrap 都已 source):
+從 `lib/logger.sh`、`lib/general.sh`、`lib/module_helper.sh` 載入(engine sub-shell + standalone bootstrap 都已 source):
 
 | Helper | 必須 / 建議 | 用途 |
 |---|---|---|
@@ -515,7 +515,7 @@ install() {
 
 獨立模式假設「DEPENDS_ON 已裝好」,適合「就是要單獨灌一個工具」的情境。如要完整流程,改用 `setup_ubuntu`。
 
-**Module 檔案結構(由 template/module.template.sh 提供):**
+**Module 檔案結構(由 `template/module-<archetype>.template.sh` 提供;archetype ∈ {apt, github-release, config, custom}):**
 
 ```bash
 #!/usr/bin/env bash
@@ -532,7 +532,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     LIB_DIR="${REPO_ROOT}/lib"
     source "${LIB_DIR}/logger.sh"
     source "${LIB_DIR}/general.sh"
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
 
 # ── 2. Metadata ──────────────────────────────────────────────
@@ -549,9 +549,9 @@ if [[ "${MODULE_STANDALONE:-false}" == "true" ]]; then
 fi
 ```
 
-`lib/runner.sh` 在 sub-shell 內預先 source `logger.sh / general.sh / module_helpers.sh` 後才 source module,所以 engine 模式下第 1 段的 if 不觸發,第 4 段的 footer 也不觸發 — 兩段都是「獨立模式 only」。
+`lib/runner.sh` 在 sub-shell 內預先 source `logger.sh / general.sh / module_helper.sh` 後才 source module,所以 engine 模式下第 1 段的 if 不觸發,第 4 段的 footer 也不觸發 — 兩段都是「獨立模式 only」。
 
-### 4.10 Helper API(`lib/module_helpers.sh`)
+### 4.10 Helper API(`lib/module_helper.sh`)
 
 Helper 抽出 i18n + 三個 archetype + 三個 generic guard + standalone CLI dispatch + engine 端聚合器。**module 不需重抄 dry-run / idempotency 樣板**。
 
@@ -669,7 +669,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
     source "${LIB_DIR}/logger.sh"
     source "${LIB_DIR}/general.sh"
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
 
 # ── Metadata ────────────────────────────────────────────────
@@ -815,7 +815,7 @@ readonly _MODULE_CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/config/neovim"
 | Standalone `info` 印出 metadata、`info --lang=zh-TW` 顯示對應翻譯 | **必須** |
 | Source 模式不會觸發 standalone footer(`$0` != module 路徑) | **必須** |
 
-範例骨架見 `template/test.template.bats`(已建立)。共用樣板測試見 `test/unit/template_smoke_spec.bats`(套到 template 本身)與 `test/unit/module_helpers_spec.bats`(套到 `lib/module_helpers.sh`)。
+範例骨架見 `template/test.template.bats`(已建立)。共用樣板測試見 `test/unit/template_smoke_spec.bats`(套到 template 本身)與 `test/unit/module_helper_spec.bats`(套到 `lib/module_helper.sh`)。
 
 ---
 

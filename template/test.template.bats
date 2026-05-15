@@ -35,7 +35,7 @@ _load_module() {
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
     # shellcheck disable=SC1091
     source "${MODULE_DIR}/<MODULE-NAME>.module.sh"
 }
@@ -116,7 +116,7 @@ _standalone_module() {
 # ── Dual-mode standalone ─────────────────────────────────────────────────────
 # These ensure `bash module/<x>.module.sh ...` works as a self-contained CLI.
 # DO NOT delete — they guard against accidentally breaking the standalone
-# entry footer (template/module.template.sh).
+# entry footer (one of template/module-{apt,github-release,config,custom}.template.sh).
 
 @test "standalone: with no args prints usage + exits 2" {
     run _standalone_module

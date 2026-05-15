@@ -15,7 +15,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
 
 # ── Metadata ────────────────────────────────────────────────────────────────
@@ -61,9 +61,9 @@ install() {
 }
 
 # Override update too — re-drop config to track upstream changes.
-update() {
-    module_default_apt_update || return $?
-    module_dryrun_guard update "re-drop tmux config" && return 0
+upgrade() {
+    module_default_apt_upgrade || return $?
+    module_dryrun_guard upgrade "re-drop tmux config" && return 0
     _install_tmux_config
 }
 

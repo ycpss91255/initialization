@@ -19,7 +19,7 @@ _load_module() {
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
     # shellcheck disable=SC1091
     source "${MODULE_DIR}/docker.module.sh"
 }

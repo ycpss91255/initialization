@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# test/unit/module_helpers_spec.bats — direct unit tests on lib/module_helpers.sh
+# test/unit/module_helper_spec.bats — direct unit tests on lib/module_helper.sh
 #
 # Tests the helper functions in isolation (no module file):
 #   - module_i18n_get with various languages + fallback to en
@@ -21,7 +21,7 @@ setup() {
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 
     NAME="testmod"
 }
@@ -106,7 +106,7 @@ teardown() { teardown_test_env; }
 @test "module_use_apt_archetype defines 6 lifecycle functions" {
     module_use_apt_archetype
     local _fn
-    for _fn in is_installed install update remove purge verify; do
+    for _fn in is_installed install upgrade remove purge verify; do
         declare -F "${_fn}" >/dev/null || { printf "missing %s\n" "${_fn}" >&2; return 1; }
     done
 }
@@ -114,7 +114,7 @@ teardown() { teardown_test_env; }
 @test "module_use_github_release_archetype defines 6 lifecycle functions" {
     module_use_github_release_archetype
     local _fn
-    for _fn in is_installed install update remove purge verify; do
+    for _fn in is_installed install upgrade remove purge verify; do
         declare -F "${_fn}" >/dev/null || { printf "missing %s\n" "${_fn}" >&2; return 1; }
     done
 }
@@ -122,7 +122,7 @@ teardown() { teardown_test_env; }
 @test "module_use_config_archetype defines 6 lifecycle functions" {
     module_use_config_archetype
     local _fn
-    for _fn in is_installed install update remove purge verify; do
+    for _fn in is_installed install upgrade remove purge verify; do
         declare -F "${_fn}" >/dev/null || { printf "missing %s\n" "${_fn}" >&2; return 1; }
     done
 }

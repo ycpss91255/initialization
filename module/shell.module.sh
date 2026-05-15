@@ -15,7 +15,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
 
 # ── Metadata ────────────────────────────────────────────────────────────────

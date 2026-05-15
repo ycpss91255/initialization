@@ -15,7 +15,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
 
 # ── Metadata ────────────────────────────────────────────────────────────────
@@ -98,8 +98,8 @@ install() {
     log_warn "[${NAME}] reboot required for driver to take effect"
 }
 
-update() {
-    module_dryrun_guard update "apt-get update + dist-upgrade nvidia-*" && return 0
+upgrade() {
+    module_dryrun_guard upgrade "apt-get update + dist-upgrade nvidia-*" && return 0
     have_sudo_access 2>/dev/null || { log_error "[${NAME}] sudo required"; return 1; }
     sudo apt-get update -qq || log_warn "[${NAME}] apt-get update failed (continuing)"
     sudo apt-get install --only-upgrade -y "nvidia-driver-*" || true

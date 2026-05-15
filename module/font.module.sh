@@ -15,7 +15,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     # shellcheck disable=SC1091
     source "${LIB_DIR}/general.sh"
     # shellcheck disable=SC1091
-    source "${LIB_DIR}/module_helpers.sh"
+    source "${LIB_DIR}/module_helper.sh"
 fi
 
 # ── Metadata ────────────────────────────────────────────────────────────────
@@ -83,8 +83,8 @@ install() {
     command -v fc-cache >/dev/null 2>&1 && fc-cache -f "${_FONTS_DIR}" >/dev/null || true
 }
 
-update() {
-    module_dryrun_guard update "re-download Nerd Fonts" && return 0
+upgrade() {
+    module_dryrun_guard upgrade "re-download Nerd Fonts" && return 0
     local _f
     for _f in "${_NERD_FONTS[@]}"; do
         rm -rf "${_FONTS_DIR:?}/${_f}" 2>/dev/null || true

@@ -11,7 +11,7 @@
 #   5. Public function names use the file's stem as prefix:
 #         lib/state.sh        -> state_record_install / state_load
 #         lib/sync.sh         -> sync_push / sync_pull
-#         lib/module_helpers  -> module_default_apt_install / ...
+#         lib/module_helper  -> module_default_apt_install / ...
 #   6. Private helpers start with a single underscore: _foo_internal.
 #
 # Standard library guard: refuse to run as an executable script.

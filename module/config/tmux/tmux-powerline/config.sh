@@ -30,7 +30,7 @@ export TMUX_POWERLINE_STATUS_VISIBILITY="2"
 export TMUX_POWERLINE_WINDOW_STATUS_LINE=0
 # The status bar refresh interval in seconds.
 # Note that events that force-refresh the status bar (such as window renaming) will ignore this.
-export TMUX_POWERLINE_STATUS_INTERVAL="1"
+export TMUX_POWERLINE_STATUS_INTERVAL="2"
 # The location of the window list. Can be {"absolute-centre, centre, left, right"}.
 # Note that "absolute-centre" is only supported on `tmux -V` >= 3.2.
 export TMUX_POWERLINE_STATUS_JUSTIFICATION="centre"
@@ -308,7 +308,7 @@ export TMUX_POWERLINE_SEG_TIME_FORMAT="%H:%M"
 # Arguments passed to tmux-mem-cpu-load.
 # See https://github.com/thewtex/tmux-mem-cpu-load for all available options.
 # export TMUX_POWERLINE_SEG_TMUX_MEM_CPU_LOAD_ARGS="-v"
-export TMUX_POWERLINE_SEG_TMUX_MEM_CPU_LOAD_ARGS="-c -q -r 136 -i 2 -v -a 0"
+export TMUX_POWERLINE_SEG_TMUX_MEM_CPU_LOAD_ARGS="-c -q -r 136 -i 1 -v -a 0"
 # }
 
 # tmux_session_info.sh {

@@ -15,7 +15,7 @@
 # convention in lib/ is: callers (setup_ubuntu.sh, bats test, module
 # sub-shells) set strict mode themselves.
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     printf "To learn how to use it, please refer to '%s'\n" "../../tests/unit/logger_spec.bats"
     return 0 2>/dev/null

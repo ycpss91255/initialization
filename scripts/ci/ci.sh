@@ -101,6 +101,18 @@ EOF
 }
 
 # ── Lint discovery (exclude deprecated paths per PRD §6.5/§6.6) ──────────────
+#
+# Pruned directories (slated for relocation or already vendored upstream):
+#   small-tools/             — legacy install scripts, replaced by modules/
+#   modules/tools/           — staging for one-off scripts (PRD §6.5)
+#   modules/config/          — third-party config files (vendored upstream)
+#   modules/submodule/       — v1 sub-tool helpers (predates v2 module pattern)
+#   modules/function/        — v1 lib/ location (moved to lib/)
+#
+# Pruned files (legacy install scripts that predate the v2 module pattern):
+#   modules/setup_*.sh       — old all-in-one installers; not migrated yet
+#   modules/anydesk.sh       — legacy one-off
+#   install-nvidia-driver.sh — legacy one-off at repo root
 
 _find_lintable_sh() {
     find "${REPO_ROOT}" \
@@ -109,8 +121,14 @@ _find_lintable_sh() {
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
            -path "${REPO_ROOT}/modules/tools" -o \
-           -path "${REPO_ROOT}/modules/config" \) -prune -o \
-        -type f \( -name "*.sh" -o -name "*.bash" -o -name "*.bats" \) -print0
+           -path "${REPO_ROOT}/modules/config" -o \
+           -path "${REPO_ROOT}/modules/submodule" -o \
+           -path "${REPO_ROOT}/modules/function" \) -prune -o \
+        -type f \( -name "*.sh" -o -name "*.bash" -o -name "*.bats" \) \
+        ! -path "${REPO_ROOT}/modules/setup_*.sh" \
+        ! -path "${REPO_ROOT}/modules/anydesk.sh" \
+        ! -path "${REPO_ROOT}/install-nvidia-driver.sh" \
+        -print0
 }
 
 _find_lintable_fish() {
@@ -120,7 +138,9 @@ _find_lintable_fish() {
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
            -path "${REPO_ROOT}/modules/tools" -o \
-           -path "${REPO_ROOT}/modules/config" \) -prune -o \
+           -path "${REPO_ROOT}/modules/config" -o \
+           -path "${REPO_ROOT}/modules/submodule" -o \
+           -path "${REPO_ROOT}/modules/function" \) -prune -o \
         -type f -name "*.fish" -print0
 }
 

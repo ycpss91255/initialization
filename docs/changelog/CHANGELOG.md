@@ -149,8 +149,16 @@ default severity (style/info/warning/error all reported).
   - Fix exclude-path typo `modules/tool` → `modules/tools` (post-
     ADR-0005 plural rename had not been propagated).
   - Extend `_find_lintable_sh` to pick up `*.bash` + `*.bats` too.
+  - Exclude legacy paths slated for removal per PRD §6.5/§6.6:
+    `modules/submodule/`, `modules/function/`, `modules/setup_*.sh`,
+    `modules/anydesk.sh`, `install-nvidia-driver.sh` — these predate
+    the v2 module pattern; their shellcheck disables stay as-is until
+    relocation.
   - Add `jq` to `_install_deps_for_coverage` apt-get list (kcov/kcov
     image lacks it; `lib/state.sh` needs jq for state.json mutation).
+  - Refactor `_bats_args` → `_set_bats_args_arr` populating global
+    `BATS_ARGS_ARR`; callers now `bats "${BATS_ARGS_ARR[@]}"` instead of
+    `bats $(_bats_args)` (SC2046 proper fix).
 - Proper fixes (no disable):
   - `lib/detect.sh:268`, `lib/platform.sh:42`: escape `\}` in case
     pattern (SC1083 — literal `}` matches JSON `null}` object close).

@@ -390,6 +390,37 @@ Alignment with `ycpss91255-docker/docker_harness` release infrastructure:
 - `.version` — `v0.0.0` baseline (commit 6e840d1).
 - All 7 hooks registered in `.claude/settings.json`.
 
+#### ADR-0007 + transcript-bound shellcheck-disable approval hook (issue #17)
+
+Codifies the ShellCheck base-alignment discipline (`# shellcheck disable=...`
+gated by wiki-link rationale + user approval) from PR #4 into an enforceable
+hook plus rationale doc:
+
+- `docs/adr/0007-exit-code-contract-scripts-default-to-set-uo.md` — ADR
+  documenting the project convention that exit-code-contract scripts
+  (`.claude/hooks/*.sh`, `.claude/scripts/release-tag.sh`) default to
+  `set -uo pipefail` (not `-euo`). Cites BashFAQ #105 + Google Shell
+  Style Guide; lists exception criteria for `-euo` (always-act scripts
+  like `test-must-use-docker.sh`).
+- `CLAUDE.md` (`AGENTS.md`) — new `## Script conventions` section
+  indexing ADR-0007 and the new hook for agent-facing discoverability.
+- `.claude/hooks/enforce_shellcheck_disable_approval.sh` — PreToolUse
+  hook on `Edit|Write|MultiEdit`. Blocks (`permissionDecision: deny`)
+  any newly added `# shellcheck disable=SC<code>` directive unless the
+  user has explicitly approved that code in their most recent message
+  via the phrase `approve SC<code>` (case-insensitive on the verb;
+  batchable: `approve SC2034 SC1091`). Approval is read from the
+  system-controlled session transcript path (`transcript_path` in the
+  PreToolUse JSON) — it cannot be forged. Emergency bypass via
+  `ECC_ALLOW_SHELLCHECK_DISABLE=1` env var.
+- Internal modules (functions sourced for bats testing in isolation):
+  `read_latest_user_message`, `new_shellcheck_disables`,
+  `is_disable_approved`, `main`.
+- `tests/unit/hooks/{transcript_reader,disable_diff,approval_check,enforce_shellcheck_disable_approval}_spec.bats`
+  — bats specs for each module + integration test for the hook entry.
+- `.claude/settings.json` — hook registered as the 2nd `PreToolUse`
+  matcher block (`Edit|Write|MultiEdit`).
+
 ### Changed
 
 - **Folder naming reverted to plural-for-collections + singular-for-concepts**

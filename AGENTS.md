@@ -25,6 +25,11 @@ to `~/.claude/rules/` via `install.sh`).
 2. **No host package installs.** Module Action Phases (install / upgrade / remove / purge) must not run on the host.
 3. **Bash + Docker scope.** Language migration triggers documented in `docs/adr/0003-language-choice-and-migration-triggers.md`.
 
+## Script conventions
+
+- Exit-code-contract scripts (`.claude/hooks/*.sh`, `.claude/scripts/release-tag.sh`) default to `set -uo pipefail`. `-euo` is reserved for always-act semantics. See `docs/adr/0007-exit-code-contract-scripts-default-to-set-uo.md` for the rationale and the Exception criteria.
+- New `# shellcheck disable=...` directives are gated by `.claude/hooks/enforce_shellcheck_disable_approval.sh` (PreToolUse on Edit/Write/MultiEdit). Consult <https://www.shellcheck.net/wiki/SC{code}> first; if no proper fix applies, request explicit user approval via the phrase `approve SC<code>` (case-insensitive on the verb; batchable: `approve SC2034 SC1091`). Approval is read from the system-controlled session transcript — it cannot be forged.
+
 ## Agent skills
 
 ### Issue tracker

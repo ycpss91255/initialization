@@ -2,7 +2,7 @@
 # shellcheck disable=SC2034  # module metadata vars (NAME / DESCRIPTION / CATEGORY / TAGS / ...) consumed by engine post-source — https://www.shellcheck.net/wiki/SC2034
 # modules/<NAME>.module.sh — <one-line summary>  [archetype: custom (hand-written)]
 #
-# Authoring guide (docs/module-spec.md §3, §4; cookbook: docs/guide/archetype-cookbook.md):
+# Authoring guide (docs/module-spec.md §3, §4; cookbook: docs/guides/archetype-cookbook.md):
 #   1. cp templates/module-custom.template.sh modules/<your-name>.module.sh
 #   2. Fill metadata (NAME / DESCRIPTION / CATEGORY / DEPENDS_ON / ...).
 #   3. Implement all 6 lifecycle functions yourself:
@@ -131,7 +131,7 @@ is_recommended() {
 
 # is_outdated: OPTIONAL. 0 = newer version available. Engine uses this for
 # `setup_ubuntu status <m>` and to decide whether `upgrade` actually does work.
-# See docs/guide/archetype-cookbook.md for archetype-specific examples.
+# See docs/guides/archetype-cookbook.md for archetype-specific examples.
 # is_outdated() {
 #     return 1
 # }
@@ -146,7 +146,7 @@ is_recommended() {
 
 # ── BEGIN: custom-lifecycle ─────────────────────────────────────────────────
 # Hand-written lifecycle. All 6 functions are REQUIRED.
-# See docs/guide/archetype-cookbook.md for super-call patterns and examples
+# See docs/guides/archetype-cookbook.md for super-call patterns and examples
 # from docker / nvidia-driver / font / neovim.
 
 is_installed() {

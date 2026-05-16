@@ -5,7 +5,7 @@
 #   i18n_detect_lang             # reads $LANG, prints one of {en, zh-TW, zh-CN, ja}
 #   i18n_sanitize_lang <outvar>  # validates outvar value; if invalid, set to "en" + bilingual warn
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not an executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi

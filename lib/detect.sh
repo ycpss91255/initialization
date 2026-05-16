@@ -21,7 +21,7 @@
 # No jq dependency: JSON is hand-assembled via printf. Field accessor
 # uses bash string ops on the assembled JSON.
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi
@@ -61,7 +61,7 @@ _detect_probe_os() {
     local _id="" _ver="" _code=""
     if [[ -f /etc/os-release ]]; then
         local _saved_ID="${ID:-}" _saved_VID="${VERSION_ID:-}" _saved_VCN="${VERSION_CODENAME:-}"
-        # shellcheck disable=SC1091
+        # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
         . /etc/os-release 2>/dev/null || true
         _id="${ID:-}"
         _ver="${VERSION_ID:-}"
@@ -265,7 +265,7 @@ _detect_extract_str() {
         return 0
     fi
     case "${_rest}" in
-        null,*|null}*|null)
+        null,*|null\}*|null)
             return 0
             ;;
         \"*)

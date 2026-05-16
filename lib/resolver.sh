@@ -39,8 +39,8 @@ _resolver_collect_deps() {
 
         local _deps_str="${MODULES_DEPS[${_node}]:-}"
         if [[ -n "${_deps_str}" ]]; then
-            # shellcheck disable=SC2206
-            local -a _deps=(${_deps_str})
+            local -a _deps=()
+            read -r -a _deps <<< "${_deps_str}"
             for _dep in "${_deps[@]}"; do
                 [[ -z "${_dep}" ]] && continue
                 [[ -z "${_out_set[${_dep}]:-}" ]] && _stack+=("${_dep}")
@@ -101,8 +101,7 @@ resolver_resolve() {
     for _name in "${!_closure[@]}"; do
         _deps_str="${MODULES_DEPS[${_name}]:-}"
         [[ -z "${_deps_str}" ]] && continue
-        # shellcheck disable=SC2206
-        _deps=(${_deps_str})
+        read -r -a _deps <<< "${_deps_str}"
         for _dep in "${_deps[@]}"; do
             [[ -z "${_dep}" ]] && continue
             _indeg["${_name}"]=$(( ${_indeg[${_name}]:-0} + 1 ))
@@ -133,8 +132,7 @@ resolver_resolve() {
         for _x in "${!_closure[@]}"; do
             _x_deps_str="${MODULES_DEPS[${_x}]:-}"
             [[ -z "${_x_deps_str}" ]] && continue
-            # shellcheck disable=SC2206
-            _x_deps=(${_x_deps_str})
+            read -r -a _x_deps <<< "${_x_deps_str}"
             for _dep in "${_x_deps[@]}"; do
                 if [[ "${_dep}" == "${_head}" ]]; then
                     _indeg["${_x}"]=$(( ${_indeg[${_x}]:-0} - 1 ))

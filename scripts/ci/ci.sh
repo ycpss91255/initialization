@@ -182,11 +182,16 @@ _run_hadolint() {
 
 # ── Bats ─────────────────────────────────────────────────────────────────────
 
-_bats_args() {
+# Populates global array BATS_ARGS_ARR with the bats invocation flags.
+# Using an array (vs `printf` of a space-separated string) lets callers
+# expand `"${BATS_ARGS_ARR[@]}"` instead of unquoted `$(_bats_args)`,
+# avoiding SC2046 (unquoted command substitution).
+_set_bats_args_arr() {
+    BATS_ARGS_ARR=()
     if command -v parallel >/dev/null 2>&1; then
         local _j
         _j="$(nproc 2>/dev/null || echo 4)"
-        printf -- '--jobs %s' "${_j}"
+        BATS_ARGS_ARR=(--jobs "${_j}")
     fi
 }
 
@@ -196,8 +201,8 @@ _run_unit() {
         return 0
     fi
     _info "Running Bats unit tests"
-    # shellcheck disable=SC2046
-    bats $(_bats_args) -r "${REPO_ROOT}/tests/unit/"
+    _set_bats_args_arr
+    bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/tests/unit/"
 }
 
 _run_integration() {
@@ -206,8 +211,8 @@ _run_integration() {
         return 0
     fi
     _info "Running Bats integration tests"
-    # shellcheck disable=SC2046
-    bats $(_bats_args) -r "${REPO_ROOT}/tests/integration/"
+    _set_bats_args_arr
+    bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/tests/integration/"
 }
 
 # ── Kcov coverage ────────────────────────────────────────────────────────────

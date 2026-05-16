@@ -56,7 +56,7 @@ _registry_parse_one() {
 
     bash --noprofile --norc -c '
         set +e
-        # shellcheck disable=SC1090
+        # shellcheck source=/dev/null  # $1 is a discovered module path; static resolution impossible — https://www.shellcheck.net/wiki/SC1090
         source "$1" 2>/dev/null || exit 2
 
         printf "NAME=%s\n" "${NAME:-}"

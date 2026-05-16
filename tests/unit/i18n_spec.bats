@@ -7,7 +7,7 @@ load "${BATS_TEST_DIRNAME}/../helpers/common"
 setup() {
     setup_test_env
     unset LANG INIT_UBUNTU_LANG
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/i18n.sh"
 }
 

@@ -503,7 +503,7 @@ _dispatcher_doctor() {
                 _status="STALE (no module file)"
                 _issues=$((_issues + 1))
             elif (
-                # shellcheck disable=SC1090
+                # shellcheck source=/dev/null  # module path is dynamic; static resolution impossible — https://www.shellcheck.net/wiki/SC1090
                 bash --noprofile --norc -c "
                     source '${LIB_DIR}/logger.sh' >/dev/null 2>&1
                     source '${LIB_DIR}/general.sh' >/dev/null 2>&1

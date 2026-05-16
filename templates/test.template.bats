@@ -1,7 +1,5 @@
 #!/usr/bin/env bats
-# shellcheck disable=SC2317
-# SC2317: mocks defined inside @test blocks (`is_installed() { return 0; }`)
-#   are dispatched indirectly by the module under test or via `run`.
+# shellcheck disable=SC2317  # mocks defined inside @test blocks (e.g. `is_installed() { return 0; }`) are dispatched indirectly via the module under test or `run` — https://www.shellcheck.net/wiki/SC2317
 # tests/unit/modules/<NAME>_spec.bats — bats spec for modules/<NAME>.module.sh
 #
 # Quick start:
@@ -33,13 +31,13 @@ teardown() {
 }
 
 _load_module() {
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/logger.sh"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/general.sh"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/module_helper.sh"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${MODULE_DIR}/<MODULE-NAME>.module.sh"
 }
 

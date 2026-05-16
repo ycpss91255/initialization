@@ -66,7 +66,7 @@ _runner_run_phase() {
     (
         export INIT_UBUNTU_CURRENT_MODULE="${_name}"
         set -euo pipefail
-        # shellcheck disable=SC1090
+        # shellcheck source=/dev/null  # module path is dynamic; static resolution impossible — https://www.shellcheck.net/wiki/SC1090
         source "${_file}"
         if ! declare -F "${_phase}" >/dev/null 2>&1; then
             log_error "[${_name}] module does not define ${_phase}() — aborting"

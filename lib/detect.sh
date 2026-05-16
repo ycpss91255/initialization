@@ -61,7 +61,7 @@ _detect_probe_os() {
     local _id="" _ver="" _code=""
     if [[ -f /etc/os-release ]]; then
         local _saved_ID="${ID:-}" _saved_VID="${VERSION_ID:-}" _saved_VCN="${VERSION_CODENAME:-}"
-        # shellcheck disable=SC1091
+        # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
         . /etc/os-release 2>/dev/null || true
         _id="${ID:-}"
         _ver="${VERSION_ID:-}"

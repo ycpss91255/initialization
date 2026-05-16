@@ -114,9 +114,7 @@ state_io_export() {
     # Resolve module name list.
     local -a _names=()
     if [[ -n "${_filter_csv}" ]]; then
-        local IFS=','
-        # shellcheck disable=SC2206
-        _names=(${_filter_csv})
+        IFS=',' read -r -a _names <<< "${_filter_csv}"
     elif [[ -f "${_state_path}" ]]; then
         local _line
         while IFS= read -r _line; do

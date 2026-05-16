@@ -119,34 +119,6 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   status / source-mode / no-side-effects) across all 4 archetypes.
 - Test count: 255 → 267 (8 new archetype-iterating smoke + 11 consistency).
 
-<<<<<<< HEAD
-#### ADR-0006 — OTel-aligned logger schema (decision only; issue #8)
-
-- `docs/adr/0006-otel-aligned-logger-schema.md` — decision to migrate
-  `lib/logger.sh` `log_event` JSONL output to mirror the OpenTelemetry
-  Logs Data Model + W3C Trace Context, without adopting the OTel SDK
-  or Collector. Sourced from the project author's observability
-  playbook (Notion: "Debug 資訊架構：從 print 到 Observability",
-  2026-05-12). Key choices:
-  - Field rename: `ts` → `timestamp`, `level` → `severity_text`,
-    `event` → `body`, top-level `module` → nested
-    `attributes.service.name`.
-  - All business payload nested under `attributes` (OTel SemConv).
-  - Add `attributes.service.lang = "bash"`, `attributes.code.filepath`
-    + `code.lineno`.
-  - Add `trace_id` (per-`setup_ubuntu`-invocation, UUID v7 preferred)
-    + `span_id` (per-phase-per-module). Auto-propagate via env into
-    sub-shells.
-  - Mirror `log_info` / `log_warn` / `log_error` to JSONL too.
-  - Per-session log file rotation:
-    `${XDG_STATE_HOME}/init_ubuntu/logs/<trace_id>.jsonl` + `latest`
-    symlink.
-  - `docs/guides/log-queries.md` will ship lnav format file with
-    `opid-field: trace_id` (free timeline view) + jq snippet library.
-- Implementation deferred to issue #8; gated on PRs #4 / #6 / #7
-  merging first to avoid CHANGELOG and `lib/runner.sh` conflicts.
-||||||| 7cca030
-=======
 #### CI workflow — GitHub Actions (issue #2)
 
 - `.github/workflows/ci.yaml` with 5 jobs:

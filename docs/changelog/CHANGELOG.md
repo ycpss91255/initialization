@@ -242,6 +242,27 @@ still `source`s the module file itself and dispatches to `${_phase}`.
 - Implementation deferred to issue #8; gated on PRs #4 / #6 / #7
   merging first to avoid CHANGELOG and `lib/runner.sh` conflicts.
 
+#### Archetype cookbook (issue #5, task #69)
+
+- `docs/guides/archetype-cookbook.md` — companion to the 4 archetype
+  templates. Documents:
+  - Decision tree for picking archetype A / B / C / D.
+  - Pure-archetype usage (apt-essentials, neovim, git-config, font).
+  - **Hybrid + super-call override pattern** — using
+    `module_use_apt_archetype` then overriding `install()` (docker
+    is the reference: apt-repo key+source setup + `usermod -aG`).
+  - Capture-and-chain pattern: `_orig_install=$(declare -f
+    module_default_apt_install | sed '1d;$d')` to `eval` the
+    original then add post-steps.
+  - `is_outdated()` recipes per archetype (apt-list-upgradable,
+    gh-release-tag-compare, sha256sum-config-hash, custom).
+  - 5 common pitfalls: bad-substitution arrays, `declare -A` vs
+    `declare -gA`, `cd` outside subshell, standalone vs engine
+    state writes (ADR-0001), `update` vs `upgrade` naming.
+- Templates' authoring docstring paths fixed:
+  `docs/guide/archetype-cookbook.md` → `docs/guides/archetype-cookbook.md`
+  (per ADR-0005, plural for the collection dir).
+
 #### Release workflow — port from docker_harness#22 + #106 (commit 1b40cfb)
 
 Alignment with `ycpss91255-docker/docker_harness` release infrastructure:

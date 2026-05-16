@@ -25,7 +25,7 @@
 #       0 — every module succeeded (or was already in desired state)
 #       6 — at least one module failed (per PRD §7.4)
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi
@@ -52,28 +52,28 @@ _runner_run_phase() {
     local _start_ts _end_ts _duration
     _start_ts="$(date +%s)"
 
-    # Sub-shell isolation: re-source helpers, then module, then call the
-    # phase function. Forwards INIT_UBUNTU_* env vars via the parent process.
-    INIT_UBUNTU_CURRENT_MODULE="${_name}" \
-    bash --noprofile --norc -c "
+    # Sub-shell isolation via `(...)` fork (not `bash -c`). Module side-effects
+    # (declare, set, cd, alias, export, traps) stay scoped to the subshell.
+    # `(...)` is chosen over `bash -c "..."` because the latter launches a
+    # fresh bash process where $BASH_SOURCE / $FUNCNAME start unbound — under
+    # `set -u`, kcov-instrumented bash trips on its own coverage hooks
+    # (ptrace reads BASH_SOURCE on every command for line attribution). The
+    # fork-style subshell inherits these arrays from the parent shell,
+    # keeping `set -u` safe and coverage instrumentation happy.
+    #
+    # Parent shell is expected to have logger.sh / general.sh / module_helper.sh
+    # already sourced (setup_ubuntu.sh or bats `_load_engine` do this).
+    (
+        export INIT_UBUNTU_CURRENT_MODULE="${_name}"
         set -euo pipefail
         # shellcheck disable=SC1090
-        source '${_lib_dir}/logger.sh'
-        # shellcheck disable=SC1090
-        source '${_lib_dir}/general.sh'
-        # shellcheck disable=SC1090
-        source '${_lib_dir}/module_helper.sh'
-        # The module's dual-mode header detects \$0 != \$BASH_SOURCE[0] and
-        # skips its own standalone-mode source block, so we don't re-source
-        # the helpers above (idempotent if it did).
-        # shellcheck disable=SC1090
-        source '${_file}'
-        if ! declare -F '${_phase}' >/dev/null 2>&1; then
-            log_error '[${_name}] module does not define ${_phase}() — aborting'
+        source "${_file}"
+        if ! declare -F "${_phase}" >/dev/null 2>&1; then
+            log_error "[${_name}] module does not define ${_phase}() — aborting"
             exit 1
         fi
-        ${_phase}
-    "
+        "${_phase}"
+    )
     local _rc=$?
 
     _end_ts="$(date +%s)"

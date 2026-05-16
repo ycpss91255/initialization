@@ -16,7 +16,7 @@
 #   resolver_collect_transitive <module> [<module> ...]
 #     Print the transitive dep closure (unsorted) on stdout, one per line.
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi

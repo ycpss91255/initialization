@@ -1,4 +1,7 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2317
+# SC2317: mocks defined inside @test blocks (`is_installed() { return 0; }`)
+#   are dispatched indirectly by the module under test or via `run`.
 # tests/unit/modules/<NAME>_spec.bats — bats spec for modules/<NAME>.module.sh
 #
 # Quick start:

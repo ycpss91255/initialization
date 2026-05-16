@@ -110,7 +110,7 @@ _find_lintable_sh() {
            -path "${REPO_ROOT}/small-tools" -o \
            -path "${REPO_ROOT}/modules/tools" -o \
            -path "${REPO_ROOT}/modules/config" \) -prune -o \
-        -type f -name "*.sh" -print0
+        -type f \( -name "*.sh" -o -name "*.bash" -o -name "*.bats" \) -print0
 }
 
 _find_lintable_fish() {

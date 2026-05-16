@@ -21,7 +21,7 @@
 # No jq dependency: JSON is hand-assembled via printf. Field accessor
 # uses bash string ops on the assembled JSON.
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi
@@ -264,9 +264,8 @@ _detect_extract_str() {
     if [[ "${_rest}" == "${_json}" ]]; then
         return 0
     fi
-    # shellcheck disable=SC1083  # literal `}` matches JSON `null}` (object close)
     case "${_rest}" in
-        null,*|null}*|null)
+        null,*|null\}*|null)
             return 0
             ;;
         \"*)

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # module metadata vars (NAME / DESCRIPTION / CATEGORY / TAGS / ...) consumed by engine post-source — https://www.shellcheck.net/wiki/SC2034
 # modules/<NAME>.module.sh — <one-line summary>  [archetype: apt]
 #
 # Authoring guide (docs/module-spec.md §3, §4; cookbook: docs/guide/archetype-cookbook.md):
@@ -34,7 +35,7 @@
 # "false": runner already sourced lib helpers, so we skip the bootstrap.
 
 MODULE_STANDALONE="true"
-[[ "${BASH_SOURCE[0]}" != "${0}" ]] && MODULE_STANDALONE="false"
+[[ "${BASH_SOURCE[0]:-}" != "${0:-}" ]] && MODULE_STANDALONE="false"
 
 if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     set -euo pipefail
@@ -42,7 +43,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
 
     # Resolve paths. Env vars take precedence so tests + relocations work:
     # `LIB_DIR=/path/to/lib bash modules/foo.module.sh install` is honored.
-    MODULE_DIR="${MODULE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)}"
+    MODULE_DIR="${MODULE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")" && pwd -P)}"
     REPO_ROOT="${REPO_ROOT:-$(cd -- "${MODULE_DIR}/.." && pwd -P)}"
     LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
     export MODULE_DIR REPO_ROOT LIB_DIR

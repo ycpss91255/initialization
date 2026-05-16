@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # module metadata vars (NAME / DESCRIPTION / CATEGORY / TAGS / ...) consumed by engine post-source — https://www.shellcheck.net/wiki/SC2034
 # modules/apt-essentials.module.sh — minimal apt baseline for the rest of the catalog
 #
 # Per-package fallback strategy (PRD §18.1 Q-A12 / A-N6):
@@ -10,11 +11,11 @@
 
 # ── Dual-mode header ────────────────────────────────────────────────────────
 MODULE_STANDALONE="true"
-[[ "${BASH_SOURCE[0]}" != "${0}" ]] && MODULE_STANDALONE="false"
+[[ "${BASH_SOURCE[0]:-}" != "${0:-}" ]] && MODULE_STANDALONE="false"
 if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     set -euo pipefail
     shopt -s inherit_errexit 2>/dev/null || true
-    MODULE_DIR="${MODULE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)}"
+    MODULE_DIR="${MODULE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")" && pwd -P)}"
     REPO_ROOT="${REPO_ROOT:-$(cd -- "${MODULE_DIR}/.." && pwd -P)}"
     LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
     # shellcheck disable=SC1091

@@ -138,29 +138,75 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `release-tag.sh`'s CI-conclusion query for RC tags works).
 - `concurrency` group cancels in-flight PR runs on new pushes.
 
-#### ShellCheck baseline — make `make lint` pass on existing tree
+#### ShellCheck baseline — base-aligned, no global config
 
-- `.shellcheckrc` at repo root: `disable=SC2034` (every module/template
-  declares sourced metadata vars the engine reads via parameter
-  expansion; ShellCheck can't see the engine-side reads) +
-  `external-sources=true` (let `shellcheck -x` follow library sources).
-- `scripts/ci/ci.sh`: fix exclude-path typo `modules/tool` →
-  `modules/tools` (post-ADR-0005 plural rename had not been propagated;
-  deprecated tools were being linted). Also add `jq` to
-  `_install_deps_for_coverage` apt-get install (kcov/kcov image lacks
-  it; `lib/state.sh` requires jq for state.json mutation).
-- Per-file disable directives with rationale comments:
-  - `lib/module_helper.sh`: SC2119/SC2120/SC2317 — archetype-macro
-    wrappers dispatched indirectly via `${_phase}`.
-  - `lib/sync.sh`: SC2029 — SSH commands intentionally expand
-    `${_remote_path}` client-side.
-  - `lib/detect.sh:268`, `lib/platform.sh:42`: SC1083 — literal `}` in
-    case patterns matches JSON `null}` (object close).
-  - `modules/docker.module.sh`: SC2032/SC2033 — `install()` shadows
-    `/usr/bin/install`; harmless inside `sudo install ...` because sudo
-    clears the function table before exec.
-- `modules/font.module.sh`: rewrite `command -v X && X || true` →
-  `if ... then ... fi` for clarity (SC2015).
+Convention: no project-wide `.shellcheckrc`. Every disable lives at its
+call site with a wiki-link rationale, matching the upstream
+`ycpss91255-docker/base` pattern. Lint level stays at shellcheck's
+default severity (style/info/warning/error all reported).
+
+- `scripts/ci/ci.sh`:
+  - Fix exclude-path typo `modules/tool` → `modules/tools` (post-
+    ADR-0005 plural rename had not been propagated).
+  - Extend `_find_lintable_sh` to pick up `*.bash` + `*.bats` too.
+  - Add `jq` to `_install_deps_for_coverage` apt-get list (kcov/kcov
+    image lacks it; `lib/state.sh` needs jq for state.json mutation).
+- Proper fixes (no disable):
+  - `lib/detect.sh:268`, `lib/platform.sh:42`: escape `\}` in case
+    pattern (SC1083 — literal `}` matches JSON `null}` object close).
+  - `lib/module_helper.sh`: remove `"$@"` from 18 archetype inner
+    wrappers — never called with args, fixes SC2119/SC2120.
+  - All `lib/*.sh` + `modules/*.module.sh` + `templates/*.sh`:
+    defensive `${BASH_SOURCE[0]:-}` / `${0:-}` (matches base).
+  - `tests/unit/module_helper_spec.bats:205`: use
+    `declare -A DESCRIPTION=([en]="...")` for assoc array (SC2190).
+  - `modules/font.module.sh`: `command -v X && X || true` → explicit
+    `if ... then ... fi` (SC2015).
+- Disable-with-rationale (wiki-link inline at each disable):
+  - 10 `modules/*.module.sh` + 4 `templates/module-*.template.sh`:
+    file-top SC2034 — metadata vars consumed by engine post-source.
+  - 1 `tests/unit/module_helper_spec.bats` file-top SC2034/SC2317.
+  - 6 `tests/unit/*_spec.bats`: file-top SC1091 — tests source libs
+    via runtime `${LIB_DIR}` shellcheck can't statically resolve.
+  - `lib/module_helper.sh`: file-top SC2317 — archetype-macro inner
+    wrappers dispatched indirectly via `${_phase}` (lib/runner.sh).
+  - `lib/sync.sh`: file-top SC2029 — SSH cmds expand `${_remote_path}`
+    client-side intentionally.
+  - `modules/docker.module.sh`: per-fn SC2032/SC2033 above `install()`
+    — function name shadows `/usr/bin/install`; harmless because `sudo
+    install` invokes the binary (sudo clears function table).
+  - `tests/unit/i18n_spec.bats`: file-top SC2030/SC2031 — bats `run`
+    spawns subshell, test setups `export LANG=...` stage env.
+  - `tests/unit/modules/docker_spec.bats`, `templates/test.template.bats`:
+    file-top SC2317 — test mocks dispatched indirectly.
+  - `tests/unit/template_smoke_spec.bats:34`: per-block SC2016 above
+    multi-line `sed` with literal `${MODULE_DIR}` template placeholders.
+  - `lib/module_helper.sh:45`: per-line SC2120 on i18n wrapper —
+    optional `<lang>` arg.
+  - `lib/module_helper.sh:478`: per-line SC2119 on call without args
+    (uses INIT_UBUNTU_LANG default).
+
+#### Engine subshell isolation: `bash -c` → `(...)` (coverage compat)
+
+`lib/runner.sh:_runner_run_phase` switches the module-dispatch
+subshell from `bash --noprofile --norc -c "..."` to `(...)` fork.
+
+Why: kcov-instrumented bash (the coverage target's image) leaves
+`$BASH_SOURCE` / `$FUNCNAME` unbound inside `bash -c` contexts.
+Under `set -u`, kcov's ptrace-driven line-attribution hits the
+unset parameter and tears down the subshell on every command. The
+fork-style subshell inherits these arrays from the parent shell, so
+the strict-mode contract holds and coverage instrumentation stays
+happy. Isolation guarantee is unchanged — `(...)` is still a true
+subshell (side-effects don't leak back to the engine), just cheaper
+than `exec`-ing a new bash.
+
+Parent shell (`setup_ubuntu.sh` or bats `_load_engine`) is now
+responsible for sourcing `logger.sh` / `general.sh` /
+`module_helper.sh` once; the subshell inherits them. The subshell
+still `source`s the module file itself and dispatches to `${_phase}`.
+
+- `.gitignore`: add `/coverage/` to ignore the kcov output dir.
 
 #### Release workflow — port from docker_harness#22 + #106 (commit 1b40cfb)
 

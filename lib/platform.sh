@@ -26,7 +26,7 @@
 #   platform_export_env [<env-json>]
 #     Convenience: classify and export INIT_UBUNTU_FORM_FACTOR.
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi
@@ -38,9 +38,8 @@ _platform_extract_str() {
     local _json="$1" _anchor="$2"
     local _rest="${_json#*"${_anchor}"}"
     [[ "${_rest}" == "${_json}" ]] && return 0
-    # shellcheck disable=SC1083  # literal `}` matches JSON `null}` (object close)
     case "${_rest}" in
-        null,*|null}*|null)
+        null,*|null\}*|null)
             return 0
             ;;
         \"*)

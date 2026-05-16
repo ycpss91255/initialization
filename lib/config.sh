@@ -17,7 +17,7 @@
 # Implementation: pure bash + awk for INI; jq only for --json output.
 # No quoted values, nested sections, multi-line values, or inline comments.
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi

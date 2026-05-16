@@ -14,7 +14,7 @@ teardown() {
 }
 
 _load_config() {
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/config.sh"
 }
 

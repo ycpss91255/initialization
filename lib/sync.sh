@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2029  # SSH cmd strings intentionally expand ${_remote_path} client-side; value is a controlled tmpfile name, never user-tainted — https://www.shellcheck.net/wiki/SC2029
 # lib/sync.sh — SSH push / pull of the install state across machines
 #
 # Per PRD §16 (Sync mechanism) and docs/architecture.md §16.
@@ -14,7 +15,7 @@
 #     setup_secrets ssh-key copy first.
 #   - Payload NEVER contains secrets — only module names + manual flags.
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi

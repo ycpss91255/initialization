@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # module metadata vars (NAME / DESCRIPTION / CATEGORY / TAGS / ...) consumed by engine post-source — https://www.shellcheck.net/wiki/SC2034
 # modules/ssh-config.module.sh — personal ~/.ssh/config drop
 
 # ── Dual-mode header ────────────────────────────────────────────────────────
 MODULE_STANDALONE="true"
-[[ "${BASH_SOURCE[0]}" != "${0}" ]] && MODULE_STANDALONE="false"
+[[ "${BASH_SOURCE[0]:-}" != "${0:-}" ]] && MODULE_STANDALONE="false"
 if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     set -euo pipefail
     shopt -s inherit_errexit 2>/dev/null || true
-    MODULE_DIR="${MODULE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)}"
+    MODULE_DIR="${MODULE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")" && pwd -P)}"
     REPO_ROOT="${REPO_ROOT:-$(cd -- "${MODULE_DIR}/.." && pwd -P)}"
     LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/logger.sh"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/general.sh"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/module_helper.sh"
 fi
 

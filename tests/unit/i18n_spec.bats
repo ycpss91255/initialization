@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2030,SC2031  # bats `run` spawns a subshell; test setups `export LANG=...` before `run` to stage the env for i18n_detect_lang — https://www.shellcheck.net/wiki/SC2030
 # tests/unit/i18n_spec.bats — lib/i18n.sh
 
 load "${BATS_TEST_DIRNAME}/../helpers/common"
@@ -6,7 +7,7 @@ load "${BATS_TEST_DIRNAME}/../helpers/common"
 setup() {
     setup_test_env
     unset LANG INIT_UBUNTU_LANG
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/i18n.sh"
 }
 

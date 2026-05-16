@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC1091  # test sources libs via runtime ${LIB_DIR}; static-resolution misses the path — https://www.shellcheck.net/wiki/SC1091
 # tests/unit/dispatcher_spec.bats — lib/dispatcher.sh
 
 load "${BATS_TEST_DIRNAME}/../helpers/common"

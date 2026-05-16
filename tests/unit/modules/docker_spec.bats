@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2317  # test mocks (e.g. command_v) dispatched indirectly when docker module's install() resolves shell functions — https://www.shellcheck.net/wiki/SC2317
 # tests/unit/modules/docker_spec.bats — modules/docker.module.sh
 
 load "${BATS_TEST_DIRNAME}/../../helpers/common"
@@ -14,13 +15,13 @@ teardown() {
 }
 
 _load_module() {
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/logger.sh"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/general.sh"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/module_helper.sh"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${MODULE_DIR}/docker.module.sh"
 }
 

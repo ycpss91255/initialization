@@ -6,14 +6,14 @@
 # into every caller. The lib/ convention is: callers (setup_ubuntu.sh,
 # bats tests, module sub-shells) set strict mode themselves.
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     printf "To learn how to use it, please refer to '%s'\n" "./tests/test_logger.sh"
     return 0 2>/dev/null
 fi
 
-_script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-# shellcheck disable=SC1091
+_script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")" && pwd -P)"
+# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
 source "${_script_path}/logger.sh"
 
 # NOTE: not use
@@ -43,7 +43,7 @@ function get_system_param() {
     local _system_id="" _system_codename="" _system_release=""
 
     if [[ -f /etc/os-release ]]; then
-        # shellcheck disable=SC1091
+        # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
         source /etc/os-release
 
         _system_id="${ID:-""}"

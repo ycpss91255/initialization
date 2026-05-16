@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2034,SC2317  # SC2034: test setups stage module metadata vars (NAME / APT_PKGS / ...) that the function-under-test reads after sourcing module_helper. SC2317: test mocks (is_installed/install) dispatched indirectly via the module's macro wrappers — https://www.shellcheck.net/wiki/SC2034 + https://www.shellcheck.net/wiki/SC2317
 # tests/unit/module_helper_spec.bats — direct unit tests on lib/module_helper.sh
 #
 # Tests the helper functions in isolation (no module file):
@@ -16,11 +17,11 @@ setup() {
     setup_test_env
     export LOG_LEVEL=INFO
     export LOG_COLOR=false
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/logger.sh"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/general.sh"
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
     source "${LIB_DIR}/module_helper.sh"
 
     NAME="testmod"
@@ -202,7 +203,7 @@ EOF
     NAME="testmod"
     VERSION_PROVIDED="v1.0"
     CATEGORY="optional"
-    DESCRIPTION=("en:my test module")
+    declare -A DESCRIPTION=([en]="my test module")
     HOMEPAGE="https://example.com"
     run module_standalone_info
     assert_success

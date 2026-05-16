@@ -119,6 +119,103 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   status / source-mode / no-side-effects) across all 4 archetypes.
 - Test count: 255 → 267 (8 new archetype-iterating smoke + 11 consistency).
 
+#### CI workflow — GitHub Actions (issue #2)
+
+- `.github/workflows/ci.yaml` with 5 jobs:
+  - `lint` — `make lint` (shellcheck + hadolint + fish syntax),
+    always runs even on doc-only PRs.
+  - `test-unit` — `make test-unit`, skipped on doc-only PRs.
+  - `test-integration` — `make test-integration`, skipped on doc-only.
+  - `coverage` — `make coverage` (kcov), uploaded as artefact;
+    skipped on doc-only.
+  - `ci-passed` — aggregator that succeeds iff lint passed and the
+    heavy three either passed or skipped. Single check name for
+    `required_status_checks` to anchor on (#3).
+- Path filter via `dorny/paths-filter@v3`: `code` output is `false`
+  for changes touching only `docs/**`, `**/*.md`, `LICENSE*`,
+  `.gitignore`, `.codecov.yaml`.
+- Triggers: PR to `main`, push to `main`, push to `v*` tags (so
+  `release-tag.sh`'s CI-conclusion query for RC tags works).
+- `concurrency` group cancels in-flight PR runs on new pushes.
+
+#### ShellCheck baseline — base-aligned, no global config
+
+Convention: no project-wide `.shellcheckrc`. Every disable lives at its
+call site with a wiki-link rationale, matching the upstream
+`ycpss91255-docker/base` pattern. Lint level stays at shellcheck's
+default severity (style/info/warning/error all reported).
+
+- `scripts/ci/ci.sh`:
+  - Fix exclude-path typo `modules/tool` → `modules/tools` (post-
+    ADR-0005 plural rename had not been propagated).
+  - Extend `_find_lintable_sh` to pick up `*.bash` + `*.bats` too.
+  - Exclude legacy paths slated for removal per PRD §6.5/§6.6:
+    `modules/submodule/`, `modules/function/`, `modules/setup_*.sh`,
+    `modules/anydesk.sh`, `install-nvidia-driver.sh` — these predate
+    the v2 module pattern; their shellcheck disables stay as-is until
+    relocation.
+  - Add `jq` to `_install_deps_for_coverage` apt-get list (kcov/kcov
+    image lacks it; `lib/state.sh` needs jq for state.json mutation).
+  - Refactor `_bats_args` → `_set_bats_args_arr` populating global
+    `BATS_ARGS_ARR`; callers now `bats "${BATS_ARGS_ARR[@]}"` instead of
+    `bats $(_bats_args)` (SC2046 proper fix).
+- Proper fixes (no disable):
+  - `lib/detect.sh:268`, `lib/platform.sh:42`: escape `\}` in case
+    pattern (SC1083 — literal `}` matches JSON `null}` object close).
+  - `lib/module_helper.sh`: remove `"$@"` from 18 archetype inner
+    wrappers — never called with args, fixes SC2119/SC2120.
+  - All `lib/*.sh` + `modules/*.module.sh` + `templates/*.sh`:
+    defensive `${BASH_SOURCE[0]:-}` / `${0:-}` (matches base).
+  - `tests/unit/module_helper_spec.bats:205`: use
+    `declare -A DESCRIPTION=([en]="...")` for assoc array (SC2190).
+  - `modules/font.module.sh`: `command -v X && X || true` → explicit
+    `if ... then ... fi` (SC2015).
+- Disable-with-rationale (wiki-link inline at each disable):
+  - 10 `modules/*.module.sh` + 4 `templates/module-*.template.sh`:
+    file-top SC2034 — metadata vars consumed by engine post-source.
+  - 1 `tests/unit/module_helper_spec.bats` file-top SC2034/SC2317.
+  - 6 `tests/unit/*_spec.bats`: file-top SC1091 — tests source libs
+    via runtime `${LIB_DIR}` shellcheck can't statically resolve.
+  - `lib/module_helper.sh`: file-top SC2317 — archetype-macro inner
+    wrappers dispatched indirectly via `${_phase}` (lib/runner.sh).
+  - `lib/sync.sh`: file-top SC2029 — SSH cmds expand `${_remote_path}`
+    client-side intentionally.
+  - `modules/docker.module.sh`: per-fn SC2032/SC2033 above `install()`
+    — function name shadows `/usr/bin/install`; harmless because `sudo
+    install` invokes the binary (sudo clears function table).
+  - `tests/unit/i18n_spec.bats`: file-top SC2030/SC2031 — bats `run`
+    spawns subshell, test setups `export LANG=...` stage env.
+  - `tests/unit/modules/docker_spec.bats`, `templates/test.template.bats`:
+    file-top SC2317 — test mocks dispatched indirectly.
+  - `tests/unit/template_smoke_spec.bats:34`: per-block SC2016 above
+    multi-line `sed` with literal `${MODULE_DIR}` template placeholders.
+  - `lib/module_helper.sh:45`: per-line SC2120 on i18n wrapper —
+    optional `<lang>` arg.
+  - `lib/module_helper.sh:478`: per-line SC2119 on call without args
+    (uses INIT_UBUNTU_LANG default).
+
+#### Engine subshell isolation: `bash -c` → `(...)` (coverage compat)
+
+`lib/runner.sh:_runner_run_phase` switches the module-dispatch
+subshell from `bash --noprofile --norc -c "..."` to `(...)` fork.
+
+Why: kcov-instrumented bash (the coverage target's image) leaves
+`$BASH_SOURCE` / `$FUNCNAME` unbound inside `bash -c` contexts.
+Under `set -u`, kcov's ptrace-driven line-attribution hits the
+unset parameter and tears down the subshell on every command. The
+fork-style subshell inherits these arrays from the parent shell, so
+the strict-mode contract holds and coverage instrumentation stays
+happy. Isolation guarantee is unchanged — `(...)` is still a true
+subshell (side-effects don't leak back to the engine), just cheaper
+than `exec`-ing a new bash.
+
+Parent shell (`setup_ubuntu.sh` or bats `_load_engine`) is now
+responsible for sourcing `logger.sh` / `general.sh` /
+`module_helper.sh` once; the subshell inherits them. The subshell
+still `source`s the module file itself and dispatches to `${_phase}`.
+
+- `.gitignore`: add `/coverage/` to ignore the kcov output dir.
+
 #### apt archetype: is_outdated default via apt list --upgradable (issue #11)
 
 - `lib/module_helper.sh`: new `module_default_apt_is_outdated` —
@@ -133,7 +230,7 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 - Test: `template_smoke_spec`'s `is-outdated` case split per
   archetype — apt returns 1 (macro-provided, empty APT_PKGS = not
   outdated); github-release / config / custom still return 2 (not
-  implemented). 267 ok.
+  implemented).
 
 Follow-ups (not in this PR):
 - github-release archetype `is_outdated` default — needs a

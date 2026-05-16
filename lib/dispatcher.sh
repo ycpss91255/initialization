@@ -12,7 +12,7 @@
 #     Entry point; parses argv, fans out to handlers. Returns the chosen
 #     handler's exit code (0/1/2/3/4/5/6/7 per PRD §7.4).
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi
@@ -503,7 +503,7 @@ _dispatcher_doctor() {
                 _status="STALE (no module file)"
                 _issues=$((_issues + 1))
             elif (
-                # shellcheck disable=SC1090
+                # shellcheck source=/dev/null  # module path is dynamic; static resolution impossible — https://www.shellcheck.net/wiki/SC1090
                 bash --noprofile --norc -c "
                     source '${LIB_DIR}/logger.sh' >/dev/null 2>&1
                     source '${LIB_DIR}/general.sh' >/dev/null 2>&1

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2317  # archetype-macro inner wrappers dispatched indirectly via ${_phase} (lib/runner.sh) — https://www.shellcheck.net/wiki/SC2317
 # lib/module_helper.sh — Reusable lifecycle helpers + i18n + archetype macros.
 #
 # Module authors declare DATA (APT_PKGS / GITHUB_REPO / CONFIG_DEST / ...) and
@@ -16,7 +17,7 @@
 #   7. Standalone CLI entry   — module_standalone_main, info, status
 #   8. Engine-side aggregators
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not an executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi
@@ -41,6 +42,7 @@ module_i18n_get() {
 }
 
 module_get_description()          { module_i18n_get DESCRIPTION          "$@"; }
+# shellcheck disable=SC2120  # optional <lang> arg; in-module callers may omit, tests pass "en" — https://www.shellcheck.net/wiki/SC2120
 module_get_post_install_message() { module_i18n_get POST_INSTALL_MESSAGE "$@"; }
 module_get_warn_message()         { module_i18n_get WARN_MESSAGE         "$@"; }
 
@@ -175,13 +177,13 @@ module_default_apt_is_outdated() {
 # Wire 7 lifecycle functions in one call (6 mutation + is_outdated read).
 # Module can still override any of them by re-declaring after the macro.
 module_use_apt_archetype() {
-    is_installed() { module_default_apt_is_installed "$@"; }
-    is_outdated() { module_default_apt_is_outdated "$@"; }
-    install()      { module_default_apt_install "$@"; }
-    upgrade()       { module_default_apt_upgrade "$@"; }
-    remove()       { module_default_apt_remove "$@"; }
-    purge()        { module_default_apt_purge "$@"; }
-    verify()       { module_default_verify "$@"; }
+    is_installed() { module_default_apt_is_installed; }
+    is_outdated()  { module_default_apt_is_outdated; }
+    install()      { module_default_apt_install; }
+    upgrade()      { module_default_apt_upgrade; }
+    remove()       { module_default_apt_remove; }
+    purge()        { module_default_apt_purge; }
+    verify()       { module_default_verify; }
 }
 
 # ─── 5. GitHub-release archetype ────────────────────────────────────────────
@@ -289,12 +291,12 @@ module_default_github_release_purge() {
 }
 
 module_use_github_release_archetype() {
-    is_installed() { module_default_github_release_is_installed "$@"; }
-    install()      { module_default_github_release_install "$@"; }
-    upgrade()       { module_default_github_release_upgrade "$@"; }
-    remove()       { module_default_github_release_remove "$@"; }
-    purge()        { module_default_github_release_purge "$@"; }
-    verify()       { module_default_verify "$@"; }
+    is_installed() { module_default_github_release_is_installed; }
+    install()      { module_default_github_release_install; }
+    upgrade()       { module_default_github_release_upgrade; }
+    remove()       { module_default_github_release_remove; }
+    purge()        { module_default_github_release_purge; }
+    verify()       { module_default_verify; }
 }
 
 # ─── 6. Config-drop archetype ───────────────────────────────────────────────
@@ -360,12 +362,12 @@ module_default_config_purge() {
 }
 
 module_use_config_archetype() {
-    is_installed() { module_default_config_is_installed "$@"; }
-    install()      { module_default_config_install "$@"; }
-    upgrade()       { module_default_config_upgrade "$@"; }
-    remove()       { module_default_config_remove "$@"; }
-    purge()        { module_default_config_purge "$@"; }
-    verify()       { module_default_verify "$@"; }
+    is_installed() { module_default_config_is_installed; }
+    install()      { module_default_config_install; }
+    upgrade()       { module_default_config_upgrade; }
+    remove()       { module_default_config_remove; }
+    purge()        { module_default_config_purge; }
+    verify()       { module_default_verify; }
 }
 
 # ─── 7. Standalone CLI entry ────────────────────────────────────────────────
@@ -492,6 +494,7 @@ module_standalone_main() {
 # module_emit_post_install — runner appends this to a session-wide buffer.
 module_emit_post_install() {
     local _msg
+    # shellcheck disable=SC2119  # call with no args = use INIT_UBUNTU_LANG default — https://www.shellcheck.net/wiki/SC2119
     _msg="$(module_get_post_install_message)"
     [[ -n "${_msg}" ]] || return 0
     printf '[%s] %s\n' "${NAME:-?}" "${_msg}"

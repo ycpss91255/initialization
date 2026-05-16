@@ -16,10 +16,10 @@
 #
 # Standard library guard: refuse to run as an executable script.
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not an executable script.\n" "${BASH_SOURCE[0]##*/}"
     printf "Source it from a script or test, e.g.:\n"
-    printf "    source \"%s\"\n" "${BASH_SOURCE[0]}"
+    printf "    source \"%s\"\n" "${BASH_SOURCE[0]:-}"
     return 0 2>/dev/null
 fi
 

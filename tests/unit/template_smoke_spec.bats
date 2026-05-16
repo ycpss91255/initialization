@@ -31,6 +31,7 @@ setup() {
         [[ -f "${_src}" ]] || { printf "missing template: %s\n" "${_src}" >&2; return 1; }
         # Fill the visible <TODO ...> placeholders. Keep the rest untouched so
         # this spec exercises the actual template shape, not a stripped variant.
+        # shellcheck disable=SC2016  # single-quoted ${MODULE_DIR}/${HOME} reach sed as literal text and match the template's placeholder strings — https://www.shellcheck.net/wiki/SC2016
         sed \
             -e 's|<TODO-kebab-case-name>|smoke|g' \
             -e 's|<TODO: apt-managed \| latest \| v1.2.3>|test|g' \

@@ -26,7 +26,7 @@
 #   registry_has <name>
 #     Return 0 if module is registered, 1 otherwise.
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi
@@ -56,7 +56,7 @@ _registry_parse_one() {
 
     bash --noprofile --norc -c '
         set +e
-        # shellcheck disable=SC1090
+        # shellcheck source=/dev/null  # $1 is a discovered module path; static resolution impossible — https://www.shellcheck.net/wiki/SC1090
         source "$1" 2>/dev/null || exit 2
 
         printf "NAME=%s\n" "${NAME:-}"

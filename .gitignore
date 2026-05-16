@@ -1,5 +1,8 @@
 tmp
 
+# kcov coverage output from `make coverage` (local + CI artefact).
+/coverage/
+
 # Yazi: ignore `ya pkg` auto-installed packages, keep only manually-tracked plugins
 modules/config/yazi/plugins/*
 !modules/config/yazi/plugins/dockerfile.yazi

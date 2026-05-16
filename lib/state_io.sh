@@ -31,7 +31,7 @@
 #
 # Dependencies: jq (same as lib/state.sh).
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
 fi
@@ -114,9 +114,7 @@ state_io_export() {
     # Resolve module name list.
     local -a _names=()
     if [[ -n "${_filter_csv}" ]]; then
-        local IFS=','
-        # shellcheck disable=SC2206
-        _names=(${_filter_csv})
+        IFS=',' read -r -a _names <<< "${_filter_csv}"
     elif [[ -f "${_state_path}" ]]; then
         local _line
         while IFS= read -r _line; do

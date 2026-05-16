@@ -65,7 +65,7 @@ _install_deps_for_coverage() {
     apt-get install -y --no-install-recommends \
         bats bats-support bats-assert \
         shellcheck git ca-certificates \
-        parallel make \
+        parallel make jq \
         || _die "apt-get install failed for bats/shellcheck deps."
 
     # bats-mock not in debian bookworm; pin to upstream v1.2.5 for reproducibility.
@@ -101,6 +101,18 @@ EOF
 }
 
 # ── Lint discovery (exclude deprecated paths per PRD §6.5/§6.6) ──────────────
+#
+# Pruned directories (slated for relocation or already vendored upstream):
+#   small-tools/             — legacy install scripts, replaced by modules/
+#   modules/tools/           — staging for one-off scripts (PRD §6.5)
+#   modules/config/          — third-party config files (vendored upstream)
+#   modules/submodule/       — v1 sub-tool helpers (predates v2 module pattern)
+#   modules/function/        — v1 lib/ location (moved to lib/)
+#
+# Pruned files (legacy install scripts that predate the v2 module pattern):
+#   modules/setup_*.sh       — old all-in-one installers; not migrated yet
+#   modules/anydesk.sh       — legacy one-off
+#   install-nvidia-driver.sh — legacy one-off at repo root
 
 _find_lintable_sh() {
     find "${REPO_ROOT}" \
@@ -108,9 +120,15 @@ _find_lintable_sh() {
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
-           -path "${REPO_ROOT}/modules/tool" -o \
-           -path "${REPO_ROOT}/modules/config" \) -prune -o \
-        -type f -name "*.sh" -print0
+           -path "${REPO_ROOT}/modules/tools" -o \
+           -path "${REPO_ROOT}/modules/config" -o \
+           -path "${REPO_ROOT}/modules/submodule" -o \
+           -path "${REPO_ROOT}/modules/function" \) -prune -o \
+        -type f \( -name "*.sh" -o -name "*.bash" -o -name "*.bats" \) \
+        ! -path "${REPO_ROOT}/modules/setup_*.sh" \
+        ! -path "${REPO_ROOT}/modules/anydesk.sh" \
+        ! -path "${REPO_ROOT}/install-nvidia-driver.sh" \
+        -print0
 }
 
 _find_lintable_fish() {
@@ -119,8 +137,10 @@ _find_lintable_fish() {
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
-           -path "${REPO_ROOT}/modules/tool" -o \
-           -path "${REPO_ROOT}/modules/config" \) -prune -o \
+           -path "${REPO_ROOT}/modules/tools" -o \
+           -path "${REPO_ROOT}/modules/config" -o \
+           -path "${REPO_ROOT}/modules/submodule" -o \
+           -path "${REPO_ROOT}/modules/function" \) -prune -o \
         -type f -name "*.fish" -print0
 }
 
@@ -182,11 +202,16 @@ _run_hadolint() {
 
 # ── Bats ─────────────────────────────────────────────────────────────────────
 
-_bats_args() {
+# Populates global array BATS_ARGS_ARR with the bats invocation flags.
+# Using an array (vs `printf` of a space-separated string) lets callers
+# expand `"${BATS_ARGS_ARR[@]}"` instead of unquoted `$(_bats_args)`,
+# avoiding SC2046 (unquoted command substitution).
+_set_bats_args_arr() {
+    BATS_ARGS_ARR=()
     if command -v parallel >/dev/null 2>&1; then
         local _j
         _j="$(nproc 2>/dev/null || echo 4)"
-        printf -- '--jobs %s' "${_j}"
+        BATS_ARGS_ARR=(--jobs "${_j}")
     fi
 }
 
@@ -196,8 +221,8 @@ _run_unit() {
         return 0
     fi
     _info "Running Bats unit tests"
-    # shellcheck disable=SC2046
-    bats $(_bats_args) -r "${REPO_ROOT}/tests/unit/"
+    _set_bats_args_arr
+    bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/tests/unit/"
 }
 
 _run_integration() {
@@ -206,8 +231,8 @@ _run_integration() {
         return 0
     fi
     _info "Running Bats integration tests"
-    # shellcheck disable=SC2046
-    bats $(_bats_args) -r "${REPO_ROOT}/tests/integration/"
+    _set_bats_args_arr
+    bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/tests/integration/"
 }
 
 # ── Kcov coverage ────────────────────────────────────────────────────────────

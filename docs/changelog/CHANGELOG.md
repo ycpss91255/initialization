@@ -263,6 +263,27 @@ still `source`s the module file itself and dispatches to `${_phase}`.
   `docs/guide/archetype-cookbook.md` → `docs/guides/archetype-cookbook.md`
   (per ADR-0005, plural for the collection dir).
 
+#### wait-pr-ci skill + hook (issue #15)
+
+Port of docker_harness's `wait-pr-ci` triple so `gh pr create` is
+followed by a non-context-burning CI monitor instead of a sleep
+poll. Three components:
+
+- `.claude/scripts/wait-pr-ci.sh` — the polling primitive. Wraps
+  `gh pr view` + `gh pr checks` with terminal-state detection
+  (success / failure / merged / closed). Designed to be the body
+  of a Claude Code Monitor invocation. SKIPPED checks count as
+  success (matches the path-filter doc-only behaviour from #4's
+  CI workflow).
+- `.claude/skills/wait-pr-ci/SKILL.md` — agent-facing flow doc.
+  When to invoke (post `gh pr create`, post force-push, when
+  checking on another agent's PR), how to read the output.
+- `.claude/hooks/remind_pr_wait_ci.sh` — PreToolUse Bash hook.
+  Fires when the agent is about to run `gh pr create` and emits
+  a non-blocking systemMessage reminding to invoke the skill
+  after the PR opens. Registered as the 8th entry in
+  `.claude/settings.json` PreToolUse Bash matcher.
+
 #### Release workflow — port from docker_harness#22 + #106 (commit 1b40cfb)
 
 Alignment with `ycpss91255-docker/docker_harness` release infrastructure:

@@ -5,7 +5,7 @@
 # Tests the helper functions in isolation (no module file):
 #   - module_i18n_get with various languages + fallback to en
 #   - module_dryrun_guard / skip_if_installed / skip_if_not_installed
-#   - module_use_apt_archetype defines 6 lifecycle functions
+#   - module_use_apt_archetype defines 7 lifecycle functions
 #   - module_use_github_release_archetype defines 6 lifecycle functions
 #   - module_use_config_archetype defines 6 lifecycle functions
 #   - module_default_apt_install in dry-run does not call apt-get
@@ -104,10 +104,10 @@ teardown() { teardown_test_env; }
 
 # ── Archetype macros: 6 functions each ──────────────────────────────────────
 
-@test "module_use_apt_archetype defines 6 lifecycle functions" {
+@test "module_use_apt_archetype defines 7 lifecycle functions" {
     module_use_apt_archetype
     local _fn
-    for _fn in is_installed install upgrade remove purge verify; do
+    for _fn in is_installed install upgrade remove purge verify is_outdated; do
         declare -F "${_fn}" >/dev/null || { printf "missing %s\n" "${_fn}" >&2; return 1; }
     done
 }

@@ -216,6 +216,116 @@ still `source`s the module file itself and dispatches to `${_phase}`.
 
 - `.gitignore`: add `/coverage/` to ignore the kcov output dir.
 
+#### ADR-0006 — OTel-aligned logger schema (decision only; issue #8)
+
+- `docs/adr/0006-otel-aligned-logger-schema.md` — decision to migrate
+  `lib/logger.sh` `log_event` JSONL output to mirror the OpenTelemetry
+  Logs Data Model + W3C Trace Context, without adopting the OTel SDK
+  or Collector. Sourced from the project author's observability
+  playbook (Notion: "Debug 資訊架構：從 print 到 Observability",
+  2026-05-12). Key choices:
+  - Field rename: `ts` → `timestamp`, `level` → `severity_text`,
+    `event` → `body`, top-level `module` → nested
+    `attributes.service.name`.
+  - All business payload nested under `attributes` (OTel SemConv).
+  - Add `attributes.service.lang = "bash"`, `attributes.code.filepath`
+    + `code.lineno`.
+  - Add `trace_id` (per-`setup_ubuntu`-invocation, UUID v7 preferred)
+    + `span_id` (per-phase-per-module). Auto-propagate via env into
+    sub-shells.
+  - Mirror `log_info` / `log_warn` / `log_error` to JSONL too.
+  - Per-session log file rotation:
+    `${XDG_STATE_HOME}/init_ubuntu/logs/<trace_id>.jsonl` + `latest`
+    symlink.
+  - `docs/guides/log-queries.md` will ship lnav format file with
+    `opid-field: trace_id` (free timeline view) + jq snippet library.
+- Implementation deferred to issue #8; gated on PRs #4 / #6 / #7
+  merging first to avoid CHANGELOG and `lib/runner.sh` conflicts.
+
+#### Archetype cookbook (issue #5, task #69)
+
+- `docs/guides/archetype-cookbook.md` — companion to the 4 archetype
+  templates. Documents:
+  - Decision tree for picking archetype A / B / C / D.
+  - Pure-archetype usage (apt-essentials, neovim, git-config, font).
+  - **Hybrid + super-call override pattern** — using
+    `module_use_apt_archetype` then overriding `install()` (docker
+    is the reference: apt-repo key+source setup + `usermod -aG`).
+  - Capture-and-chain pattern: `_orig_install=$(declare -f
+    module_default_apt_install | sed '1d;$d')` to `eval` the
+    original then add post-steps.
+  - `is_outdated()` recipes per archetype (apt-list-upgradable,
+    gh-release-tag-compare, sha256sum-config-hash, custom).
+  - 5 common pitfalls: bad-substitution arrays, `declare -A` vs
+    `declare -gA`, `cd` outside subshell, standalone vs engine
+    state writes (ADR-0001), `update` vs `upgrade` naming.
+- Templates' authoring docstring paths fixed:
+  `docs/guide/archetype-cookbook.md` → `docs/guides/archetype-cookbook.md`
+  (per ADR-0005, plural for the collection dir).
+
+#### wait-pr-ci skill + hook (issue #15)
+
+Port of docker_harness's `wait-pr-ci` triple so `gh pr create` is
+followed by a non-context-burning CI monitor instead of a sleep
+poll. Three components:
+
+- `.claude/scripts/wait-pr-ci.sh` — the polling primitive. Wraps
+  `gh pr view` + `gh pr checks` with terminal-state detection
+  (success / failure / merged / closed). Designed to be the body
+  of a Claude Code Monitor invocation. SKIPPED checks count as
+  success (matches the path-filter doc-only behaviour from #4's
+  CI workflow).
+- `.claude/skills/wait-pr-ci/SKILL.md` — agent-facing flow doc.
+  When to invoke (post `gh pr create`, post force-push, when
+  checking on another agent's PR), how to read the output.
+- `.claude/hooks/remind_pr_wait_ci.sh` — PreToolUse Bash hook.
+  Fires when the agent is about to run `gh pr create` and emits
+  a non-blocking systemMessage reminding to invoke the skill
+  after the PR opens. Registered as the 8th entry in
+  `.claude/settings.json` PreToolUse Bash matcher.
+
+#### User-local module discovery (issue #13, PRD §13.2 Q35)
+
+- `lib/registry.sh`: `registry_load_all` now scans a second directory
+  after the bundled `modules/` — defaults to
+  `${INIT_UBUNTU_USER_MODULE_DIR:-${XDG_CONFIG_HOME:-${HOME}/.config}/init_ubuntu/modules}`.
+  Skipped silently if absent (engine works on hosts that never opt in).
+- Name collision: user-local wins by overwriting the bundled entry;
+  `log_warn` (or stderr fallback if logger not loaded) reports the
+  override with both paths.
+- Internal: existing scan loop extracted to private
+  `_registry_load_one_dir(dir, is_user_local)` helper. Public API
+  `registry_load_all` keeps backwards-compatible single-arg
+  signature.
+- Tests: 267 → 271 (4 new in `tests/unit/registry_spec.bats`):
+  - user-local module appears in `registry_list_names`
+  - user-local NAME collision overrides bundled metadata
+  - collision emits `user-local override` warn line
+  - absent user dir is a no-op
+
+#### apt archetype: is_outdated default via apt list --upgradable (issue #11)
+
+- `lib/module_helper.sh`: new `module_default_apt_is_outdated` —
+  returns 0 (outdated) if any package in `APT_PKGS` appears in
+  `apt list --upgradable` output, 1 otherwise. No sudo required;
+  graceful on hosts without apt (`apt -> empty -> 1`).
+- `module_use_apt_archetype` macro now binds `is_outdated()` too
+  (was 6 fns → 7 fns). Module authors get the default for free; can
+  still override after the macro.
+- Test: `module_use_apt_archetype` function-list assertion updated
+  to include `is_outdated` (now 7).
+- Test: `template_smoke_spec`'s `is-outdated` case split per
+  archetype — apt returns 1 (macro-provided, empty APT_PKGS = not
+  outdated); github-release / config / custom still return 2 (not
+  implemented).
+
+Follow-ups (not in this PR):
+- github-release archetype `is_outdated` default — needs a
+  `module_sidecar_get_version` helper to read
+  `${XDG_STATE_HOME}/init_ubuntu/versions/<name>`. Separate task.
+- config archetype `is_outdated` default — sha256sum-based diff;
+  ~15-line stub but ships cleanly in its own PR.
+
 #### Engine: upgrade / verify subcommands + state.json fields (issue #7)
 
 - `setup_ubuntu upgrade [<module>...] [-y] [--dry-run]` — calls each

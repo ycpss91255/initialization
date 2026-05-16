@@ -157,12 +157,30 @@ module_default_verify() {
     fi
 }
 
-# Wire all five (six w/ verify) lifecycle functions in one call.
+# module_default_apt_is_outdated — `apt list --upgradable` query.
+#   Returns 0 (= outdated) if any package in APT_PKGS appears in the
+#   apt-managed upgradable list, 1 otherwise. No sudo required;
+#   degrades gracefully on hosts without apt (apt -> empty -> 1).
+module_default_apt_is_outdated() {
+    declare -p APT_PKGS >/dev/null 2>&1 || return 1
+    [[ "${#APT_PKGS[@]}" -gt 0 ]] || return 1
+    local _upgradable _pkg
+    _upgradable="$(apt list --upgradable 2>/dev/null)"
+    [[ -n "${_upgradable}" ]] || return 1
+    for _pkg in "${APT_PKGS[@]}"; do
+        [[ -n "${_pkg}" ]] || continue
+        printf '%s\n' "${_upgradable}" | grep -q "^${_pkg}/" && return 0
+    done
+    return 1
+}
+
+# Wire 7 lifecycle functions in one call (6 mutation + is_outdated read).
 # Module can still override any of them by re-declaring after the macro.
 module_use_apt_archetype() {
     is_installed() { module_default_apt_is_installed; }
+    is_outdated()  { module_default_apt_is_outdated; }
     install()      { module_default_apt_install; }
-    upgrade()       { module_default_apt_upgrade; }
+    upgrade()      { module_default_apt_upgrade; }
     remove()       { module_default_apt_remove; }
     purge()        { module_default_apt_purge; }
     verify()       { module_default_verify; }

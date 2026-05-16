@@ -284,6 +284,25 @@ poll. Three components:
   after the PR opens. Registered as the 8th entry in
   `.claude/settings.json` PreToolUse Bash matcher.
 
+#### User-local module discovery (issue #13, PRD §13.2 Q35)
+
+- `lib/registry.sh`: `registry_load_all` now scans a second directory
+  after the bundled `modules/` — defaults to
+  `${INIT_UBUNTU_USER_MODULE_DIR:-${XDG_CONFIG_HOME:-${HOME}/.config}/init_ubuntu/modules}`.
+  Skipped silently if absent (engine works on hosts that never opt in).
+- Name collision: user-local wins by overwriting the bundled entry;
+  `log_warn` (or stderr fallback if logger not loaded) reports the
+  override with both paths.
+- Internal: existing scan loop extracted to private
+  `_registry_load_one_dir(dir, is_user_local)` helper. Public API
+  `registry_load_all` keeps backwards-compatible single-arg
+  signature.
+- Tests: 267 → 271 (4 new in `tests/unit/registry_spec.bats`):
+  - user-local module appears in `registry_list_names`
+  - user-local NAME collision overrides bundled metadata
+  - collision emits `user-local override` warn line
+  - absent user dir is a no-op
+
 #### Release workflow — port from docker_harness#22 + #106 (commit 1b40cfb)
 
 Alignment with `ycpss91255-docker/docker_harness` release infrastructure:

@@ -98,6 +98,18 @@ _runner_run_phase() {
                     state_record_install "${_name}" "${_manual}" "${VERSION_PROVIDED:-unknown}" || \
                         log_warn "[${_name}] state_record_install failed (continuing)"
                     ;;
+                upgrade)
+                    if declare -F state_record_upgrade >/dev/null 2>&1; then
+                        state_record_upgrade "${_name}" "${VERSION_PROVIDED:-unknown}" || \
+                            log_warn "[${_name}] state_record_upgrade failed (continuing)"
+                    fi
+                    ;;
+                verify)
+                    if declare -F state_record_verify >/dev/null 2>&1; then
+                        state_record_verify "${_name}" || \
+                            log_warn "[${_name}] state_record_verify failed (continuing)"
+                    fi
+                    ;;
                 remove|purge)
                     state_record_remove "${_name}" || \
                         log_warn "[${_name}] state_record_remove failed (continuing)"
@@ -157,3 +169,6 @@ _runner_run_batch() {
 runner_install() { _runner_run_batch install "$@"; }
 runner_remove()  { _runner_run_batch remove  "$@"; }
 runner_purge()   { _runner_run_batch purge   "$@"; }
+runner_upgrade() { _runner_run_batch upgrade "$@"; }
+runner_verify()  { _runner_run_batch verify  "$@"; }
+runner_doctor()  { _runner_run_batch doctor  "$@"; }

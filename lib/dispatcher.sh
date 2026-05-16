@@ -38,8 +38,9 @@ Subcommands (Phase 2 MVP):
   status                 Print modules recorded as installed (use --json)
   export  <file>         Export installed-state payload (use --modules=<csv>)
   import  <file>         Import payload and install the listed modules
-  update                 Re-scan modules/ + refresh registry
-  upgrade [<module>...]  Re-run install() for given modules (or all installed)
+  update                 Re-scan modules/ + refresh registry (apt-update analog)
+  upgrade [<module>...]  Run upgrade() for given modules (or all installed)
+  verify  [<module>...]  Run verify() for given modules (or all installed)
   search  <keyword>      Search modules by name / category / tag
   doctor                 Diff state.json vs system reality
   config  set|get|unset|show|load <section.key> [<value>]
@@ -482,7 +483,48 @@ _dispatcher_upgrade() {
         return 4
     fi
 
-    runner_install "${_modules[@]}"
+    runner_upgrade "${_modules[@]}"
+}
+
+_dispatcher_verify() {
+    # verify = run verify() for the named modules (or every installed module
+    # if no names given). Read-mostly; modules typically just confirm
+    # is_installed + run TEST_VERIFY_CMD. Does not refuse root because
+    # verify is safe to invoke as root (no apt mutation).
+    local -a _modules=()
+    local _arg
+    for _arg in "$@"; do
+        case "${_arg}" in
+            --dry-run) export INIT_UBUNTU_DRY_RUN=true ;;
+            -*) printf "[dispatcher] ERROR: unknown flag %s\n" "${_arg}" >&2; return 2 ;;
+            *) _modules+=("${_arg}") ;;
+        esac
+    done
+
+    if [[ "${#_modules[@]}" -eq 0 ]]; then
+        local _line
+        while IFS= read -r _line; do
+            [[ -n "${_line}" ]] && _modules+=("${_line}")
+        done < <(state_list_installed)
+    fi
+
+    if [[ "${#_modules[@]}" -eq 0 ]]; then
+        printf "[dispatcher] nothing recorded as installed; nothing to verify\n"
+        return 0
+    fi
+
+    log_info "[dispatcher] verifying ${#_modules[@]} module(s): ${_modules[*]}"
+
+    if [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]]; then
+        printf "[dispatcher] DRY-RUN: would verify in this order:\n"
+        local _n
+        for _n in "${_modules[@]}"; do
+            printf "  - %s\n" "${_n}"
+        done
+        return 0
+    fi
+
+    runner_verify "${_modules[@]}"
 }
 
 _dispatcher_doctor() {
@@ -645,6 +687,7 @@ dispatcher_dispatch() {
         import)  _dispatcher_import "$@" ;;
         update)  _dispatcher_update "$@" ;;
         upgrade) _dispatcher_upgrade "$@" ;;
+        verify)  _dispatcher_verify "$@" ;;
         search)  _dispatcher_search "$@" ;;
         doctor)  _dispatcher_doctor "$@" ;;
         config)  _dispatcher_config "$@" ;;

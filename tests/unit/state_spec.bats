@@ -177,3 +177,81 @@ _load_state() {
     assert_success
     assert_output "5"
 }
+
+# ── upgrade / verify recording ──────────────────────────────────────────────
+
+@test "state_record_upgrade stamps version_provided + last_upgraded_at" {
+    _load_state
+    state_init
+    state_record_install docker false "v0.1.0"
+    state_record_upgrade docker "v0.2.0"
+
+    local _p; _p="$(state_get_path)"
+    run jq -r '.installed.docker.version_provided' "${_p}"
+    assert_success
+    assert_output "v0.2.0"
+
+    run jq -r '.installed.docker.last_upgraded_at' "${_p}"
+    assert_success
+    # ISO-8601-ish: yyyy-mm-ddThh:mm:ss
+    [[ "${output}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2} ]]
+}
+
+@test "state_record_upgrade preserves other fields" {
+    _load_state
+    state_init
+    state_record_install docker true "v0.1.0"
+    state_record_upgrade docker "v0.2.0"
+
+    local _p; _p="$(state_get_path)"
+    run jq -r '.installed.docker.manual' "${_p}"
+    assert_success
+    assert_output "true"
+
+    run jq -r '.installed.docker.installed_at' "${_p}"
+    assert_success
+    [[ -n "${output}" && "${output}" != "null" ]]
+}
+
+@test "state_record_upgrade on absent module is a no-op (no crash)" {
+    _load_state
+    state_init
+    run state_record_upgrade nonexistent "v1"
+    assert_success
+
+    local _p; _p="$(state_get_path)"
+    run jq -r '.installed.nonexistent' "${_p}"
+    assert_success
+    assert_output "null"
+}
+
+@test "state_record_verify stamps last_verified_at" {
+    _load_state
+    state_init
+    state_record_install docker false "v0.1.0"
+    state_record_verify docker
+
+    local _p; _p="$(state_get_path)"
+    run jq -r '.installed.docker.last_verified_at' "${_p}"
+    assert_success
+    [[ "${output}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2} ]]
+}
+
+@test "state_record_verify preserves version_provided" {
+    _load_state
+    state_init
+    state_record_install docker false "v0.1.0"
+    state_record_verify docker
+
+    local _p; _p="$(state_get_path)"
+    run jq -r '.installed.docker.version_provided' "${_p}"
+    assert_success
+    assert_output "v0.1.0"
+}
+
+@test "state_record_verify on absent module is a no-op" {
+    _load_state
+    state_init
+    run state_record_verify nonexistent
+    assert_success
+}

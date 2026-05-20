@@ -125,7 +125,7 @@ function install_yazi() {
     for _shell in "bash" "zsh"; do
         # add to rc file
         if [[ -f "${HOME}/.${_shell}rc" ]]; then
-            local _replace_cmd="cat"
+            local _replace_cmd="yz"
             local _alias_cmd="${_bin_file}"
             local _alias_full_cmd="command -v ${_alias_cmd} &>/dev/null && alias ${_replace_cmd}='${_alias_cmd}'"
             if ! grep -q "${_alias_full_cmd}" "${HOME}/.${_shell}rc"; then

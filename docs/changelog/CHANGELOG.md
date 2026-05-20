@@ -468,6 +468,15 @@ hook plus rationale doc:
 
 ### Fixed
 
+- `modules/submodule/yazi.sh`: alias clobbered `cat` instead of installing
+  `yz` (issue #1). The script wrote `command -v yazi &>/dev/null &&
+  alias cat='yazi'` to `~/.bashrc` and `~/.zshrc` — looked like a
+  copy-paste leftover from `batcat.sh` where `alias cat=bat` is the
+  intended override. Now matches the fish config
+  (`modules/config/fish/conf.d/alias.fish`) which already uses
+  `alias yz=yazi`. Users with the bad alias already in their rc files
+  should `unalias cat` + remove the line manually (no auto-cleanup).
+
 - `wait-pr-ci.sh` watch-start guard hung forever when launched after CI
   completion (issue #22). New `--stale-window <seconds>` flag (default
   120s) bounds the post-force-push race window — checks that completed

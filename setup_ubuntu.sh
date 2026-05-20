@@ -30,31 +30,31 @@ export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export LOG_COLOR="${LOG_COLOR:-true}"
 
 # ── Source engine ────────────────────────────────────────────────────────────
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/logger.sh
 source "${LIB_DIR}/logger.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/general.sh
 source "${LIB_DIR}/general.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/i18n.sh
 source "${LIB_DIR}/i18n.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/detect.sh
 source "${LIB_DIR}/detect.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/platform.sh
 source "${LIB_DIR}/platform.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/state.sh
 source "${LIB_DIR}/state.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/state_io.sh
 source "${LIB_DIR}/state_io.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/config.sh
 source "${LIB_DIR}/config.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/sync.sh
 source "${LIB_DIR}/sync.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/registry.sh
 source "${LIB_DIR}/registry.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/resolver.sh
 source "${LIB_DIR}/resolver.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/runner.sh
 source "${LIB_DIR}/runner.sh"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=lib/dispatcher.sh
 source "${LIB_DIR}/dispatcher.sh"
 
 # ── Compute & export form_factor for module sub-shells ──────────────────────

@@ -13,7 +13,7 @@ if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
 fi
 
 _script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")" && pwd -P)"
-# shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+# shellcheck source=logger.sh
 source "${_script_path}/logger.sh"
 
 # NOTE: not use
@@ -43,7 +43,7 @@ function get_system_param() {
     local _system_id="" _system_codename="" _system_release=""
 
     if [[ -f /etc/os-release ]]; then
-        # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+        # shellcheck source=/dev/null  # system file not in repo
         source /etc/os-release
 
         _system_id="${ID:-""}"

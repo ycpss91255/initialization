@@ -31,13 +31,13 @@ teardown() {
 }
 
 _load_module() {
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=/dev/null  # template — source path resolved per-module-instance
     source "${LIB_DIR}/logger.sh"
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=/dev/null  # template — source path resolved per-module-instance
     source "${LIB_DIR}/general.sh"
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=/dev/null  # template — source path resolved per-module-instance
     source "${LIB_DIR}/module_helper.sh"
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=/dev/null  # template — source path resolved per-module-instance
     source "${MODULE_DIR}/<MODULE-NAME>.module.sh"
 }
 

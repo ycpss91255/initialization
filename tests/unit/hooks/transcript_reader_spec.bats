@@ -16,7 +16,7 @@ load "${BATS_TEST_DIRNAME}/../../helpers/common"
 setup() {
     setup_test_env
     HOOK_SH="${REPO_ROOT}/.claude/hooks/enforce_shellcheck_disable_approval.sh"
-    # shellcheck disable=SC1090  # dynamic source path resolved per-test — https://www.shellcheck.net/wiki/SC1090
+    # shellcheck source=../../../.claude/hooks/enforce_shellcheck_disable_approval.sh
     source "${HOOK_SH}"
     FIXTURE_DIR="${BATS_TEST_TMPDIR}/transcripts"
     mkdir -p "${FIXTURE_DIR}"

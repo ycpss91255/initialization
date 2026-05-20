@@ -1,5 +1,4 @@
 #!/usr/bin/env bats
-# shellcheck disable=SC1091  # test sources libs via runtime ${LIB_DIR}; static-resolution misses the path — https://www.shellcheck.net/wiki/SC1091
 # tests/unit/e2e_spec.bats — end-to-end review path
 #
 # These specs exercise the real setup_ubuntu.sh entry point (not a wrapper)
@@ -224,6 +223,7 @@ EOF
 
 @test "setup_ubuntu export --modules filters to requested list" {
     # Seed state.json directly via the lib (faster than running real installs).
+    # shellcheck source=../../lib/state.sh
     source "${LIB_DIR}/state.sh"
     state_record_install docker true
     state_record_install neovim true

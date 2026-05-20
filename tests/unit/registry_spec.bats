@@ -1,5 +1,4 @@
 #!/usr/bin/env bats
-# shellcheck disable=SC1091  # test sources libs via runtime ${LIB_DIR}; static-resolution misses the path — https://www.shellcheck.net/wiki/SC1091
 # tests/unit/registry_spec.bats — lib/registry.sh
 
 load "${BATS_TEST_DIRNAME}/../helpers/common"
@@ -49,6 +48,7 @@ teardown() {
 }
 
 @test "registry_load_all populates MODULES_NAME with one entry per fixture" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
     [[ "${MODULES_NAME[alpha]}" == *"/alpha.module.sh" ]]
@@ -57,6 +57,7 @@ teardown() {
 }
 
 @test "registry_load_all reads CATEGORY correctly" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
     [[ "${MODULES_CATEGORY[alpha]}" == "base" ]]
@@ -65,6 +66,7 @@ teardown() {
 }
 
 @test "registry_load_all reads DEPENDS_ON as space-separated string" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
     [[ "${MODULES_DEPS[alpha]}" == "" ]]
@@ -72,18 +74,21 @@ teardown() {
 }
 
 @test "registry_load_all reads CONFLICTS_WITH" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
     [[ "${MODULES_CONFLICTS[bravo]}" == "charlie" ]]
 }
 
 @test "registry_load_all reads multi-element TAGS" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
     [[ "${MODULES_TAGS[charlie]}" == "cli agent" ]]
 }
 
 @test "registry_get_field returns the right field" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
     run registry_get_field bravo category
@@ -95,6 +100,7 @@ teardown() {
 }
 
 @test "registry_has reports presence correctly" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
     run registry_has alpha
@@ -104,6 +110,7 @@ teardown() {
 }
 
 @test "registry_list_names returns sorted module names" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
     run registry_list_names
@@ -114,6 +121,7 @@ teardown() {
 }
 
 @test "registry_list_names --category=base filters" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
     run registry_list_names --category=base
@@ -122,6 +130,7 @@ teardown() {
 }
 
 @test "registry_list_names --tag=cli filters" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
     run registry_list_names --tag=cli
@@ -135,6 +144,7 @@ teardown() {
 NAME="not-delta"
 CATEGORY="optional"
 EOF
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     run registry_load_all "${FAKE_MODULE_DIR}"
     assert_failure 1
@@ -143,12 +153,14 @@ EOF
 }
 
 @test "registry_load_all on missing dir is a no-op (returns 0)" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     run registry_load_all "${INIT_UBUNTU_TEST_SCRATCH}/does-not-exist"
     assert_success
 }
 
 @test "registry_load_all on real modules/ at least finds docker" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${MODULE_DIR}"
     run registry_has docker
@@ -170,7 +182,9 @@ DEPENDS_ON=()
 CONFLICTS_WITH=()
 EOF
 
+    # shellcheck source=../../lib/logger.sh
     source "${LIB_DIR}/logger.sh"
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     INIT_UBUNTU_USER_MODULE_DIR="${_user_dir}" \
         registry_load_all "${FAKE_MODULE_DIR}"
@@ -197,7 +211,9 @@ DEPENDS_ON=()
 CONFLICTS_WITH=()
 EOF
 
+    # shellcheck source=../../lib/logger.sh
     source "${LIB_DIR}/logger.sh"
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     INIT_UBUNTU_USER_MODULE_DIR="${_user_dir}" \
         registry_load_all "${FAKE_MODULE_DIR}" 2>/dev/null
@@ -226,7 +242,9 @@ DEPENDS_ON=()
 CONFLICTS_WITH=()
 EOF
 
+    # shellcheck source=../../lib/logger.sh
     source "${LIB_DIR}/logger.sh"
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     run bash -c "
         source '${LIB_DIR}/logger.sh'
@@ -242,7 +260,9 @@ EOF
 
 @test "registry_load_all is a no-op when INIT_UBUNTU_USER_MODULE_DIR points at nothing" {
     local _empty="${INIT_UBUNTU_TEST_SCRATCH}/no-such-dir"
+    # shellcheck source=../../lib/logger.sh
     source "${LIB_DIR}/logger.sh"
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     INIT_UBUNTU_USER_MODULE_DIR="${_empty}" \
         registry_load_all "${FAKE_MODULE_DIR}"

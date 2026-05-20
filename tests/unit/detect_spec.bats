@@ -14,7 +14,7 @@ teardown() {
 }
 
 _load_detect() {
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=../../lib/detect.sh
     source "${LIB_DIR}/detect.sh"
 }
 

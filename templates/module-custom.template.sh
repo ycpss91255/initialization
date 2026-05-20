@@ -52,11 +52,11 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
     export MODULE_DIR REPO_ROOT LIB_DIR
 
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=/dev/null  # template — source path resolved per-module-instance
     source "${LIB_DIR}/logger.sh"
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=/dev/null  # template — source path resolved per-module-instance
     source "${LIB_DIR}/general.sh"
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=/dev/null  # template — source path resolved per-module-instance
     source "${LIB_DIR}/module_helper.sh"
 fi
 # ── END: shared-bootstrap ───────────────────────────────────────────────────

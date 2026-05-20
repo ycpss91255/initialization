@@ -29,15 +29,15 @@ export TEST_DIR="${REPO_ROOT}/tests"
 
 _BATS_LIB="/usr/lib/bats"
 if [[ -f "${_BATS_LIB}/bats-support/load.bash" ]]; then
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=/dev/null  # baked into test-tools image at /usr/lib
     load "${_BATS_LIB}/bats-support/load"
 fi
 if [[ -f "${_BATS_LIB}/bats-assert/load.bash" ]]; then
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=/dev/null  # baked into test-tools image at /usr/lib
     load "${_BATS_LIB}/bats-assert/load"
 fi
 if [[ -f "${_BATS_LIB}/bats-mock/load.bash" ]]; then
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=/dev/null  # baked into test-tools image at /usr/lib
     load "${_BATS_LIB}/bats-mock/load"
 fi
 
@@ -66,12 +66,12 @@ teardown_test_env() {
 
 source_logger() {
     unset TTY_COLORS_READY
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=../../lib/logger.sh
     source "${LIB_DIR}/logger.sh"
 }
 
 source_general() {
     unset TTY_COLORS_READY
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=../../lib/general.sh
     source "${LIB_DIR}/general.sh"
 }

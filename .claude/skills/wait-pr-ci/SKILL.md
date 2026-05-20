@@ -152,13 +152,15 @@ For `wait-pr-ci-batch.sh`, `--min-checks` accepts the same two forms as `--check
 
 ## Stale-rollup guards (force-push race)
 
-Two additional guards (refs ycpss91255-docker/docker_harness#60) catch the case where the script is launched immediately after a `git push --force-with-lease`. GitHub takes 10-60 seconds to retrigger CI on the new head; during that window the PR rollup either still shows the old head's results, returns empty, or shows the new head with only some checks queued. Without these guards, the "still shows old head" sub-case results in immediate false ALL_DONE because the previous run's `ci-summary=pass` matches the success filter.
+Two additional guards (refs ycpss91255-docker/docker_harness#60, ycpss91255/initialization#22) catch the case where the script is launched immediately after a `git push --force-with-lease`. GitHub takes 10-60 seconds to retrigger CI on the new head; during that window the PR rollup either still shows the old head's results, returns empty, or shows the new head with only some checks queued. Without these guards, the "still shows old head" sub-case results in immediate false ALL_DONE because the previous run's `ci-summary=pass` matches the success filter.
 
-1. **Watch-start completedAt guard** — captured at script start. Inside the `all(.conclusion == "SUCCESS")` branch, if every filter-matched check has `completedAt` set AND every one of those values predates the watch start time, the rollup is carry-over from a prior head. Demoted to `pending` rather than declared `all-pass`. Backwards-compatible: only fires when every matching check has `completedAt` (real GitHub API always populates it; existing test stubs without the field keep working).
+1. **Watch-start completedAt guard** — captured at script start. Inside the `all(.conclusion == "SUCCESS")` branch, the rollup is treated as carry-over from a prior head ONLY when every filter-matched check has `completedAt` set AND every one of those values falls in the window `(watch_start - stale_window, watch_start)`. Inside that window → demote to `pending`; older than that → trust as legitimate prior run and emit `all-pass`. The `--stale-window <seconds>` flag controls the window width (default 120s — covers GitHub's observed 10-60s retrigger latency plus buffer). `--stale-window 0` restores the original always-demote behaviour. Backwards-compatible: only fires when every matching check has `completedAt` (real GitHub API always populates it; existing test stubs without the field keep working).
+
+    Issue #22 motivation: launching `wait-pr-ci.sh` against a PR whose CI completed long before — e.g. hours later, manual verification flow — would otherwise hang forever because every `completedAt < watch_start`. The stale-window cap bounds the guard to the actual race window.
 
 2. **`headRefOid` change guard** — captured per PR / per pair across iterations. When the current `headRefOid` differs from the value seen on the previous poll, emit one `[head-moved] PR<n> <old7>..<new7>` (or `[head-moved] <owner>/<repo>#<pr> <old7>..<new7>` for the batch script) log line and force the per-PR state to `pending` for that poll iteration. The next poll re-evaluates against the new head normally. One stale PR in the batch does not abort the rest.
 
-Both guards apply to `wait-pr-ci.sh` and `wait-pr-ci-batch.sh` symmetrically. No new flag is required — both fire automatically when conditions match.
+Both guards apply to `wait-pr-ci.sh` and `wait-pr-ci-batch.sh` symmetrically. `--stale-window` fires automatically with its default; override only for unusual workflows.
 
 ## Anti-patterns
 

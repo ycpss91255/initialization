@@ -62,9 +62,21 @@ _Avoid_: settings (overloaded).
 **Sidecar**: `${XDG_STATE_HOME}/init_ubuntu/versions/<name>` file recording the
 installed version of one Module. Single source of truth for "what version did
 we install?", consulted by `is_outdated`. Written by both Engine and Standalone.
+Deleted on `remove` / `purge` (both modes) — invariant: `is_installed()==false`
+↔ Sidecar absent.
 
-**Manual flag**: state.json field on each installed Module. `true` = user
-explicitly named it on CLI; `false` = pulled in as a dep. Engine-only concept.
+**Manual flag**: `state.json.installed.<m>.synced.manual` field on each
+installed Module. `true` = user explicitly named it on CLI / TUI;
+`false` = pulled in as a dep. Sticky-to-true (once true, never auto-flips
+back). Engine-only concept (Standalone never writes state.json).
+
+**Synced / Local split**: `state.json.installed.<m>` divides into two
+sub-objects. `synced` carries machine-portable facts (`manual`,
+`depends_on`, `version_provided`, `installed_at`, `installed_by`) and
+is the only payload that crosses machine boundaries via sync / import /
+export. `local` carries host-specific facts (`install_target_resolved`,
+`user_home_root`, `frozen_pkgs` / `frozen_platform` for apt-essentials)
+and is rebuilt on each machine by its own install pipeline.
 
 ### CLI vocabulary (apt-aligned)
 

@@ -129,6 +129,7 @@ platform_classify() {
 
 # ── Public: platform_export_env ─────────────────────────────────────────────
 
+# shellcheck disable=SC2120  # optional <env-json> arg; caller may omit (defaults to live host classify) — https://www.shellcheck.net/wiki/SC2120
 platform_export_env() {
     INIT_UBUNTU_FORM_FACTOR="$(platform_classify "${1:-}")"
     export INIT_UBUNTU_FORM_FACTOR

@@ -503,6 +503,8 @@ hook plus rationale doc:
 - 5 metadata fields no longer carried: MAINTAINER, RECOVERY_FALLBACK,
   PARALLEL_GROUP, INSTALL_TIME_ESTIMATE, DISK_SPACE_ESTIMATE (commit
   6fc3d6c).
+- ECC plugin + marketplace (`affaan-m/everything-claude-code`) from
+  `.claude/settings.json` — no longer used.
 
 ---
 

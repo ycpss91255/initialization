@@ -27,14 +27,29 @@
 #                             length < N the state is "pending", not
 #                             "all-pass".
 #   --interval <seconds>      Poll interval (default 45; 0 = no sleep, for tests)
+#   --stale-window <seconds>  Width of the post-force-push stale-rollup
+#                             race window (default 120). The watch-start
+#                             completedAt guard only demotes to "pending"
+#                             when every matching check completed
+#                             AFTER (watch_start - stale_window); checks
+#                             that completed earlier than that are
+#                             trusted as a legitimate prior run, fixing
+#                             issue #22 (post-completion launch hung
+#                             forever). 0 = restore pre-fix behaviour
+#                             (always demote when completedAt <
+#                             watch_start); large value = effectively
+#                             disable the guard.
 #
-# Stale-rollup guards (refs ycpss91255-docker/docker_harness#60):
+# Stale-rollup guards (refs ycpss91255-docker/docker_harness#60, ycpss91255/initialization#22):
 #   * Watch-start completedAt guard — if every filter-matched check has
-#     completedAt < <watch start>, the rollup is showing carry-over
-#     results from a previous head (typically because the agent ran this
-#     script immediately after a `git push --force-with-lease` and GitHub
-#     has not yet re-triggered CI). Demoted to "pending" rather than
-#     declared "all-pass". Backwards-compatible: only fires when every
+#     watch_start - stale_window < completedAt < watch_start, the rollup
+#     is showing carry-over results from a previous head (typically
+#     because the agent ran this script immediately after a `git push
+#     --force-with-lease` and GitHub has not yet re-triggered CI).
+#     Demoted to "pending" rather than declared "all-pass". When checks
+#     completed earlier than that window, they are trusted as a
+#     legitimate prior run rather than stale rollup (post-completion
+#     launch case, #22). Backwards-compatible: only fires when every
 #     matching check has completedAt set (real GitHub API always sets
 #     it; existing test stubs that omit it keep working).
 #   * headRefOid change guard — on each poll, compare current
@@ -76,6 +91,7 @@ main() {
   local min_checks=1
   local interval=45
   local max_iter=0
+  local stale_window=120
 
   while (( $# > 0 )); do
     case "$1" in
@@ -85,6 +101,7 @@ main() {
       --check-filter) check_filter="$2"; shift 2 ;;
       --min-checks) min_checks="$2"; shift 2 ;;
       --interval) interval="$2"; shift 2 ;;
+      --stale-window) stale_window="$2"; shift 2 ;;
       --max-iterations) max_iter="$2"; shift 2 ;;
       *) err "unknown arg: $1"; usage; exit 2 ;;
     esac
@@ -92,6 +109,11 @@ main() {
 
   if ! [[ "${min_checks}" =~ ^[0-9]+$ ]] || (( min_checks < 1 )); then
     err "--min-checks must be a positive integer (got: ${min_checks})"
+    exit 2
+  fi
+
+  if ! [[ "${stale_window}" =~ ^[0-9]+$ ]]; then
+    err "--stale-window must be a non-negative integer (got: ${stale_window})"
     exit 2
   fi
 
@@ -170,6 +192,7 @@ main() {
       local state
       state=$(jq -r --argjson min "${min_checks}" \
         --argjson watch_start "${watch_start}" \
+        --argjson stale_window "${stale_window}" \
         "[.statusCheckRollup[]? | select(${check_filter})] as \$c | \
         if (\$c | length) == 0 then \"no-checks\" \
         elif (\$c | length) < \$min then \"pending\" \
@@ -177,6 +200,7 @@ main() {
         elif (\$c | all(.conclusion == \"SUCCESS\" or .conclusion == \"SKIPPED\")) then \
           (if (\$c | all(.completedAt != null)) \
               and (\$c | all((.completedAt | fromdateiso8601) < \$watch_start)) \
+              and (\$c | all((.completedAt | fromdateiso8601) > (\$watch_start - \$stale_window))) \
            then \"pending\" else \"all-pass\" end) \
         elif (\$c | any(.conclusion == \"FAILURE\")) then \"FAIL\" \
         else \"pending\" end" <<< "${s}")

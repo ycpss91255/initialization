@@ -468,6 +468,13 @@ hook plus rationale doc:
 
 ### Fixed
 
+- `wait-pr-ci.sh` watch-start guard hung forever when launched after CI
+  completion (issue #22). New `--stale-window <seconds>` flag (default
+  120s) bounds the post-force-push race window — checks that completed
+  more than `stale_window` seconds before `watch_start` are now trusted
+  as a legitimate prior run instead of demoted to `pending`. Setting
+  `--stale-window 0` restores the pre-fix always-demote behaviour.
+
 - `module_default_apt_is_installed`: `${#APT_PKGS[@]:-0}` bad-substitution
   under `set -u` (would crash if an apt-archetype module's smoke test
   triggered the macro path) — replaced with `declare -p` existence

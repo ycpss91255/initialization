@@ -4,6 +4,7 @@ function claude-rm --description 'Trash Claude Code session(s) by customTitle or
         return 1
     end
 
+    # matches stores base paths: ~/.claude/projects/{project}/{sessionId}
     set -l matches
     set -l unmatched
 
@@ -14,20 +15,36 @@ function claude-rm --description 'Trash Claude Code session(s) by customTitle or
 
         set -l found
 
-        # 1. Try exact customTitle match first
+        # 1. Try exact customTitle match first (only .jsonl files have titles)
         for f in ~/.claude/projects/*/*.jsonl
             set -l title (head -1 $f 2>/dev/null | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('customTitle',''))" 2>/dev/null)
             if test -n "$title"; and test "$title" = "$target"
-                set found $found $f
+                set -l base (string replace -r '\.jsonl$' '' $f)
+                if not contains -- $base $found
+                    set found $found $base
+                end
             end
         end
 
-        # 2. Fall back to sessionId prefix match
+        # 2. Fall back to sessionId prefix match (both .jsonl and UUID dirs)
         if test (count $found) -eq 0
             for f in ~/.claude/projects/*/*.jsonl
                 set -l sid (basename $f .jsonl)
                 if string match -q "$target*" $sid
-                    set found $found $f
+                    set -l base (string replace -r '\.jsonl$' '' $f)
+                    if not contains -- $base $found
+                        set found $found $base
+                    end
+                end
+            end
+            for entry in ~/.claude/projects/*/*
+                test -d "$entry"; or continue
+                set -l name (basename $entry)
+                test "$name" = memory; and continue
+                if string match -q "$target*" $name
+                    if not contains -- $entry $found
+                        set found $found $entry
+                    end
                 end
             end
         end
@@ -35,9 +52,9 @@ function claude-rm --description 'Trash Claude Code session(s) by customTitle or
         if test (count $found) -eq 0
             set unmatched $unmatched $target
         else
-            for f in $found
-                if not contains -- $f $matches
-                    set matches $matches $f
+            for base in $found
+                if not contains -- $base $matches
+                    set matches $matches $base
                 end
             end
         end
@@ -52,8 +69,8 @@ function claude-rm --description 'Trash Claude Code session(s) by customTitle or
     end
 
     set -l target_ids
-    for f in $matches
-        set target_ids $target_ids (basename $f .jsonl)
+    for base in $matches
+        set target_ids $target_ids (basename $base)
     end
 
     # 3. Safety check: any fork sessions depending on the targets?
@@ -68,9 +85,12 @@ for line in sys.stdin:
 " $target_ids)
 
     echo "Found "(count $matches)" session(s):"
-    for f in $matches
-        set -l sid (basename $f .jsonl)
-        echo "  [$sid]  $f"
+    for base in $matches
+        set -l sid (basename $base)
+        set -l artifacts
+        test -f "$base.jsonl"; and set artifacts $artifacts "$base.jsonl"
+        test -d "$base"; and set artifacts $artifacts "$base/"
+        echo "  [$sid]  "(string join ", " $artifacts)
     end
 
     if test -n "$dependents"
@@ -93,8 +113,9 @@ for line in sys.stdin:
         end
     end
 
-    for f in $matches
-        gio trash $f
+    for base in $matches
+        test -f "$base.jsonl"; and gio trash "$base.jsonl"
+        test -d "$base"; and gio trash "$base"
     end
     echo "Moved to trash (recoverable from GNOME Trash / ~/.local/share/Trash)"
 end

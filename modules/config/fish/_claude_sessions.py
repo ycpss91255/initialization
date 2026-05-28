@@ -7,13 +7,15 @@ One JSON object per line, fields:
 import glob
 import json
 import os
+import re
 import sys
 
 PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
-def session_info(path):
-    sid = os.path.basename(path)[:-len(".jsonl")] if path.endswith(".jsonl") else os.path.basename(path)
+def session_info_jsonl(path):
+    sid = os.path.basename(path).removesuffix(".jsonl")
     project = os.path.basename(os.path.dirname(path))
     title = ""
     first_user = ""
@@ -56,9 +58,44 @@ def session_info(path):
     }
 
 
+def session_info_dir(path):
+    sid = os.path.basename(path)
+    project = os.path.basename(os.path.dirname(path))
+    first_user = ""
+    for meta in sorted(glob.glob(os.path.join(path, "subagents", "*.meta.json"))):
+        try:
+            with open(meta) as fp:
+                d = json.load(fp)
+                desc = d.get("description", "")
+                if desc:
+                    first_user = desc[:60]
+                    break
+        except Exception:
+            pass
+    return {
+        "path": path,
+        "session_id": sid,
+        "project": project,
+        "title": "",
+        "first_user": first_user,
+        "forked_from": None,
+    }
+
+
 def main():
+    seen_ids = set()
     for path in sorted(glob.glob(os.path.join(PROJECTS_DIR, "*", "*.jsonl"))):
-        print(json.dumps(session_info(path), ensure_ascii=False))
+        info = session_info_jsonl(path)
+        seen_ids.add(info["session_id"])
+        print(json.dumps(info, ensure_ascii=False))
+
+    for entry in sorted(glob.glob(os.path.join(PROJECTS_DIR, "*", "*"))):
+        if not os.path.isdir(entry):
+            continue
+        name = os.path.basename(entry)
+        if not UUID_RE.match(name) or name in seen_ids:
+            continue
+        print(json.dumps(session_info_dir(entry), ensure_ascii=False))
 
 
 if __name__ == "__main__":

@@ -480,11 +480,71 @@ install() {
 - 不可呼叫 `sudo -i` / `sudo -s`(會 spawn root shell)
 - 不可 `chmod 777` 或 `chown -R root:root` 改使用者檔案
 
-### 4.7 失敗回傳
+### 4.7 失敗回傳 + 自動清理(ADR-0015)
+
+#### 4.7.1 函式回傳慣例
 
 - 用 `return 1`(或非 0),**不要** `exit`
 - Engine 攔截 return,寫 log,繼續下一個 module
 - `exit` 會把 engine 整個 kill,違反契約
+
+#### 4.7.2 install 失敗 → state.json 不寫(ADR-0015,Q1)
+
+`install()` 退非 0 = 視為**完全沒裝**:
+- `state.json.installed.<name>` **不建**(維持「state 二態」原則)
+- 已成功的 transitive dep **保留**(每個 dep 自己的 `install()` 已 idempotent 完成)
+- Engine 印失敗 module 清單 + 退 **code 6**(PRD §7.4 partial)
+- 結構化 log event `install_failed`(ADR-0006 schema)
+
+#### 4.7.3 verify 失敗 → 自動跑 purge() 收尾(ADR-0015,Q16)
+
+install→verify 是一條 transaction:
+
+```
+trace_id = new_uuid
+emit install_start
+run install()
+if install exit != 0:
+  emit install_failed
+  exit 6
+run verify()
+if verify exit != 0:
+  emit verify_failed (ERROR)
+  emit cleanup_start
+  run purge()                              # 用既有 lifecycle 自動清 side effects
+  if purge exit != 0:
+    emit cleanup_failed (ERROR, "manual cleanup required")
+  else:
+    emit cleanup_done
+  emit install_failed (cause: "verify_failed")
+  exit 6
+write state.json.installed.<m>
+emit install_done
+```
+
+理由:install() 可能已加 apt repo / 下載 binary / 建 symlink。verify 失敗若不收拾 → 孤兒 file 累積。**用既有 `purge()`**(已 mandatory + idempotent,ADR-0002)當 rollback,零新機制。
+
+Module 作者責任:把 `install()` 寫成「裝完留下的所有檔案/設定都該被 `purge()` 砍掉」。Archetype A/B/C 預設 purge 已正確處理。Archetype D(custom)要對稱:install 加什麼,purge 砍什麼。
+
+### 4.7.4 Sidecar 生命週期(Q4)
+
+Sidecar(`${XDG_STATE_HOME}/init_ubuntu/versions/<name>`)記安裝當下的版本字串(PRD §10.1.1)。
+
+| Lifecycle 事件 | Engine 模式 | Standalone 模式 |
+|---|---|---|
+| `install` 成功 | 寫 Sidecar(版本) + 寫 state.json | 只寫 Sidecar |
+| `install` 失敗 | 不寫 | 不寫 |
+| `install` 成功 + verify 失敗(ADR-0015) | 跑 purge() → Sidecar 被刪 + state.json 不寫 | 同上(Sidecar 被刪) |
+| `upgrade` 成功 | 更新 Sidecar 為新版 + 更新 state.json `version_provided` | 只更 Sidecar |
+| `remove` 成功 | **刪 Sidecar** + 從 state.json 拔掉 | **刪 Sidecar** |
+| `purge` 成功 | **刪 Sidecar** + 從 state.json 拔掉 | **刪 Sidecar** |
+
+不變式(invariants):
+- `is_installed() == false` ↔ Sidecar 不存在(若不符 = corruption,`doctor` 抓得到)
+- `state.json.installed.<name>` 存在 → Sidecar 必存在(Engine 寫一致)
+- Sidecar 存在但 `state.json.installed.<name>` 不存在 → 可能是 standalone 安裝(合法,ADR-0001)
+
+理由:Sidecar 是「裝了什麼版本」事實。module 不在 = 「裝了哪版」這事實也不在。`remove` 對應 `apt remove`(保留 user config),但 Sidecar **不是 user config**,是 state。
 
 ### 4.8 不可使用
 
@@ -858,9 +918,24 @@ log_warn "Docker installed. Run 'newgrp docker' or re-login to use docker withou
 
 ### Q2: install 失敗到一半,系統處於不一致狀態,該怎麼回滾?
 
-v0.1 **不要求**自動回滾(複雜度過高)。建議:
-- 用 `backup_file` 在覆寫前備份
+#### install() 自己失敗
+
+state.json 不寫(ADR-0015 §4.7.2);engine 視為「完全沒裝」。
+作者寫 install() 時應該:
+- 用 `backup_file` 在覆寫前備份重要檔案
 - 失敗時 log 出備份位置,讓使用者手動還原
+- 若可能,在 `install()` 末端做 sanity check 自己退非 0
+
+#### install() 成功但 verify() 失敗
+
+Engine **自動呼 module 的 `purge()`** 清掉 install 留下的 side
+effects(ADR-0015 §4.7.3)。所以 module 作者該確保:
+- `install()` 留下的 file / config / repo / symlink,**都能被 `purge()` 砍掉**
+- `purge()` 是 idempotent(ADR-0002)— 對「裝一半」也要能砍
+
+例外 — `nvidia-driver` 等高風險 module:v0.1 仍不要求自動回 nouveau
+(PRD §13.1 Q9 / AC-21 移到 v1.0)。verify 失敗仍會呼 purge,但若 purge
+也失敗會印「manual cleanup required」,user 自己手 chroot 救援。
 
 ### Q3: 我的 module 想呼叫另一個 module 的 helper,可以嗎?
 

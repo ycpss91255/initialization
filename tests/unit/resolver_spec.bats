@@ -1,5 +1,4 @@
 #!/usr/bin/env bats
-# shellcheck disable=SC1091  # test sources libs via runtime ${LIB_DIR}; static-resolution misses the path — https://www.shellcheck.net/wiki/SC1091
 # tests/unit/resolver_spec.bats — lib/resolver.sh (Kahn topo sort + cycle detect)
 
 load "${BATS_TEST_DIRNAME}/../helpers/common"
@@ -36,7 +35,9 @@ EOF
     _make_mod "a" ""
     _make_mod "b" '"a"'
     _make_mod "c" '"b"'
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
+    # shellcheck source=../../lib/resolver.sh
     source "${LIB_DIR}/resolver.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
 
@@ -52,7 +53,9 @@ EOF
     _make_mod "left"   '"bottom"'
     _make_mod "right"  '"bottom"'
     _make_mod "top"    '"left" "right"'
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
+    # shellcheck source=../../lib/resolver.sh
     source "${LIB_DIR}/resolver.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
 
@@ -66,7 +69,9 @@ EOF
 
 @test "no-dep module: order is just the module itself" {
     _make_mod "solo" ""
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
+    # shellcheck source=../../lib/resolver.sh
     source "${LIB_DIR}/resolver.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
 
@@ -76,7 +81,9 @@ EOF
 }
 
 @test "unknown module returns exit 2" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
+    # shellcheck source=../../lib/resolver.sh
     source "${LIB_DIR}/resolver.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
 
@@ -87,7 +94,9 @@ EOF
 @test "direct cycle returns exit 5" {
     _make_mod "a" '"b"'
     _make_mod "b" '"a"'
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
+    # shellcheck source=../../lib/resolver.sh
     source "${LIB_DIR}/resolver.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
 
@@ -99,7 +108,9 @@ EOF
     _make_mod "a" '"b"'
     _make_mod "b" '"c"'
     _make_mod "c" '"a"'
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
+    # shellcheck source=../../lib/resolver.sh
     source "${LIB_DIR}/resolver.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
 
@@ -111,7 +122,9 @@ EOF
     _make_mod "shared" ""
     _make_mod "x"      '"shared"'
     _make_mod "y"      '"shared"'
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
+    # shellcheck source=../../lib/resolver.sh
     source "${LIB_DIR}/resolver.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
 
@@ -122,7 +135,9 @@ EOF
 }
 
 @test "empty input returns success with empty output" {
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
+    # shellcheck source=../../lib/resolver.sh
     source "${LIB_DIR}/resolver.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
 
@@ -135,7 +150,9 @@ EOF
     _make_mod "a" ""
     _make_mod "b" '"a"'
     _make_mod "c" '"b"'
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
+    # shellcheck source=../../lib/resolver.sh
     source "${LIB_DIR}/resolver.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
 

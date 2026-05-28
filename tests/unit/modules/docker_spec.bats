@@ -15,13 +15,13 @@ teardown() {
 }
 
 _load_module() {
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=../../../lib/logger.sh
     source "${LIB_DIR}/logger.sh"
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=../../../lib/general.sh
     source "${LIB_DIR}/general.sh"
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=../../../lib/module_helper.sh
     source "${LIB_DIR}/module_helper.sh"
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=../../../modules/docker.module.sh
     source "${MODULE_DIR}/docker.module.sh"
 }
 

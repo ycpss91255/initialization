@@ -1,5 +1,4 @@
 #!/usr/bin/env bats
-# shellcheck disable=SC1091  # test sources libs via runtime ${LIB_DIR}; static-resolution misses the path — https://www.shellcheck.net/wiki/SC1091
 # tests/unit/platform_spec.bats — lib/platform.sh
 
 load "${BATS_TEST_DIRNAME}/../helpers/common"
@@ -15,7 +14,7 @@ teardown() {
 }
 
 _load_platform() {
-    # shellcheck disable=SC1091  # dynamic source path ($VAR resolved at runtime) — https://www.shellcheck.net/wiki/SC1091
+    # shellcheck source=../../lib/platform.sh
     source "${LIB_DIR}/platform.sh"
 }
 
@@ -132,7 +131,9 @@ _load_platform() {
 # ── No-arg path delegates to detect_environment ─────────────────────────────
 
 @test "platform_classify with no arg falls back to detect_environment()" {
+    # shellcheck source=../../lib/detect.sh
     source "${LIB_DIR}/detect.sh"
+    # shellcheck source=../../lib/platform.sh
     source "${LIB_DIR}/platform.sh"
     run platform_classify
     assert_success

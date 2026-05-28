@@ -1,5 +1,4 @@
 #!/usr/bin/env bats
-# shellcheck disable=SC1091  # test sources libs via runtime ${LIB_DIR}; static-resolution misses the path — https://www.shellcheck.net/wiki/SC1091
 # tests/unit/dispatcher_spec.bats — lib/dispatcher.sh
 
 load "${BATS_TEST_DIRNAME}/../helpers/common"
@@ -32,11 +31,17 @@ teardown() {
 }
 
 _load_engine() {
+    # shellcheck source=../../lib/logger.sh
     source "${LIB_DIR}/logger.sh"
+    # shellcheck source=../../lib/general.sh
     source "${LIB_DIR}/general.sh"
+    # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
+    # shellcheck source=../../lib/resolver.sh
     source "${LIB_DIR}/resolver.sh"
+    # shellcheck source=../../lib/runner.sh
     source "${LIB_DIR}/runner.sh"
+    # shellcheck source=../../lib/dispatcher.sh
     source "${LIB_DIR}/dispatcher.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
 }

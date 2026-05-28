@@ -25,8 +25,16 @@ data leaning on `jq`.
 
 1. **Engine surface area** — `lib/dispatcher.sh` exceeds ~1000 LOC, or the
    engine layer collectively exceeds ~5000 LOC.
-2. **State complexity** — `state.json` schema needs migrations, cross-field
-   invariants, or nested objects that `jq` can't express cleanly.
+2. **State complexity** — `state.json` schema operations have outgrown
+   `jq` + bash. Specifically: cross-field invariants checked at every read,
+   migration logic that needs algorithms more than a transform pipeline
+   can express (loops, lookups across records, conditional rewrites with
+   memory). ADR-0008 introduced forward-only migration via
+   `migrate_<from>_to_<to>()` functions in `lib/state_migrate.sh`; each
+   step uses `jq` for shape transforms and stays within bash's
+   comfort zone. That alone does **not** fire this trigger. The trigger
+   fires when *individual* migration steps require non-trivial logic
+   beyond what `jq` + simple bash can express cleanly.
 3. **TUI scope** — needs scrollable tables, async loading, real-time progress
    bars (bash + `dialog` cannot support this well).
 4. **Test pain** — CI run time exceeds ~5 minutes for unit tests, or

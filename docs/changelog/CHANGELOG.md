@@ -468,6 +468,22 @@ hook plus rationale doc:
 
 ### Fixed
 
+- `modules/submodule/yazi.sh`: alias clobbered `cat` instead of installing
+  `yz` (issue #1). The script wrote `command -v yazi &>/dev/null &&
+  alias cat='yazi'` to `~/.bashrc` and `~/.zshrc` — looked like a
+  copy-paste leftover from `batcat.sh` where `alias cat=bat` is the
+  intended override. Now matches the fish config
+  (`modules/config/fish/conf.d/alias.fish`) which already uses
+  `alias yz=yazi`. Users with the bad alias already in their rc files
+  should `unalias cat` + remove the line manually (no auto-cleanup).
+
+- `wait-pr-ci.sh` watch-start guard hung forever when launched after CI
+  completion (issue #22). New `--stale-window <seconds>` flag (default
+  120s) bounds the post-force-push race window — checks that completed
+  more than `stale_window` seconds before `watch_start` are now trusted
+  as a legitimate prior run instead of demoted to `pending`. Setting
+  `--stale-window 0` restores the pre-fix always-demote behaviour.
+
 - `module_default_apt_is_installed`: `${#APT_PKGS[@]:-0}` bad-substitution
   under `set -u` (would crash if an apt-archetype module's smoke test
   triggered the macro path) — replaced with `declare -p` existence
@@ -487,6 +503,8 @@ hook plus rationale doc:
 - 5 metadata fields no longer carried: MAINTAINER, RECOVERY_FALLBACK,
   PARALLEL_GROUP, INSTALL_TIME_ESTIMATE, DISK_SPACE_ESTIMATE (commit
   6fc3d6c).
+- ECC plugin + marketplace (`affaan-m/everything-claude-code`) from
+  `.claude/settings.json` — no longer used.
 
 ---
 

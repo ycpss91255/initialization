@@ -1,10 +1,10 @@
 ---
 name: init-ubuntu
-version: 0.1.0-draft
-status: draft
+version: 1.0.0
+status: approved
 owner: ycpss91255
 created: 2026-05-13
-updated: 2026-05-16
+updated: 2026-06-06
 ---
 
 # PRD: init_ubuntu — Ubuntu 環境初始化工具
@@ -27,10 +27,11 @@ updated: 2026-05-16
 | G2 | 環境感知推薦 | 偵測到 NVIDIA GPU / WSL / 容器 / VM / SBC 時自動調整推薦清單 |
 | G3 | 完整生命週期 | 每個 module 都有完整 10 個 mandatory lifecycle(`detect` / `is_recommended` / `is_installed` / `install` / `upgrade` / `remove` / `purge` / `verify` / `is_outdated` / `doctor`),全部 idempotent(見 ADR-0002) |
 | G4 | CLI 與 TUI 雙前端共享同一 engine | 兩個前端的行為完全一致 |
-| G5 | 高測試覆蓋率 | 起始 80%,目標 100%,全部在 Docker 內驗證 |
+| G5 | 高測試覆蓋率 | **80% 為硬門檻**(kcov gate,AC-17),持續提升為 best-effort(不設 100% 硬性目標);全部在 Docker 內驗證 |
 | G6 | CI/CD 可整合 | GitHub Actions 上 `ubuntu-22.04` / `ubuntu-24.04` / **`ubuntu-26.04`** 矩陣全綠 |
 | G7 | 易擴充 | 新增一個 module 不需要改 engine 程式碼,只要符合 `module-spec.md` 契約 |
-| G8 | 並行安裝(nice-to-have) | 對非 apt 來源的 module(curl / git / cargo)在 v0.3+ 啟用 worker pool。受 `dpkg` lock 限制,apt 操作仍序列化 |
+
+> 原 G8(並行安裝)已自 Goals 移除(2026-06-06):與 §5.2「並行安裝不做」矛盾;移入 §5.3 Backlog。
 
 ---
 
@@ -139,24 +140,33 @@ updated: 2026-05-16
 **子工具**
 - `setup_secrets.sh`(見 §14):SSH key / GPG / token 互動式安全處理
 
-### 5.2 nice-to-have(v0.3 / v1.x)
+### 5.2 Roadmap(0.2.0 ~ 0.4.0)
 
-- `setup_ubuntu self-upgrade`(從 GitHub release 拉最新工具本身)
-- `setup_ubuntu reinstall <m>`(便利動詞 = `remove` + `install`)
-- `setup_ubuntu autoremove`(清未被 `manual=true` module 依賴的 orphan)
-- Module repository(`setup_ubuntu module add <git-url>`,第三方 module)
-- `setup_ubuntu doctor --fix`(自動修復狀態檔失真)
-- `setup_secrets sync ...`(secrets 跨機,GPG 簽章保護)
-- Sync payload 簽章(防 MITM)
+> 版本階梯目前規劃至 **0.4.0**(2026-06-06 定稿);**1.0 暫不規劃**(非永久取消 — 若未來要做,先回本 PRD 變更並 bump 文件版本)。未排版本的願望收在 §5.3 Backlog。
 
-> **並行安裝不做** — v0.1 起始終 sequential。`dpkg` lock 與 sudo 互斥讓 apt module 無法並行;非 apt module 並行收益不足以抵 scheduler 複雜度。`PARALLEL_GROUP` metadata 也已從 module spec 移除。
+| 版本 | 主題 | 內容 |
+|---|---|---|
+| **0.2.0** | 清理與遷移 | state schema migration 機制啟用(AC-30 / AC-31)・`tools/` 各檔去向逐一決定(§6.5)・`small-tools/` 標 deprecated(§6.6)・`.adoc` → `.md` 全轉(AC-28) |
+| **0.3.0** | 便利動詞 | `setup_ubuntu reinstall <m>`(= `remove` + `install`)・`setup_ubuntu autoremove`(清未被 `manual=true` module 依賴的 orphan)・`setup_ubuntu doctor --fix`(自動修復狀態檔失真 + config hand-edit 偵測,§10.3)・`setup_ubuntu self-upgrade`(從 GitHub release 拉最新工具本身,§17.3) |
+| **0.4.0** | 終局 | `small-tools/` 移除(AC-27)・nvidia-driver 失敗自動回滾(AC-21,ADR-0020)・i18n 四語系全覆蓋(AC-29) |
 
-### 5.3 未來(v2+)
+> **並行安裝不做** — 始終 sequential。`dpkg` lock 與 sudo 互斥讓 apt module 無法並行;非 apt module 並行收益不足以抵 scheduler 複雜度。`PARALLEL_GROUP` metadata 也已從 module spec 移除。未來若使用體驗改變,自 §5.3 Backlog 重啟討論。
 
+### 5.3 Backlog(願望清單,不排版本)
+
+> 不承諾、不排程;若要實作,須先回到本 PRD 變更並 bump 文件版本。
+
+- 並行安裝(非 apt module worker pool)
+- `setup_ubuntu rollback`(任意版本回滾;upgrade 失敗的 archetype rollback 已涵蓋主要需求,見 §7.6)
+- `setup_secrets sync ...`(secrets 跨機加密搬運)
 - 支援 Debian 衍生(非 Ubuntu)
 - Wayland-aware 推薦
 - 蘋果硬體偵測 + 對應 driver 推薦
 - Web UI(若有需求)
+
+**已砍(不做,亦不入 Backlog,2026-06-06)**:
+- Module repository(`setup_ubuntu module add <git-url>`)— 與「不對外發行」Non-Goal 矛盾;私有擴充由 user-local module 區(§5.1 / Q35)涵蓋
+- Sync payload 簽章 — sync 走 SSH(strict host key checking + key-only 認證),通道已認證已加密,GPG 簽章為重複防護
 
 ---
 
@@ -267,9 +277,9 @@ updated: 2026-05-16
 ### 6.6 small-tools/ 退場路徑
 
 `small-tools/install.sh` 內裝的東西基本與上述 module 重疊,規劃:
-- v0.1 釋出:`small-tools/` 維持原狀,可獨立執行
-- v0.2:在 `setup_ubuntu list` 標示「small-tools/ deprecated,請改用 `setup_ubuntu install --base`」
-- v0.5:`small-tools/` 移除,README 內僅保留歷史說明
+- 0.1.0 釋出:`small-tools/` 維持原狀,可獨立執行
+- 0.2.0:在 `setup_ubuntu list` 標示「small-tools/ deprecated,請改用 `setup_ubuntu install --base`」
+- 0.4.0:`small-tools/` 移除,README 內僅保留歷史說明(AC-27)
 
 ---
 
@@ -298,7 +308,7 @@ setup_ubuntu <subcommand> [args] [flags]
 | `list` | — | `--category=<n>`、`--installed`、`--upgradable`、`--available`、`--tag=<t>`、`--json` | 列出 module(`--installed` 取代 `status`) | `apt list` |
 | `status` | `[<module>]` | `--json` | **deprecated**(forward 到 `list --installed`,印 warn 提示) | — |
 | `detect` | — | `--json` | 環境偵測結果(也是 `doctor` 開頭印出的一部分) | — |
-| `doctor` | `[<module>...]` | `--validate-modules`、`--fix`(v1.x) | 不帶名 = 印 env detect + 跑所有 installed 的 `doctor()`;帶名 = 跑該 module;`--validate-modules` 跑 metadata lint | — |
+| `doctor` | `[<module>...]` | `--validate-modules`、`--fix`(0.3.0) | 不帶名 = 印 env detect + 跑所有 installed 的 `doctor()`;帶名 = 跑該 module;`--validate-modules` 跑 metadata lint | — |
 | `config set` | `<key>` `<value>` | — | 修改 `~/.config/init_ubuntu/config.ini` 的單一鍵值(取代手動編輯) | — |
 | `config get` | `<key>` | — | 讀取單一鍵值 | — |
 | `config unset` | `<key>` | — | 移除單一鍵值(回復為預設) | — |
@@ -471,6 +481,8 @@ upgrade 一個 module 與 install 一樣走 install → verify pipeline(ADR-0015
 ```
 
 > Module 在 TUI 內按 `TAGS[0]` 自動分組;每個 module 只在第一個 tag 群組顯示,避免重複勾選混淆。
+>
+> **Dep 鏈顯示**(arch §18.2 Q-A3,2026-06-06 定稿):勾選 module 時 dep 鏈預設**折疊**,僅顯示「will pull N deps」一行提示;可展開明細。dialog / whiptail 雙後端行為一致。
 
 ### 8.2.1 Quick Setup 多 step 流程
 
@@ -824,6 +836,8 @@ fi
 
 額外的人類可讀單行格式仍會印到 stdout(`tee` 模式),但**檔案存的是 JSONL**。
 
+**保留策略(0.1.0,AC-33;arch §18.2 Q-A4)**:session 結尾自動清理 — 保留最近 **30 天**且至多 **100 個** `.jsonl` 檔,任一條件超過即從最舊開始刪(類 logrotate,無外部依賴)。
+
 ### 10.3 User config
 
 `${XDG_CONFIG_HOME:-$HOME/.config}/init_ubuntu/config.ini`(INI 風格,**對標 base** repo 慣例)
@@ -840,7 +854,7 @@ fi
 # ===========================================================================
 ```
 
-`setup_ubuntu doctor`(v1.x)會偵測 hand-edit(用 checksum)並警告。
+`setup_ubuntu doctor --fix`(0.3.0)會偵測 hand-edit(用 checksum)並警告。
 
 ```ini
 [ui]
@@ -876,13 +890,13 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 
 **Ship gate**:標 `v0.1-mandatory` 的 AC 全綠才 tag `v0.1.0`。**無 due date(個人 project,有空才推進)**。
 
-26.04 配套(2026-05-21 更新):26.04 Plucky 已 release(2026-04-23,~ 1 月前),`ubuntu:26.04` Docker image GA。`ubuntu-26.04` GitHub Actions runner 預計 5 月底 / 6 月初 GA(actions/runner-images 流程)。當前策略:CI matrix 用 stable `ubuntu-24.04` runner + `docker_image: ubuntu:26.04`(在 24.04 host 內跑 26.04 container);觀察 1 ~ 2 週 stable 後 26.04 從 best-effort 轉 mandatory。在此期間 AC-3 / AC-18 對 26.04 走 `continue-on-error: true`,不阻 v0.1 ship gate。
+26.04 配套(2026-06-06 定稿):**26.04 即日起 mandatory,無豁免**。CI 矩陣維度是 **Docker image**(`docker_image: ubuntu:22.04 / 24.04 / 26.04`),不是 GitHub Actions runner 版本 — 測試依 ADR-0004 全部跑在 container 內,runner 固定用 stable `ubuntu-24.04` 即可,`ubuntu-26.04` runner GA 與否無關緊要(截至 2026-06-06 仍未 GA,actions/runner-images #13855 / #13964 open)。AC-3 / AC-18 不再帶 `continue-on-error`。
 
 | ID | 條件 | Scope |
 |---|---|---|
 | AC-1 | 在乾淨 `ubuntu:22.04` container 內 `setup_ubuntu install --base -y` 成功 | v0.1-mandatory |
 | AC-2 | 在乾淨 `ubuntu:24.04` container 內同樣指令成功 | v0.1-mandatory |
-| AC-3 | 在乾淨 `ubuntu:26.04` container 內同樣指令成功 | v0.1-mandatory(待 26.04 release) |
+| AC-3 | 在乾淨 `ubuntu:26.04` container 內同樣指令成功 | v0.1-mandatory |
 | AC-4 | `setup_ubuntu install neovim` 自動拉入所有 dep 並裝完 | v0.1-mandatory |
 | AC-5 | `setup_ubuntu install neovim` 跑兩次,第二次仍 exit 0(idempotent) | v0.1-mandatory |
 | AC-6 | `setup_ubuntu remove neovim` → `setup_ubuntu install neovim` 連續執行可成功 | v0.1-mandatory |
@@ -897,50 +911,56 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | AC-15 | `setup_ubuntu sync user@host` 推送後對端 state.json 含預期 module | v0.1-mandatory |
 | AC-16 | 非 tty 輸出(`setup_ubuntu list | cat`)自動關閉 ANSI 色彩 | v0.1-mandatory |
 | AC-17 | bats unit test 覆蓋率 >= 80%(by kcov) | v0.1-mandatory |
-| AC-18 | integration test 在 GitHub Actions `ubuntu-22.04` + `ubuntu-24.04` + `ubuntu-26.04` 矩陣全綠 | v0.1-mandatory(26.04 同 AC-3) |
+| AC-18 | integration test 在 GitHub Actions 上 `ubuntu:22.04` + `ubuntu:24.04` + `ubuntu:26.04` Docker image 矩陣全綠 | v0.1-mandatory |
 | AC-19 | 寫一個新的 dummy module(<10 行)能被 engine 自動發現並列入 `list` | v0.1-mandatory |
 | AC-20 | `setup_secrets ssh-key generate` 互動產 key 不入 shell history | v0.1-mandatory |
 | AC-22 | `setup_ubuntu upgrade neovim` 跑完,Sidecar `${XDG_STATE_HOME}/init_ubuntu/versions/neovim` 內版本與 GitHub release latest 對齊 | v0.1-mandatory |
 | AC-23 | `bash modules/docker.module.sh install --dry-run` 跑完,Sidecar 寫入正確(Standalone 模式)但 `state.json` 完全沒變(ADR-0001) | v0.1-mandatory |
 | AC-24 | `setup_ubuntu doctor` 印出 env detect 結果 + 所有 installed module 的 `doctor()` 結果;`--validate-modules` flag 額外驗證每個 module 的 metadata 合法 | v0.1-mandatory |
 | AC-25 | 全 10 個 lifecycle 函式對每個 module 都能跑(`bash modules/<m>.module.sh <phase>` 都 exit 0 或預期 Query-no 的 exit 1,絕無「not implemented」exit 2) | v0.1-mandatory |
+| AC-32 | docker daemon 停掉 → `doctor docker` exit 1 而 `verify docker` exit 0(ADR-0009) | v0.1-mandatory |
+| AC-33 | 任一 session 結束後,`logs/` 內 `.jsonl` 不超過 100 檔且無超過 30 天的檔(保留策略生效,§10.2) | v0.1-mandatory |
 
-### 11.2 v1.0 — 額外要求
+### 11.2 0.2.0 ~ 0.4.0 — 後續里程碑 AC
 
 | ID | 條件 | Scope |
 |---|---|---|
-| AC-21 | nvidia-driver install 失敗時自動回復 nouveau,系統仍可開機進入桌面 | v1.0(§13 Q9 自動回滾延後) |
-| AC-26 | 覆蓋率 100% | v1.0 |
-| AC-27 | `small-tools/` 已移除,README 內保留歷史說明 | v1.0 |
-| AC-28 | `.adoc` 全部換為 `.md` | v1.0 |
-| AC-29 | i18n 全覆蓋(en + zh-TW + zh-CN + ja 四種語系皆無 untranslated 字串) | v1.0 |
-| AC-30 | state.json 升級後 `state.json.v<old>.bak` 存在(ADR-0008) | v0.2+(schema 第一次變才會觸發) |
-| AC-31 | 讀到比 tool 新的 state.json 退 code 1 不改檔(ADR-0008) | v0.2+ |
-| AC-32 | docker daemon 停掉 → `doctor docker` exit 1 而 `verify docker` exit 0(ADR-0009) | v0.1-mandatory |
+| AC-28 | `.adoc` 全部換為 `.md` | 0.2.0 |
+| AC-30 | state.json 升級後 `state.json.v<old>.bak` 存在(ADR-0008) | 0.2.0(schema 第一次變才會觸發) |
+| AC-31 | 讀到比 tool 新的 state.json 退 code 1 不改檔(ADR-0008) | 0.2.0 |
+| AC-21 | nvidia-driver install 失敗時自動回復 nouveau,系統仍可開機進入桌面(ADR-0020) | 0.4.0 |
+| AC-27 | `small-tools/` 已移除,README 內保留歷史說明 | 0.4.0 |
+| AC-29 | i18n 全覆蓋(en + zh-TW + zh-CN + ja 四種語系皆無 untranslated 字串) | 0.4.0 |
+
+> **AC-26(覆蓋率 100%)已撤銷**(2026-06-06):80% 硬門檻由 AC-17 把關,後續提升為 best-effort(G5)。
+> **AC-32 移至 §11.1**(本就是 v0.1-mandatory)。
 
 ---
 
 ## 12. Delivery Milestones
 
-| Milestone | Plan | Status |
-|---|---|---|
-| M0 - Discovery | `docs/prd/` + `docs/architecture.md` + `docs/module-spec.md` + `CONTEXT.md` + `docs/adr/` | **completed** |
-| M1 - Test harness | 借用 base 的 `Dockerfile.test-tools` + `Makefile` + `scripts/ci/ci.sh`(bats + bats-assert + bats-mock) | **completed** |
-| M2 - Engine core | `lib/dispatcher.sh` + `lib/registry.sh` + `lib/runner.sh` + `lib/resolver.sh` + `lib/module_helper.sh` + 10 v2 modules | **completed** |
-| M3 - Detect engine | `lib/detect.sh` + `lib/platform.sh` + `setup_ubuntu detect` | **completed** |
-| M4 - State + log | `lib/state.sh` + `lib/state_io.sh` + `lib/logger.sh`(JSONL)+ flock concurrency | **completed** |
-| M5 - CLI(部分) | `setup_ubuntu.sh` subcommands;待補 `upgrade` / `verify` / `doctor` 入口 + `list` 各 flag 實作 + `--verbose/--quiet/--color` wire | **in-progress** |
-| M6 - TUI | `setup_ubuntu_tui.sh` + `lib/tui_backend.sh`(含 tag 分組 / Quick Setup 多 step) | pending |
-| M7 - Module migration | Batch A(10 個 v2 module + helpers + template)完成;待 Batch B(cli-essentials 8 個)/ Batch C(agent + 其他 optional 11 個) | **in-progress** |
-| M8 - i18n + color | `lib/i18n.sh`(`i18n_detect_lang` / `i18n_sanitize_lang`,對標 base)+ `lib/color.sh`;module 用 `declare -A` + `module_i18n_get` | pending |
-| M9 - Sync + Secrets | `lib/sync.sh`(SSH push/pull)+ `setup_secrets.sh`(SSH key / GPG / token) | partial(sync 完成,secrets pending) |
-| M10 - Unit tests 80% | 239 + N modules × ~50 tests ≈ 600+ unit tests。CI 切「per-module job」(每 module 一個 job,matrix 從 `ls modules/*.module.sh` discover step 動態生;`fail-fast: false`;`timeout-minutes: 5`;`make test-unit MODULE=<name>` 入口);path-filter(dorny/paths-filter)讓 PR 只跑改動的 module job,main push 跑完整 cartesian | **in-progress**(239/239 綠) |
-| M11 - Integration tests | `ubuntu:22.04` + `ubuntu:24.04` + `ubuntu:26.04` 矩陣 | pending |
-| M12 - Coverage + CI | kcov + GitHub Actions | pending |
-| M13 - Code review | code-reviewer x 2 + security-reviewer 並行 | pending |
-| M14 - Docs + .adoc->.md | `docs/guides/` 4 篇手寫 + `docs/modules/` 自動 INDEX + per-module 文件;README 改寫 | pending |
-| M15 - Post-install management 驗收 | 確認裝完後 CLI + TUI 仍可管理(install / upgrade / remove / verify / doctor / sync) | pending |
-| M16 - Coverage 100% | 後續迭代 | pending |
+> **執行狀態不在本文件維護**(2026-06-06 起):進度由 GitHub issues / milestones 追蹤,此處只定義範圍。M0 ~ M15 全屬 **0.1.0**;0.2.0 ~ 0.4.0 的範圍見 §5.2 Roadmap。
+
+| Milestone | Plan |
+|---|---|
+| M0 - Discovery | `docs/prd/` + `docs/architecture.md` + `docs/module-spec.md` + `CONTEXT.md` + `docs/adr/` |
+| M1 - Test harness | 借用 base 的 `Dockerfile.test-tools` + `Makefile` + `scripts/ci/ci.sh`(bats + bats-assert + bats-mock) |
+| M2 - Engine core | `lib/dispatcher.sh` + `lib/registry.sh` + `lib/runner.sh` + `lib/resolver.sh` + `lib/module_helper.sh` + 10 v2 modules |
+| M3 - Detect engine | `lib/detect.sh` + `lib/platform.sh` + `setup_ubuntu detect` |
+| M4 - State + log | `lib/state.sh` + `lib/state_io.sh` + `lib/logger.sh`(JSONL + 30 天/100 檔保留,AC-33)+ flock concurrency |
+| M5 - CLI | `setup_ubuntu.sh` subcommands(含 `upgrade` / `verify` / `doctor` 入口 + `list` 各 flag + `--verbose/--quiet/--color` wire) |
+| M6 - TUI | `setup_ubuntu_tui.sh` + `lib/tui_backend.sh`(含 tag 分組 / Quick Setup 多 step / dep 鏈折疊顯示) |
+| M7 - Module migration | Batch A(10 個 v2 module + helpers + template)/ Batch B(cli-essentials 8 個)/ Batch C(agent + 其他 optional 11 個) |
+| M8 - i18n + color | `lib/i18n.sh`(`i18n_detect_lang` / `i18n_sanitize_lang`,對標 base)+ `lib/color.sh`;module 用 `declare -A` + `module_i18n_get` |
+| M9 - Sync + Secrets | `lib/sync.sh`(SSH push/pull)+ `setup_secrets.sh`(SSH key / GPG / token) |
+| M10 - Unit tests 80% | 239 + N modules × ~50 tests ≈ 600+ unit tests。CI 切「per-module job」(每 module 一個 job,matrix 從 `ls modules/*.module.sh` discover step 動態生;`fail-fast: false`;`timeout-minutes: 5`;`make test-unit MODULE=<name>` 入口);path-filter(dorny/paths-filter)讓 PR 只跑改動的 module job,main push 跑完整 cartesian |
+| M11 - Integration tests | `ubuntu:22.04` + `ubuntu:24.04` + `ubuntu:26.04` 矩陣 |
+| M12 - Coverage + CI | kcov + GitHub Actions |
+| M13 - Code review | code-reviewer x 2 + security-reviewer 並行 |
+| M14 - Docs | `docs/guides/` 4 篇手寫 + `docs/modules/` 自動 INDEX + per-module 文件;README 改寫(`.adoc`→`.md` 全轉屬 0.2.0,AC-28) |
+| M15 - Post-install management 驗收 | 確認裝完後 CLI + TUI 仍可管理(install / upgrade / remove / verify / doctor / sync) |
+
+> 原 M16(Coverage 100%)已撤銷(同 AC-26,2026-06-06):80% gate 由 M10 / AC-17 把關,提升為 best-effort。
 
 ---
 
@@ -956,10 +976,10 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | Q6 | `modules/config/` 內的 config 檔該怎麼套用? | **配 config-drop archetype 走正常 install pipeline**(ADR-0014,2026-05-20):每個 config bundle 有 `<name>-config.module.sh`,用 `setup_ubuntu install <name>-config` 套用;批次用 `install --tag=config`。**`config load` subcommand 已砍**(與 `config get/set/unset/show` 名稱重疊易混) |
 | Q7 | `experimental` 分類是否保留? | **保留**作為未來不穩定 module 入口;但 `dual-system-time-sync` 不該放這層,後續重新分類 |
 | Q8 | 是否要在 v0.1 就支援 import / export state? | **v0.1 就要有**(已從 nice-to-have 提前到必備) |
-| Q9 | `setup_ubuntu install --recommended` 是否包含 `nvidia-driver`? | **可包含**,但需使用者 dual-check 確認(`RISK_LEVEL=high` 觸發 `WARN_MESSAGE` 顯示在 install 之前);failure recovery 透過 `POST_INSTALL_MESSAGE` 提示使用者手動切回 nouveau,**v0.1 不自動回滾**(複雜度過高,v1.x 評估;見 §13.2 Q22 metadata 收斂) |
+| Q9 | `setup_ubuntu install --recommended` 是否包含 `nvidia-driver`? | **可包含**,但需使用者 dual-check 確認(`RISK_LEVEL=high` 觸發 `WARN_MESSAGE` 顯示在 install 之前);failure recovery 透過 `POST_INSTALL_MESSAGE` 提示使用者手動切回 nouveau,**v0.1 不自動回滾**;自動回滾排入 **0.4.0**(AC-21,ADR-0020;見 §13.2 Q22 metadata 收斂) |
 | Q10 | `purge` 是否要連 dep 一起 purge? | **不要**;純 purge 自己。要清 dep 用 `--with-orphans`(只清沒被其他 module 依賴的 dep) |
 | Q11 | Module 檔名 kebab-case 還是 snake_case? | **kebab-case** |
-| Q12 | 是否要支援 `setup_ubuntu rollback`? | **v0.1 不做**,v1.x 評估 |
+| Q12 | 是否要支援 `setup_ubuntu rollback`? | **不做**;移入 Backlog(§5.3)。upgrade 失敗的 archetype rollback(§7.6)已涵蓋主要需求 |
 
 > 設計細節層次的決定(parallel 預設、sync 簽章、secrets backend 選擇、平台 allowlist 策略、高風險 module snapshot 範圍、non-sudo 模式 apt-essentials 處理)收斂進 `docs/architecture.md` §18 開放問題與決定。
 
@@ -1116,8 +1136,8 @@ setup_ubuntu sync <user@host> --pull
 
 - ✅ Push / Pull state.json
 - ✅ Bootstrap 對端
-- ❌ Payload 簽章(v1.x)
-- ❌ Push secrets(由 `setup_secrets sync ...` v1.x 處理)
+- ❌ Payload 簽章(**已砍**,2026-06-06:SSH 通道已認證已加密,見 §5.3)
+- ❌ Push secrets(`setup_secrets sync` 在 Backlog §5.3;目前一律手動處理)
 
 ---
 
@@ -1149,7 +1169,7 @@ setup_ubuntu_tui                      # 互動式管理
 
 ### 17.3 工具自身的升級路徑
 
-- `setup_ubuntu self-upgrade`(v1.x):從 GitHub release 拉最新版
+- `setup_ubuntu self-upgrade`(0.3.0):從 GitHub release 拉最新版
 - 升級不影響既有 state.json(`state.json.version` migration 保護)
 
 ---
@@ -1186,7 +1206,7 @@ setup_ubuntu_tui                      # 互動式管理
 | └ `modules/tools/ros1/*` | (隨上面搬遷) | v0.1 不處理 |
 | `modules/config/*` | 不動 — 由各對應 module 引用 | 保留 |
 | `templates/*_tmp.sh` | `templates/module-{apt,github-release,config,custom}.template.sh` + `templates/test.template.bats` | 改寫為新契約模板(4 個 archetype 各一,共用 shared sections,drift 由 `template_consistency_spec.bats` 把關) |
-| `small-tools/*` | v0.5 移除,內容已分散到對應 module | deprecation 路徑 |
+| `small-tools/*` | 0.4.0 移除,內容已分散到對應 module | deprecation 路徑(§6.6) |
 | `gh-upgrade-README.md` | 評估歸入 `docs/` 或保留 | 評估 |
 | `install-nvidia-driver.sh` | 與 `modules/nvidia-driver.module.sh` 整合 | 整合 |
 | `run_claude.sh` | 不動 | 保留 |

@@ -404,7 +404,7 @@ Payload schema(`payload.json`):
 
 **安全性原則**:
 - payload **絕不含**敏感資料(SSH key / token / 個人 config 內的 secrets)
-- 由 `setup_secrets.sh` 另開獨立流程處理敏感資料(`setup_secrets sync ...` v1.x)
+- 由 `setup_secrets.sh` 另開獨立流程處理敏感資料(`setup_secrets sync` 在 PRD §5.3 Backlog,目前一律手動)
 - SSH 連線**只用既有 key**,不在工具內存任何 password
 - 對方執行前一律 `--dry-run` 預覽,使用者確認後才實際 install
 - 加 `--strict-host-key-checking=yes`,拒絕 unknown host
@@ -649,12 +649,7 @@ flowchart LR
 
 ### 8.4 Coverage gate
 
-| 階段 | 門檻 |
-|---|---|
-| v0.1 | >= 80% |
-| v0.5 | >= 90% |
-| v1.0 | >= 95% |
-| 之後 | >= 99%(允許 1% 為硬體相關不可測) |
+**80% 為唯一硬門檻**(kcov,PRD G5 / AC-17,2026-06-06 定稿);提升為 best-effort,不設階梯式目標。原 v0.5 ≥90% / v1.0 ≥95% 階梯已撤銷(版本階梯目前至 0.4.0,1.0 暫不規劃)。
 
 ---
 
@@ -874,9 +869,9 @@ CLI 旗標 `--color=auto|always|never`(預設 `auto`,套用上述判斷)。
 
 ## 13. 整合與擴充
 
-### 13.1 第三方 module(v1.x)
+### 13.1 第三方 module(已砍,2026-06-06)
 
-`setup_ubuntu module add <git-url>`,clone 到 `~/.local/share/init_ubuntu/modules/`。
+`setup_ubuntu module add <git-url>` **不做**:與「不對外發行」Non-Goal 矛盾;私有擴充由 user-local module 區(`${XDG_CONFIG_HOME}/init_ubuntu/modules/`,PRD Q35)涵蓋。
 
 ### 13.2 與 base repo 的關係
 
@@ -1054,20 +1049,20 @@ v0.1+ 一律序列。`dpkg` lock + sudo 互斥讓 apt module 無法並行;非 ap
 
 | # | 問題 | **決定** |
 |---|---|---|
-| Q-A7 [N8] | sync payload 是否要簽章? | **v0.1 不考慮**;後續若有擴大 user 範圍再評估(加 GPG signature) |
+| Q-A7 [N8] | sync payload 是否要簽章? | **不做,已砍**(2026-06-06 PRD 定稿):sync 走 SSH(strict host key checking + key-only),通道已認證已加密,GPG 簽章為重複防護 |
 | Q-A8 [N4] | secrets 主要後端? | **偵測順序嘗試**:`pass` > `gnome-keyring` > encrypted-file(自動找最好用的);使用者可在 `~/.config/init_ubuntu/config.ini` 寫 `[secrets] backend=pass` 強制指定 |
 | Q-A9 [N9] | RPi / Jetson 是 allowlist 還是 is_recommended? | **allowlist**:`SUPPORTED_PLATFORMS` 為硬限制;沒列就視為不支援(可 `--force` 強裝)。**支援與否的依據**:做 CI 測試 / 看官方資訊確認;沒有官方資訊的就用 CI 測試 |
-| Q-A10 [N3] | 並行安裝預設啟用嗎? | **v0.1 預設關閉**;後續再評估要不要啟動或**直接取消功能**(取決於使用體驗) |
+| Q-A10 [N3] | 並行安裝預設啟用嗎? | **不做**(2026-06-06 PRD 定稿):移入 PRD §5.3 Backlog;`PARALLEL_GROUP` metadata 已砍(PRD Q34) |
 | Q-A11 [N17] | 高風險 module 自動回復的「snapshot」要做到多深? | **預設記前三層**(`lsmod` + `apt-mark showmanual` + 關鍵 config `/etc/X11`、`/etc/modprobe.d`)。**使用者在 install 確認對話框內可勾選是否額外做全機 snapshot**(BTRFS / timeshift),預設不做,需明確選擇 |
 | Q-A12 [N6] | Non-sudo 模式下 `apt-essentials` 怎麼辦? | **檢查每個套件是否已裝且符合最低版本**:已裝 + 版本 OK → 略過此套件繼續其他安裝;沒裝且無法 `apt install` → **跳過該套件**(不是整個 module fail)。**結尾彙報**:哪些套件成功 / 跳過 / 失敗 |
 
-### 18.2 設計階段傾向(尚未經使用者確認,屬於實作層細節)
+### 18.2 設計階段傾向(已全數收斂,2026-06-06 PRD 定稿)
 
-| # | 問題 | 我的傾向 |
+| # | 問題 | **決定** |
 |---|---|---|
-| Q-A1 | resolver 用 Kahn 還是 DFS topo sort? | **Kahn** |
-| Q-A2 | state.json schema migration 策略 | 一個 schema 版本一個 migrator,自動 migrate + 備份 |
-| Q-A3 | TUI dep 鏈是否遞迴展開 | 預設折疊,提供「展開」按鈕 |
-| Q-A4 | log 保留多久 | 預設 30 天 / 100 個檔,類 logrotate |
-| Q-A5 | Module-local i18n? | v0.1 不做 |
-| Q-A6 [N7] | i18n 字典是 bash declare -A 還是外部 JSON? | bash declare -A(對標 base) |
+| Q-A1 | resolver 用 Kahn 還是 DFS topo sort? | **Kahn** — 已實作於 `lib/resolver.sh` |
+| Q-A2 | state.json schema migration 策略 | 由 **ADR-0008**(forward-only migration + 備份)取代 |
+| Q-A3 | TUI dep 鏈是否遞迴展開 | **預設折疊 + 可展開**(「will pull N deps」一行提示;PRD §8.2) |
+| Q-A4 | log 保留多久 | **30 天 / 100 檔**,session 結尾清理;排入 **0.1.0**(PRD §10.2 / AC-33) |
+| Q-A5 | Module-local i18n? | **不另做** — metadata 層 i18n 已由 PRD Q23(`declare -A` + `module_i18n_get`)涵蓋 |
+| Q-A6 [N7] | i18n 字典是 bash declare -A 還是外部 JSON? | bash **declare -A**(PRD Q23 已決定;`lib/module_helper.sh` 已實作) |

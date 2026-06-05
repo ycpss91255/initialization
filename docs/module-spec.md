@@ -881,7 +881,7 @@ readonly _MODULE_CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/config/neovim"
 
 ## 8. 驗證工具
 
-Engine 提供 `setup_ubuntu doctor --validate-modules`(v1.x)自動檢查所有 module:
+Engine 提供 `setup_ubuntu doctor --validate-modules`(v0.1,PRD AC-24)自動檢查所有 module:
 
 - Metadata 必要欄位完整
 - 函式名稱與簽名正確

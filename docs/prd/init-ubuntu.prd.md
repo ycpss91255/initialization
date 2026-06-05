@@ -315,7 +315,7 @@ setup_ubuntu <subcommand> [args] [flags]
 
 | Subcommand | Args | Flags | 行為 | 對標 apt |
 |---|---|---|---|---|
-| `install` | `<module>...` | `-y / --yes`、`--dry-run`、`--no-deps`、`--base`、`--recommended`、`--all-base`、`--category=<n>`、`--install-target=auto\|sudo\|user-home`、`--force` | 安裝指定 module(自動帶 dep)。`--dry-run` 對整條 dep chain 傳播:engine 對每個 dep + 主 module 都 call `install()`,各 module 內透過 `module_dryrun_guard` 只印 cmd 不執行;dry-run 跳過 verify(印 `verify_skipped`);結束印 summary 列出所有 would-install module。AC-12 驗證 dry-run 期間無 fs 寫入 | `apt install` |
+| `install` | `<module>...` | `-y / --yes`、`--dry-run`、`--no-deps`、`--base`、`--recommended`、`--all-base`、`--category=<n>`、`--install-target=auto\|sudo\|user-home`、`--force` | 安裝指定 module(自動帶 dep)。`--dry-run` 對整條 dep chain 傳播:engine 對每個 dep + 主 module 都 call `install()`,各 module 內透過 `module_dryrun_guard` 只印 cmd 不執行;dry-run 跳過 verify(印 `verify_skipped`);結束印 summary 列出所有 would-install module。AC-12 驗證 dry-run 期間無 fs 寫入。**確認行為(2026-06-06)**:無 `-y` 時 dep 解析完先列 plan(`Will install: neovim + 6 deps (fzf, lazygit, ...)`)問 `Proceed? [Y/n]`(install 預設 Y;upgrade 維持 `[y/N]`,§7.6);`-y` 跳過 | `apt install` |
 | `remove` | `<module>...` | `-y / --yes`、`--dry-run`、`--with-orphans` | 移除 module(保留 config) | `apt remove` |
 | `purge` | `<module>...` | `-y / --yes`、`--dry-run`、`--with-orphans` | 完整移除 module + config | `apt purge` |
 | `update` | — | — | Rescan `modules/` + 重建 registry(對應 apt-aligned「index 重整」,**非**升級) | `apt update` |

@@ -710,17 +710,16 @@ install() {
 
 ### 9.4 Log 格式(JSONL,structured logging)
 
-Log **檔案存的是 JSON Lines**(`.jsonl`),主要使用對象是 **agent**(Claude / Codex / Gemini)做問題診斷;stdout 同時印人類可讀單行格式(`tee` 模式)。
+Log **檔案存的是 JSON Lines**(`.jsonl`),主要使用對象是 **agent**(Claude / Codex / Gemini)做問題診斷;人讀 stdout 輸出見 PRD §7.7(進度行 + exec_cmd 命令流,結尾聚合由事件衍生)。
 
 ```jsonl
-{"ts":"2026-05-13T14:22:33+08:00","level":"info","module":"docker","event":"install_start","payload":{"version":"apt-managed","install_target":"sudo","dry_run":false}}
-{"ts":"2026-05-13T14:22:34+08:00","level":"info","module":"docker","event":"cmd_exec","payload":{"cmd":"sudo apt-get update","exit":0,"duration_ms":1430}}
-{"ts":"2026-05-13T14:22:45+08:00","level":"info","module":"docker","event":"cmd_exec","payload":{"cmd":"sudo apt-get install -y docker-ce ...","exit":0,"duration_ms":11200}}
-{"ts":"2026-05-13T14:23:02+08:00","level":"info","module":"docker","event":"install_done","payload":{"status":"ok"}}
+{"timestamp":"2026-05-13T14:22:33.123456Z","severity_text":"INFO","body":"install_start","trace_id":"0193cdef-...","span_id":"install_docker_001","attributes":{"service.name":"docker","version":"apt-managed","install_target":"sudo","dry_run":false}}
+{"timestamp":"2026-05-13T14:22:34.001234Z","severity_text":"INFO","body":"cmd_exec","trace_id":"0193cdef-...","span_id":"install_docker_001","attributes":{"service.name":"docker","cmd":"sudo apt-get update","exit":0,"duration_ms":1430}}
+{"timestamp":"2026-05-13T14:23:02.654321Z","severity_text":"INFO","body":"install_done","trace_id":"0193cdef-...","span_id":"install_docker_001","attributes":{"service.name":"docker","status":"ok"}}
 ```
 
-Schema 見 PRD §10.2。常見 events:
-- `session_start` / `session_end`(engine 層,`module=null`)
+Schema 對齊 ADR-0006(OTel Logs Data Model;舊 `ts/level/module/event/payload` 命名作廢,2026-06-06 與 PRD §10.2 同步)。常見 events(`body` 值):
+- `session_start` / `session_end`(engine 層,`attributes."service.name"="engine"`)
 - `install_start` / `install_done` / `install_failed`
 - `cmd_exec`(每次 `exec_cmd` 呼叫)
 - `dep_resolved`(resolver 完成拓樸排序)

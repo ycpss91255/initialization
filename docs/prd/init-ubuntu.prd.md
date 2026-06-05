@@ -73,6 +73,23 @@ updated: 2026-06-06
 - 使用者已完成 Ubuntu 基本安裝(此工具不負責 OS 安裝)
 - 安裝目標 binary 路徑可改(預設 `/opt`、`/usr/local/bin` for sudo;`$HOME/.local/{bin,lib,share}` for user-home)
 
+### 3.4 取得工具(bootstrap,2026-06-06 定稿)
+
+乾淨 Ubuntu 機器上的第一步是 **git clone + 直接執行**,不另做 installer / 一行式 bootstrap script:
+
+```bash
+sudo apt install -y git          # 乾淨 server/container 才需要;desktop 通常已有
+git clone https://github.com/ycpss91255/initialization.git
+cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --recommended
+```
+
+- README 以此三行作為 Quick Start(取代現況的零說明)
+- 與 self-upgrade(0.3.0,git pull / release)、user-local module 區同一世界觀
+- **Self-deps preflight**:entrypoint 啟動時檢查工具自身依賴(`jq` / `curl` / `git`):
+  - 缺 + 有 sudo → 提示並**詢問一次**是否 `apt install`(`-y` 時自動裝)
+  - 缺 + 無 sudo → fail fast,印明確安裝指引(exit 4)
+  - 解決「state/config/detect 需要 jq、但 jq 在 apt-essentials 內」的雞生蛋(AC-34)
+
 ---
 
 ## 4. User Stories
@@ -108,6 +125,7 @@ updated: 2026-06-06
 - Sudo 偵測 + non-sudo fallback(user-home install,可由 `--install-target` 覆寫)
 - 4 層分類:`base` / `recommended` / `optional` / `experimental`
 - User-local module 區:除了 repo `modules/`,Engine 額外掃 `${XDG_CONFIG_HOME}/init_ubuntu/modules/`(使用者私有模組,同 NAME 撞名時 user-local 勝)
+- Self-deps preflight(`jq` / `curl` / `git` 檢查 + 一次性安裝詢問,§3.4 / AC-34)
 
 **CLI subcommands(對標 apt 的常用使用方式)**
 - `install` / `remove` / `purge` / `upgrade` / `verify` / `doctor`
@@ -146,8 +164,8 @@ updated: 2026-06-06
 
 | 版本 | 主題 | 內容 |
 |---|---|---|
-| **0.2.0** | 清理與遷移 | state schema migration 機制啟用(AC-30 / AC-31)・`tools/` 各檔去向逐一決定(§6.5)・`small-tools/` 標 deprecated(§6.6)・`.adoc` → `.md` 全轉(AC-28) |
-| **0.3.0** | 便利動詞 | `setup_ubuntu reinstall <m>`(= `remove` + `install`)・`setup_ubuntu autoremove`(清未被 `manual=true` module 依賴的 orphan)・`setup_ubuntu doctor --fix`(自動修復狀態檔失真 + config hand-edit 偵測,§10.3)・`setup_ubuntu self-upgrade`(從 GitHub release 拉最新工具本身,§17.3) |
+| **0.2.0** | 清理與遷移 | state schema migration 機制啟用(AC-30 / AC-31)・`tools/` 各檔去向逐一決定(§6.5)・`small-tools/` 標 deprecated(§6.6)・`.adoc` → `.md` 全轉(AC-28)・`doctor --json`(對齊 ADR-0019 agent-friendly schema) |
+| **0.3.0** | 便利動詞 | `setup_ubuntu reinstall <m>`(= `remove` + `install`)・`setup_ubuntu autoremove`(清未被 `manual=true` module 依賴的 orphan)・`setup_ubuntu doctor --fix`(自動修復狀態檔失真 + config hand-edit 偵測,§10.3)・`setup_ubuntu self-upgrade`(從 GitHub release 拉最新工具本身,§17.3)・shell completion(fish + bash:subcommand / module 名 / flag 動態補全,install 時裝進 `~/.config/fish/completions/`) |
 | **0.4.0** | 終局 | `small-tools/` 移除(AC-27)・nvidia-driver 失敗自動回滾(AC-21,ADR-0020)・i18n 四語系全覆蓋(AC-29) |
 
 > **並行安裝不做** — 始終 sequential。`dpkg` lock 與 sudo 互斥讓 apt module 無法並行;非 apt module 並行收益不足以抵 scheduler 複雜度。`PARALLEL_GROUP` metadata 也已從 module spec 移除。未來若使用體驗改變,自 §5.3 Backlog 重啟討論。
@@ -433,9 +451,39 @@ setup_ubuntu config load git-config
 
 upgrade 一個 module 與 install 一樣走 install → verify pipeline(ADR-0015)。verify 失敗 = upgrade 失敗,觸發 archetype rollback。
 
----
+### 7.7 安裝執行輸出 UX(2026-06-06 定稿)
 
-## 8. TUI Wireframe
+> 設計原則承襲 ADR-0006 / 觀測性架構:**JSONL 事件是單一真相源,人讀輸出是事件的 render 結果**。
+
+#### 7.7.1 進行中(預設)
+
+stdout 只印 per-module 進度標頭 + `exec_cmd`(`lib/general.sh`,語法高亮)印出的主要命令行;子命令自身的 stdout/stderr **不 stream**,捕捉進 JSONL(`body: cmd_exec`,attributes 含 `exit` / `duration_ms`):
+
+```
+[2/8] docker: installing...
+  $ sudo apt-get update
+  $ sudo apt-get install -y docker-ce docker-ce-cli ...
+  ✔ docker installed (32s)
+```
+
+- **失敗時**:自動 dump 該 module 子命令輸出最後 ~20 行 + `trace_id` + log 檔路徑
+- `--verbose`:子命令輸出即時 stream
+- `--quiet`:連進度行都不印(只剩 warn / error)
+
+#### 7.7.2 結尾「Action required」聚合
+
+「事後要做」訊息**不在裝完當下印**(會被後續輸出洗掉),統一走結構化事件 → 結尾衍生:
+
+1. `module_emit_post_install` / `module_emit_reboot_required`(module-spec §4.10)發 JSONL 事件:
+   `{"body":"action_required","attributes":{"kind":"post_install|reboot|path","service.name":"<module>","message":"<i18n-resolved>"}}`
+2. Engine 於 session 結尾從本 session 的 `action_required` 事件**衍生**人讀聚合區:
+   ```
+   ── Action required ─────────────────────
+   docker:  Run 'newgrp docker' or re-login to use docker without sudo.
+   neovim:  PATH must include $HOME/.local/bin
+   ⚠ Reboot required (nvidia-driver). Run: sudo reboot
+   ```
+3. Agent 以 `jq 'select(.body=="action_required")'` 取得完全相同資訊 — stdout 與 log 永不分歧(AC-35)
 
 ### 8.1 主選單
 
@@ -518,6 +566,10 @@ Review & Install  -->  顯示完整安裝清單,Proceed / Back / Cancel
 ```
 
 `optional - 其他`(§6.3.3)不在 Quick Setup 內,使用者要用主選單第 4 項「Optional」進入逐項選擇。
+
+#### Proceed 後執行畫面(2026-06-06 定稿)
+
+Review 按 Proceed 後 **TUI 清幕退出,改以 CLI pipeline 輸出**(§7.7:exec_cmd 命令流 + 結尾 Action required 聚合)。不做 dialog `--gauge` / `--prgbox`(whiptail 僅支援 dialog 功能子集,且 AC-11 要求 CLI / TUI 安裝行為完全一致 — 共用同一條輸出 pipeline 讓 AC-11 天然成立)。
 
 #### Cancel / 中斷行為
 
@@ -815,26 +867,26 @@ fi
 
 **Log 主要使用對象是 agent**(Claude / Codex / Gemini)做問題診斷,因此採用**結構化 JSONL** 格式(每行一個 JSON object,易被工具切片與查詢)。stdout 同時印人類可讀格式。
 
-每次 `install` / `remove` / `purge` 產一個 `.jsonl` 檔。每筆 log entry 的 schema:
+每次 `install` / `remove` / `purge` 產一個 `.jsonl` 檔。Schema **對齊 ADR-0006(OTel Logs Data Model + W3C Trace Context,2026-06-06 同步;舊 `ts/level/module/event/payload` 命名作廢)**:
 
 ```json
-{"ts":"2026-05-13T14:22:33+08:00","level":"info","module":"docker","event":"install_start","payload":{"version":"apt-managed","install_target":"sudo","dry_run":false}}
-{"ts":"2026-05-13T14:22:34+08:00","level":"info","module":"docker","event":"cmd_exec","payload":{"cmd":"sudo apt-get update","exit":0,"duration_ms":1430}}
-{"ts":"2026-05-13T14:22:45+08:00","level":"info","module":"docker","event":"cmd_exec","payload":{"cmd":"sudo apt-get install -y docker-ce ...","exit":0,"duration_ms":11200}}
-{"ts":"2026-05-13T14:23:02+08:00","level":"info","module":"docker","event":"install_done","payload":{"status":"ok"}}
+{"timestamp":"2026-05-13T14:22:33.123456Z","severity_text":"INFO","body":"install_start","trace_id":"0193cdef-...","span_id":"install_docker_001","attributes":{"service.name":"docker","version":"apt-managed","install_target":"sudo","dry_run":false}}
+{"timestamp":"2026-05-13T14:22:34.001234Z","severity_text":"INFO","body":"cmd_exec","trace_id":"0193cdef-...","span_id":"install_docker_001","attributes":{"service.name":"docker","cmd":"sudo apt-get update","exit":0,"duration_ms":1430}}
+{"timestamp":"2026-05-13T14:23:02.654321Z","severity_text":"INFO","body":"install_done","trace_id":"0193cdef-...","span_id":"install_docker_001","attributes":{"service.name":"docker","status":"ok"}}
 ```
 
 | 欄位 | 型別 | 說明 |
 |---|---|---|
-| `ts` | ISO 8601 | 事件時間 |
-| `level` | enum(`debug` / `info` / `warn` / `error` / `fatal`) | 等級 |
-| `module` | string \| null | 哪個 module(engine 層事件為 null) |
-| `event` | string | 事件代號(`install_start` / `cmd_exec` / `dep_resolved` / `snapshot_taken` / `recovery_triggered` / `install_done` / ...)|
-| `payload` | object | 事件特定資料 |
+| `timestamp` | ISO 8601(UTC,微秒) | 事件時間(OTel 標準欄位名) |
+| `severity_text` | enum(`DEBUG` / `INFO` / `WARN` / `ERROR` / `FATAL`) | 等級 |
+| `body` | string | 事件代號 enum(`install_start` / `cmd_exec` / `dep_resolved` / `snapshot_taken` / `recovery_triggered` / `install_done` / `action_required` / ...),**不是自由句子** |
+| `trace_id` | string | 一次 engine 執行(session)共用,串起跨 module 事件鏈 |
+| `span_id` | string | 單一 module 的單一 lifecycle 操作 |
+| `attributes` | object | 業務資料容器;`service.name` = module 名(engine 層事件為 `"engine"`) |
 
 **Session 開頭**會印一筆 `session_start` 含當下環境偵測快照(`form_factor` / `os` / `arch` / `gpu` / ...)。**Session 結尾**印 `session_end` 含 exit code + 統計(ok / skipped / failed 個數)。
 
-額外的人類可讀單行格式仍會印到 stdout(`tee` 模式),但**檔案存的是 JSONL**。
+人讀 stdout 輸出規範見 §7.7(進度行 + exec_cmd 命令流;結尾聚合由事件衍生),**檔案存的是 JSONL** — 兩者同源(log 事件為單一真相源)。
 
 **保留策略(0.1.0,AC-33;arch §18.2 Q-A4)**:session 結尾自動清理 — 保留最近 **30 天**且至多 **100 個** `.jsonl` 檔,任一條件超過即從最舊開始刪(類 logrotate,無外部依賴)。
 
@@ -920,6 +972,8 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | AC-25 | 全 10 個 lifecycle 函式對每個 module 都能跑(`bash modules/<m>.module.sh <phase>` 都 exit 0 或預期 Query-no 的 exit 1,絕無「not implemented」exit 2) | v0.1-mandatory |
 | AC-32 | docker daemon 停掉 → `doctor docker` exit 1 而 `verify docker` exit 0(ADR-0009) | v0.1-mandatory |
 | AC-33 | 任一 session 結束後,`logs/` 內 `.jsonl` 不超過 100 檔且無超過 30 天的檔(保留策略生效,§10.2) | v0.1-mandatory |
+| AC-34 | 乾淨 container(無 jq)內 `setup_ubuntu install --base -y` 經 preflight 自動裝 jq 後成功;無 sudo 時 fail-fast 退 code 4 並印安裝指引(§3.4) | v0.1-mandatory |
+| AC-35 | 安裝含 `POST_INSTALL_MESSAGE` / `REBOOT_REQUIRED=true` 的 module 後,結尾印「Action required」聚合區,且內容與 `jq 'select(.body=="action_required")'` 查 log 的結果一致(§7.7.2) | v0.1-mandatory |
 
 ### 11.2 0.2.0 ~ 0.4.0 — 後續里程碑 AC
 

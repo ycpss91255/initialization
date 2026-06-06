@@ -55,7 +55,7 @@ graph TB
     user --> tui
     user --> secrets
     cli --> dispatcher
-    tui --> dispatcher
+    tui --> cli
     secrets --> state
     secrets --> log_svc
 
@@ -379,7 +379,7 @@ sequenceDiagram
     L->>L: 1) export local state (filtered)
     L->>R: 2) SSH: test connection + auth
     L->>R: 3) SCP: payload.json -> /tmp/init_ubuntu_sync.json
-    L->>R: 4) SSH: bootstrap setup_ubuntu (if missing)
+    L->>R: 4) SSH: check setup_ubuntu exists (missing -> exit 7 + bootstrap 教學)
     L->>R: 5) SSH: setup_ubuntu import /tmp/init_ubuntu_sync.json
     R-->>L: 6) apply log streamed back
     L-->>User: summary + exit code
@@ -445,12 +445,15 @@ argv -> parse_cli_args() -> intent { subcommand, modules, flags }
      -> dispatcher.dispatch(intent)
 ```
 
-### TUI 路徑
+### TUI 路徑(2026-06-06 定稿:TUI = CLI 前端,PRD G4)
 
 ```
-TUI prompts -> collect_tui_selections() -> intent { subcommand, modules, flags }
-            -> dispatcher.dispatch(intent)
+讀:setup_ubuntu list --json / detect --json  -> 選單資料(ADR-0019 schema)
+TUI prompts -> collect_tui_selections() -> 組 CLI 命令字串
+            -> exec setup_ubuntu <subcommand> <modules...> [flags]   # fork 子程序,清幕交棒
 ```
+
+TUI 不 source engine lib、不寫 state;AC-11(CLI/TUI 一致)結構性成立。
 
 ### Secrets-tool 路徑 [N4]
 
@@ -1011,16 +1014,14 @@ setup_ubuntu sync <user@host> [--modules base,recommended] [--include-config] [-
 setup_ubuntu sync <user@host> --pull
 ```
 
-### 16.3 Bootstrap
+### 16.3 對端工具檢查(2026-06-06 定稿:不自動 bootstrap)
 
 對端可能沒裝 `setup_ubuntu`。流程:
 
 1. SSH 連線測試
 2. `which setup_ubuntu` on remote
-3. 若不存在:
-   - rsync 本工具到 `~/init_ubuntu_bootstrap/`(只傳 lib/ + modules/ + setup_ubuntu.sh)
-   - 或下載最新 release tarball
-4. 跑 `setup_ubuntu import payload.json`
+3. 若不存在:**退 code 7,印三行 bootstrap 教學**(同 PRD §3.4:`apt install git` → `git clone` → 執行)。不 rsync(產生無 `.git` 孤兒安裝,self-upgrade 斷裂)、不在遠端無人值守動 sudo
+4. 存在:跑 `setup_ubuntu import payload.json`(版本偏差:state schema 同版即可,ADR-0008 把關;工具版本不同僅 warn)
 
 ### 16.4 SSH 安全
 

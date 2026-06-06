@@ -26,7 +26,7 @@ updated: 2026-06-06
 | G1 | 一鍵安裝預設工具集 | `setup_ubuntu install --recommended` 在 Ubuntu 22.04 / 24.04 / **26.04** 乾淨機上 30 分鐘內裝完 |
 | G2 | 環境感知推薦 | 偵測到 NVIDIA GPU / WSL / 容器 / VM / SBC 時自動調整推薦清單 |
 | G3 | 完整生命週期 | 每個 module 都有完整 10 個 mandatory lifecycle(`detect` / `is_recommended` / `is_installed` / `install` / `upgrade` / `remove` / `purge` / `verify` / `is_outdated` / `doctor`),全部 idempotent(見 ADR-0002) |
-| G4 | CLI 與 TUI 雙前端共享同一 engine | 兩個前端的行為完全一致 |
+| G4 | **TUI 是 CLI 的前端**(2026-06-06 定稿,對標 base repo):TUI 讀資料走 `setup_ubuntu list/detect --json`,執行動作 fork `setup_ubuntu <subcommand>` 子程序,不直接碰 engine lib | AC-11(CLI/TUI 行為一致)結構性成立 — TUI 沒有自己的安裝路徑 |
 | G5 | 高測試覆蓋率 | **80% 為硬門檻**(kcov gate,AC-17),持續提升為 best-effort(不設 100% 硬性目標);全部在 Docker 內驗證 |
 | G6 | CI/CD 可整合 | GitHub Actions 上 `ubuntu-22.04` / `ubuntu-24.04` / **`ubuntu-26.04`** 矩陣全綠 |
 | G7 | 易擴充 | 新增一個 module 不需要改 engine 程式碼,只要符合 `module-spec.md` 契約 |
@@ -165,7 +165,7 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 | 版本 | 主題 | 內容 |
 |---|---|---|
 | **0.2.0** | 清理與遷移 | state schema migration 機制啟用(AC-30 / AC-31)・`tools/` 各檔去向逐一決定(§6.5)・`small-tools/` 標 deprecated(§6.6)・`.adoc` → `.md` 全轉(AC-28)・`doctor --json`(對齊 ADR-0019 agent-friendly schema) |
-| **0.3.0** | 便利動詞 | `setup_ubuntu reinstall <m>`(= `remove` + `install`)・`setup_ubuntu autoremove`(清未被 `manual=true` module 依賴的 orphan)・`setup_ubuntu doctor --fix`(自動修復狀態檔失真 + config hand-edit 偵測,§10.3)・`setup_ubuntu self-upgrade`(從 GitHub release 拉最新工具本身,§17.3)・shell completion(fish + bash:subcommand / module 名 / flag 動態補全,install 時裝進 `~/.config/fish/completions/`) |
+| **0.3.0** | 便利動詞 | `setup_ubuntu reinstall <m>`(= `remove` + `install`)・`setup_ubuntu autoremove`(清未被 `manual=true` module 依賴的 orphan)・`setup_ubuntu doctor --fix`(自動修復狀態檔失真 + config hand-edit 偵測,§10.3)・`setup_ubuntu self-upgrade`(主路徑 `git pull`,release 亦提供,§17.3)・shell completion(fish + bash:subcommand / module 名 / flag 動態補全,install 時裝進 `~/.config/fish/completions/`) |
 | **0.4.0** | 終局 | `small-tools/` 移除(AC-27)・nvidia-driver 失敗自動回滾(AC-21,ADR-0020)・i18n 四語系全覆蓋(AC-29) |
 
 > **並行安裝不做** — 始終 sequential。`dpkg` lock 與 sudo 互斥讓 apt module 無法並行;非 apt module 並行收益不足以抵 scheduler 複雜度。`PARALLEL_GROUP` metadata 也已從 module spec 移除。未來若使用體驗改變,自 §5.3 Backlog 重啟討論。
@@ -251,9 +251,9 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 
 | Module 檔名 | 來源 | 說明 | 依賴 |
 |---|---|---|---|
-| `claude-code.module.sh` | (新建) | Anthropic Claude Code CLI | — |
-| `codex.module.sh` | (新建) | OpenAI Codex CLI | — |
-| `gemini.module.sh` | (新建) | Google Gemini CLI | — |
+| `claude-code.module.sh` | (新建) | Anthropic Claude Code CLI(官方 native installer,archetype D;自帶 auto-update,`is_outdated` 委派之) | — |
+| `codex.module.sh` | (新建) | OpenAI Codex CLI(github-release archetype,原生 binary) | — |
+| `gemini.module.sh` | (新建) | Google Gemini CLI(npm 安裝 — npm-only 發行) | fnm |
 | `claude-code-config.module.sh` | `modules/config/claude/` | Claude Code 個人 settings(裝完 claude-code 才裝) | claude-code |
 
 #### 6.3.3 其他(各種 `TAGS[0]`)— 環境/硬體特定或備選
@@ -484,6 +484,12 @@ stdout 只印 per-module 進度標頭 + `exec_cmd`(`lib/general.sh`,語法高亮
    ⚠ Reboot required (nvidia-driver). Run: sudo reboot
    ```
 3. Agent 以 `jq 'select(.body=="action_required")'` 取得完全相同資訊 — stdout 與 log 永不分歧(AC-35)
+
+---
+
+## 8. TUI Wireframe
+
+> **TUI = CLI 的前端**(2026-06-06 定稿,見 G4):TUI 只負責畫面與收集選擇 — 選單資料來源是 `setup_ubuntu list --json` / `detect --json`(ADR-0019 schema),所有動作 fork `setup_ubuntu <subcommand>` 子程序執行。TUI 自身不 source engine lib、不寫 state。
 
 ### 8.1 主選單
 
@@ -777,6 +783,10 @@ fi
 
 `${XDG_STATE_HOME:-$HOME/.local/state}/init_ubuntu/state.json`
 
+**並發與損毀(2026-06-06 定稿)**:
+- 寫入以 `flock -w 30` 互斥(`.state.lock`):等待期間印一行提示;30 秒超時退 code 1,印鎖持有者資訊(PID / 鎖檔路徑)
+- 讀到損毀 JSON:自動 `mv` 為 `state.json.corrupt.<ts>` 後 fail fast(exit 1),印「已備份;重跑 install 可重建記錄(module idempotent),或手動修復後改名放回」。**不靜默重建**(不丟 manual / dep 資料);自動修復屬 `doctor --fix`(0.3.0)
+
 每個 installed module 拆 **`synced`**(可跨機)+ **`local`**(本機 only)兩段(ADR-0018)。Sync / import / export 只攜 `synced`,receiver 自己重建 `local`。
 
 ```json
@@ -955,7 +965,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | AC-7 | `setup_ubuntu purge docker` 後 `~/.docker` 與 `/etc/docker` 不存在 | v0.1-mandatory |
 | AC-8 | `setup_ubuntu detect --json` 在 NVIDIA 機器輸出 `"gpu": {"vendor": "nvidia", ...}` | v0.1-mandatory |
 | AC-9 | 在容器內跑 `setup_ubuntu detect` 偵測到 `"form_factor": "container"` 並把 nvidia-driver 從推薦排除 | v0.1-mandatory |
-| AC-10 | TUI(dialog 與 whiptail 兩種後端)主選單可顯示、可選擇、可儲存退出 | v0.1-mandatory |
+| AC-10 | TUI(dialog 與 whiptail 兩種後端)主選單可顯示、可選擇、可儲存退出。驗證雙層:`tui_backend.sh` mock 下的「選擇 → CLI 命令字串」bats 單元測 + CI 內 expect/偽 tty 對兩後端各跑一次煙霧測(開主選單 → 選一項 → Save & Exit) | v0.1-mandatory |
 | AC-11 | CLI 與 TUI 同一個 module 安裝結果完全一致(state.json diff = 0) | v0.1-mandatory |
 | AC-12 | `--dry-run` 不對檔案系統做任何寫入(用 strace 驗證) | v0.1-mandatory |
 | AC-13 | 無 sudo 環境下,`setup_ubuntu install eza` 走 user-home 安裝(裝到 `$HOME/.local/bin/eza`)且 `eza --version` 可執行 | v0.1-mandatory |
@@ -1003,7 +1013,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | M3 - Detect engine | `lib/detect.sh` + `lib/platform.sh` + `setup_ubuntu detect` |
 | M4 - State + log | `lib/state.sh` + `lib/state_io.sh` + `lib/logger.sh`(JSONL + 30 天/100 檔保留,AC-33)+ flock concurrency |
 | M5 - CLI | `setup_ubuntu.sh` subcommands(含 `upgrade` / `verify` / `doctor` 入口 + `list` 各 flag + `--verbose/--quiet/--color` wire) |
-| M6 - TUI | `setup_ubuntu_tui.sh` + `lib/tui_backend.sh`(含 tag 分組 / Quick Setup 多 step / dep 鏈折疊顯示) |
+| M6 - TUI | `setup_ubuntu_tui.sh` + `lib/tui_backend.sh`(含 tag 分組 / Quick Setup 多 step / dep 鏈折疊顯示)。TUI = CLI 前端(G4):讀 `--json`、寫 fork `setup_ubuntu`;測試 = backend mock 單元 + expect 煙霧(AC-10) |
 | M7 - Module migration | Batch A(10 個 v2 module + helpers + template)/ Batch B(cli-essentials 8 個)/ Batch C(agent + 其他 optional 11 個) |
 | M8 - i18n + color | `lib/i18n.sh`(`i18n_detect_lang` / `i18n_sanitize_lang`,對標 base)+ `lib/color.sh`;module 用 `declare -A` + `module_i18n_get` |
 | M9 - Sync + Secrets | `lib/sync.sh`(SSH push/pull)+ `setup_secrets.sh`(SSH key / GPG / token) |
@@ -1174,7 +1184,7 @@ setup_ubuntu sync <user@host> --pull
 ### 16.3 流程
 
 1. SSH 連線測試(`--strict-host-key-checking=yes`)
-2. 對端 bootstrap(若無 `setup_ubuntu`,rsync 工具過去)
+2. 對端工具檢查(2026-06-06 定稿):若對端無 `setup_ubuntu` → **退 code 7 + 印三行 bootstrap 教學**(同 §3.4:apt install git → git clone → 執行)。**不自動 rsync / 不遠端動 sudo**(rsync 會產生無 `.git` 的孤兒安裝,self-upgrade 斷裂)。版本偏差:state schema 同版即可 sync(ADR-0008 把關);工具版本不同僅 warn
 3. `setup_ubuntu export` 本機 state.json 過濾後成 payload.json
 4. SCP 推送
 5. 對端 `setup_ubuntu import payload.json`(內部走 install pipeline)
@@ -1189,7 +1199,7 @@ setup_ubuntu sync <user@host> --pull
 ### 16.5 v0.1 範疇
 
 - ✅ Push / Pull state.json
-- ✅ Bootstrap 對端
+- ❌ Bootstrap 對端(**已砍**,2026-06-06:對端無工具 → 退 code 7 + 三行教學,見 §16.3 步驟 2;不自動 rsync)
 - ❌ Payload 簽章(**已砍**,2026-06-06:SSH 通道已認證已加密,見 §5.3)
 - ❌ Push secrets(`setup_secrets sync` 在 Backlog §5.3;目前一律手動處理)
 
@@ -1223,7 +1233,7 @@ setup_ubuntu_tui                      # 互動式管理
 
 ### 17.3 工具自身的升級路徑
 
-- `setup_ubuntu self-upgrade`(0.3.0):從 GitHub release 拉最新版
+- `setup_ubuntu self-upgrade`(0.3.0,2026-06-06 定稿):**主路徑 `git fetch` + 顯示 changelog 摘要 + `git pull --ff-only`**(安裝即 §3.4 的 git clone);偵測到無 `.git`(tarball 安裝)時改走 GitHub release 下載。release tag 兩種路徑都照常發佈
 - 升級不影響既有 state.json(`state.json.version` migration 保護)
 
 ---

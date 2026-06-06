@@ -1,6 +1,6 @@
 ---
 name: init-ubuntu
-version: 1.1.0
+version: 1.2.0
 status: approved
 owner: ycpss91255
 created: 2026-05-13
@@ -266,8 +266,10 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 | `lnav.module.sh` | `modules/config/lnav_pkg/` | log navigator | — | logs |
 | `qmk-firmware.module.sh` | `modules/setup_qmk_firmware.sh` | QMK 韌體開發環境 | apt-essentials, build-essential | hardware |
 | `anydesk.module.sh` | `modules/anydesk.sh` | AnyDesk 遠端桌面(`SUPPORTED_PLATFORMS=("desktop")`,Q49) | apt-essentials | remote |
+| `notion.module.sh` | (新建,Q50 / #35) | Notion 桌面版(github-release archetype 吃 notion-electron `.deb`;取代 small-tools snap 路徑;`SUPPORTED_PLATFORMS=("desktop")`) | apt-essentials | notes |
+| `jetson-stats.module.sh` | (新建,Q51 / #37) | jetson-stats(`jtop` 監控 TUI;pip 安裝;`SUPPORTED_PLATFORMS=("jetson-orin")`) | apt-essentials | hardware |
 
-> TUI 在 §6.3.3 內進一步按 `TAGS[0]` 子分組顯示(`editor` / `filemgr` / `logs` / `hardware` / `remote`)。
+> TUI 在 §6.3.3 內進一步按 `TAGS[0]` 子分組顯示(`editor` / `filemgr` / `logs` / `hardware` / `remote` / `notes`)。
 >
 > **gnome-terminal-config 已自 catalog 移除**(Q42,2026-06-06):來源檔 `modules/tools/copy_gnome_terminal_config.sh` 隨 §6.5 整批搬遷至 `tools/`,v0.2+ 再個別決定去向 — 修復「同一檔案兩個矛盾去向」。
 
@@ -1024,7 +1026,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | M4 - State + log | `lib/state.sh` + `lib/state_io.sh` + `lib/logger.sh`(JSONL + 30 天/100 檔保留,AC-33)+ flock concurrency |
 | M5 - CLI | `setup_ubuntu.sh` subcommands(含 `upgrade` / `verify` / `doctor` 入口 + `list` 各 flag + `--verbose/--quiet/--color` wire) |
 | M6 - TUI | `setup_ubuntu_tui.sh` + `lib/tui_backend.sh`(含 tag 分組 / Quick Setup 多 step / dep 鏈折疊顯示)。TUI = CLI 前端(G4):讀 `--json`、寫 fork `setup_ubuntu`;測試 = backend mock 單元 + expect 煙霧(AC-10) |
-| M7 - Module migration | Batch A(10 個 v2 module + helpers + template)/ Batch B(cli-essentials 9 個,含新建 ripgrep,Q41)/ Batch C(agent + 其他 optional 10 個,Q42) |
+| M7 - Module migration | Batch A(10 個 v2 module + helpers + template)/ Batch B(cli-essentials 9 個,含新建 ripgrep,Q41)/ Batch C(agent + 其他 optional 12 個,Q42 / Q50 / Q51) |
 | M8 - i18n + color | `lib/i18n.sh`(`i18n_detect_lang` / `i18n_sanitize_lang`,對標 base)+ `lib/color.sh`;module 用 `declare -A` + `module_i18n_get` |
 | M9 - Sync + Secrets | `lib/sync.sh`(SSH push/pull)+ `setup_secrets.sh`(SSH key / GPG / token) |
 | M10 - Unit tests 80% | 239 + N modules × ~50 tests ≈ 600+ unit tests。CI 切「per-module job」(每 module 一個 job,matrix 從 `ls modules/*.module.sh` discover step 動態生;`fail-fast: false`;`timeout-minutes: 5`;`make test-unit MODULE=<name>` 入口);path-filter(dorny/paths-filter)讓 PR 只跑改動的 module job,main push 跑完整 cartesian |
@@ -1105,6 +1107,13 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | Q47 | `--lang` 只列 2 語系,白名單有 4? | **對齊四語系** `en\|zh-TW\|zh-CN\|ja`;未翻譯 fallback `en`(AC-29 於 0.4.0 收尾) |
 | Q48 | state.json 範例版本 0.2.0 vs MVP 0.1.0? | **統一 0.1.0**;首次 schema 變更才 bump + 觸發 AC-30 migration |
 | Q49 | anydesk 依賴欄寫平台條件? | **dep 改 `apt-essentials`**;條件移 `SUPPORTED_PLATFORMS=("desktop")`(Q39 規則一併防堵) |
+
+### 13.4 Issue triage 決議(2026-06-06,PRD 1.2.0)
+
+| # | Question | **決定** |
+|---|---|---|
+| Q50 | notion 只活在 small-tools(#35;0.4.0 移除 small-tools 後安裝路徑消失)? | **補 `notion.module.sh`** 進 §6.3.3(github-release archetype,吃 notion-electron `.deb`);#35 的 snap→deb hotfix 照做(legacy 路徑),module 化排 M7 Batch C |
+| Q51 | jetson-stats / `jtop` 無著陸點(#37;§15.4 jetson-orin 不裝 nvidia-driver)? | **補 `jetson-stats.module.sh`** 進 §6.3.3(`hardware` tag,`SUPPORTED_PLATFORMS=("jetson-orin")`,pip 安裝);#37 重寫對齊 module 形態,排 M7 Batch C |
 
 ---
 
@@ -1290,6 +1299,8 @@ setup_ubuntu_tui                      # 互動式管理
 | `modules/submodules/*.sh` (8 個) | `modules/<name>.module.sh`(8 個 `cli-essentials` optional module,見 §6.3.1) | 改寫 |
 | (無) | `modules/ripgrep.module.sh` | 新建(apt archetype,grep 替代;Q41) |
 | (無) | `modules/claude-code.module.sh` / `codex.module.sh` / `gemini.module.sh` | 新建(3 大 agent) |
+| (無) | `modules/notion.module.sh` | 新建(github-release archetype,notion-electron `.deb`;Q50 / #35) |
+| (無) | `modules/jetson-stats.module.sh` | 新建(pip 安裝 `jtop`,jetson-orin only;Q51 / #37) |
 | `modules/function/logger.sh` | `lib/logger.sh` | 整理(可能拆 file logging 出去) |
 | `modules/function/general.sh` | `lib/general.sh` + `lib/detect.sh` + `lib/platform.sh` | 拆分(平台分類抽到獨立檔) |
 | `modules/function/tests/test_*.sh` | `tests/unit/logger_spec.bats` 與 `general_spec.bats` | 重寫為 bats |

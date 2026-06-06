@@ -1,10 +1,10 @@
 ---
 name: init-ubuntu
-version: 1.2.0
+version: 1.2.1
 status: approved
 owner: ycpss91255
 created: 2026-05-13
-updated: 2026-06-06
+updated: 2026-06-07
 ---
 
 # PRD: init_ubuntu — Ubuntu 環境初始化工具
@@ -975,14 +975,14 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | AC-5 | `setup_ubuntu install neovim` 跑兩次,第二次仍 exit 0(idempotent) | v0.1-mandatory |
 | AC-6 | `setup_ubuntu remove neovim` → `setup_ubuntu install neovim` 連續執行可成功 | v0.1-mandatory |
 | AC-7 | `setup_ubuntu purge docker` 後 `~/.docker` 與 `/etc/docker` 不存在 | v0.1-mandatory |
-| AC-8 | `setup_ubuntu detect --json` 在 NVIDIA 機器輸出 `"gpu": {"vendor": "nvidia", ...}` | v0.1-mandatory |
+| AC-8 | `setup_ubuntu detect --json` 在 NVIDIA 機器輸出 `"gpu": {"vendor": "nvidia", ...}`(ship gate 以 mock `nvidia-smi` / sysfs fixture 在 Docker 內驗證,Q52;真機驗證列 post-0.1.0 人工 checklist) | v0.1-mandatory |
 | AC-9 | 在容器內跑 `setup_ubuntu detect` 偵測到 `"form_factor": "container"` 並把 nvidia-driver 從推薦排除 | v0.1-mandatory |
 | AC-10 | TUI(dialog 與 whiptail 兩種後端)主選單可顯示、可勾選、可退出(Q43 執行模型)。驗證雙層:`tui_backend.sh` mock 下的「勾選累積 → Run → 產生的 CLI 命令字串」bats 單元測 + CI 內 expect/偽 tty 對兩後端各跑一次煙霧測(開主選單 → 進 Optional 勾一項 → OK → Exit) | v0.1-mandatory |
 | AC-11 | CLI 與 TUI 同一個 module 安裝結果完全一致(state.json diff = 0) | v0.1-mandatory |
 | AC-12 | `--dry-run` 不對檔案系統做任何寫入(用 strace 驗證) | v0.1-mandatory |
 | AC-13 | 無 sudo 環境下,`setup_ubuntu install eza` 走 user-home 安裝(裝到 `$HOME/.local/bin/eza`)且 `eza --version` 可執行 | v0.1-mandatory |
 | AC-14 | `setup_ubuntu export A.json` → 在另一台 `setup_ubuntu import A.json` 結果一致 | v0.1-mandatory |
-| AC-15 | `setup_ubuntu sync user@host` 推送後對端 state.json 含預期 module | v0.1-mandatory |
+| AC-15 | `setup_ubuntu sync user@host` 推送後對端 state.json 含預期 module(ship gate 以雙 container + sshd 模擬兩台機器,Q52) | v0.1-mandatory |
 | AC-16 | 非 tty 輸出(`setup_ubuntu list | cat`)自動關閉 ANSI 色彩 | v0.1-mandatory |
 | AC-17 | bats unit test 覆蓋率 >= 80%(by kcov) | v0.1-mandatory |
 | AC-18 | integration test 在 GitHub Actions 上 `ubuntu:22.04` + `ubuntu:24.04` + `ubuntu:26.04` Docker image 矩陣全綠 | v0.1-mandatory |
@@ -1114,6 +1114,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 |---|---|---|
 | Q50 | notion 只活在 small-tools(#35;0.4.0 移除 small-tools 後安裝路徑消失)? | **補 `notion.module.sh`** 進 §6.3.3(github-release archetype,吃 notion-electron `.deb`);#35 的 snap→deb hotfix 照做(legacy 路徑),module 化排 M7 Batch C |
 | Q51 | jetson-stats / `jtop` 無著陸點(#37;§15.4 jetson-orin 不裝 nvidia-driver)? | **補 `jetson-stats.module.sh`** 進 §6.3.3(`hardware` tag,`SUPPORTED_PLATFORMS=("jetson-orin")`,pip 安裝);#37 重寫對齊 module 形態,排 M7 Batch C |
+| Q52 | AC-8(NVIDIA 真機)/ AC-15(兩台機器)在 CI 容器內無法字面驗證? | **ship gate 一律以 Docker 模擬為準**(同 Q46 精神,ADR-0004):AC-8 用 mock `nvidia-smi` / sysfs fixture;AC-15 用雙 container + sshd 跑真 SSH 流程。真硬體(NVIDIA 工作站 / RPi / Jetson / WSL)驗證列 post-0.1.0 `ready-for-human` checklist issue,不擋 tag(2026-06-07,PRD 1.2.1) |
 
 ---
 

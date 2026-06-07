@@ -22,6 +22,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Batch-A module spec backfill** (issue #123, AC-17 gap 2/2): Q29-scope
+  per-module specs for the 10 pre-runner Batch-A modules that previously
+  had only incidental coverage (26-60%) — apt-essentials (72 tests),
+  docker (72, extended thin spec), font (80), nvidia-driver (86), fish
+  (82), tmux (66), neovim (77), shell (65), ssh-config (69), git-config
+  (71); 740 tests total, reusing the Batch B/C pattern (smoke / metadata /
+  lifecycle dry-run / no-side-fx / sidecar ADR-0001 / idempotency AC-5 /
+  standalone CLI AC-25). No kcov excludes, no threshold changes; the
+  per-module matrix shards (#31) pick the specs up automatically.
+
 - **Runner records the ADR-0010 depends_on snapshot** (issue #93, PRD
   §10.1, follow-up to #43): `runner_install` now passes the resolved
   forward-dep snapshot into `state_record_install`'s 4th parameter

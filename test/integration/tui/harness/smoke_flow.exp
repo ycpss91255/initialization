@@ -1,0 +1,55 @@
+#!/usr/bin/env expect
+# smoke_flow.exp <dialog|whiptail> — AC-10 layer 2: the literal §11.1 flow
+# on a live widget under a pseudo-tty:
+#   open main menu → enter Optional → check one item → OK → Exit
+#
+# In-flow assertions (each tui_expect_text is one): every screen renders
+# its text, the checkbox toggles to [*], the Cancel button is relabeled
+# < Exit >, and the TUI exits 0. The bats wrapper (tui_smoke_spec.bats)
+# re-asserts zero file writes and that no action was ever forked.
+#
+# Exit codes: 0 = flow green; 99 = harness assertion failed (see stderr);
+# anything else = the TUI's own nonzero rc.
+
+source [file join [file dirname [file normalize [info script]]] tui_expect_lib.tcl]
+
+if {[llength $argv] != 1} { tui_die "usage: smoke_flow.exp <dialog|whiptail>" }
+set backend [lindex $argv 0]
+
+tui_spawn
+
+# 1. Main menu visible (§8.1 rows + the relabeled < Exit > button).
+tui_expect_text "Quick Setup"
+tui_expect_text "Optional"
+tui_expect_text "Run"
+tui_expect_text "Exit"
+
+# 2. Enter Optional: highlight starts on quick-setup; three rows down
+#    (base → recommended → optional), then Enter.
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_enter
+
+# 3. Checklist visible; Space checks the highlighted first item
+#    (claude-code — TAGS[0] grouping sorts [agent] first). Match the row's
+#    description, not the tag: dialog colors the tag's hotkey letter, so
+#    "claude-code" is never a contiguous byte sequence on the stream.
+tui_expect_text "Optional Modules"
+tui_expect_text "Anthropic agent CLI"
+tui_key_space
+# The toggle repaint differs per backend: dialog cursor-addresses the lone
+# checkbox cell and writes just `*`; whiptail redraws the row. Either way
+# the first `*` on the whole stream is the checked mark (box borders are
+# line-drawing chars, and no fixture text contains an asterisk).
+tui_expect_re {\*} "the checked \[*\] mark"
+tui_key_enter   ;# < OK > stores the page in the in-memory accumulator
+
+# 4. Back on the main menu (fresh redraw).
+tui_expect_text "Quick Setup"
+
+# 5. < Exit >: selections dropped with the process — clean rc 0 (Q43).
+tui_press_exit $backend
+set rc [tui_wait_exit_rc]
+if {$rc != 0} { tui_die "TUI exited rc=$rc (want 0) on backend=$backend" }
+exit 0

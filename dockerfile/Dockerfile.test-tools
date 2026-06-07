@@ -72,6 +72,10 @@ RUN apk add --no-cache curl xz && \
 #   - newt               [init_ubuntu addition] provides `whiptail`, the
 #                        fallback TUI backend; alpine packages it under
 #                        "newt"
+#   - expect             [init_ubuntu addition] pseudo-tty driver for the
+#                        AC-10 layer-2 TUI smoke tests (issue #73): drives
+#                        the REAL dialog/whiptail through the §8.1 flow in
+#                        test/integration/tui/
 #   - curl               [init_ubuntu addition] tool self-dep (preflight,
 #                        PRD §3.4): e2e specs drive the real entrypoint,
 #                        which gates non-help subcommands on jq/curl/git
@@ -89,6 +93,7 @@ RUN apk add --no-cache \
         fish \
         dialog ncurses-terminfo \
         newt \
+        expect \
         jq curl \
         openssl
 
@@ -129,7 +134,8 @@ RUN bash --version >/dev/null && \
     fish --version >/dev/null && \
     fish -c 'functions -q fishtape; or exit 1' && \
     (dialog --version 2>&1 | head -1 >/dev/null || true) && \
-    (whiptail --version 2>&1 | head -1 >/dev/null || true)
+    (whiptail --version 2>&1 | head -1 >/dev/null || true) && \
+    expect -v >/dev/null
 
 WORKDIR /source
 ENTRYPOINT ["/bin/bash"]

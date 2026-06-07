@@ -277,7 +277,7 @@ _module_github_release_fetch_and_install() {
     fi
     [[ -n "${_ver}" ]] && log_info "[${NAME}] target: ${GITHUB_REPO} v${_ver}"
 
-    _url="https://github.com/${GITHUB_REPO}/releases/latests/download/${GITHUB_ASSET_PATTERN}"
+    _url="https://github.com/${GITHUB_REPO}/releases/latest/download/${GITHUB_ASSET_PATTERN}"
     _tmp="$(mktemp 2>/dev/null || printf '/tmp/%s-%s' "${NAME}" "$$")"
     log_info "[${NAME}] download ${_url}"
     if ! curl -fsSL --retry 3 -o "${_tmp}" "${_url}"; then

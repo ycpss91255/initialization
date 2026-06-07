@@ -366,6 +366,29 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Sync SSH end-to-end** (issue #67, PRD §16, AC-15): `lib/sync.sh` now
+  implements the full §16.3 flow. Remote tool check — a remote without
+  `setup_ubuntu` exits 7 and prints the 3-line §3.4 bootstrap (apt
+  install git → git clone → run); **no auto-rsync** (an orphan install
+  without `.git` breaks self-upgrade) and **no unattended remote sudo**.
+  Tool version skew between the two ends only warns; the hard
+  compatibility gate stays with the payload schema version check inside
+  the import pipeline (ADR-0008), on whichever side imports. Connection
+  test keeps `StrictHostKeyChecking=yes` + `BatchMode=yes` (key-only —
+  a missing key fails fast pointing at `setup_secrets ssh-key copy`,
+  never a password prompt, PRD §16.4), remote import/export output
+  streams back over the ssh channel, and conflict handling is fully
+  delegated to the shared ADR-0013 import pipeline (issue #43). Ship
+  gate per Q52: a dual-container integration suite
+  (`test/integration/sync_ssh_spec.bats` + compose `sync-receiver`
+  service under the `sync-e2e` profile) runs the real `ssh`/`scp` flow
+  against a pinned host key — default push streams the remote
+  `IMPORT DIFF` back without changes; `--apply` lands the module in the
+  receiver's `state.json` through its real install pipeline (AC-15).
+  `make test-integration` orchestrates receiver up → suite (`SYNC_E2E=1`)
+  → teardown; other workflows skip the spec. `openssh` is baked into
+  the test-tools image, and `/.tmp/` (throwaway E2E ssh keys) is now
+  gitignored.
 - **`fnm.module.sh` v2 module** (issue #56, PRD §6.3.1 Batch B, Q3/Q4):
   Fast Node Manager split out of `module/setup_neovim.sh` so the
   dependency is reusable (neovim and gemini both need Node.js). Custom

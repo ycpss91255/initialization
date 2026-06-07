@@ -64,3 +64,23 @@ services:
     command:
       - -c
       - COVERAGE=1 ./script/ci/ci.sh --ci
+
+  # Sync E2E receiver (AC-15, issue #67): the "other machine" of
+  # `setup_ubuntu sync user@host`. An sshd container on the same compose
+  # network as `ci`, reachable as host `sync-receiver`. Profile-gated so
+  # plain `up` / `run ci` never starts it — only `make test-integration`
+  # (script/ci/ci.sh --integration-only) brings it up, runs the suite with
+  # SYNC_E2E=1, and tears it down. test/integration/sync/receiver-entry.sh
+  # provisions host keys, the key-only `syncuser`, the e2e-probe fixture
+  # module and a `setup_ubuntu` wrapper, then execs sshd in the foreground.
+  sync-receiver:
+    image: ${TEST_TOOLS_IMAGE:-test-tools:local}
+    profiles:
+      - sync-e2e
+    volumes:
+      - .:/source
+    working_dir: /source
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - ./test/integration/sync/receiver-entry.sh

@@ -14,6 +14,7 @@
 #   4. APT archetype          — lifecycle + macro
 #   5. GitHub-release archetype
 #   6. Config-drop archetype
+#   6.5 Sidecar helpers       — ADR-0001 / module-spec §4.7.4
 #   7. Standalone CLI entry   — module_standalone_main, info, status
 #   8. Engine-side aggregators
 
@@ -416,6 +417,51 @@ module_use_config_archetype() {
     remove()       { module_default_config_remove; }
     purge()        { module_default_config_purge; }
     verify()       { module_default_verify; }
+}
+
+# ─── 6.5 Sidecar helpers (ADR-0001 / module-spec §4.7.4) ────────────────────
+#
+# The Sidecar at ${XDG_STATE_HOME}/init_ubuntu/versions/<name> records the
+# version string installed for one module. Per ADR-0001 the write logic
+# lives here in the module helpers so Standalone and Engine mode share the
+# same code path: modules call module_sidecar_write after a successful
+# install/upgrade and module_sidecar_remove after remove/purge. Writers are
+# dry-run-safe (no-op when INIT_UBUNTU_DRY_RUN=true, AC-12).
+# INIT_UBUNTU_STATE_DIR overrides the base dir (same contract as lib/state.sh).
+
+module_sidecar_path() {
+    local _name="${1:-${NAME:-}}"
+    [[ -n "${_name}" ]] || return 1
+    local _dir="${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu}"
+    printf '%s/versions/%s' "${_dir}" "${_name}"
+}
+
+module_sidecar_write() {
+    local _name="${1:?module_sidecar_write needs <name>}"
+    local _version="${2:-unknown}"
+    if [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]]; then
+        return 0
+    fi
+    local _path; _path="$(module_sidecar_path "${_name}")" || return 1
+    mkdir -p "${_path%/*}"
+    printf '%s\n' "${_version}" > "${_path}"
+}
+
+module_sidecar_remove() {
+    local _name="${1:?module_sidecar_remove needs <name>}"
+    if [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]]; then
+        return 0
+    fi
+    local _path; _path="$(module_sidecar_path "${_name}")" || return 1
+    rm -f "${_path}"
+}
+
+# module_sidecar_get_version <name> — print recorded version; exit 1 if absent.
+module_sidecar_get_version() {
+    local _name="${1:?module_sidecar_get_version needs <name>}"
+    local _path; _path="$(module_sidecar_path "${_name}")" || return 1
+    [[ -f "${_path}" ]] || return 1
+    cat "${_path}"
 }
 
 # ─── 7. Standalone CLI entry ────────────────────────────────────────────────

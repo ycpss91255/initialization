@@ -6,6 +6,8 @@
 # archetype with overridden install/upgrade: config drop + fisher plugins +
 # chsh; sidecar semantics per ADR-0001).
 
+bats_require_minimum_version 1.5.0
+
 load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
@@ -141,7 +143,7 @@ _mock_fisher_and_chsh() {
 
 @test "fish module leaves optional doctor unimplemented (engine treats as optional)" {
     _load_module
-    ! declare -F doctor >/dev/null
+    run ! declare -F doctor
 }
 
 @test "fish module ships its config payload at module/config/fish" {

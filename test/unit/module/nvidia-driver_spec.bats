@@ -12,6 +12,8 @@
 # no Sidecar and implements neither is_outdated() nor doctor() (both optional
 # per doc/module-spec.md §lifecycle; standalone CLI degrades to exit 2).
 
+bats_require_minimum_version 1.5.0
+
 load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
@@ -55,10 +57,15 @@ _mock_is_installed() {
 # and executes nothing.
 #   MOCK_SUDO_RC          — exit code for every call (default 0)
 #   MOCK_SUDO_FAIL_MATCH  — fail (rc 1) only calls whose argv contains this
+# have_sudo_access mock: MOCK_HAVE_SUDO_RC (0 = sudo ok, 1 = no sudo).
+_mock_have_sudo_access() {
+    have_sudo_access() { return "${MOCK_HAVE_SUDO_RC:-0}"; }
+}
+
 _mock_sudo() {
     MOCK_SUDO_LOG="${INIT_UBUNTU_TEST_SCRATCH}/sudo.log"
     : > "${MOCK_SUDO_LOG}"
-    have_sudo_access() { return 0; }
+    _mock_have_sudo_access
     sudo() {
         printf '%s\n' "$*" >> "${MOCK_SUDO_LOG}"
         if [[ -n "${MOCK_SUDO_FAIL_MATCH:-}" \
@@ -230,8 +237,8 @@ _sidecar_file() {
 
 @test "optional is_outdated/doctor intentionally absent (apt owns versions)" {
     _load_module
-    ! declare -F is_outdated >/dev/null
-    ! declare -F doctor >/dev/null
+    run ! declare -F is_outdated
+    run ! declare -F doctor
 }
 
 # ── Lifecycle dry-run (AC-12 pattern: log only, no side effects) ─────────────
@@ -429,7 +436,8 @@ _sidecar_file() {
     _load_module
     MOCK_IS_INSTALLED_RC=1
     _mock_is_installed
-    have_sudo_access() { return 1; }
+    MOCK_HAVE_SUDO_RC=1
+    _mock_have_sudo_access
     run install
     assert_failure
     assert_output --partial "sudo required"
@@ -559,7 +567,8 @@ _sidecar_file() {
 
 @test "upgrade fails without sudo access" {
     _load_module
-    have_sudo_access() { return 1; }
+    MOCK_HAVE_SUDO_RC=1
+    _mock_have_sudo_access
     run upgrade
     assert_failure
     assert_output --partial "sudo required"

@@ -47,6 +47,13 @@ _use_scratch_home() {
     mkdir -p "${HOME}"
 }
 
+# Config re-drops route through backup_file (lib/general.sh), which
+# log_fatals when BACKUP_DIR is unset. Helper (not inline in the @test
+# bodies: shellcheck SC2030/SC2031 flag cross-test var modification).
+_use_backup_dir() {
+    export BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+}
+
 # ── Controllable mocks ───────────────────────────────────────────────────────
 # Each shadowed function is defined exactly once and parameterized via
 # MOCK_* variables, so every definition stays reachable for the linter
@@ -342,7 +349,7 @@ _mock_apt_list() {
     _use_scratch_home
     _load_module
     _mock_apt_defaults
-    export BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+    _use_backup_dir
     printf '# user-local tweaks\n' > "${HOME}/.tmux.conf"
     install
     [[ -f "${BACKUP_DIR}/.tmux.conf" ]]
@@ -354,8 +361,7 @@ _mock_apt_list() {
     _use_scratch_home
     _load_module
     _mock_apt_defaults
-    MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/no-such-module-dir"
-    run install
+    MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/no-such-module-dir" run install
     assert_success
     assert_output --partial "config dir missing"
     [[ ! -e "${HOME}/.tmux.conf" ]]
@@ -365,7 +371,7 @@ _mock_apt_list() {
     _use_scratch_home
     _load_module
     _mock_apt_defaults
-    export BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+    _use_backup_dir
     printf '# drifted local copy\n' > "${HOME}/.tmux.conf"
     upgrade
     diff -q "${MODULE_DIR}/config/tmux/tmux.conf" "${HOME}/.tmux.conf"
@@ -402,7 +408,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     # Second pass re-drops the config over the first pass's ~/.tmux.conf,
     # which goes through backup_file — that helper requires BACKUP_DIR.
-    export BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+    _use_backup_dir
     run install
     assert_success
     MOCK_IS_INSTALLED_RC=0

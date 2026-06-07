@@ -9,6 +9,8 @@
 # lifecycle overrides beyond detect/is_recommended, and no doctor() —
 # the standalone CLI reports doctor as not implemented (exit 2).
 
+bats_require_minimum_version 1.5.0
+
 load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
@@ -105,7 +107,7 @@ _mock_have_sudo_access() {
     done
     # doctor is intentionally absent: the apt archetype provides no default
     # and shell does not hand-write one; standalone reports "not implemented".
-    ! declare -F doctor >/dev/null
+    run ! declare -F doctor
 }
 
 # ── Metadata sanity ──────────────────────────────────────────────────────────

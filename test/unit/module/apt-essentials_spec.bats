@@ -17,6 +17,8 @@
 #     are engine-side state (not yet in the module); this spec pins the
 #     current universal-list behavior.
 
+bats_require_minimum_version 1.5.0
+
 load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
@@ -58,12 +60,14 @@ _mock_have_sudo_access() {
 
 # sudo mock: records every invocation into ${INIT_UBUNTU_TEST_SCRATCH}/sudo.log
 # and never runs the real command. `apt-get install` calls return
-# MOCK_APT_INSTALL_RC (default 0); everything else (update / apt-mark) 0.
+# MOCK_APT_INSTALL_RC (default 0), `apt-get update` returns
+# MOCK_APT_UPDATE_RC (default 0); everything else (apt-mark) 0.
 _mock_sudo() {
     sudo() {
         printf '%s\n' "$*" >> "${INIT_UBUNTU_TEST_SCRATCH}/sudo.log"
         case "$*" in
             apt-get\ install*) return "${MOCK_APT_INSTALL_RC:-0}" ;;
+            apt-get\ update*)  return "${MOCK_APT_UPDATE_RC:-0}" ;;
         esac
         return 0
     }
@@ -125,8 +129,8 @@ _refute_sudo_log_has() {
 
 @test "is_outdated and doctor are intentionally absent (optional phases)" {
     _load_module
-    ! declare -F is_outdated >/dev/null
-    ! declare -F doctor >/dev/null
+    run ! declare -F is_outdated
+    run ! declare -F doctor
 }
 
 # ── Metadata sanity (doc/module-spec.md §3) ──────────────────────────────────
@@ -387,13 +391,8 @@ _refute_sudo_log_has() {
 @test "install survives a failing apt-get update (warn + per-pkg anyway)" {
     _load_module
     _mock_have_sudo_access
-    sudo() {
-        printf '%s\n' "$*" >> "${INIT_UBUNTU_TEST_SCRATCH}/sudo.log"
-        case "$*" in
-            apt-get\ update*) return 1 ;;
-        esac
-        return 0
-    }
+    MOCK_APT_UPDATE_RC=1
+    _mock_sudo
     MOCK_DPKG_INSTALLED=""
     _mock_dpkg
     run install

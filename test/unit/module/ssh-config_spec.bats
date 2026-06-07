@@ -10,6 +10,8 @@
 # 8 of the 10 lifecycle hooks exist (doctor / is_outdated are optional and
 # absent); the standalone CLI must degrade gracefully for the missing two.
 
+bats_require_minimum_version 1.5.0
+
 load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
@@ -51,6 +53,13 @@ _standalone_module() {
         bash "${MODULE_DIR}/ssh-config.module.sh" "$@"
 }
 
+# Some upgrade paths route through backup_file (lib/general.sh), which
+# log_fatals when BACKUP_DIR is unset. Helper (not inline in the @test
+# bodies: shellcheck SC2030/SC2031 flag cross-test var modification).
+_use_backup_dir() {
+    export BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+}
+
 # ── Smoke ────────────────────────────────────────────────────────────────────
 
 @test "ssh-config module file parses (bash -n)" {
@@ -77,8 +86,8 @@ _standalone_module() {
 
 @test "ssh-config leaves the optional hooks doctor / is_outdated undefined" {
     _load_module
-    ! declare -F doctor >/dev/null
-    ! declare -F is_outdated >/dev/null
+    run ! declare -F doctor
+    run ! declare -F is_outdated
 }
 
 # ── Metadata sanity ──────────────────────────────────────────────────────────
@@ -259,7 +268,7 @@ _standalone_module() {
     printf 'Host foreign\n' > "${HOME}/.ssh/config"
     install
     [[ "$(head -n 1 "${HOME}/.ssh/config")" == "${CONFIG_MARKER}" ]]
-    ! grep -q "^Host foreign$" "${HOME}/.ssh/config"
+    run ! grep -q "^Host foreign$" "${HOME}/.ssh/config"
 }
 
 @test "install then is_installed returns 0" {
@@ -310,17 +319,17 @@ _standalone_module() {
 
 @test "upgrade restores drifted config back to the template content" {
     _load_module
-    export BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+    _use_backup_dir
     install
     printf '# init_ubuntu managed\nHost drifted\n' > "${HOME}/.ssh/config"
     upgrade
     grep -q "^Host github$" "${HOME}/.ssh/config"
-    ! grep -q "^Host drifted$" "${HOME}/.ssh/config"
+    run ! grep -q "^Host drifted$" "${HOME}/.ssh/config"
 }
 
 @test "upgrade backs up the pre-existing config into BACKUP_DIR" {
     _load_module
-    export BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+    _use_backup_dir
     install
     upgrade
     [[ -f "${BACKUP_DIR}/config" ]]
@@ -332,7 +341,7 @@ _standalone_module() {
     # contract: standalone upgrades need BACKUP_DIR when a config exists.
     _load_module
     install
-    BACKUP_DIR= run upgrade
+    BACKUP_DIR='' run upgrade
     assert_failure
     assert_output --partial "BACKUP_DIR is not set"
 }

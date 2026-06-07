@@ -9,6 +9,8 @@
 # Pattern: codex_spec.bats (custom hand-written lifecycle). All non-dry-run
 # install paths mock curl/unzip — Q46: gates have zero network deps.
 
+bats_require_minimum_version 1.5.0
+
 load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
@@ -47,32 +49,15 @@ _make_installed() {
 }
 
 # Mock the network-touching pieces (Q46): curl drops an empty "zip", unzip
-# is a no-op (install already mkdir-ed the family dir), fc-cache is inert.
-_mock_remote_ok() {
-    curl() {
-        local _out=""
-        while [[ $# -gt 0 ]]; do
-            case "${1}" in
-                -o) _out="${2}"; shift 2 ;;
-                *)  shift ;;
-            esac
-        done
-        [[ -n "${_out}" ]] && : > "${_out}"
-        return 0
-    }
-    unzip() { return 0; }
-    fc-cache() { return 0; }
-}
-
-# Mock where every download fails.
-_mock_remote_down() {
-    curl() { return 1; }
-    unzip() { return 0; }
-    fc-cache() { return 0; }
-}
-
-# Mock where only FiraCode fails (partial-failure path).
-_mock_remote_partial() {
+# is a no-op (install already mkdir-ed the family dir), fc-cache is inert
+# (touches MOCK_FCCACHE_TOUCH when set, for spy assertions).
+# MOCK_REMOTE_MODE picks the curl behaviour at call time:
+#   ok (default) — every download succeeds
+#   down         — every download fails
+#   partial      — only the FiraCode URL fails (partial-failure path)
+# Single definition site: redefining the same mock per scenario trips
+# SC2317 in the linter (re-definitions are flagged as unreachable).
+_mock_remote() {
     curl() {
         local _out="" _url=""
         while [[ $# -gt 0 ]]; do
@@ -82,13 +67,23 @@ _mock_remote_partial() {
                 *)  shift ;;
             esac
         done
-        [[ "${_url}" == *"FiraCode"* ]] && return 1
+        case "${MOCK_REMOTE_MODE:-ok}" in
+            down)    return 1 ;;
+            partial) [[ "${_url}" == *"FiraCode"* ]] && return 1 ;;
+        esac
         [[ -n "${_out}" ]] && : > "${_out}"
         return 0
     }
     unzip() { return 0; }
-    fc-cache() { return 0; }
+    fc-cache() {
+        [[ -n "${MOCK_FCCACHE_TOUCH:-}" ]] && : > "${MOCK_FCCACHE_TOUCH}"
+        return 0
+    }
 }
+
+_mock_remote_ok()      { MOCK_REMOTE_MODE=ok;      _mock_remote; }
+_mock_remote_down()    { MOCK_REMOTE_MODE=down;    _mock_remote; }
+_mock_remote_partial() { MOCK_REMOTE_MODE=partial; _mock_remote; }
 
 # ── Smoke ────────────────────────────────────────────────────────────────────
 
@@ -261,8 +256,8 @@ _mock_remote_partial() {
     # Hand-written Batch-A module: optional read phases not implemented;
     # the standalone CLI degrades gracefully (exit 2, see AC-25 block below).
     _load_module
-    ! declare -F is_outdated
-    ! declare -F doctor
+    run ! declare -F is_outdated
+    run ! declare -F doctor
 }
 
 # ── Dry-run (AC-12 pattern: log only, no side effects) ──────────────────────
@@ -401,7 +396,7 @@ _mock_remote_partial() {
     _load_module
     _sandbox_paths
     _mock_remote_ok
-    fc-cache() { : > "${INIT_UBUNTU_TEST_SCRATCH}/fc-cache-called"; }
+    MOCK_FCCACHE_TOUCH="${INIT_UBUNTU_TEST_SCRATCH}/fc-cache-called"
     install
     [[ -f "${INIT_UBUNTU_TEST_SCRATCH}/fc-cache-called" ]]
 }

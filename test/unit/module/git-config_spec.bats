@@ -12,6 +12,8 @@
 # (optional per module-spec §4.1) — the standalone CLI exits 2 with
 # "not implemented" for those phases.
 
+bats_require_minimum_version 1.5.0
+
 load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
@@ -91,8 +93,8 @@ _in_home() {
     _load_module
     # Pure config-drop archetype: these two optional hooks are not wired —
     # the standalone CLI exits 2 "not implemented" for them (AC-25 below).
-    ! declare -F is_outdated >/dev/null
-    ! declare -F doctor >/dev/null
+    run ! declare -F is_outdated
+    run ! declare -F doctor
 }
 
 # ── Metadata sanity ──────────────────────────────────────────────────────────

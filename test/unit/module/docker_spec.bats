@@ -51,6 +51,13 @@ _mock_have_sudo() {
     have_sudo_access() { return "${MOCK_SUDO_ACCESS_RC:-0}"; }
 }
 
+# Sandbox HOME into the per-test scratch dir (helper, not inline in the
+# @test bodies: shellcheck SC2030/SC2031 flag cross-test var modification).
+_use_scratch_home() {
+    export HOME="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${HOME}"
+}
+
 # Recording sudo mock: every invocation is appended to MOCK_SUDO_LOG.
 # Stdin-consuming subcommands (gpg, tee) drain the pipe so upstream
 # writers never see EPIPE; tee content is captured to MOCK_TEE_CAPTURE.
@@ -468,7 +475,7 @@ _mock_install_env() {
 @test "purge wipes HOME config and drops the apt source + keyring (mocked sudo)" {
     _load_module
     _mock_sudo_record
-    HOME="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    _use_scratch_home
     CONFIG_PATHS=("${HOME}/.docker")
     mkdir -p "${CONFIG_PATHS[0]}"
     : > "${CONFIG_PATHS[0]}/config.json"
@@ -484,7 +491,7 @@ _mock_install_env() {
 @test "purge on a clean system still exits 0 (idempotent)" {
     _load_module
     _mock_sudo_record
-    HOME="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    _use_scratch_home
     CONFIG_PATHS=("${HOME}/.docker")
     run purge
     assert_success

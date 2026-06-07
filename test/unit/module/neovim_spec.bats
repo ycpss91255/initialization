@@ -51,6 +51,13 @@ _sandbox_paths() {
     mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/bin" "${HOME}"
 }
 
+# Config re-drops route through backup_file (lib/general.sh), which
+# log_fatals when BACKUP_DIR is unset. Helper (not inline in the @test
+# bodies: shellcheck SC2030/SC2031 flag cross-test var modification).
+_use_backup_dir() {
+    export BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+}
+
 # Mock the network-touching pieces (Q46: gates have zero network deps).
 _mock_remote() {
     local _ver="${1:-0.11.0}"
@@ -346,7 +353,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    export BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+    _use_backup_dir
     mkdir -p "${HOME}/.config/nvim"
     printf '%s\n' '-- user config' > "${HOME}/.config/nvim/init.lua"
     run install
@@ -358,9 +365,9 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/empty-module"
-    mkdir -p "${MODULE_DIR}"
-    run install
+    local _empty_module="${INIT_UBUNTU_TEST_SCRATCH}/empty-module"
+    mkdir -p "${_empty_module}"
+    MODULE_DIR="${_empty_module}" run install
     assert_success
     assert_output --partial "config dir missing"
     [[ ! -e "${HOME}/.config/nvim" ]]
@@ -405,7 +412,7 @@ _mock_remote() {
     _mock_remote
     # Second run re-drops the config over an existing ~/.config/nvim, which
     # routes through backup_file — that helper log_fatals without BACKUP_DIR.
-    export BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+    _use_backup_dir
     install
     run install
     assert_success

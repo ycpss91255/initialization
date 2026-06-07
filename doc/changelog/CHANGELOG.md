@@ -22,6 +22,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Runner records the ADR-0010 depends_on snapshot** (issue #93, PRD
+  §10.1, follow-up to #43): `runner_install` now passes the resolved
+  forward-dep snapshot into `state_record_install`'s 4th parameter
+  instead of always recording `[]`. The snapshot is the resolver's
+  transitive dep closure for the module, filtered to deps that actually
+  completed install earlier in the same session (topo order guarantees
+  deps run first), so deps that failed mid-batch are excluded and
+  `--no-deps` installs record `[]` — the state reflects what really
+  happened, not metadata intent. The per-session success set resets on
+  every runner batch. `upgrade` topo-sort (PRD §7.6) and
+  `--with-orphans` consume this field later.
+
 - **TUI Quick Setup multi-step wizard + manual-flag semantics** (issue
   #71, PRD §8.2.1, ADR-0010): main-menu item 1 is now the real four-step
   wizard. Step 1/4 confirms the detected platform with an optional

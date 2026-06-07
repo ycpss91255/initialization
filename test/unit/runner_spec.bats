@@ -49,6 +49,33 @@ teardown() {
     teardown_test_env
 }
 
+# Dep-chain fixtures for the ADR-0010 depends_on snapshot specs (#93):
+# top -> mid -> leaf, plus half-broken (depends on fails + leaf).
+_write_dep_chain_fixtures() {
+    local _m
+    for _m in leaf mid top half-broken; do
+        local _deps='()'
+        case "${_m}" in
+            mid)         _deps='("leaf")' ;;
+            top)         _deps='("mid")' ;;
+            half-broken) _deps='("fails" "leaf")' ;;
+        esac
+        cat > "${FAKE_MODULE_DIR}/${_m}.module.sh" <<EOF
+NAME="${_m}"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=${_deps}
+CONFLICTS_WITH=()
+
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    done
+}
+
 _load_engine() {
     # shellcheck source=../../lib/logger.sh
     source "${LIB_DIR}/logger.sh"
@@ -59,6 +86,17 @@ _load_engine() {
     # shellcheck source=../../lib/runner.sh
     source "${LIB_DIR}/runner.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
+}
+
+# Engine with state.json + resolver wired in — the surface the ADR-0010
+# depends_on snapshot specs (#93) exercise.
+_load_engine_with_state() {
+    # shellcheck source=../../lib/state.sh
+    source "${LIB_DIR}/state.sh"
+    # shellcheck source=../../lib/resolver.sh
+    source "${LIB_DIR}/resolver.sh"
+    _write_dep_chain_fixtures
+    _load_engine
 }
 
 @test "runner_install runs install() of the named module" {
@@ -279,4 +317,56 @@ EOF
     [[ "$(find "${_logdir}" -maxdepth 1 -type f -name '*.jsonl' | wc -l)" -eq 100 ]]
     [[ -e "${_logdir}/current.jsonl" ]]
     grep -q '"body":"log_pruned"' "${_logdir}/current.jsonl"
+}
+
+# ── ADR-0010 depends_on snapshot (issue #93) ─────────────────────────────────
+#
+# The runner records the resolver's transitive dep snapshot (forward-dep,
+# ADR-0010) for every module installed in the session — not the metadata
+# DEPENDS_ON as-is. --no-deps installs record [].
+
+@test "install records the resolved transitive depends_on snapshot (#93)" {
+    _load_engine_with_state
+    INIT_UBUNTU_REQUESTED_MODULES=" top " runner_install leaf mid top
+    run jq -c '.installed.top.synced.depends_on' "$(state_get_path)"
+    assert_success
+    assert_output '["leaf","mid"]'
+}
+
+@test "install records correct depends_on on the dep's own entry too (#93)" {
+    _load_engine_with_state
+    INIT_UBUNTU_REQUESTED_MODULES=" top " runner_install leaf mid top
+    run jq -c '[.installed.mid.synced.depends_on, .installed.leaf.synced.depends_on]' \
+        "$(state_get_path)"
+    assert_success
+    assert_output '[["leaf"],[]]'
+}
+
+@test "install --no-deps records depends_on [] (ADR-0010, #93)" {
+    _load_engine_with_state
+    INIT_UBUNTU_NO_DEPS=true INIT_UBUNTU_REQUESTED_MODULES=" top " \
+        runner_install top
+    run jq -c '.installed.top.synced.depends_on' "$(state_get_path)"
+    assert_success
+    assert_output '[]'
+}
+
+@test "depends_on snapshot excludes deps that failed this session (ADR-0010, #93)" {
+    _load_engine_with_state
+    INIT_UBUNTU_REQUESTED_MODULES=" half-broken " \
+        runner_install leaf fails half-broken || true
+    run jq -c '.installed."half-broken".synced.depends_on' "$(state_get_path)"
+    assert_success
+    assert_output '["leaf"]'
+}
+
+@test "depends_on snapshot resets between runner sessions (#93)" {
+    _load_engine_with_state
+    INIT_UBUNTU_REQUESTED_MODULES=" mid " runner_install leaf mid
+    # Second session installs only top: leaf/mid succeeded in the PREVIOUS
+    # session, not this one, so they must not leak into top's snapshot.
+    INIT_UBUNTU_REQUESTED_MODULES=" top " runner_install top
+    run jq -c '.installed.top.synced.depends_on' "$(state_get_path)"
+    assert_success
+    assert_output '[]'
 }

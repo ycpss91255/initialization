@@ -38,6 +38,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   install/upgrade and removed on remove/purge per ADR-0001 while
   `state.json` is never touched by the module.
 
+- **anydesk module** (issue #64, PRD §6.3.3 Batch C, M7): migrated
+  `module/anydesk.sh` to the v2 contract as `module/anydesk.module.sh`
+  on the apt archetype with AnyDesk's vendor repo — install wires the
+  upstream signing key under `/etc/apt/keyrings/anydesk.gpg`
+  (unprivileged `gpg --dearmor` piped into `sudo tee`) plus the
+  `deb.anydesk.com all main` source, then chains to the apt default;
+  remove keeps the repo wiring, purge unhooks source + keyring.
+  Desktop-only `SUPPORTED_PLATFORMS` with a form-factor-gated
+  `is_recommended` (Q49), `DEPENDS_ON=("apt-essentials")` (module names
+  only, Q39), tagged `remote`. All 10 lifecycle phases runnable
+  standalone (AC-25), idempotent install (AC-5), dry-run writes nothing
+  (AC-12), Sidecar per ADR-0001. 76-test bats spec
+  `test/unit/module/anydesk_spec.bats` (Q29 coverage ladder).
 - **TUI skeleton: entry point, backend detection, main menu** (issue
   #69, PRD §8.1 / §8.5, G4): new `setup_ubuntu_tui.sh` +
   `lib/tui_backend.sh`. Backend detection prefers `dialog`, falls back

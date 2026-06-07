@@ -37,6 +37,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   Sidecar code path — closes the cookbook's
   `module_sidecar_get_version` follow-up. Spec:
   `test/unit/module/zoxide_spec.bats` (49 tests).
+- **fzf module migrated to the v2 contract** (issue #50, PRD §6.3.1 Batch
+  B): `module/submodule/fzf.sh` (git-clone + `~/.fzf/install`) is replaced
+  by `module/fzf.module.sh` on the github-release archetype — downloads
+  the prebuilt single-binary tarball for the host arch (amd64 / arm64 /
+  armv7) into `/opt/fzf` and symlinks `/usr/local/bin/fzf`. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  is written on install/upgrade and removed on remove/purge per ADR-0001
+  while `state.json` is never touched by the module. Tagged
+  `cli-essentials`, `CATEGORY=optional`, depends on `apt-essentials`.
 - **lazydocker module migrated to the v2 contract** (issue #49, PRD
   §6.3.1 Batch B): `module/lazydocker.module.sh` (docker TUI,
   github-release archetype with a version-aware fetch override —

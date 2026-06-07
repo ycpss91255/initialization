@@ -33,6 +33,72 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   removed on remove/purge per ADR-0001 while `state.json` is never
   touched by the module. Tagged `cli-essentials`, `CATEGORY=optional`,
   `DEPENDS_ON=()` (also a neovim dependency for telescope file finding).
+- **`setup_secrets.sh` skeleton: storage backend abstraction + ssh-key
+  subcommands** (issue #44, PRD §14, AC-20): new standalone sensitive-data
+  tool (not a module; shares `lib/logger.sh` / `lib/i18n.sh` /
+  `lib/config.sh` only — no engine pipeline coupling, so the TUI can fork
+  it later). New `lib/secrets.sh` implements the generic backend API
+  (`secrets_store/retrieve/exists/list/remove`, stdin/stdout only — secret
+  material never travels through argv) over three backends with PRD §14.3
+  priority: `pass` → `gnome-keyring` (secret-tool + DBus) → encrypted file
+  (`openssl enc` AES-256-CBC + PBKDF2, `~/.config/init_ubuntu/secrets/
+  <name>.enc`, 0600/0700 perms, passphrase via `-pass env:` — never
+  plaintext on disk). Autoselect honors `[secrets] backend` in config.ini
+  and the `INIT_UBUNTU_SECRETS_BACKEND` env override. Subcommands shipped:
+  `ssh-key generate` (passphrase prompting delegated to ssh-keygen's own
+  tty — nothing sensitive in argv or shell history, AC-20), `ssh-key
+  load` (ssh-add), `ssh-key copy <user@host>` (ssh-copy-id, remote
+  failure → exit 7). `gpg` / `token` / `list` / `remove` are reserved
+  stubs for issue #68 and mount directly on the backend API. Test-tools
+  image gains `openssl` so the encrypted-file round-trip is tested for
+  real in the container.
+- **eza module migrated to the v2 contract** (issue #51, PRD §6.3.1
+  Batch B): `module/submodule/eza.sh` → `module/eza.module.sh`
+  (github-release archetype, `CATEGORY=optional`,
+  `TAGS=("cli-essentials")`). Keeps the legacy behavior — tarball to
+  `/opt/eza`, `/usr/local/bin/eza` symlink, `alias ls='eza'` dropped
+  into `~/.bashrc` / `~/.zshrc` (removed on purge, kept on remove) —
+  and adds Sidecar bookkeeping plus `is_outdated` / `doctor`. New
+  shared Sidecar helpers in `lib/module_helper.sh`
+  (`module_sidecar_write/remove/get_version/path`, ADR-0001) are
+  available to all modules.
+- **zoxide module** (issue #52, PRD §6.3.1 Batch B): migrated
+  `module/submodule/zoxide.sh` to the v2 contract as
+  `module/zoxide.module.sh` (smarter `cd`; aliases `cd` to `z`).
+  Archetype B (github-release) with super-call overrides — the release
+  asset name embeds the version, so install/upgrade resolve the latest
+  tag first, then chain to the archetype default; both wire
+  `zoxide init` + the `cd`→`z` alias into existing bash/zsh rc files
+  (idempotent) and write the version Sidecar; remove/purge delete it
+  (ADR-0001). All 10 lifecycle phases run standalone (AC-25); dry-run
+  performs no filesystem writes (AC-12). New shared `module_sidecar_*`
+  helpers in `lib/module_helper.sh` (path / write / remove /
+  get_version, dry-run-safe) give Standalone and Engine mode one
+  Sidecar code path — closes the cookbook's
+  `module_sidecar_get_version` follow-up. Spec:
+  `test/unit/module/zoxide_spec.bats` (49 tests).
+- **fzf module migrated to the v2 contract** (issue #50, PRD §6.3.1 Batch
+  B): `module/submodule/fzf.sh` (git-clone + `~/.fzf/install`) is replaced
+  by `module/fzf.module.sh` on the github-release archetype — downloads
+  the prebuilt single-binary tarball for the host arch (amd64 / arm64 /
+  armv7) into `/opt/fzf` and symlinks `/usr/local/bin/fzf`. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  is written on install/upgrade and removed on remove/purge per ADR-0001
+  while `state.json` is never touched by the module. Tagged
+  `cli-essentials`, `CATEGORY=optional`, depends on `apt-essentials`.
+- **lazydocker module migrated to the v2 contract** (issue #49, PRD
+  §6.3.1 Batch B): `module/lazydocker.module.sh` (docker TUI,
+  github-release archetype with a version-aware fetch override —
+  upstream asset names embed the release version). Metadata per PRD
+  §9.1 (`CATEGORY=optional`, `TAGS=(cli-essentials)`,
+  `DEPENDS_ON=(docker)`, i18n `DESCRIPTION`). All 10 lifecycle phases
+  run standalone (AC-25); install is idempotent (AC-5); `--dry-run`
+  writes nothing (AC-12). New `module_sidecar_*` helpers in
+  `lib/module_helper.sh` implement the ADR-0001 Sidecar (written on
+  install/upgrade, dropped on remove/purge, never touching
+  `state.json` in standalone mode); `is_outdated` compares the Sidecar
+  version against the latest GitHub release.
 
 - **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
   `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory

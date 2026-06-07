@@ -10,10 +10,9 @@
 #     and never writes state — enforced by the G4 grep gate in
 #     test/unit/tui_backend_spec.bats.
 #
-# Issue #69 scope: skeleton + main-menu rendering. Mount points for the
-# follow-ups are marked in _tui_dispatch below:
-#   #70  checkbox accumulator + Run / Review & Install
-#   #71  Quick Setup multi-step flow
+# Issue #69 scope: skeleton + main-menu rendering. #70 added the checkbox
+# accumulator + Run / Review & Install; #71 added the Quick Setup
+# multi-step wizard (§8.2.1). Remaining mount point in _tui_dispatch:
 #   #72  Manage Installed (update / remove / purge)
 #
 # `set -uo pipefail` (not -e): dialog/whiptail return rc 1/255 for the
@@ -38,9 +37,14 @@ source "${REPO_ROOT}/lib/tui_backend.sh"
 
 # ── In-memory session selections (Q43: never persisted by the TUI) ──────────
 # Platform override chosen on the System Info screen. Consumed as
-# `--profile=<value>` on action forks (#70 / #71 wire this through);
-# it is NOT written to config.ini by the TUI (G4 / §8.2.1 cancel table).
+# `--profile=<value>` on action forks; it is NOT written to config.ini by
+# the TUI (G4 / §8.2.1 cancel table).
 TUI_PLATFORM_OVERRIDE=""
+# The Quick Setup Step-1 override (§8.2.1) is deliberately NOT a global:
+# it lives in _tui_screen_quick_setup's locals during prepare and reaches
+# config.ini only on the Proceed leg, via a forked
+# `setup_ubuntu config set platform.override <v>` (the TUI itself never
+# writes the file).
 
 # ── Usage ────────────────────────────────────────────────────────────────────
 
@@ -85,16 +89,17 @@ _tui_screen_system_info() {
         return 0
     fi
 
+    local -a _choices=()
+    local _tag _desc
+    while IFS=$'\t' read -r _tag _desc; do
+        _choices+=("${_tag}" "${_desc}")
+    done < <(tui_platform_choices)
+    _choices+=("detected" "Clear override (use auto-detection)")
+
     local _choice
     _choice="$(tui_render_menu "Platform Override" \
         "Select a form factor (PRD §7.5 --profile):" \
-        "desktop"     "Desktop / laptop" \
-        "server"      "Headless server" \
-        "wsl"         "Windows Subsystem for Linux" \
-        "rpi-4"       "Raspberry Pi 4" \
-        "rpi-5"       "Raspberry Pi 5" \
-        "jetson-orin" "NVIDIA Jetson Orin" \
-        "detected"    "Clear override (use auto-detection)")" || return 0
+        "${_choices[@]}")" || return 0
 
     if [[ "${_choice}" == "detected" ]]; then
         TUI_PLATFORM_OVERRIDE=""
@@ -145,25 +150,22 @@ _tui_screen_category() {
     tui_selection_replace_page "${_json}" "${_cat}" "${_names[@]}"
 }
 
-# < Run > (§8.1): Review & Install — full selection list + collapsed
-# "will pull N deps" summary (arch Q-A3; expandable via a details row).
-# Proceed clears the screen and hands the terminal to ONE forked CLI
-# install pipeline (G4 / AC-11: same path as the CLI). Back keeps the
-# selections and returns to the main menu.
-_tui_screen_run() {
-    if [[ "$(tui_selection_count)" -eq 0 ]]; then
-        tui_render_msgbox "Review & Install" "nothing selected"
-        return 0
-    fi
-
-    local -a _sel=()
-    mapfile -t _sel < <(tui_selection_list)
+# Review & Install screen shared by < Run > (#70) and Quick Setup (#71):
+#   _tui_screen_review <module...>
+# Full selection list + collapsed "will pull N deps" summary (arch Q-A3;
+# expandable via a details row). Pure decision screen: rc 0 = the user
+# chose Proceed (the caller forks the ONE CLI install pipeline — G4 /
+# AC-11: same path as the CLI), rc 1 = Back / Cancel / plan failure; the
+# caller decides what selection memory survives (Run: the Q43 accumulator
+# stays; Quick Setup: the wizard locals die with the caller → pure cancel).
+_tui_screen_review() {
+    local -a _sel=("$@")
 
     local _plan
     if ! _plan="$(tui_cli_install_plan "${_sel[@]}")"; then
         tui_render_msgbox "Review & Install" \
             "ERROR: 'setup_ubuntu install --dry-run' failed — cannot build the plan."
-        return 0
+        return 1
     fi
     local -a _deps=()
     mapfile -t _deps < <(tui_plan_deps "${_plan}" "${_sel[@]}")
@@ -184,7 +186,7 @@ _tui_screen_run() {
     while :; do
         if ! _choice="$(TUI_CANCEL_LABEL="Back" tui_render_menu \
             "Review & Install" "${_text}" "${_entries[@]}")"; then
-            return 0  # Back / Cancel: selections stay in memory (Q43)
+            return 1  # Back / Cancel: the caller owns what survives
         fi
         case "${_choice}" in
             deps)
@@ -192,10 +194,24 @@ _tui_screen_run() {
                     "$(printf '%s\n' "${_deps[@]}")"
                 ;;
             proceed)
-                _tui_exec_install "${_sel[@]}"  # never returns
+                return 0
                 ;;
         esac
     done
+}
+
+# < Run > (§8.1): Review & Install over the Q43 accumulator. Back keeps
+# the selections and returns to the main menu.
+_tui_screen_run() {
+    if [[ "$(tui_selection_count)" -eq 0 ]]; then
+        tui_render_msgbox "Review & Install" "nothing selected"
+        return 0
+    fi
+
+    local -a _sel=()
+    mapfile -t _sel < <(tui_selection_list)
+    _tui_screen_review "${_sel[@]}" || return 0
+    _tui_exec_install "${_sel[@]}"  # never returns
 }
 
 # Proceed (§8.2.1): clear the screen, fork the CLI install pipeline in the
@@ -209,15 +225,161 @@ _tui_exec_install() {
     exit $?
 }
 
-# ── Menu action dispatch (mount points for #71 / #72) ───────────────────────
+# ── Quick Setup wizard (#71, §8.2.1) ─────────────────────────────────────────
+# Four prepare steps accumulate picks into FUNCTION-LOCAL memory, then the
+# shared Review screen executes via _tui_qs_proceed. Prepare is pure
+# memory (§8.2.1 cancel table): Cancel / ESC at any step returns to the
+# main menu having forked nothing that writes — no config.ini write, no
+# state write. SIGINT during prepare kills the TUI process outright with
+# the same zero-side-effect guarantee; SIGINT after Proceed lands in the
+# foreground CLI pipeline, which finishes the current step, prints the
+# partial summary and exits 6 (ADR-0015 partial-install policy) — the
+# exec in _tui_exec_install propagates that rc as the TUI's own.
+
+# Step 1 submenu: pick an override form factor. Prints the choice;
+# rc != 0 = Cancel (keep the current value).
+_tui_qs_platform_menu() {
+    local -a _choices=()
+    local _tag _desc
+    while IFS=$'\t' read -r _tag _desc; do
+        _choices+=("${_tag}" "${_desc}")
+    done < <(tui_platform_choices)
+    tui_render_menu "Quick Setup — Platform Override" \
+        "Select a form factor (PRD §7.5 --profile):" "${_choices[@]}"
+}
+
+# Steps 2-4 below print the picked module names (one per line) on stdout;
+# rc != 0 = Cancel / ESC → the wizard aborts (pure cancel). A step with no
+# offerable modules prints nothing and succeeds (skipped transparently).
+
+# Step 2/4: recommended modules, is_recommended-preselected (Q36-filtered).
+_tui_qs_step2() {
+    local -a _rows=()
+    local _name _label _status _on=0
+    while IFS=$'\t' read -r _name _label _status; do
+        _rows+=("${_name}" "${_label}" "${_status}")
+        [[ "${_status}" == "on" ]] && _on=$((_on + 1))
+    done < <(tui_qs_recommended_entries "$1" "$2")
+    [[ "${#_rows[@]}" -eq 0 ]] && return 0
+
+    tui_render_checklist "Quick Setup — Step 2/4: Recommended modules" \
+        "${_on} / $(( ${#_rows[@]} / 3 )) will be installed — adjust and press OK." \
+        "${_rows[@]}"
+}
+
+# Step 3/4: the CLI-essentials suite — whole suite / pick / skip (§8.2.1).
+_tui_qs_step3() {
+    local -a _rows=() _names=()
+    local _name _label _status
+    while IFS=$'\t' read -r _name _label _status; do
+        _rows+=("${_name}" "${_label}" "${_status}")
+        _names+=("${_name}")
+    done < <(tui_qs_tag_entries "$1" cli-essentials "$2")
+    [[ "${#_rows[@]}" -eq 0 ]] && return 0
+
+    local _joined
+    _joined="$(printf '%s / ' "${_names[@]}")"
+    _joined="${_joined% / }"
+
+    local _choice
+    _choice="$(tui_render_menu \
+        "Quick Setup — Step 3/4: CLI Essentials suite? (${#_names[@]} tools)" \
+        "${_joined}" \
+        "all"  "Yes, install all" \
+        "pick" "Pick individually" \
+        "skip" "Skip")" || return 1
+    case "${_choice}" in
+        all)  printf '%s\n' "${_names[@]}" ;;
+        pick) tui_render_checklist "Quick Setup — Step 3/4: CLI Essentials" \
+                  "Check the tools to install." "${_rows[@]}" || return 1 ;;
+        skip) : ;;
+    esac
+}
+
+# Step 4/4: AI agent CLI multi-select (recommended ones preselected).
+_tui_qs_step4() {
+    local -a _rows=()
+    local _name _label _status
+    while IFS=$'\t' read -r _name _label _status; do
+        _rows+=("${_name}" "${_label}" "${_status}")
+    done < <(tui_qs_tag_entries "$1" agent "$2")
+    [[ "${#_rows[@]}" -eq 0 ]] && return 0
+
+    tui_render_checklist "Quick Setup — Step 4/4: AI agent CLI? (multi-select)" \
+        "Check the agent CLIs to install." "${_rows[@]}"
+}
+
+# §8.2.1 wizard driver: Step 1 platform confirm → Steps 2-4 accumulate →
+# Review & Install (shared screen) → Proceed leg.
+_tui_screen_quick_setup() {
+    local _list_json="$1" _detect_json="$2"
+    local _override="" _form _summary _choice _picked
+    _summary="$(tui_system_summary "${_detect_json}")"
+
+    # Step 1/4: confirm platform. An override only updates wizard memory;
+    # re-render the confirmation so the user approves the final value.
+    while :; do
+        _form="$(tui_effective_form_factor "${_detect_json}" "${_override}")"
+        _choice="$(tui_render_menu \
+            "Quick Setup — Step 1/4: Confirm platform" \
+            "Detected: ${_summary}"$'\n'"Form factor: ${_form}" \
+            "continue" "Yes, continue" \
+            "override" "Override platform")" || return 0
+        [[ "${_choice}" == "continue" ]] && break
+        if _picked="$(_tui_qs_platform_menu)"; then
+            _override="${_picked}"
+        fi
+    done
+
+    local -a _sel=()
+    local _out _line
+    _out="$(_tui_qs_step2 "${_list_json}" "${_form}")" || return 0
+    while IFS= read -r _line; do
+        [[ -n "${_line}" ]] && _sel+=("${_line}")
+    done <<<"${_out}"
+    _out="$(_tui_qs_step3 "${_list_json}" "${_form}")" || return 0
+    while IFS= read -r _line; do
+        [[ -n "${_line}" ]] && _sel+=("${_line}")
+    done <<<"${_out}"
+    _out="$(_tui_qs_step4 "${_list_json}" "${_form}")" || return 0
+    while IFS= read -r _line; do
+        [[ -n "${_line}" ]] && _sel+=("${_line}")
+    done <<<"${_out}"
+
+    if [[ "${#_sel[@]}" -eq 0 ]]; then
+        tui_render_msgbox "Quick Setup" "nothing selected"
+        return 0
+    fi
+
+    # Review backing out before Proceed = pure cancel: the override and
+    # the picks die with this function's locals (§8.2.1 cancel table).
+    _tui_screen_review "${_sel[@]}" || return 0
+
+    # Proceed leg: the ONE point where the Step-1 override leaves TUI
+    # memory (§8.2.1 "not written to config.ini until Review"). Persisting
+    # goes through a `setup_ubuntu config set` fork (G4: the TUI never
+    # writes config itself), then the shared exec leg forks the install
+    # pipeline with `--profile=<override>` and the user-picked names only —
+    # which is what makes the ADR-0010 manual-flag matrix structural:
+    # named modules get manual=true via the CLI's requested-modules path,
+    # engine-pulled deps stay manual=false (they never appear on this argv).
+    if [[ -n "${_override}" ]]; then
+        if ! "${TUI_CLI}" config set platform.override "${_override}"; then
+            tui_render_msgbox "Quick Setup" \
+                "ERROR: failed to persist the platform override — nothing was installed."
+            return 0
+        fi
+        TUI_PLATFORM_OVERRIDE="${_override}"
+    fi
+    _tui_exec_install "${_sel[@]}"  # never returns
+}
+
+# ── Menu action dispatch (mount point for #72) ──────────────────────────────
 
 _tui_dispatch() {
     case "$1" in
         quick-setup)
-            # #71: Quick Setup multi-step flow (§8.2.1) → Review → fork
-            # `setup_ubuntu install ... -y` with TUI_PLATFORM_OVERRIDE
-            # (reuse _tui_exec_install for the Proceed leg).
-            _tui_screen_todo "Quick Setup" "#71"
+            _tui_screen_quick_setup "$2" "$3"
             ;;
         base | recommended | optional | experimental)
             _tui_screen_category "$1" "$2"
@@ -259,7 +421,7 @@ _tui_main_loop() {
         _choice="$(TUI_CANCEL_LABEL="Exit" tui_render_menu \
             "init_ubuntu v${INIT_UBUNTU_VERSION}" \
             "System: ${_summary}" "${_menu_args[@]}")" || return 0
-        _tui_dispatch "${_choice}" "${_list_json}"
+        _tui_dispatch "${_choice}" "${_list_json}" "${_detect_json}"
     done
 }
 

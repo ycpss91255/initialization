@@ -22,6 +22,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`lazygit.module.sh` v2 module** (issue #48, PRD §6.3.1 Batch B):
+  migrates `module/submodule/lazygit.sh` to the v2 contract on the
+  github-release archetype. Versioned upstream assets
+  (`lazygit_<ver>_Linux_x86_64.tar.gz`) are resolved at run time before
+  super-calling the archetype fetch. All 10 lifecycle phases are
+  runnable standalone (AC-25); the version Sidecar (shared
+  `module_sidecar_*` helpers) is written on install/upgrade and deleted
+  on remove/purge (ADR-0001), with `doctor` flagging
+  Sidecar/install-state drift. Ships
+  `test/unit/module/lazygit_spec.bats` (71 tests, Q29 scope) with
+  mocked GitHub queries (Q46: zero network in gates).
 - **Import/export with the ADR-0013 conflict pipeline** (issue #43,
   AC-14): `export <file> [--modules=<csv>]` ships only the
   machine-portable `synced` section of each installed module (ADR-0018);

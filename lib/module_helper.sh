@@ -11,6 +11,7 @@
 #   1. Library guard
 #   2. i18n (list + key:value)
 #   3. Generic guards (dryrun / idempotency)
+#   3.5 Sidecar helpers (ADR-0001)
 #   4. APT archetype          — lifecycle + macro
 #   5. GitHub-release archetype
 #   6. Config-drop archetype
@@ -69,6 +70,51 @@ module_skip_if_not_installed() {
     is_installed 2>/dev/null && return 1
     log_info "[${NAME:-?}] not installed; nothing to do"
     return 0
+}
+
+# ─── 3.5 Sidecar (ADR-0001) ─────────────────────────────────────────────────
+#
+# The Sidecar at ${INIT_UBUNTU_STATE_DIR}/versions/<name> records the
+# version string installed by the module. Both Standalone and Engine mode
+# hit these helpers (ADR-0001: Sidecar logic lives in module helpers, not
+# in the Engine). state.json stays Engine-only — never touch it here.
+
+module_sidecar_dir() {
+    printf '%s/versions' \
+        "${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu}"
+}
+
+module_sidecar_path() {
+    local _name="${1:?module_sidecar_path needs <module-name>}"
+    printf '%s/%s' "$(module_sidecar_dir)" "${_name}"
+}
+
+# module_sidecar_write <name> [version]  — no-op under --dry-run.
+module_sidecar_write() {
+    local _name="${1:?module_sidecar_write needs <module-name>}"
+    local _version="${2:-unknown}"
+    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
+    local _dir
+    _dir="$(module_sidecar_dir)"
+    mkdir -p "${_dir}"
+    printf '%s\n' "${_version}" > "${_dir}/${_name}"
+}
+
+# module_sidecar_remove <name>  — no-op under --dry-run; missing file is OK.
+module_sidecar_remove() {
+    local _name="${1:?module_sidecar_remove needs <module-name>}"
+    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
+    rm -f "$(module_sidecar_path "${_name}")"
+}
+
+# module_sidecar_get_version <name>  — prints the recorded version;
+# returns 1 (prints nothing) when no Sidecar exists.
+module_sidecar_get_version() {
+    local _name="${1:?module_sidecar_get_version needs <module-name>}"
+    local _path
+    _path="$(module_sidecar_path "${_name}")"
+    [[ -f "${_path}" ]] || return 1
+    cat "${_path}"
 }
 
 # ─── 4. APT archetype ───────────────────────────────────────────────────────

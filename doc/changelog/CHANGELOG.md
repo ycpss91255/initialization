@@ -22,6 +22,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **eza module migrated to the v2 contract** (issue #51, PRD §6.3.1
+  Batch B): `module/submodule/eza.sh` → `module/eza.module.sh`
+  (github-release archetype, `CATEGORY=optional`,
+  `TAGS=("cli-essentials")`). Keeps the legacy behavior — tarball to
+  `/opt/eza`, `/usr/local/bin/eza` symlink, `alias ls='eza'` dropped
+  into `~/.bashrc` / `~/.zshrc` (removed on purge, kept on remove) —
+  and adds Sidecar bookkeeping plus `is_outdated` / `doctor`. New
+  shared Sidecar helpers in `lib/module_helper.sh`
+  (`module_sidecar_write/remove/get_version/path`, ADR-0001) are
+  available to all modules.
+
 - **State robustness** (issue #41, PRD §10.1): reading a corrupt
   `state.json` now quarantines it (`mv` → `state.json.corrupt.<ts>`) and
   fails fast (exit 1) with recovery guidance — re-run install to rebuild

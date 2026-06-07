@@ -46,6 +46,44 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   arg and preserves the `local` sub-object across re-records;
   `state_record_upgrade` updates `synced`; `state_record_verify` stamps
   `local.last_verified_at`; `state_get_field` reads synced-then-local.
+- **zoxide module** (issue #52, PRD §6.3.1 Batch B): migrated
+  `module/submodule/zoxide.sh` to the v2 contract as
+  `module/zoxide.module.sh` (smarter `cd`; aliases `cd` to `z`).
+  Archetype B (github-release) with super-call overrides — the release
+  asset name embeds the version, so install/upgrade resolve the latest
+  tag first, then chain to the archetype default; both wire
+  `zoxide init` + the `cd`→`z` alias into existing bash/zsh rc files
+  (idempotent) and write the version Sidecar; remove/purge delete it
+  (ADR-0001). All 10 lifecycle phases run standalone (AC-25); dry-run
+  performs no filesystem writes (AC-12). New shared `module_sidecar_*`
+  helpers in `lib/module_helper.sh` (path / write / remove /
+  get_version, dry-run-safe) give Standalone and Engine mode one
+  Sidecar code path — closes the cookbook's
+  `module_sidecar_get_version` follow-up. Spec:
+  `test/unit/module/zoxide_spec.bats` (49 tests).
+- **fzf module migrated to the v2 contract** (issue #50, PRD §6.3.1 Batch
+  B): `module/submodule/fzf.sh` (git-clone + `~/.fzf/install`) is replaced
+  by `module/fzf.module.sh` on the github-release archetype — downloads
+  the prebuilt single-binary tarball for the host arch (amd64 / arm64 /
+  armv7) into `/opt/fzf` and symlinks `/usr/local/bin/fzf`. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  is written on install/upgrade and removed on remove/purge per ADR-0001
+  while `state.json` is never touched by the module. Tagged
+  `cli-essentials`, `CATEGORY=optional`, depends on `apt-essentials`.
+- **lazydocker module migrated to the v2 contract** (issue #49, PRD
+  §6.3.1 Batch B): `module/lazydocker.module.sh` (docker TUI,
+  github-release archetype with a version-aware fetch override —
+  upstream asset names embed the release version). Metadata per PRD
+  §9.1 (`CATEGORY=optional`, `TAGS=(cli-essentials)`,
+  `DEPENDS_ON=(docker)`, i18n `DESCRIPTION`). All 10 lifecycle phases
+  run standalone (AC-25); install is idempotent (AC-5); `--dry-run`
+  writes nothing (AC-12). New `module_sidecar_*` helpers in
+  `lib/module_helper.sh` implement the ADR-0001 Sidecar (written on
+  install/upgrade, dropped on remove/purge, never touching
+  `state.json` in standalone mode); `is_outdated` compares the Sidecar
+  version against the latest GitHub release.
+
 - **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
   `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory
   at session end — keeps the newest 100 `.jsonl` files and none older

@@ -22,6 +22,13 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **CI path filter now actually skips heavy jobs on doc-only / meta-only
+  PRs** (issue #27): the all-negated `changes` filter gets
+  `predicate-quantifier: every` (without it the default `some` quantifier
+  matched nearly every file, so `code` was effectively always true), and
+  the exclusion list adds `.claude/**`, `.github/ISSUE_TEMPLATE/**`, and
+  `**/*.adoc`. `ci-passed` name and aggregation semantics unchanged
+  (skipped heavy jobs still count as pass).
 - **CI builds the test-tools image once and reuses it** (issue #26):
   new `build-image` job builds `test-tools:local` via
   `docker/build-push-action@v6` with GHA layer cache and uploads it as a

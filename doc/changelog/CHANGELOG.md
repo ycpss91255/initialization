@@ -22,6 +22,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`setup_secrets.sh`: token / gpg / list / remove subcommands**
+  (issue #68, PRD §14, AC-20): the reserved #44 stubs are now real.
+  `token set <name>` reads the value from a no-echo `/dev/tty` prompt
+  (or from a stdin pipe in automation) — never from argv, so nothing
+  sensitive can land in `ps` output or shell history; `token get <name>`
+  prints the value (and nothing else) on stdout so it is pipe-safe.
+  `gpg generate` delegates to `gpg --full-generate-key` (all prompts,
+  including the passphrase, stay on gpg's own tty); `gpg import [<file>]`
+  imports key material from a file or stdin. `list` prints stored names
+  only — never values — on a log-free stdout; `remove <name>` deletes
+  from the active backend and fails non-zero for unknown names. Token
+  round-trip is covered through the real CLI on all three PRD §14.3
+  backends: encrypted-file for real in Docker, `pass` and `gnome-keyring`
+  via PATH-stub mocks that also assert the secret value never rides argv.
 - **`setup_secrets.sh` skeleton: storage backend abstraction + ssh-key
   subcommands** (issue #44, PRD §14, AC-20): new standalone sensitive-data
   tool (not a module; shares `lib/logger.sh` / `lib/i18n.sh` /

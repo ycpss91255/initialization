@@ -72,6 +72,9 @@ RUN apk add --no-cache curl xz && \
 #   - newt               [init_ubuntu addition] provides `whiptail`, the
 #                        fallback TUI backend; alpine packages it under
 #                        "newt"
+#   - curl               [init_ubuntu addition] tool self-dep (preflight,
+#                        PRD §3.4): e2e specs drive the real entrypoint,
+#                        which gates non-help subcommands on jq/curl/git
 FROM alpine:latest
 RUN apk add --no-cache \
         bash \
@@ -83,7 +86,7 @@ RUN apk add --no-cache \
         fish \
         dialog ncurses-terminfo \
         newt \
-        jq
+        jq curl
 
 # bats core + extensions (bats-support / bats-assert / bats-mock)
 COPY --from=bats-src /opt/bats /opt/bats

@@ -2,7 +2,8 @@
 #
 # Aligns with ycpss91255-docker/docker_harness CI conventions:
 # - All test workflows run inside Docker (ADR-0004 hard rule).
-# - Path-filtered: doc-only PRs skip test/coverage; lint still runs.
+# - Path-filtered: doc-only / meta-only PRs (doc/, *.md, .claude/, GH
+#   issue templates, …) skip test/coverage; lint still runs.
 # - Job names match Makefile targets so `required_status_checks` can
 #   pin them by name (see issue #3).
 # - test-tools image is built ONCE in `build-image` (BuildKit + GHA
@@ -34,8 +35,9 @@ permissions:
 
 jobs:
   # ── Path filter ────────────────────────────────────────────────────────────
-  # Detect whether the change is doc-only. Other jobs key on this to skip
-  # heavy work for pure markdown / license updates.
+  # Detect whether the change is doc-only / meta-only. Other jobs key on
+  # this to skip heavy work for pure markdown / license / agent-config
+  # updates (issue #27).
   changes:
     name: detect-changes
     runs-on: ubuntu-latest
@@ -46,16 +48,29 @@ jobs:
       - id: filter
         uses: dorny/paths-filter@v3
         with:
-          # `code` = anything that could affect runtime behaviour.
-          # Doc-only = `code` false → heavy jobs skip.
+          # The filter below is all-negated, so it needs `every`: a file
+          # counts as `code` only when EVERY '!' pattern matches it, i.e.
+          # no exclusion applies. The default (`some`) would flag almost
+          # every file as `code` (any file outside ONE exclusion matches
+          # that negation) — see dorny/paths-filter#167.
+          predicate-quantifier: 'every'
+          # `code` = anything that could affect runtime behaviour:
+          # everything not excluded below — lib/, module/, script/,
+          # template/, test/, small-tools/, dockerfile/, compose.yaml,
+          # Makefile, .github/workflows/, … (all-singular dirs, ADR-0021).
+          # Doc-only / meta-only = `code` false → heavy jobs skip;
+          # ci-passed treats their `skipped` result as pass.
           filters: |
             code:
               - '!doc/**'
               - '!**/*.md'
+              - '!**/*.adoc'
               - '!LICENSE'
               - '!LICENSE.*'
               - '!.gitignore'
               - '!.codecov.yaml'
+              - '!.claude/**'
+              - '!.github/ISSUE_TEMPLATE/**'
 
   # ── Build test-tools image once (issue #26) ────────────────────────────────
   # Always runs (no path filter) because lint runs on every PR, including

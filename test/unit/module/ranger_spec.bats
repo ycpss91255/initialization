@@ -360,7 +360,7 @@ _seed_managed_config() {
 @test "failed apt install leaves no sidecar and no config (ADR-0015)" {
     _load_module
     module_default_apt_install() { return 1; }
-    ! module_default_apt_install
+    module_default_apt_install || true
     run install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ranger" ]]
@@ -372,7 +372,7 @@ _seed_managed_config() {
     module_default_apt_install() { return 0; }
     module_default_apt_install
     module_default_config_install() { return 1; }
-    ! module_default_config_install
+    module_default_config_install || true
     run install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ranger" ]]
@@ -474,7 +474,7 @@ _seed_managed_config() {
 @test "verify fails when not installed" {
     _load_module
     is_installed() { return 1; }
-    ! is_installed
+    is_installed || true
     run verify
     assert_failure
 }
@@ -491,7 +491,7 @@ _seed_managed_config() {
 @test "doctor fails when not installed" {
     _load_module
     is_installed() { return 1; }
-    ! is_installed
+    is_installed || true
     run doctor
     assert_failure
 }
@@ -551,7 +551,7 @@ _seed_managed_config() {
 @test "is_recommended is zero when not installed, nonzero when installed" {
     _load_module
     is_installed() { return 1; }
-    ! is_installed
+    is_installed || true
     run is_recommended
     assert_success
     is_installed() { return 0; }

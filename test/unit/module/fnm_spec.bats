@@ -299,3 +299,212 @@ _mock_remote() {
     doctor || true
     [[ -z "$(find "${INIT_UBUNTU_STATE_DIR}" -type f 2>/dev/null)" ]]
 }
+
+# ── Install + Sidecar (ADR-0001 / module-spec §4.7.4) ───────────────────────
+
+@test "install fetches and exits 0 (mocked remote)" {
+    _load_module
+    _sandbox_paths
+    _mock_remote "1.38.0"
+    run install
+    assert_success
+    [[ -x "${FNM_INSTALL_DIR}/fnm" ]]
+}
+
+@test "install writes the Sidecar with the binary-reported version" {
+    _load_module
+    _sandbox_paths
+    _mock_remote "1.38.0"
+    install
+    [[ -f "$(_sidecar_file)" ]]
+    [[ "$(cat "$(_sidecar_file)")" == "1.38.0" ]]
+}
+
+@test "standalone install never touches state.json (AC-23 pattern)" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/state.json" ]]
+}
+
+@test "install short-circuits when already installed (AC-5 idempotency)" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    eval 'is_installed() { return 0; }'
+    run install
+    assert_success
+    assert_output --partial "already installed"
+}
+
+@test "second install run also exits 0 (AC-5 pattern, real is_installed)" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    run install
+    assert_success
+}
+
+@test "failed fetch leaves no Sidecar behind" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    eval '_fnm_fetch_and_install() { return 1; }'
+    run install
+    assert_failure
+    [[ ! -e "$(_sidecar_file)" ]]
+}
+
+@test "upgrade re-fetches and updates the Sidecar version" {
+    _load_module
+    _sandbox_paths
+    _mock_remote "1.38.0"
+    install
+    _mock_remote "1.39.0"
+    upgrade
+    [[ "$(cat "$(_sidecar_file)")" == "1.39.0" ]]
+}
+
+@test "remove deletes the fnm binary and Sidecar" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    remove
+    [[ ! -e "${FNM_INSTALL_DIR}/fnm" ]]
+    [[ ! -e "$(_sidecar_file)" ]]
+}
+
+@test "remove keeps downloaded Node versions (purge wipes them)" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    mkdir -p "${FNM_INSTALL_DIR}/node-versions/v22.0.0"
+    remove
+    [[ -d "${FNM_INSTALL_DIR}/node-versions/v22.0.0" ]]
+}
+
+@test "remove on a clean system still exits 0 (idempotent)" {
+    _load_module
+    _sandbox_paths
+    run remove
+    assert_success
+    run remove
+    assert_success
+}
+
+@test "purge deletes install dir (incl. Node versions), hooks and Sidecar" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    printf '# user bashrc\n' > "${FNM_BASH_RC}"
+    install
+    mkdir -p "${FNM_INSTALL_DIR}/node-versions/v22.0.0"
+    purge
+    [[ ! -e "${FNM_INSTALL_DIR}" ]]
+    [[ ! -e "${FNM_FISH_CONF}" ]]
+    ! grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
+    [[ ! -e "$(_sidecar_file)" ]]
+}
+
+@test "purge on a clean system still exits 0 (idempotent)" {
+    _load_module
+    _sandbox_paths
+    run purge
+    assert_success
+}
+
+# ── Shell-init hooks (idempotent, marker-guarded) ───────────────────────────
+
+@test "install writes the fish conf.d hook with our marker" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    [[ -f "${FNM_FISH_CONF}" ]]
+    grep -Fq "${FNM_SHELL_MARKER}" "${FNM_FISH_CONF}"
+    grep -Fq "fnm env --use-on-cd --shell fish" "${FNM_FISH_CONF}"
+}
+
+@test "fish hook embeds the actual install dir" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    grep -Fq "set -gx FNM_PATH \"${FNM_INSTALL_DIR}\"" "${FNM_FISH_CONF}"
+}
+
+@test "second run leaves the fish hook byte-identical (idempotent)" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    local _before; _before="$(cat "${FNM_FISH_CONF}")"
+    upgrade
+    [[ "$(cat "${FNM_FISH_CONF}")" == "${_before}" ]]
+}
+
+@test "a user-owned fnm.fish (no marker) is never clobbered" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    mkdir -p "${FNM_FISH_CONF%/*}"
+    printf '# my own fnm setup\n' > "${FNM_FISH_CONF}"
+    install
+    [[ "$(cat "${FNM_FISH_CONF}")" == "# my own fnm setup" ]]
+}
+
+@test "purge keeps a user-owned fnm.fish (no marker)" {
+    _load_module
+    _sandbox_paths
+    mkdir -p "${FNM_FISH_CONF%/*}"
+    printf '# my own fnm setup\n' > "${FNM_FISH_CONF}"
+    purge
+    [[ -f "${FNM_FISH_CONF}" ]]
+}
+
+@test "install appends the bash hook block to an existing .bashrc" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    printf '# user bashrc\n' > "${FNM_BASH_RC}"
+    install
+    grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
+    grep -Fq 'eval "$(fnm env --use-on-cd)"' "${FNM_BASH_RC}"
+    grep -Fq "${FNM_BASH_BLOCK_END}" "${FNM_BASH_RC}"
+}
+
+@test "install never creates a .bashrc when none exists" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    [[ ! -e "${FNM_BASH_RC}" ]]
+}
+
+@test "second run appends the bash block exactly once (idempotent)" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    printf '# user bashrc\n' > "${FNM_BASH_RC}"
+    install
+    upgrade
+    [[ "$(grep -Fc "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}")" -eq 1 ]]
+}
+
+@test "purge strips only the fenced bash block, keeping user content" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    printf '# user bashrc top\n' > "${FNM_BASH_RC}"
+    install
+    printf '# user bashrc bottom\n' >> "${FNM_BASH_RC}"
+    purge
+    grep -Fq "# user bashrc top" "${FNM_BASH_RC}"
+    grep -Fq "# user bashrc bottom" "${FNM_BASH_RC}"
+    ! grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
+    ! grep -Fq "FNM_PATH" "${FNM_BASH_RC}"
+}

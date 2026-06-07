@@ -30,6 +30,15 @@
 #   tui_cli_install_plan <m...>   Fork `setup_ubuntu install --dry-run` → order
 #   tui_plan_deps <plan> <m...>   Plan minus selection = "will pull N deps"
 #   tui_install_args <ovr> <m...> Argv for the Proceed fork (one per line)
+#   tui_platform_choices          §7.5 form factors as "tag<TAB>desc" rows
+#   tui_effective_form_factor <detect_json> <ovr>
+#                                 Override (when set) else detected form factor
+#   tui_qs_recommended_entries <json> <form>
+#                                 §8.2.1 Step-2 rows "name<TAB>label<TAB>on|off"
+#                                 (§15.3 platform filter → Q36 enabled tri-state
+#                                 → engine `recommended` preselect)
+#   tui_qs_tag_entries <json> <tag> <form>
+#                                 Same row shape for one TAGS group (Step 3/4)
 #   tui_cli_installed_json        Fork `setup_ubuntu list --installed --json`
 #   tui_installed_entries <state_json> <list_json> <flat|grouped>
 #                                 §8.3 rows "name<TAB>display" (version +
@@ -285,6 +294,63 @@ tui_install_args() {
     done
     printf -- '-y\n'
 }
+
+# ── Quick Setup data (#71, §8.2.1) ───────────────────────────────────────────
+
+# §7.5 / §15.2 form-factor vocabulary as "tag<TAB>description" rows —
+# single source for every platform-override menu (System Info, Quick
+# Setup Step 1).
+tui_platform_choices() {
+    printf 'desktop\tDesktop / laptop\n'
+    printf 'server\tHeadless server\n'
+    printf 'wsl\tWindows Subsystem for Linux\n'
+    printf 'rpi-4\tRaspberry Pi 4\n'
+    printf 'rpi-5\tRaspberry Pi 5\n'
+    printf 'jetson-orin\tNVIDIA Jetson Orin\n'
+}
+
+# The form factor the wizard filters against: the in-memory override when
+# the user picked one (§8.2.1 Step 1), else the detect payload's verdict.
+#   tui_effective_form_factor <detect_json> <override>
+tui_effective_form_factor() {
+    if [[ -n "${2:-}" ]]; then
+        printf '%s\n' "$2"
+        return 0
+    fi
+    jq -r '.form_factor // "unknown"' <<<"$1"
+}
+
+# Quick Setup row builder: "name<TAB>label<TAB>on|off" lines, §15.3 filter
+# pipeline order. The two #71 additive ADR-0019 fields drive it:
+#   recommended  bool|null  engine is_recommended() verdict
+#   enabled      bool|null  Q36 `[modules.<n>] enabled` config tri-state
+# Pipeline: SUPPORTED_PLATFORMS ∋ form factor FIRST (fail → row dropped,
+# is_recommended never consulted), then enabled=false → dropped (force
+# exclude), enabled=true → "on" (force include), unset → recommended
+# decides the precheck. Absent fields read as null (ADR-0019: additive
+# fields are optional), which lands on "off" — never a silent install.
+#   _tui_qs_entries <list_json> category <category> <form>
+#   _tui_qs_entries <list_json> tag <tag> <form>
+_tui_qs_entries() {
+    jq -r --arg key "$2" --arg v "$3" --arg f "$4" '
+        [.items[]
+         | select(if $key == "category"
+                  then .category == $v
+                  else ((.tags // []) | index($v)) != null end)
+         | select(((.supported_platforms // []) | index($f)) != null)
+         | select(.enabled != false)]
+        | sort_by(.name)
+        | .[]
+        | "\(.name)\t\(.description)\t"
+          + (if .enabled == true or .recommended == true then "on" else "off" end)
+    ' <<<"$1"
+}
+
+# §8.2.1 Step 2: recommended-category modules surviving the filter pipeline.
+tui_qs_recommended_entries() { _tui_qs_entries "$1" category recommended "$2"; }
+
+# §8.2.1 Steps 3/4: one TAGS group (cli-essentials suite / agent CLIs).
+tui_qs_tag_entries() { _tui_qs_entries "$1" tag "$2" "$3"; }
 
 # ── Manage Installed data + action argv (#72, §8.3 / §8.4) ───────────────────
 

@@ -22,6 +22,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`claude-code-config.module.sh` module** (issue #75, PRD §6.3.2 Batch C,
+  M7): new config-drop module applying the personal Claude Code settings
+  shipped in `module/config/claude/` (`settings.json`,
+  `run-statusline.sh`, `settings.statusline.json`) to `~/.claude/`.
+  Built on `module_use_config_archetype` with super-call overrides: the
+  two statusline companions are dropped alongside the primary
+  `settings.json`, template-author `/home/<user>` prefixes are rewritten
+  to the current `$HOME`, and the marker is a JSON key already present in
+  the template so the archetype never injects a `#` comment into JSON.
+  `CATEGORY=optional`, `TAGS=(agent ...)`, `DEPENDS_ON=(claude-code)`
+  (Q39). All 10 lifecycle phases run standalone (AC-25); install is
+  idempotent (AC-5); `--dry-run` performs no filesystem writes (AC-12);
+  the version Sidecar is written on install/upgrade and removed on
+  remove/purge per ADR-0001 while `state.json` is never touched by the
+  module. `is_outdated` reports drift between the dropped files and the
+  localized templates; `doctor` validates the statusline launcher.
+  80-test bats spec.
+
 - **`lnav.module.sh` v2 module** (issue #62, PRD §6.3.3 Batch C):
   migrates the `module/config/lnav_pkg/` based install (config bundle
   loaded ad-hoc via `lnav -I <path>`) to the v2 contract on the custom

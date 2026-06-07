@@ -32,6 +32,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   shared Sidecar helpers in `lib/module_helper.sh`
   (`module_sidecar_write/remove/get_version/path`, ADR-0001) are
   available to all modules.
+- **lazydocker module migrated to the v2 contract** (issue #49, PRD
+  §6.3.1 Batch B): `module/lazydocker.module.sh` (docker TUI,
+  github-release archetype with a version-aware fetch override —
+  upstream asset names embed the release version). Metadata per PRD
+  §9.1 (`CATEGORY=optional`, `TAGS=(cli-essentials)`,
+  `DEPENDS_ON=(docker)`, i18n `DESCRIPTION`). All 10 lifecycle phases
+  run standalone (AC-25); install is idempotent (AC-5); `--dry-run`
+  writes nothing (AC-12). New `module_sidecar_*` helpers in
+  `lib/module_helper.sh` implement the ADR-0001 Sidecar (written on
+  install/upgrade, dropped on remove/purge, never touching
+  `state.json` in standalone mode); `is_outdated` compares the Sidecar
+  version against the latest GitHub release.
 
 - **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
   `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory
@@ -56,6 +68,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Unit tests run as a per-module CI matrix** (issue #31, PRD M10): a
+  `discover` job builds the matrix dynamically from `module/*.module.sh`
+  (`fail-fast: false`, `timeout-minutes: 5` per shard) and non-module
+  specs (engine/lib/hook/script/template) run in a single
+  `test-unit (core)` job. `make test-unit MODULE=<name>` (and
+  `MODULE=core`) narrows the bats run via the new `ci.sh --module` flag;
+  a module without a spec yet is a green skip. Runtime-generated
+  `dorny/paths-filter` filters (`script/ci/generate_module_filters.sh` +
+  `script/ci/select_unit_matrix.sh`) make PRs run only the shards for
+  changed modules — `lib/`/`script/`/`Makefile`/workflow changes (or any
+  code change outside the known filters) fan out to the full matrix, and
+  pushes to main / tags always run the full matrix. `ci-passed` name and
+  aggregation semantics unchanged (skipped shards still count as pass);
+  every shard reuses the `build-image` test-tools artifact (#26).
 - **Module tools directory relocated to top-level `tool/`** (issue #46,
   PRD §6.5): holding area for one-off scripts — not in the module
   catalog, not in the TUI, not in the install pipeline; per-file

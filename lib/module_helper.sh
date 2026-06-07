@@ -11,7 +11,6 @@
 #   1. Library guard
 #   2. i18n (list + key:value)
 #   3. Generic guards (dryrun / idempotency)
-#   3.5 Sidecar helpers (ADR-0001)
 #   4. APT archetype          — lifecycle + macro
 #   5. GitHub-release archetype
 #   6. Config-drop archetype
@@ -72,12 +71,12 @@ module_skip_if_not_installed() {
     return 0
 }
 
-# ─── 3.5 Sidecar (ADR-0001) ─────────────────────────────────────────────────
+# ─── 3b. Sidecar (ADR-0001) ─────────────────────────────────────────────────
 #
-# The Sidecar at ${INIT_UBUNTU_STATE_DIR}/versions/<name> records the
-# version string installed by the module. Both Standalone and Engine mode
-# hit these helpers (ADR-0001: Sidecar logic lives in module helpers, not
-# in the Engine). state.json stays Engine-only — never touch it here.
+# The Sidecar is a one-line version file at
+#   ${INIT_UBUNTU_STATE_DIR}/versions/<name>
+# written by BOTH Standalone and Engine modes (same code path — ADR-0001).
+# Standalone never touches state.json; only the engine does.
 
 module_sidecar_dir() {
     printf '%s/versions' \
@@ -85,36 +84,39 @@ module_sidecar_dir() {
 }
 
 module_sidecar_path() {
-    local _name="${1:?module_sidecar_path needs <module-name>}"
+    local _name="${1:-${NAME:?module_sidecar_path needs <name>}}"
     printf '%s/%s' "$(module_sidecar_dir)" "${_name}"
 }
 
-# module_sidecar_write <name> [version]  — no-op under --dry-run.
+# module_sidecar_write <name> [version] — record the installed version.
+# No-op under --dry-run (defense in depth; callers should guard earlier).
 module_sidecar_write() {
-    local _name="${1:?module_sidecar_write needs <module-name>}"
-    local _version="${2:-unknown}"
+    local _name="${1:-${NAME:?module_sidecar_write needs <name>}}"
+    local _version="${2:-${VERSION_PROVIDED:-unknown}}"
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     local _dir
     _dir="$(module_sidecar_dir)"
-    mkdir -p "${_dir}"
+    mkdir -p "${_dir}" || {
+        log_warn "[${_name}] cannot create sidecar dir ${_dir}"
+        return 1
+    }
     printf '%s\n' "${_version}" > "${_dir}/${_name}"
 }
 
-# module_sidecar_remove <name>  — no-op under --dry-run; missing file is OK.
+# module_sidecar_remove <name> — drop the version record (remove/purge).
 module_sidecar_remove() {
-    local _name="${1:?module_sidecar_remove needs <module-name>}"
+    local _name="${1:-${NAME:?module_sidecar_remove needs <name>}}"
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     rm -f "$(module_sidecar_path "${_name}")"
 }
 
-# module_sidecar_get_version <name>  — prints the recorded version;
-# returns 1 (prints nothing) when no Sidecar exists.
+# module_sidecar_get_version <name> — print recorded version, 1 if absent.
 module_sidecar_get_version() {
-    local _name="${1:?module_sidecar_get_version needs <module-name>}"
-    local _path
-    _path="$(module_sidecar_path "${_name}")"
-    [[ -f "${_path}" ]] || return 1
-    cat "${_path}"
+    local _name="${1:-${NAME:?module_sidecar_get_version needs <name>}}"
+    local _f
+    _f="$(module_sidecar_path "${_name}")"
+    [[ -f "${_f}" ]] || return 1
+    cat "${_f}"
 }
 
 # ─── 4. APT archetype ───────────────────────────────────────────────────────

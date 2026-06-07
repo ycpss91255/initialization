@@ -111,6 +111,16 @@ _load_engine() {
     refute_output --partial "Proceed?"
 }
 
+# ── §7.7.1 progress rendering ────────────────────────────────────────────────
+
+@test "runner_install prints [i/N] per-module progress headers" {
+    _load_engine
+    run runner_install depa main
+    assert_success
+    assert_output --partial "[1/2] depa: installing..."
+    assert_output --partial "[2/2] main: installing..."
+}
+
 @test "upgrade without -y keeps Proceed? [y/N] and non-tty default aborts" {
     _load_engine
     # Upgrade keeps the conservative [y/N] default (PRD §7.6): a non-tty

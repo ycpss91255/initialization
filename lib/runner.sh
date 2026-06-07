@@ -52,6 +52,37 @@ _runner_snapshot_gpu() {
     detect_get_field gpu.vendor 2>/dev/null || true
 }
 
+# ── Internal: progress rendering helpers (PRD §7.7.1) ───────────────────────
+
+# English verb forms for the human-readable progress lines.
+_runner_phase_gerund() {
+    case "${1}" in
+        install) printf 'installing' ;;
+        remove)  printf 'removing'   ;;
+        purge)   printf 'purging'    ;;
+        upgrade) printf 'upgrading'  ;;
+        verify)  printf 'verifying'  ;;
+        *)       printf '%sing' "${1}" ;;
+    esac
+}
+
+_runner_phase_past() {
+    case "${1}" in
+        install) printf 'installed' ;;
+        remove)  printf 'removed'   ;;
+        purge)   printf 'purged'    ;;
+        upgrade) printf 'upgraded'  ;;
+        verify)  printf 'verified'  ;;
+        *)       printf '%sed' "${1}" ;;
+    esac
+}
+
+# Progress lines print unless --quiet (PRD §7.7.1: quiet keeps warn/error only).
+_runner_progress() {
+    [[ "${INIT_UBUNTU_QUIET:-false}" == "true" ]] && return 0
+    printf '%s\n' "$*"
+}
+
 # ── Internal: run one phase (install/remove/purge) for one module ────────────
 
 # Per-trace monotonic counter backing span_id (`<phase>_<module>_NNN`).
@@ -182,7 +213,10 @@ _runner_run_batch() {
         "gpu=$(_runner_snapshot_gpu)"
 
     local _name _rc _failures=0 _ok=0
+    local _idx=0 _total="${#_modules[@]}"
     for _name in "${_modules[@]}"; do
+        _idx=$(( _idx + 1 ))
+        _runner_progress "[${_idx}/${_total}] ${_name}: $(_runner_phase_gerund "${_phase}")..."
         if _runner_run_phase "${_phase}" "${_name}"; then
             _ok=$(( _ok + 1 ))
         else

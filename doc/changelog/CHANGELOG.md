@@ -36,7 +36,7 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   get_version, dry-run-safe) give Standalone and Engine mode one
   Sidecar code path — closes the cookbook's
   `module_sidecar_get_version` follow-up. Spec:
-  `test/unit/module/zoxide_spec.bats` (44 tests).
+  `test/unit/module/zoxide_spec.bats` (49 tests).
 - **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
   `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory
   at session end — keeps the newest 100 `.jsonl` files and none older

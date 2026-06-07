@@ -6,7 +6,7 @@
 #   - Replaced `_log_err` from base's _lib.sh with inline `_die`
 #     (we don't borrow base's docker/_lib.sh per PRD §13.2)
 #   - shellcheck path glob: lint all *.sh under repo; exclude small-tools/
-#     (deprecated, PRD §6.6) and module/tools/ (pending relocation, §6.5)
+#     (deprecated, PRD §6.6) and tool/ (one-off script holding area, §6.5)
 #   - Added fish syntax check (`fish -n`) for all *.fish
 #   - Added hadolint on dockerfile/Dockerfile.test-tools
 #   - Removed `--behavioural` mode (no Docker image build per PRD §2)
@@ -102,9 +102,9 @@ EOF
 
 # ── Lint discovery (exclude deprecated paths per PRD §6.5/§6.6) ──────────────
 #
-# Pruned directories (slated for relocation or already vendored upstream):
+# Pruned directories (deprecated, holding areas, or vendored upstream):
 #   small-tools/             — legacy install scripts, replaced by module/
-#   module/tools/           — staging for one-off scripts (PRD §6.5)
+#   tool/                    — holding area for one-off scripts (PRD §6.5)
 #   module/config/          — third-party config files (vendored upstream)
 #   module/submodule/       — v1 sub-tool helpers (predates v2 module pattern)
 #   module/function/        — v1 lib/ location (moved to lib/)
@@ -120,7 +120,7 @@ _find_lintable_sh() {
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
-           -path "${REPO_ROOT}/module/tools" -o \
+           -path "${REPO_ROOT}/tool" -o \
            -path "${REPO_ROOT}/module/config" -o \
            -path "${REPO_ROOT}/module/submodule" -o \
            -path "${REPO_ROOT}/module/function" \) -prune -o \
@@ -137,7 +137,7 @@ _find_lintable_fish() {
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
-           -path "${REPO_ROOT}/module/tools" -o \
+           -path "${REPO_ROOT}/tool" -o \
            -path "${REPO_ROOT}/module/config" -o \
            -path "${REPO_ROOT}/module/submodule" -o \
            -path "${REPO_ROOT}/module/function" \) -prune -o \
@@ -251,7 +251,7 @@ _run_coverage() {
         "${REPO_ROOT}/dockerfile/"
         "${REPO_ROOT}/.github/"
         "${REPO_ROOT}/small-tools/"
-        "${REPO_ROOT}/module/tools/"
+        "${REPO_ROOT}/tool/"
     )
     local _exclude_path
     _exclude_path="$(IFS=,; printf '%s' "${_excludes[*]}")"

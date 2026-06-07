@@ -1,6 +1,13 @@
 = README
 This repository is a tool I use in Ubuntu, It uses a script to complete the initialization action.
 
+== tool/ holding area
+
+`tool/` (relocated from the former module tools directory per PRD §6.5)
+is a temporary holding area for one-off scripts. It is not part of the
+module catalog, the TUI, or the install pipeline. The destination of
+each file will be decided individually in 0.2+.
+
 == NVIDIA Related toolkit
 [source, shell]
 ----

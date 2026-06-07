@@ -4,7 +4,7 @@
 # Customizations vs upstream:
 #   - target changed from "auto" to "80%" (PRD G5: v0.1 起始覆蓋率 80%)
 #   - ignore[] expanded to cover small-tools/ (deprecated, PRD §6.6) and
-#     module/tools/ (pending relocation, PRD §6.5) so they don't drag the
+#     tool/ (holding area for one-off scripts, PRD §6.5) so they don't drag the
 #     headline number down before they're modernized
 
 coverage:
@@ -29,7 +29,7 @@ ignore:
   - "test/**/*"
   - ".github/**/*"
   - "small-tools/**/*"
-  - "module/tools/**/*"
+  - "tool/**/*"
   - "dockerfile/**/*"
   - "template/**/*"
 

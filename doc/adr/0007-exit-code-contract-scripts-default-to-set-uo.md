@@ -143,7 +143,7 @@ inherited from the module template.
   correctly.
 - **Negative:** Removing `-e` means relying on test coverage to catch
   bugs that `-e` would have flagged at runtime. Mitigation: every
-  hook has bats tests under `test/unit/hooks/` covering its
+  hook has bats tests under `test/unit/hook/` covering its
   observable outputs (introduced alongside this ADR for the new
   `enforce_shellcheck_disable_approval.sh` hook).
 - **Negative:** A future contributor (human or agent) may copy a hook

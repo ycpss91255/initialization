@@ -191,7 +191,7 @@ A: 在 build `test-tools:local`,需要下載 alpine + bats + fishtape 等(~150 M
 A: Phase 1 只建測試框架,實際 bats spec 從 Phase 2 才開始加。Lint 部分(shellcheck + fish syntax + hadolint)會跑。
 
 ### Q: 我的覆蓋率被低估?(明明測了卻顯示沒覆蓋)
-A: 確認 `script/ci/ci.sh` 的 `_run_coverage` 中 `--include-path` 與 `--exclude-path` 有沒有把你的檔案放對位置。`small-tools/` 與 `module/tools/` 是有意排除的(deprecated)。
+A: 確認 `script/ci/ci.sh` 的 `_run_coverage` 中 `--include-path` 與 `--exclude-path` 有沒有把你的檔案放對位置。`small-tools/` 與 `tool/` 是有意排除的(deprecated)。
 
 ### Q: 為什麼 ANSI 色彩在 CI log 內看不到?
 A: ci.sh 預設不主動加色;CI runner 的 terminal 一般是非 tty,符合 PRD §7.5 `--color=auto` 設計。要強制色彩用 `--color=always`(實作後)。

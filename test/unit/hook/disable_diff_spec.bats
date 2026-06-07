@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# test/unit/hooks/disable_diff_spec.bats
+# test/unit/hook/disable_diff_spec.bats
 #
 # Unit tests for `new_shellcheck_disables` in
 # .claude/hook/enforce_shellcheck_disable_approval.sh (issue #17).

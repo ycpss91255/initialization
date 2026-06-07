@@ -22,6 +22,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Module tools directory relocated to top-level `tool/`** (issue #46,
+  PRD §6.5): holding area for one-off scripts — not in the module
+  catalog, not in the TUI, not in the install pipeline; per-file
+  destinations deferred to 0.2+. Engine registry scan (`lib/registry.sh`)
+  only reads `module/*.module.sh`, so `tool/` is outside its scope.
+  CI lint prune list, kcov excludes, and `.codecov.yaml` ignore updated.
+  ADR-0021 leftovers finished in the same pass:
+  `test/unit/hooks/`→`test/unit/hook/`,
+  `test/unit/scripts/`→`test/unit/script/`.
 - **CI path filter now actually skips heavy jobs on doc-only / meta-only
   PRs** (issue #27): the all-negated `changes` filter gets
   `predicate-quantifier: every` (without it the default `some` quantifier
@@ -119,8 +128,8 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   PARALLEL_GROUP, INSTALL_TIME_ESTIMATE, DISK_SPACE_ESTIMATE.
 - Folder naming convention enforced (singular):
   `doc/` → `doc/`, `test/helper/` → `test/helper/`,
-  `test/unit/module/` → `test/unit/module/`, `module/tools/` →
-  `module/tools/`. Hook `.claude/hook/test-must-use-docker.sh` enforces
+  `test/unit/module/` → `test/unit/module/`, `tool/` →
+  `tool/`. Hook `.claude/hook/test-must-use-docker.sh` enforces
   Docker-only test execution (ADR-0004).
 - ADRs 0001-0004 introduced (`doc/adr/`):
   0001 standalone/engine state boundary,
@@ -176,7 +185,7 @@ call site with a wiki-link rationale, matching the upstream
 default severity (style/info/warning/error all reported).
 
 - `script/ci/ci.sh`:
-  - Fix exclude-path typo `module/tool` → `module/tools` (post-
+  - Fix exclude-path typo `module/tool` → `tool` (post-
     ADR-0005 plural rename had not been propagated).
   - Extend `_find_lintable_sh` to pick up `*.bash` + `*.bats` too.
   - Exclude legacy paths slated for removal per PRD §6.5/§6.6:
@@ -446,7 +455,7 @@ hook plus rationale doc:
 - Internal modules (functions sourced for bats testing in isolation):
   `read_latest_user_message`, `new_shellcheck_disables`,
   `is_disable_approved`, `main`.
-- `test/unit/hooks/{transcript_reader,disable_diff,approval_check,enforce_shellcheck_disable_approval}_spec.bats`
+- `test/unit/hook/{transcript_reader,disable_diff,approval_check,enforce_shellcheck_disable_approval}_spec.bats`
   — bats specs for each module + integration test for the hook entry.
 - `.claude/settings.json` — hook registered as the 2nd `PreToolUse`
   matcher block (`Edit|Write|MultiEdit`).
@@ -461,7 +470,7 @@ hook plus rationale doc:
   exception list for upstream-mandated plurals kept growing. Renames:
   `doc/` → `doc/`, `doc/agent/` → `doc/agent/`,
   `doc/process/` → `doc/process/`, `module/` → `module/`,
-  `module/tool/` → `module/tools/`, `script/` → `script/`,
+  `module/tool/` → `tool/`, `script/` → `script/`,
   `script/hook/test-must-use-docker.sh` → `.claude/hook/test-must-use-docker.sh`
   (also relocated since all hooks are Claude PreToolUse, matching
   docker_harness `.claude/hook/`), `test/` → `test/`,

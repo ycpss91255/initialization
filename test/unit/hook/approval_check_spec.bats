@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# test/unit/hooks/approval_check_spec.bats
+# test/unit/hook/approval_check_spec.bats
 #
 # Unit tests for `is_disable_approved` in
 # .claude/hook/enforce_shellcheck_disable_approval.sh (issue #17).

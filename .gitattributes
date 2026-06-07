@@ -1,0 +1,2 @@
+# CHANGELOG [Unreleased] gets a line from nearly every PR; union-merge both-added lines
+doc/changelog/CHANGELOG.md merge=union

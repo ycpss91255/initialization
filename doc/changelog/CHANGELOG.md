@@ -33,6 +33,43 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   lifecycle phases runnable standalone (AC-25). 74-test bats spec at
   `test/unit/module/claude-code_spec.bats`.
 
+- **`lnav.module.sh` v2 module** (issue #62, PRD §6.3.3 Batch C):
+  migrates the `module/config/lnav_pkg/` based install (config bundle
+  loaded ad-hoc via `lnav -I <path>`) to the v2 contract on the custom
+  archetype — the apt `lnav` package plus the legacy lnav_pkg config
+  bundle (theme, UI settings, custom log formats) deployed to
+  `~/.config/lnav` so lnav loads it without the `-I` flag. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  (dpkg-reported package version) is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. `remove` keeps the deployed config bundle,
+  `purge` wipes it. Tagged `logs`, `CATEGORY=optional`, `DEPENDS_ON=()`.
+- **vscode module migrated to the v2 contract** (issue #59, PRD §6.3.3
+  Batch C): `module/setup_vscode.sh` (v1) is superseded by
+  `module/vscode.module.sh` on the apt archetype with a Microsoft vendor
+  repo — deb822 source at `/etc/apt/sources.list.d/vscode.sources` signed
+  by a dearmored `/etc/apt/keyrings/microsoft.gpg` (same shape as
+  `docker.module.sh`), then `apt install code`. Demoted from recommended
+  to optional (no longer the primary editor): `CATEGORY=optional`,
+  `TAGS=(editor)`, `DEPENDS_ON=(apt-essentials)` (Q39). All 10 lifecycle
+  phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  (dpkg-reported `code` version) is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. `remove` keeps the vendor repo files for cheap
+  re-install; only `purge` drops them.
+- **codex module** (issue #58, PRD §6.3.2 Batch C, M7): new
+  `module/codex.module.sh` installs the OpenAI Codex CLI from GitHub
+  releases (`openai/codex`, native musl binary, github-release
+  archetype) into `/opt/codex` with a `/usr/local/bin/codex` symlink.
+  Arch-aware asset selection (x86_64 / aarch64), best-effort latest-tag
+  lookup feeds the Sidecar (the download URL itself is
+  version-independent), `rust-vX.Y.Z` tags normalised for
+  `is_outdated`. Tagged `agent`; all 10 lifecycle phases runnable
+  standalone (AC-25), idempotent install (AC-5), dry-run writes nothing
+  (AC-12), Sidecar per ADR-0001. 84-test bats spec
+  `test/unit/module/codex_spec.bats` (Q29 coverage ladder).
 - **Color library + global output flags** (issue #45, PRD §5.1 / §7.5,
   M8, AC-16): new `lib/color.sh` decides ANSI color once per run —
   `auto` (default) turns color off for non-tty stdout, `NO_COLOR`,

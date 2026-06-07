@@ -22,6 +22,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **codex module** (issue #58, PRD §6.3.2 Batch C, M7): new
+  `module/codex.module.sh` installs the OpenAI Codex CLI from GitHub
+  releases (`openai/codex`, native musl binary, github-release
+  archetype) into `/opt/codex` with a `/usr/local/bin/codex` symlink.
+  Arch-aware asset selection (x86_64 / aarch64), best-effort latest-tag
+  lookup feeds the Sidecar (the download URL itself is
+  version-independent), `rust-vX.Y.Z` tags normalised for
+  `is_outdated`. Tagged `agent`; all 10 lifecycle phases runnable
+  standalone (AC-25), idempotent install (AC-5), dry-run writes nothing
+  (AC-12), Sidecar per ADR-0001. 84-test bats spec
+  `test/unit/module/codex_spec.bats` (Q29 coverage ladder).
 - **Color library + global output flags** (issue #45, PRD §5.1 / §7.5,
   M8, AC-16): new `lib/color.sh` decides ANSI color once per run —
   `auto` (default) turns color off for non-tty stdout, `NO_COLOR`,

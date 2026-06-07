@@ -192,6 +192,17 @@ _runner_run_phase() {
         log_event error "${_name}" "${_phase}_failed" \
             "duration_s=${_duration}" "exit_code=${_rc}"
         log_error "[${_name}] ${_phase} failed (exit=${_rc}, ${_duration}s)"
+        # Failure dump (PRD §7.7.1): last ~20 lines of the module's captured
+        # child output + trace_id + log path. Error-class output — printed
+        # to stderr and NOT silenced by --quiet.
+        if [[ -s "${_cmd_log}" ]]; then
+            printf '  ── last ~20 lines of %s output ──\n' "${_name}" >&2
+            tail -n 20 "${_cmd_log}" >&2
+        fi
+        printf '  trace_id=%s\n' "${INIT_UBUNTU_TRACE_ID:-unknown}" >&2
+        if [[ -n "${INIT_UBUNTU_LOG_FILE:-}" ]]; then
+            printf '  log: %s\n' "${INIT_UBUNTU_LOG_FILE}" >&2
+        fi
     fi
 
     rm -f "${_cmd_log}"

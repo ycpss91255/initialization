@@ -232,6 +232,27 @@ EOF
     refute_output --partial "unknown flag"
 }
 
+@test "failure dumps last ~20 child-output lines plus trace_id and log path" {
+    _load_engine
+    _register_cmdmod
+    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
+    # Child emits 30 numbered lines then fails: the dump must contain the
+    # tail (line-30) but not the head (line-1).
+    cat > "${INIT_UBUNTU_TEST_SCRATCH}/child.sh" <<'EOF'
+#!/usr/bin/env bash
+for i in $(seq 1 30); do echo "child-line-${i}"; done
+exit 1
+EOF
+
+    run runner_install cmdmod
+    assert_failure 6
+    assert_output --partial "child-line-30"
+    # tail ~20 of 30 lines keeps 11..30; the exact line "child-line-1" is cut.
+    refute_output --partial $'child-line-1\n'
+    assert_output --partial "trace_id="
+    assert_output --partial "${INIT_UBUNTU_LOG_FILE}"
+}
+
 @test "upgrade without -y keeps Proceed? [y/N] and non-tty default aborts" {
     _load_engine
     # Upgrade keeps the conservative [y/N] default (PRD §7.6): a non-tty

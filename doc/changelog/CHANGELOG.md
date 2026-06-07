@@ -220,6 +220,13 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **legacy small-tools Notion install GPU-crash on 24.04** (issue #35):
+  `_install_notion()` in `module/setup_small_tools.sh` no longer runs
+  `snap install notion-desktop` (the snap's bundled Mesa lacks
+  iris/swrast, crashing the GPU process on Ubuntu 24.04); it now
+  downloads the notion-electron `.deb` (anechunaev/notion-electron)
+  and installs it via `apt install ./<deb>`.
+
 - **github-release archetype download URL 404** : `lib/module_helper.sh`
   built `releases/latests/download/` (one-char typo) so every real
   (non-mocked) install of an archetype-B module would 404. Fixed to

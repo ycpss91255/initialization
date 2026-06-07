@@ -261,6 +261,11 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **Module phase exit codes could be masked in the runner sub-shell**
+  (issue #66 follow-on, `lib/runner.sh`): the module sub-shell runs in an
+  `if`-tested context where `set -e` is suspended, so any command appended
+  after the phase call would overwrite the sub-shell's exit status. The
+  phase exit code is now captured explicitly and re-raised via `exit`.
 - **github-release archetype download URL 404** : `lib/module_helper.sh`
   built `releases/latests/download/` (one-char typo) so every real
   (non-mocked) install of an archetype-B module would 404. Fixed to
@@ -269,6 +274,60 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`fnm.module.sh` v2 module** (issue #56, PRD §6.3.1 Batch B, Q3/Q4):
+  Fast Node Manager split out of `module/setup_neovim.sh` so the
+  dependency is reusable (neovim and gemini both need Node.js). Custom
+  archetype matching the legacy logic: the upstream install script
+  (`https://fnm.vercel.app/install --skip-shell --install-dir`) performs
+  a pure user-home install into `~/.local/share/fnm`
+  (`SUPPORTS_USER_HOME=true`, `INSTALL_TARGET_DEFAULT=user-home`, no
+  sudo), with `Schniz/fnm` release queries powering `is_outdated` and
+  the Sidecar version. Shell integration is idempotent and
+  marker-guarded: a fish `conf.d/fnm.fish` drop (user-owned files are
+  never clobbered) and a fenced block appended to an existing
+  `~/.bashrc` (never created); purge strips exactly what install added.
+  Install also provisions the legacy default Node.js 22 (fail-soft) so
+  dependents get a working `node`/`npm` out of the box. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent
+  (AC-5); `--dry-run` performs no filesystem writes (AC-12); the
+  Sidecar is written on install/upgrade and removed on remove/purge per
+  ADR-0001 while `state.json` is never touched by the module. Tagged
+  `cli-essentials`, `CATEGORY=optional`, `DEPENDS_ON=()`. Ships
+  `test/unit/module/fnm_spec.bats` (94 tests, Q29 scope) with mocked
+  fetch + GitHub queries (Q46: zero network in gates).
+- **New `ripgrep` module on the apt archetype** (issue #55, PRD §6.3.1
+  Batch B, Q41): `module/ripgrep.module.sh` installs the `ripgrep`
+  package (binary: `rg`, fast grep alternative) — referenced by the
+  neovim dep chain (telescope live-grep) but previously missing from
+  the catalog. All 10 lifecycle phases run standalone (AC-25); install
+  is idempotent (AC-5); `--dry-run` performs no filesystem writes
+  (AC-12); the version Sidecar (dpkg-reported package version) is
+  written on install/upgrade and removed on remove/purge per ADR-0001
+  while `state.json` is never touched by the module. Tagged
+  `cli-essentials`, `CATEGORY=optional`, `DEPENDS_ON=()`. Ships
+  `test/unit/module/ripgrep_spec.bats` (63 tests, Q29 scope).
+- **Install output UX** (issue #66, PRD §7.7, AC-35): the install pipeline
+  now renders human-readable output derived from JSONL events (events are
+  the single source of truth).
+  - Per-module `[i/N] <name>: installing...` progress headers and
+    `✔ <name> installed (Ns)` success lines (`lib/runner.sh`).
+  - `exec_cmd` capture mode (`lib/general.sh`): inside the engine pipeline
+    child stdout/stderr is no longer streamed — it is captured into one
+    `cmd_exec` JSONL event per command (attributes: `cmd` / `exit` /
+    `duration_ms` / `output`). New `--verbose` flag streams child output
+    live (still captured); new `--quiet` flag suppresses progress lines
+    and raises `LOG_LEVEL` to WARN. Legacy standalone `module/setup_*.sh`
+    callers keep the streaming behavior (capture is opt-in via
+    `INIT_UBUNTU_CMD_CAPTURE`, set only by the runner sub-shell).
+  - On module failure: automatic dump of the last ~20 lines of that
+    module's captured child output + `trace_id` + the JSONL log path.
+  - End-of-session **Action required** aggregation (PRD §7.7.2):
+    `module_emit_post_install` / `module_emit_reboot_required` now emit
+    structured `action_required` events (`kind=post_install|reboot`,
+    i18n-resolved message) after a successful install, and the engine
+    derives the human-readable block from this session's events at
+    session end — stdout and `jq 'select(.body=="action_required")'`
+    over the session log never diverge (AC-35).
 - **fdfind module migrated to the v2 contract** (issue #54, PRD §6.3.1
   Batch B): `module/submodule/fdfind.sh` (v1 GitHub tarball install) is
   replaced by `module/fdfind.module.sh` on the apt archetype — Ubuntu

@@ -30,6 +30,14 @@
 #   tui_cli_install_plan <m...>   Fork `setup_ubuntu install --dry-run` → order
 #   tui_plan_deps <plan> <m...>   Plan minus selection = "will pull N deps"
 #   tui_install_args <ovr> <m...> Argv for the Proceed fork (one per line)
+#   tui_cli_installed_json        Fork `setup_ubuntu list --installed --json`
+#   tui_installed_entries <state_json> <list_json> <flat|grouped>
+#                                 §8.3 rows "name<TAB>display" (version +
+#                                 installed_at; grouped = TAGS[0] buckets)
+#   tui_manage_args <action> <m>  Argv for the Update/Remove/Purge fork
+#   tui_cli_manage_plan <a> <m>   Fork `<action> --dry-run --no-deps` → order
+#   tui_manage_confirm_text <a> <m> <plan>
+#                                 §8.4 confirm body (exact cmd + plan + state)
 #   tui_render_menu / tui_render_msgbox / tui_render_yesno / tui_render_checklist
 #                                 Thin backend wrappers (argv-level unit tests
 #                                 via a mock widget binary; live-widget smoke
@@ -137,8 +145,9 @@ _tui_cli_json() {
     printf '%s\n' "${_payload}"
 }
 
-tui_cli_list_json()   { _tui_cli_json list --json; }
-tui_cli_detect_json() { _tui_cli_json detect --json; }
+tui_cli_list_json()      { _tui_cli_json list --json; }
+tui_cli_detect_json()    { _tui_cli_json detect --json; }
+tui_cli_installed_json() { _tui_cli_json list --installed --json; }
 
 # Resolver-ordered install plan for the Review screen, one module per line:
 #   tui_cli_install_plan <module...>
@@ -277,6 +286,113 @@ tui_install_args() {
     printf -- '-y\n'
 }
 
+# ── Manage Installed data + action argv (#72, §8.3 / §8.4) ───────────────────
+
+# §8.3 rows as "name<TAB>display" lines:
+#   tui_installed_entries <state_json> <list_json> <flat|grouped>
+# <state_json> is the forked `list --installed --json` payload (raw
+# state.json, ADR-0018) — the single §8.3 data source for version /
+# installed_at. <list_json> only supplies TAGS[0] for the grouped view;
+# modules missing from it (file deleted, state survives) fall back to the
+# "other" bucket instead of erroring. flat sorts by name, grouped by
+# tag-then-name with a "[tag]" prefix (same convention as §8.2 checklists).
+tui_installed_entries() {
+    local _state="$1" _list="$2" _mode="${3:-flat}"
+    jq -r --argjson list "${_list}" --arg mode "${_mode}" '
+        ([$list.items[]? | {key: .name, value: (.tags[0] // "other")}]
+         | from_entries) as $tagof
+        | (.installed // {}) | to_entries
+        | map({name: .key,
+               version: (((.value.synced.version_provided // "?")
+                          + "              ")[0:14]),
+               at: ((.value.synced.installed_at // "?")
+                    | sub("T"; " ") | .[0:16]),
+               tag: ($tagof[.key] // "other")})
+        | (if $mode == "grouped" then sort_by(.tag, .name)
+           else sort_by(.name) end)
+        | .[]
+        | if $mode == "grouped"
+          then "\(.name)\t[\(.tag)] \(.version)\(.at)"
+          else "\(.name)\t\(.version)\(.at)"
+          end
+    ' <<<"${_state}"
+}
+
+# Argv for an Update / Remove / Purge fork, one arg per line (G4 — same
+# never-a-shell-string contract as tui_install_args):
+#   tui_manage_args <update|remove|purge> <module>
+# - update maps to the CLI's `upgrade` subcommand (`update` was removed,
+#   PRD §7.2 Q40); upgrade takes only the named modules, no dep expansion.
+# - remove/purge pass --no-deps: the resolver expands DEPENDS_ON closures
+#   (correct for install), but tearing down a module must NOT cascade into
+#   its still-shared dependencies. §8.4 scopes the action to the named
+#   module only.
+# - `-y` because the TUI owns consent: the action menu (update) or the
+#   §8.4 Proceed button (remove/purge) IS the confirmation — the CLI's own
+#   prompt would double-ask.
+tui_manage_args() {
+    local _action="$1" _module="$2"
+    case "${_action}" in
+        update)       printf 'upgrade\n%s\n-y\n' "${_module}" ;;
+        remove|purge) printf '%s\n--no-deps\n%s\n-y\n' "${_action}" "${_module}" ;;
+        *)
+            printf 'ERROR: tui_manage_args: unknown action %s\n' "${_action}" >&2
+            return 2
+            ;;
+    esac
+}
+
+# Dry-run plan for the §8.4 confirm dialog, one module per line:
+#   tui_cli_manage_plan <remove|purge> <module>
+# Forks `setup_ubuntu <action> --dry-run --no-deps <module>` — the CLI
+# stays the single authority on what the action will touch (G4); the TUI
+# only re-renders its DRY-RUN bullets.
+tui_cli_manage_plan() {
+    local _action="$1" _module="$2" _out
+    if ! _out="$("${TUI_CLI:?TUI_CLI not set}" "${_action}" --dry-run --no-deps "${_module}" 2>/dev/null)"; then
+        printf "ERROR: 'setup_ubuntu %s --dry-run --no-deps %s' failed\n" \
+            "${_action}" "${_module}" >&2
+        return 1
+    fi
+    if [[ "${_out}" != *"DRY-RUN: would ${_action}"* ]]; then
+        printf "ERROR: 'setup_ubuntu %s --dry-run --no-deps %s' returned no plan\n" \
+            "${_action}" "${_module}" >&2
+        return 1
+    fi
+    awk '/^  - / { sub(/^  - /, ""); print }' <<<"${_out}"
+}
+
+# §8.4 confirm-dialog body: enumerate the CONCRETE actions —
+#   tui_manage_confirm_text <remove|purge> <module> <plan>
+#   - the exact CLI command the Proceed button forks (G4: what you read
+#     is literally what runs),
+#   - the dry-run-derived module plan (<plan> = tui_cli_manage_plan lines),
+#   - the state.json change.
+# Per-package/path enumeration (apt-get purge <pkgs>, rm -rf CONFIG_PATHS)
+# needs the CLI to expose APT_PKGS/CONFIG_PATHS first (`show --json`,
+# future) — until then the module-level plan + config-fate note is the
+# §8.4 payload the CLI surface can back.
+tui_manage_confirm_text() {
+    local _action="$1" _module="$2" _plan="$3"
+    local -a _argv=()
+    mapfile -t _argv < <(tui_manage_args "${_action}" "${_module}")
+
+    local _text="About to ${_action^^} '${_module}':"$'\n'
+    _text+="  - run: setup_ubuntu ${_argv[*]}"$'\n'
+    local _n
+    while IFS= read -r _n; do
+        [[ -n "${_n}" ]] && _text+="  - ${_action} module: ${_n}"$'\n'
+    done <<<"${_plan}"
+    _text+="  - remove '${_module}' from state.json"$'\n\n'
+    case "${_action}" in
+        purge)
+            _text+="Purge also deletes the module's config files (CONFIG_PATHS)." ;;
+        remove)
+            _text+="The module's config files are retained (Purge deletes them too)." ;;
+    esac
+    printf '%s\n' "${_text}"
+}
+
 # One §8.1 category row as "tag<TAB>label<TAB>description".
 _tui_category_entry() {
     local _json="$1" _cat="$2"
@@ -381,8 +497,23 @@ tui_render_msgbox() {
         --msgbox "$2" "${TUI_HEIGHT}" "${TUI_WIDTH}"
 }
 
+# Yes/No relabel flags (the §8.4 < Proceed > / < Cancel > captions);
+# dialog and whiptail spell them differently, same split as
+# _tui_cancel_button_args. Callers opt in via TUI_YES_LABEL/TUI_NO_LABEL.
+_tui_yesno_button_args() {
+    case "${TUI_BACKEND##*/}" in
+        whiptail) printf -- '--yes-button\n%s\n--no-button\n%s\n' "$1" "$2" ;;
+        *)        printf -- '--yes-label\n%s\n--no-label\n%s\n'   "$1" "$2" ;;
+    esac
+}
+
 # tui_render_yesno <title> <text> → rc 0 yes / rc 1 no
 tui_render_yesno() {
-    "${TUI_BACKEND:?TUI_BACKEND not set}" --title "$1" \
+    local -a _btn=()
+    if [[ -n "${TUI_YES_LABEL:-}" || -n "${TUI_NO_LABEL:-}" ]]; then
+        mapfile -t _btn < <(_tui_yesno_button_args \
+            "${TUI_YES_LABEL:-Yes}" "${TUI_NO_LABEL:-No}")
+    fi
+    "${TUI_BACKEND:?TUI_BACKEND not set}" --title "$1" "${_btn[@]}" \
         --yesno "$2" "${TUI_HEIGHT}" "${TUI_WIDTH}"
 }

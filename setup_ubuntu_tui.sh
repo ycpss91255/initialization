@@ -10,11 +10,11 @@
 #     and never writes state — enforced by the G4 grep gate in
 #     test/unit/tui_backend_spec.bats.
 #
-# Issue #69 scope: skeleton + main-menu rendering. Mount points for the
-# follow-ups are marked in _tui_dispatch below:
-#   #70  checkbox accumulator + Run / Review & Install
+# Issue #69 scope: skeleton + main-menu rendering. Follow-ups landed /
+# pending (mount points in _tui_dispatch below):
+#   #70  checkbox accumulator + Run / Review & Install (landed)
 #   #71  Quick Setup multi-step flow
-#   #72  Manage Installed (update / remove / purge)
+#   #72  Manage Installed (update / remove / purge) + Manage Secrets (landed)
 #
 # `set -uo pipefail` (not -e): dialog/whiptail return rc 1/255 for the
 # Cancel button and ESC, which is normal control flow here, not an error
@@ -29,6 +29,9 @@ REPO_ROOT="${SCRIPT_PATH}"
 # CLI; real sessions never set it and fork the sibling setup_ubuntu.sh.
 TUI_CLI="${TUI_CLI:-${REPO_ROOT}/setup_ubuntu.sh}"
 export TUI_CLI
+# Same override seam for the Manage Secrets fork target (§8.1 item 6).
+TUI_SECRETS="${TUI_SECRETS:-${REPO_ROOT}/setup_secrets.sh}"
+export TUI_SECRETS
 
 : "${INIT_UBUNTU_VERSION:=0.1.0-draft}"
 
@@ -41,6 +44,9 @@ source "${REPO_ROOT}/lib/tui_backend.sh"
 # `--profile=<value>` on action forks (#70 / #71 wire this through);
 # it is NOT written to config.ini by the TUI (G4 / §8.2.1 cancel table).
 TUI_PLATFORM_OVERRIDE=""
+# Manage Installed view mode (§8.3 "group by TAGS[0]" toggle). Session-only,
+# like every other piece of TUI state.
+TUI_MANAGE_GROUPED="false"
 
 # ── Usage ────────────────────────────────────────────────────────────────────
 
@@ -104,7 +110,7 @@ _tui_screen_system_info() {
 }
 
 # Placeholder screen for follow-up issues — the dispatch seam stays stable
-# while #71 / #72 replace these stubs with real screens.
+# while #71 replaces the remaining stub with a real screen.
 _tui_screen_todo() {
     tui_render_msgbox "$1" "$1 is not wired up yet (tracked in issue $2)."
 }
@@ -198,18 +204,137 @@ _tui_screen_run() {
     done
 }
 
-# Proceed (§8.2.1): clear the screen, fork the CLI install pipeline in the
-# foreground (exec_cmd stream + Action-required aggregation render on the
-# plain terminal — no --gauge/--prgbox), then exit the TUI with its rc.
-_tui_exec_install() {
-    local -a _argv=()
-    mapfile -t _argv < <(tui_install_args "${TUI_PLATFORM_OVERRIDE}" "$@")
+# Shared Proceed leg (§8.2.1 execution model): clear the screen, fork ONE
+# CLI pipeline in the foreground (exec_cmd stream + Action-required
+# aggregation render on the plain terminal — no --gauge/--prgbox), then
+# exit the TUI with its rc. Used by Run/Proceed (#70) and the Manage
+# Installed actions (#72) — G4 single execution path.
+_tui_exec_cli() {
     clear 2>/dev/null || printf '\033c'
-    "${TUI_CLI}" "${_argv[@]}"
+    "${TUI_CLI}" "$@"
     exit $?
 }
 
-# ── Menu action dispatch (mount points for #71 / #72) ───────────────────────
+_tui_exec_install() {
+    local -a _argv=()
+    mapfile -t _argv < <(tui_install_args "${TUI_PLATFORM_OVERRIDE}" "$@")
+    _tui_exec_cli "${_argv[@]}"
+}
+
+# ── Manage Installed (#72, §8.3 / §8.4) ──────────────────────────────────────
+
+# §8.4 destructive confirm: enumerate the concrete actions (exact forked
+# command, dry-run-derived module plan, state.json change), then
+# Proceed / Cancel. Cancel forks nothing and returns to the module list.
+_tui_screen_confirm_destructive() {
+    local _action="$1" _module="$2"
+    local _plan
+    if ! _plan="$(tui_cli_manage_plan "${_action}" "${_module}")"; then
+        tui_render_msgbox "Confirm ${_action^}" \
+            "ERROR: 'setup_ubuntu ${_action} --dry-run' failed — cannot enumerate the plan."
+        return 0
+    fi
+    local _text
+    _text="$(tui_manage_confirm_text "${_action}" "${_module}" "${_plan}")"
+    if ! TUI_YES_LABEL="Proceed" TUI_NO_LABEL="Cancel" tui_render_yesno \
+        "Confirm ${_action^}" "${_text}"; then
+        return 0  # Cancel / ESC: nothing was forked
+    fi
+    local -a _argv=()
+    mapfile -t _argv < <(tui_manage_args "${_action}" "${_module}")
+    _tui_exec_cli "${_argv[@]}"  # never returns
+}
+
+# Per-module action menu: Update forks straight away (non-destructive —
+# §8.4 only gates Remove / Purge); Remove / Purge route through the
+# confirm dialog. < Back > returns to the module list.
+_tui_screen_manage_action() {
+    local _module="$1" _action
+    _action="$(TUI_CANCEL_LABEL="Back" tui_render_menu \
+        "Manage '${_module}'" \
+        "Pick an action (forks the setup_ubuntu CLI — G4):" \
+        "update" "Upgrade to the latest version" \
+        "remove" "Remove (config retained)" \
+        "purge"  "Remove + delete config (destructive)")" || return 0
+    case "${_action}" in
+        update)
+            local -a _argv=()
+            mapfile -t _argv < <(tui_manage_args update "${_module}")
+            _tui_exec_cli "${_argv[@]}"  # never returns
+            ;;
+        remove | purge)
+            _tui_screen_confirm_destructive "${_action}" "${_module}"
+            ;;
+    esac
+}
+
+# §8.3 Manage Installed: list installed modules (version + installed_at,
+# data source: forked `setup_ubuntu list --installed --json`), with a
+# flat ↔ group-by-TAGS[0] view toggle. State is re-forked on every loop
+# pass so the list never goes stale behind an action.
+_tui_screen_manage() {
+    local _list_json="$1"
+    while :; do
+        local _state_json
+        if ! _state_json="$(tui_cli_installed_json)"; then
+            tui_render_msgbox "Manage Installed" \
+                "ERROR: 'setup_ubuntu list --installed --json' failed."
+            return 0
+        fi
+
+        local _mode="flat"
+        [[ "${TUI_MANAGE_GROUPED}" == "true" ]] && _mode="grouped"
+        local -a _rows=()
+        local _name _disp
+        while IFS=$'\t' read -r _name _disp; do
+            _rows+=("${_name}" "${_disp}")
+        done < <(tui_installed_entries "${_state_json}" "${_list_json}" "${_mode}")
+
+        if [[ "${#_rows[@]}" -eq 0 ]]; then
+            tui_render_msgbox "Manage Installed" \
+                "(no modules recorded as installed)"
+            return 0
+        fi
+
+        local _toggle="Switch view: group by tag"
+        [[ "${_mode}" == "grouped" ]] && _toggle="Switch view: flat list"
+        _rows+=("view" "<< ${_toggle} >>")
+
+        local _choice
+        if ! _choice="$(TUI_CANCEL_LABEL="Back" tui_render_menu \
+            "Manage Installed" \
+            "Module / Version / Installed at — pick one to manage:" \
+            "${_rows[@]}")"; then
+            return 0  # Back / ESC → main menu
+        fi
+        if [[ "${_choice}" == "view" ]]; then
+            if [[ "${TUI_MANAGE_GROUPED}" == "true" ]]; then
+                TUI_MANAGE_GROUPED="false"
+            else
+                TUI_MANAGE_GROUPED="true"
+            fi
+            continue
+        fi
+        _tui_screen_manage_action "${_choice}"
+    done
+}
+
+# ── Manage Secrets (#72, §8.1 item 6) ────────────────────────────────────────
+
+# Fork setup_secrets (a standalone interactive sub-tool — it owns the
+# terminal and all sensitive prompts, AC-20) and come back to the main
+# menu afterwards. Unlike install/manage actions the TUI does NOT exit:
+# secrets management is a side trip, not a pipeline handoff.
+_tui_screen_secrets() {
+    clear 2>/dev/null || printf '\033c'
+    "${TUI_SECRETS}"
+    local _rc=$?
+    printf '\n[setup_secrets exited %d] Press Enter to return to the menu...' "${_rc}"
+    read -r REPLY || true
+    return 0
+}
+
+# ── Menu action dispatch (mount point left: #71) ─────────────────────────────
 
 _tui_dispatch() {
     case "$1" in
@@ -226,12 +351,10 @@ _tui_dispatch() {
             _tui_screen_run
             ;;
         manage)
-            # #72: Manage Installed (§8.3 / §8.4 destructive confirms).
-            _tui_screen_todo "Manage Installed" "#72"
+            _tui_screen_manage "$2"
             ;;
         secrets)
-            # #72: forks setup_secrets.sh (§8.1 item 6).
-            _tui_screen_todo "Manage Secrets" "#72"
+            _tui_screen_secrets
             ;;
         sysinfo)
             _tui_screen_system_info

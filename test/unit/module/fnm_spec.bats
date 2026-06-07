@@ -508,3 +508,270 @@ _mock_remote() {
     ! grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
     ! grep -Fq "FNM_PATH" "${FNM_BASH_RC}"
 }
+
+# ── is_outdated (mocked remote, Q46) ────────────────────────────────────────
+
+@test "is_outdated returns nonzero when not installed" {
+    _load_module
+    _sandbox_paths
+    eval 'is_installed() { return 1; }'
+    run is_outdated
+    assert_failure
+}
+
+@test "is_outdated returns nonzero when local matches latest" {
+    _load_module
+    _sandbox_paths
+    _mock_remote "1.38.0"
+    install
+    run is_outdated
+    assert_failure
+}
+
+@test "is_outdated returns 0 when a newer release exists" {
+    _load_module
+    _sandbox_paths
+    _mock_remote "1.38.0"
+    install
+    eval 'get_github_pkg_latest_version() { local -n _out="${1}"; _out="1.39.0"; }'
+    run is_outdated
+    assert_success
+}
+
+@test "is_outdated returns nonzero when the remote query fails" {
+    _load_module
+    _sandbox_paths
+    _mock_remote "1.38.0"
+    install
+    eval 'get_github_pkg_latest_version() { return 1; }'
+    run is_outdated
+    assert_failure
+}
+
+# ── doctor (Sidecar invariant: is_installed ⟷ Sidecar exists) ───────────────
+
+@test "doctor passes on a clean system (not installed, no Sidecar)" {
+    _load_module
+    _sandbox_paths
+    run doctor
+    assert_success
+}
+
+@test "doctor passes after a successful install" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    run doctor
+    assert_success
+}
+
+@test "doctor flags drift: installed but Sidecar missing" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    rm -f "$(_sidecar_file)"
+    run doctor
+    assert_failure
+}
+
+@test "doctor flags drift: Sidecar exists but not installed" {
+    _load_module
+    _sandbox_paths
+    mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
+    printf '1.38.0\n' > "$(_sidecar_file)"
+    run doctor
+    assert_failure
+}
+
+@test "doctor flags a present but non-runnable fnm binary" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    printf '#!/usr/bin/env bash\nexit 1\n' > "${FNM_INSTALL_DIR}/fnm"
+    chmod +x "${FNM_INSTALL_DIR}/fnm"
+    run doctor
+    assert_failure
+}
+
+# ── detect / is_recommended / verify ────────────────────────────────────────
+
+@test "detect returns 0 on x86_64" {
+    _load_module
+    eval 'uname() { printf "x86_64\n"; }'
+    run detect
+    assert_success
+}
+
+@test "detect returns 0 on aarch64 (rpi4/5, jetson)" {
+    _load_module
+    eval 'uname() { printf "aarch64\n"; }'
+    run detect
+    assert_success
+}
+
+@test "detect returns nonzero on an unsupported arch" {
+    _load_module
+    eval 'uname() { printf "riscv64\n"; }'
+    run detect
+    assert_failure
+}
+
+@test "is_recommended returns 0 when not installed" {
+    _load_module
+    eval 'is_installed() { return 1; }'
+    run is_recommended
+    assert_success
+}
+
+@test "is_recommended returns nonzero when already installed" {
+    _load_module
+    eval 'is_installed() { return 0; }'
+    run is_recommended
+    assert_failure
+}
+
+@test "verify fails when not installed" {
+    _load_module
+    _sandbox_paths
+    run verify
+    assert_failure
+}
+
+@test "verify passes after install (runnable mocked binary)" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    install
+    run verify
+    assert_success
+}
+
+# ── Engine discovery (registry scan) ────────────────────────────────────────
+
+@test "registry discovers fnm under --tag=cli-essentials" {
+    # shellcheck source=../../../lib/logger.sh
+    source "${LIB_DIR}/logger.sh"
+    # shellcheck source=../../../lib/registry.sh
+    source "${LIB_DIR}/registry.sh"
+    export INIT_UBUNTU_USER_MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/user-module"
+    registry_load_all "${MODULE_DIR}"
+    run registry_list_names --tag=cli-essentials
+    assert_success
+    assert_output --partial "fnm"
+}
+
+# ── Standalone CLI (AC-25: all 10 phases, never not-implemented exit 2) ─────
+
+_standalone() {
+    local _home="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_home}"
+    HOME="${_home}" XDG_STATE_HOME="" INIT_UBUNTU_STATE_DIR="" \
+        run bash "${MODULE_DIR}/fnm.module.sh" "$@"
+}
+
+@test "standalone --help prints usage" {
+    _standalone --help
+    assert_success
+    assert_output --partial "Usage:"
+}
+
+@test "standalone --version prints name + version" {
+    _standalone --version
+    assert_success
+    assert_output --partial "fnm"
+}
+
+@test "standalone info prints metadata" {
+    _standalone info
+    assert_success
+    assert_output --partial "name:        fnm"
+    assert_output --partial "cli-essentials"
+}
+
+@test "standalone status reports install state" {
+    _standalone status
+    assert_success
+    assert_output --partial "installed:"
+}
+
+@test "standalone with no args exits 2 and shows usage" {
+    _standalone
+    [[ "${status}" -eq 2 ]]
+}
+
+@test "standalone with unknown phase exits 2" {
+    _standalone frobnicate
+    [[ "${status}" -eq 2 ]]
+}
+
+@test "AC-25 standalone install --dry-run runs (exit 0)" {
+    _standalone install --dry-run
+    assert_success
+    refute_output --partial "not implemented"
+}
+
+@test "AC-25 standalone upgrade --dry-run runs (exit 0)" {
+    _standalone upgrade --dry-run
+    assert_success
+    refute_output --partial "not implemented"
+}
+
+@test "AC-25 standalone remove --dry-run runs (exit 0)" {
+    _standalone remove --dry-run
+    assert_success
+    refute_output --partial "not implemented"
+}
+
+@test "AC-25 standalone purge --dry-run runs (exit 0)" {
+    _standalone purge --dry-run
+    assert_success
+    refute_output --partial "not implemented"
+}
+
+@test "AC-25 standalone verify --dry-run runs (exit 0)" {
+    _standalone verify --dry-run
+    assert_success
+    refute_output --partial "not implemented"
+}
+
+@test "AC-25 standalone detect runs (exit != 2)" {
+    _standalone detect
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "AC-25 standalone is-installed runs (exit != 2)" {
+    _standalone is-installed
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "AC-25 standalone is-recommended runs (exit != 2)" {
+    _standalone is-recommended
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "AC-25 standalone is-outdated runs (exit != 2)" {
+    _standalone is-outdated
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "AC-25 standalone doctor runs (exit != 2)" {
+    _standalone doctor
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "standalone --dry-run install leaves a fresh HOME empty" {
+    local _home="${INIT_UBUNTU_TEST_SCRATCH}/home-clean"
+    mkdir -p "${_home}"
+    HOME="${_home}" XDG_STATE_HOME="" INIT_UBUNTU_STATE_DIR="" \
+        run bash "${MODULE_DIR}/fnm.module.sh" install --dry-run
+    assert_success
+    [[ -z "$(find "${_home}" -type f 2>/dev/null)" ]]
+}

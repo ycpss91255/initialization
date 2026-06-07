@@ -22,6 +22,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`lnav.module.sh` v2 module** (issue #62, PRD §6.3.3 Batch C):
+  migrates the `module/config/lnav_pkg/` based install (config bundle
+  loaded ad-hoc via `lnav -I <path>`) to the v2 contract on the custom
+  archetype — the apt `lnav` package plus the legacy lnav_pkg config
+  bundle (theme, UI settings, custom log formats) deployed to
+  `~/.config/lnav` so lnav loads it without the `-I` flag. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  (dpkg-reported package version) is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. `remove` keeps the deployed config bundle,
+  `purge` wipes it. Tagged `logs`, `CATEGORY=optional`, `DEPENDS_ON=()`.
 - **Color library + global output flags** (issue #45, PRD §5.1 / §7.5,
   M8, AC-16): new `lib/color.sh` decides ANSI color once per run —
   `auto` (default) turns color off for non-tty stdout, `NO_COLOR`,

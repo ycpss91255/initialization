@@ -190,3 +190,112 @@ _load_module() {
     _load_module
     declare -F doctor
 }
+
+# ── Sandbox + mocks ──────────────────────────────────────────────────────────
+
+# Point all mutable paths into the per-test scratch dir so non-dry-run
+# lifecycle runs never touch the real filesystem.
+_sandbox_paths() {
+    FNM_INSTALL_DIR="${INIT_UBUNTU_TEST_SCRATCH}/home/.local/share/fnm"
+    FNM_FISH_CONF="${INIT_UBUNTU_TEST_SCRATCH}/home/.config/fish/conf.d/fnm.fish"
+    FNM_BASH_RC="${INIT_UBUNTU_TEST_SCRATCH}/home/.bashrc"
+    mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/home"
+}
+
+_sidecar_file() {
+    printf '%s/versions/fnm' "${INIT_UBUNTU_STATE_DIR}"
+}
+
+# Mock the network-touching pieces (Q46: gates have zero network deps).
+# The fake binary answers `fnm --version` so the Sidecar records ${1}.
+_mock_remote() {
+    local _ver="${1:-1.38.0}"
+    eval "get_github_pkg_latest_version() { local -n _out=\"\${1}\"; _out=\"${_ver}\"; }"
+    eval "_fnm_fetch_and_install() {
+        mkdir -p \"\${FNM_INSTALL_DIR}\"
+        printf '#!/usr/bin/env bash\nprintf \"fnm %s\\\\n\"\n' \"${_ver}\" \
+            > \"\${FNM_INSTALL_DIR}/fnm\"
+        chmod +x \"\${FNM_INSTALL_DIR}/fnm\"
+    }"
+    _fnm_install_default_node() { return 0; }
+}
+
+# ── Dry-run (AC-12 pattern: log only, no side effects) ──────────────────────
+
+@test "install --dry-run exits 0 and logs DRY-RUN" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run install
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "upgrade --dry-run exits 0 and logs DRY-RUN" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run upgrade
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "remove --dry-run exits 0 and logs DRY-RUN" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run remove
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "purge --dry-run exits 0 and logs DRY-RUN" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run purge
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "verify --dry-run exits 0 and logs DRY-RUN" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run verify
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "install --dry-run writes nothing (no sidecar, no install dir, no hooks)" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    INIT_UBUNTU_DRY_RUN=true install
+    [[ ! -e "$(_sidecar_file)" ]]
+    [[ ! -e "${FNM_INSTALL_DIR}" ]]
+    [[ ! -e "${FNM_FISH_CONF}" ]]
+    [[ ! -e "${FNM_BASH_RC}" ]]
+}
+
+@test "remove --dry-run does not delete an existing sidecar" {
+    _load_module
+    _sandbox_paths
+    mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
+    printf '1.38.0\n' > "$(_sidecar_file)"
+    INIT_UBUNTU_DRY_RUN=true remove
+    [[ -f "$(_sidecar_file)" ]]
+}
+
+@test "purge --dry-run leaves shell hooks untouched" {
+    _load_module
+    _sandbox_paths
+    mkdir -p "${FNM_FISH_CONF%/*}"
+    printf '%s\n' "${FNM_SHELL_MARKER}" > "${FNM_FISH_CONF}"
+    printf '%s\nstuff\n%s\n' "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_BLOCK_END}" \
+        > "${FNM_BASH_RC}"
+    INIT_UBUNTU_DRY_RUN=true purge
+    [[ -f "${FNM_FISH_CONF}" ]]
+    grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
+}
+
+# ── No-side-fx: read-only phases write nothing ──────────────────────────────
+
+@test "detect / is_installed / doctor leave the state dir untouched" {
+    _load_module
+    _sandbox_paths
+    detect || true
+    is_installed || true
+    doctor || true
+    [[ -z "$(find "${INIT_UBUNTU_STATE_DIR}" -type f 2>/dev/null)" ]]
+}

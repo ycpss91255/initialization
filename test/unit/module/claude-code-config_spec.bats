@@ -160,3 +160,249 @@ _fake_claude_on_path() {
     # never injects a '#' comment line into a JSON file.
     grep -qF "${CONFIG_MARKER}" "${CONFIG_TEMPLATE_SRC}"
 }
+
+# ── Lifecycle dry-run (AC-12 pattern) ────────────────────────────────────────
+
+@test "install in dry-run mode is a no-op" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run install
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "upgrade in dry-run mode is a no-op" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run upgrade
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "remove in dry-run mode is a no-op" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run remove
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "purge in dry-run mode is a no-op" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run purge
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "verify in dry-run mode is a no-op" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run verify
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+# ── No side effects under dry-run ────────────────────────────────────────────
+
+@test "dry-run install writes nothing to HOME or the state dir" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run install
+    assert_success
+    [[ ! -e "${HOME}/.claude" ]]
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/state.json" ]]
+}
+
+@test "dry-run remove leaves dropped files and sidecar in place" {
+    _load_module
+    install
+    INIT_UBUNTU_DRY_RUN=true run remove
+    assert_success
+    [[ -f "${HOME}/.claude/settings.json" ]]
+    [[ -f "${HOME}/.claude/run-statusline.sh" ]]
+    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
+}
+
+@test "standalone dry-run install creates no files in a scratch HOME" {
+    run _standalone_module install --dry-run
+    assert_success
+    local _leftover
+    _leftover="$(find "${TEST_HOME}" -mindepth 1 2>/dev/null)"
+    [[ -z "${_leftover}" ]]
+}
+
+# ── install drops the config bundle ──────────────────────────────────────────
+
+@test "install drops settings.json with the JSON marker" {
+    _load_module
+    run install
+    assert_success
+    [[ -f "${HOME}/.claude/settings.json" ]]
+    grep -qF "${CONFIG_MARKER}" "${HOME}/.claude/settings.json"
+}
+
+@test "install drops run-statusline.sh as an executable" {
+    _load_module
+    install
+    [[ -x "${HOME}/.claude/run-statusline.sh" ]]
+}
+
+@test "install drops settings.statusline.json (mode 644)" {
+    _load_module
+    install
+    [[ -f "${HOME}/.claude/settings.statusline.json" ]]
+    [[ "$(stat -c '%a' "${HOME}/.claude/settings.statusline.json")" == "644" ]]
+}
+
+@test "install localizes template-author home paths to the current HOME" {
+    _load_module
+    install
+    # No foreign /home/<user> prefix survives; statusLine points at this HOME.
+    run grep -RE "/home/[A-Za-z0-9._-]+/" "${HOME}/.claude/settings.json"
+    assert_output --partial "${HOME}"
+    ! grep -q "/home/yunchien" "${HOME}/.claude/settings.json"
+    ! grep -q "/home/yunchien" "${HOME}/.claude/settings.statusline.json"
+}
+
+@test "install drops valid JSON settings (marker never injected as a comment)" {
+    _load_module
+    install
+    # First byte must still be '{' — the archetype must not have prepended
+    # a '#' marker line to the JSON file.
+    [[ "$(head -c 1 "${HOME}/.claude/settings.json")" == "{" ]]
+}
+
+@test "install then is_installed returns 0" {
+    _load_module
+    install
+    run is_installed
+    assert_success
+}
+
+# ── Sidecar lifecycle (ADR-0001) ─────────────────────────────────────────────
+
+@test "install writes the sidecar with VERSION_PROVIDED" {
+    _load_module
+    install
+    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config")" == "${VERSION_PROVIDED}" ]]
+}
+
+@test "install never touches state.json (ADR-0001 / AC-23 pattern)" {
+    _load_module
+    printf '{"schema_version":"0.1.0","installed":{}}\n' \
+        > "${INIT_UBUNTU_STATE_DIR}/state.json"
+    local _before; _before="$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")"
+    install
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
+}
+
+@test "failed drop leaves no sidecar behind (ADR-0015)" {
+    _load_module
+    _claude_config_drop_files() { return 1; }
+    run install
+    assert_failure
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
+}
+
+@test "upgrade refreshes the sidecar version" {
+    _load_module
+    mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
+    printf '0.9\n' > "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config"
+    upgrade
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config")" == "${VERSION_PROVIDED}" ]]
+}
+
+@test "remove deletes the sidecar" {
+    _load_module
+    install
+    remove
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
+}
+
+@test "purge deletes the sidecar" {
+    _load_module
+    install
+    purge
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
+}
+
+# ── upgrade ──────────────────────────────────────────────────────────────────
+
+@test "upgrade restores drifted settings back to the template content" {
+    _load_module
+    install
+    printf '{ "drifted": true }\n' > "${HOME}/.claude/settings.json"
+    upgrade
+    grep -qF "${CONFIG_MARKER}" "${HOME}/.claude/settings.json"
+}
+
+@test "upgrade works as initial drop when nothing is installed" {
+    _load_module
+    run upgrade
+    assert_success
+    [[ -f "${HOME}/.claude/settings.json" ]]
+    [[ -x "${HOME}/.claude/run-statusline.sh" ]]
+}
+
+# ── remove / purge ───────────────────────────────────────────────────────────
+
+@test "remove deletes all three dropped files" {
+    _load_module
+    install
+    remove
+    [[ ! -e "${HOME}/.claude/settings.json" ]]
+    [[ ! -e "${HOME}/.claude/run-statusline.sh" ]]
+    [[ ! -e "${HOME}/.claude/settings.statusline.json" ]]
+}
+
+@test "remove does not touch unmanaged files in ~/.claude" {
+    _load_module
+    install
+    mkdir -p "${HOME}/.claude"
+    printf 'user data\n' > "${HOME}/.claude/CLAUDE.md"
+    remove
+    [[ -f "${HOME}/.claude/CLAUDE.md" ]]
+}
+
+@test "purge deletes all three dropped files" {
+    _load_module
+    install
+    purge
+    [[ ! -e "${HOME}/.claude/settings.json" ]]
+    [[ ! -e "${HOME}/.claude/run-statusline.sh" ]]
+    [[ ! -e "${HOME}/.claude/settings.statusline.json" ]]
+}
+
+# ── Idempotency (AC-5 pattern) ───────────────────────────────────────────────
+
+@test "install twice exits 0 both times and converges (AC-5)" {
+    _load_module
+    run install
+    assert_success
+    local _hash1; _hash1="$(cat "${HOME}/.claude/settings.json")"
+    run install
+    assert_success
+    [[ "$(cat "${HOME}/.claude/settings.json")" == "${_hash1}" ]]
+}
+
+@test "install short-circuits the primary drop when already installed" {
+    _load_module
+    install
+    run install
+    assert_success
+    assert_output --partial "already installed"
+}
+
+@test "remove is idempotent — second run still exits 0" {
+    _load_module
+    install
+    run remove
+    assert_success
+    run remove
+    assert_success
+}
+
+@test "purge is idempotent — second run still exits 0" {
+    _load_module
+    run purge
+    assert_success
+    run purge
+    assert_success
+}

@@ -97,6 +97,11 @@ install() {
 }
 
 upgrade() {
+    # backup_file (lib/general.sh) log_fatals when BACKUP_DIR is unset;
+    # default the pre-upgrade backup into the state dir so the chained
+    # config-drop upgrade can snapshot an existing settings.json.
+    local _state_base="${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu}"
+    export BACKUP_DIR="${BACKUP_DIR:-${_state_base}/backup/${NAME}}"
     module_default_config_upgrade || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _claude_config_drop_files || return $?

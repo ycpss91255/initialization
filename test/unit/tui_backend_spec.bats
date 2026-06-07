@@ -14,6 +14,9 @@
 # is touched. Menu parsing eats inline ADR-0019 fixtures, never live state.
 
 load "${BATS_TEST_DIRNAME}/../helper/common"
+# Shared TUI fixtures + scripted-widget e2e harness (also used by the AC-10
+# layer-1 suite in tui_ac10_spec.bats and the layer-2 integration smoke).
+load "${BATS_TEST_DIRNAME}/../helper/tui_harness"
 
 # Source the library at file level, THEN shadow its probes. bats
 # re-evaluates the whole file per test, so every test gets fresh copies.
@@ -47,57 +50,7 @@ teardown() {
 }
 
 # ── ADR-0019 fixtures ────────────────────────────────────────────────────────
-# Minimal `list --json` payload: base/recommended/optional populated,
-# experimental EMPTY (mirrors the current catalog — Q44 case).
-
-FIXTURE_LIST_JSON="$(cat <<'EOF'
-{
-  "schema_version": "1",
-  "scope": "available",
-  "filters": {"category": null, "tag": null},
-  "items": [
-    {"name": "apt-essentials", "category": "base", "tags": ["core", "apt"],
-     "description": "Foundation apt packages", "version_provided": "apt-managed",
-     "installed": true, "outdated": false, "manual": false,
-     "depends_on": [], "supports_user_home": false,
-     "supported_platforms": ["desktop", "server"], "supported_ubuntu": ["24.04"],
-     "risk_level": "low", "reboot_required": false, "homepage": null},
-    {"name": "docker", "category": "recommended", "tags": ["container"],
-     "description": "Docker Engine", "version_provided": "apt-managed",
-     "installed": true, "outdated": false, "manual": true,
-     "depends_on": ["apt-essentials"], "supports_user_home": false,
-     "supported_platforms": ["desktop", "server"], "supported_ubuntu": ["24.04"],
-     "risk_level": "low", "reboot_required": false, "homepage": "https://docs.docker.com/"},
-    {"name": "neovim", "category": "recommended", "tags": ["editor"],
-     "description": "Neovim editor", "version_provided": "v0.10.2",
-     "installed": false, "outdated": null, "manual": null,
-     "depends_on": null, "supports_user_home": true,
-     "supported_platforms": ["desktop", "server", "wsl"], "supported_ubuntu": ["24.04"],
-     "risk_level": "low", "reboot_required": false, "homepage": "https://neovim.io/"},
-    {"name": "eza", "category": "optional", "tags": ["cli-essentials"],
-     "description": "ls alternative", "version_provided": "github-release",
-     "installed": false, "outdated": null, "manual": null,
-     "depends_on": null, "supports_user_home": true,
-     "supported_platforms": ["desktop", "server", "wsl"], "supported_ubuntu": ["24.04"],
-     "risk_level": "low", "reboot_required": false, "homepage": "https://eza.rocks/"},
-    {"name": "zoxide", "category": "optional", "tags": ["cli-essentials"],
-     "description": "cd alternative", "version_provided": "github-release",
-     "installed": false, "outdated": null, "manual": null,
-     "depends_on": null, "supports_user_home": true,
-     "supported_platforms": ["desktop", "server", "wsl"], "supported_ubuntu": ["24.04"],
-     "risk_level": "low", "reboot_required": false, "homepage": null},
-    {"name": "claude-code", "category": "optional", "tags": ["agent"],
-     "description": "Anthropic agent CLI", "version_provided": "npm",
-     "installed": false, "outdated": null, "manual": null,
-     "depends_on": null, "supports_user_home": true,
-     "supported_platforms": ["desktop", "server", "wsl"], "supported_ubuntu": ["24.04"],
-     "risk_level": "low", "reboot_required": false, "homepage": null}
-  ],
-  "count": 6,
-  "generated_at": "2026-06-07T00:00:00+08:00"
-}
-EOF
-)"
+# FIXTURE_LIST_JSON / FIXTURE_DETECT_JSON come from helper/tui_harness.bash.
 
 # Same payload + one experimental module (Q44 future case: category
 # auto-appears once non-empty, no spec change needed).
@@ -109,12 +62,6 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
   "supported_platforms": ["desktop"], "supported_ubuntu": ["24.04"],
   "risk_level": "high", "reboot_required": false, "homepage": null}] | .count = 5' \
   <<<"${FIXTURE_LIST_JSON}")"
-
-# `detect --json` fixture (lib/detect.sh shape + form_factor splice).
-FIXTURE_DETECT_JSON="$(cat <<'EOF'
-{"os":{"id":"ubuntu","version":"24.04","codename":"noble"},"arch":"x86_64","cpu":{"vendor":"GenuineIntel"},"gpu":{"vendor":"nvidia","model":"NVIDIA RTX 4090"},"desktop":"GNOME","session_type":"x11","virt":{"container":false,"vm":false},"wsl":false,"board":null,"form_factor":"desktop"}
-EOF
-)"
 
 # ── Backend selection (§8.5) ─────────────────────────────────────────────────
 
@@ -485,65 +432,17 @@ EOF
 }
 
 # ── Q43 end-to-end: scripted backend + recorded CLI forks (#70, AC-10) ───────
-# Drives the REAL setup_ubuntu_tui.sh process with:
-#   - a scripted `dialog` on PATH — each invocation pops one "rc|output"
-#     line (a canned user interaction) and replays it like the live widget
-#     (output on stderr, rc as button), logging argv;
-#   - a recording mock `setup_ubuntu` (TUI_CLI env override) that serves the
-#     ADR-0019 fixtures and logs every fork.
-# This asserts AC-10 layer 1 end to end: checkbox pages accumulate in TUI
-# memory, < Run > → Review → Proceed forks ONE CLI install command (G4 — the
-# same path the CLI takes, which is what makes AC-11 structural), and
-# < Exit > leaves zero files behind.
-
-_make_e2e_harness() {
-    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/e2e"
-    mkdir -p "${_dir}/bin" "${_dir}/home"
-    E2E_BIN="${_dir}/bin"
-    E2E_HOME="${_dir}/home"               # fs-snapshot target (must stay empty)
-    E2E_RESPONSES="${_dir}/responses"     # popped one per widget invocation
-    E2E_WIDGET_LOG="${_dir}/widget.log"
-    E2E_CLI_LOG="${_dir}/cli.log"
-    export E2E_BIN E2E_HOME E2E_RESPONSES E2E_WIDGET_LOG E2E_CLI_LOG
-
-    printf '%s\n' "${FIXTURE_LIST_JSON}"   >"${_dir}/list.json"
-    printf '%s\n' "${FIXTURE_DETECT_JSON}" >"${_dir}/detect.json"
-
-    cat >"${E2E_BIN}/dialog" <<EOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >>"${E2E_WIDGET_LOG}"
-_line="\$(head -n1 "${E2E_RESPONSES}")"
-sed -i 1d "${E2E_RESPONSES}"
-_rc="\${_line%%|*}"
-_out="\${_line#*|}"
-[[ -n "\${_out}" ]] && printf '%b' "\${_out}" >&2
-exit "\${_rc}"
-EOF
-
-    cat >"${E2E_BIN}/setup_ubuntu" <<EOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >>"${E2E_CLI_LOG}"
-case "\$*" in
-    "list --json")   cat "${_dir}/list.json" ;;
-    "detect --json") cat "${_dir}/detect.json" ;;
-    "install --dry-run "*)
-        printf '[dispatcher] DRY-RUN: would install in this order:\n'
-        printf '  - fzf\n  - neovim\n  - eza\n  - zoxide\n'
-        ;;
-    "install "*) printf 'CLI pipeline output\n' ;;
-esac
-EOF
-    chmod +x "${E2E_BIN}/dialog" "${E2E_BIN}/setup_ubuntu"
-}
-
-_run_tui_e2e() {
-    run env "PATH=${E2E_BIN}:${PATH}" "HOME=${E2E_HOME}" \
-        "TUI_CLI=${E2E_BIN}/setup_ubuntu" \
-        "${REPO_ROOT}/setup_ubuntu_tui.sh"
-}
+# tui_e2e_make_harness / tui_e2e_run (helper/tui_harness.bash) drive the
+# REAL setup_ubuntu_tui.sh process with a scripted widget + recording mock
+# `setup_ubuntu` on a sealed PATH. This asserts AC-10 layer 1 end to end:
+# checkbox pages accumulate in TUI memory, < Run > → Review → Proceed forks
+# ONE CLI install command (G4 — the same path the CLI takes, which is what
+# makes AC-11 structural), and < Exit > leaves zero files behind.
+# The dual-backend (dialog vs whiptail) AC-10 suite lives in
+# test/unit/tui_ac10_spec.bats.
 
 @test "e2e: checked pages accumulate and Run/Proceed forks one install command" {
-    _make_e2e_harness
+    tui_e2e_make_harness
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
 0|eza\nzoxide\n
@@ -552,7 +451,7 @@ _run_tui_e2e() {
 0|run
 0|proceed
 EOF
-    _run_tui_e2e
+    tui_e2e_run
     assert_success
     # The Proceed fork IS the CLI pipeline (G4 / AC-11 structural).
     assert_output --partial "CLI pipeline output"
@@ -563,7 +462,7 @@ EOF
 }
 
 @test "e2e: Back on a checklist page discards only that page (Q43)" {
-    _make_e2e_harness
+    tui_e2e_make_harness
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
 0|eza\n
@@ -572,20 +471,20 @@ EOF
 0|run
 0|proceed
 EOF
-    _run_tui_e2e
+    tui_e2e_run
     assert_success
     run tail -n1 "${E2E_CLI_LOG}"
     assert_output "install eza -y"
 }
 
 @test "e2e: Run with nothing selected reports 'nothing selected', no fork" {
-    _make_e2e_harness
+    tui_e2e_make_harness
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|run
 0|
 1|
 EOF
-    _run_tui_e2e
+    tui_e2e_run
     assert_success
     run cat "${E2E_WIDGET_LOG}"
     assert_output --partial "nothing selected"
@@ -594,7 +493,7 @@ EOF
 }
 
 @test "e2e: Review Back returns to the main menu keeping selections" {
-    _make_e2e_harness
+    tui_e2e_make_harness
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
 0|eza\n
@@ -603,20 +502,20 @@ EOF
 0|run
 0|proceed
 EOF
-    _run_tui_e2e
+    tui_e2e_run
     assert_success
     run tail -n1 "${E2E_CLI_LOG}"
     assert_output "install eza -y"
 }
 
 @test "e2e: Exit drops in-memory selections with zero file writes (fs snapshot)" {
-    _make_e2e_harness
+    tui_e2e_make_harness
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
 0|eza\nzoxide\n
 1|
 EOF
-    _run_tui_e2e
+    tui_e2e_run
     assert_success
     # Selections lived ONLY in TUI process memory: nothing under $HOME...
     run find "${E2E_HOME}" -mindepth 1

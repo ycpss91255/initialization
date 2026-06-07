@@ -22,6 +22,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **CI builds the test-tools image once and reuses it** (issue #26):
+  new `build-image` job builds `test-tools:local` via
+  `docker/build-push-action@v6` with GHA layer cache and uploads it as a
+  1-day tar artifact; `lint` / `test-unit` / `test-integration`
+  `docker load` the artifact instead of cold-building per job. `coverage`
+  runs in the upstream `kcov/kcov` image and skips the test-tools build
+  entirely. `Makefile` gains a `TEST_TOOLS_PREBUILT=1` escape hatch that
+  drops the `build-test-tools` prerequisite (CI-only; local dev behavior
+  unchanged). `ci-passed` aggregator now also requires `build-image`
+  (required-check name unchanged).
 - **Folder naming reverted to all-singular** (issue #32, ADR-0021
   supersedes ADR-0005): `docs/`→`doc/`, `tests/`→`test/`
   (`helpers/`→`helper/`, `unit/modules/`→`unit/module/`),

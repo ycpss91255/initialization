@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # test/unit/runner_spec.bats — lib/runner.sh
 
+bats_require_minimum_version 1.5.0
+
 load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
@@ -143,10 +145,10 @@ EOF
     local _log="${INIT_UBUNTU_TEST_SCRATCH}/run.jsonl"
     INIT_UBUNTU_LOG_FILE="${_log}" runner_install echo-mod >/dev/null 2>&1 || true
 
-    ! grep -q '"ts":' "${_log}"
-    ! grep -q '"level":' "${_log}"
-    ! grep -q '"module":' "${_log}"
-    ! grep -q '"event":' "${_log}"
+    run ! grep -q '"ts":' "${_log}"
+    run ! grep -q '"level":' "${_log}"
+    run ! grep -q '"module":' "${_log}"
+    run ! grep -q '"event":' "${_log}"
 }
 
 @test "runner shares one session-level trace_id across all JSONL events" {

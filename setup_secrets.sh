@@ -261,6 +261,71 @@ _secrets_cmd_token() {
     esac
 }
 
+# ── gpg actions (issue #68) ──────────────────────────────────────────────────
+
+_secrets_require_gpg() {
+    if ! command -v gpg >/dev/null 2>&1; then
+        log_error "gpg is not installed (install it first: sudo apt install gnupg)"
+        exit 3
+    fi
+}
+
+_secrets_gpg_generate() {
+    if (( $# != 0 )); then
+        log_error "gpg generate takes no arguments"
+        exit 2
+    fi
+    _secrets_require_gpg
+    # gpg owns every interactive prompt (key parameters AND the passphrase)
+    # on its own tty — nothing sensitive ever passes through our argv or
+    # shell history (AC-20).
+    gpg --full-generate-key
+    log_event info setup_secrets gpg_generate
+    log_info "GPG key generated"
+}
+
+_secrets_gpg_import() {
+    local _file=""
+    case $# in
+        0) ;;
+        1) _file="$1" ;;
+        *) log_error "usage: setup_secrets gpg import [<file>]"; exit 2 ;;
+    esac
+    _secrets_require_gpg
+
+    if [[ -n "${_file}" ]]; then
+        if [[ ! -f "${_file}" ]]; then
+            log_error "key file not found: ${_file}"
+            exit 1
+        fi
+        gpg --import "${_file}"
+    else
+        if [[ -t 0 ]]; then
+            log_error "gpg import needs a <file> argument or key material on stdin"
+            exit 2
+        fi
+        gpg --import
+    fi
+    log_event info setup_secrets gpg_import
+    log_info "GPG key material imported"
+}
+
+_secrets_cmd_gpg() {
+    if (( $# == 0 )); then
+        log_error "gpg requires an action: generate | import [<file>]"
+        exit 2
+    fi
+    local _action="$1"; shift
+    case "${_action}" in
+        generate) _secrets_gpg_generate "$@" ;;
+        import)   _secrets_gpg_import "$@" ;;
+        *)
+            log_error "unknown gpg action '${_action}' (valid: generate | import)"
+            exit 2
+            ;;
+    esac
+}
+
 # ── list / remove actions (issue #68) ────────────────────────────────────────
 
 _secrets_cmd_list() {
@@ -305,8 +370,7 @@ main() {
             _secrets_cmd_remove "$@"
             ;;
         gpg)
-            log_error "'${_cmd}' is not implemented yet — planned for issue #68"
-            exit 2
+            _secrets_cmd_gpg "$@"
             ;;
         help|-h|--help)
             _secrets_usage

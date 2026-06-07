@@ -384,6 +384,48 @@ _set_agent_sock() {
     assert_failure
 }
 
+# ── gpg generate / import (issue #68) ───────────────────────────────────────
+
+@test "gpg generate delegates to gpg --full-generate-key with a clean argv" {
+    _stub gpg
+    run "${REPO_ROOT}/setup_secrets.sh" gpg generate
+    assert_success
+    grep -q -- '^gpg --full-generate-key' "${SECRETS_STUB_LOG}"
+    # all prompts (incl. passphrase) belong to gpg's own tty — nothing
+    # passphrase-like may ever pass through our argv (AC-20)
+    run ! grep -qE -- '--passphrase|--pinentry' "${SECRETS_STUB_LOG}"
+}
+
+@test "gpg import imports key material from a file" {
+    _stub gpg
+    printf '%s\n' 'FAKE KEY BLOCK' > "${INIT_UBUNTU_TEST_SCRATCH}/key.asc"
+    run "${REPO_ROOT}/setup_secrets.sh" gpg import "${INIT_UBUNTU_TEST_SCRATCH}/key.asc"
+    assert_success
+    grep -q -- "^gpg --import ${INIT_UBUNTU_TEST_SCRATCH}/key.asc" "${SECRETS_STUB_LOG}"
+}
+
+@test "gpg import reads key material from stdin when no file is given" {
+    export SECRETS_FAKE_GPG_IN="${INIT_UBUNTU_TEST_SCRATCH}/gpg-stdin"
+    _stub gpg 'cat > "${SECRETS_FAKE_GPG_IN:?}"'
+    run bash -c "printf '%s' 'STDIN KEY BLOCK' | '${REPO_ROOT}/setup_secrets.sh' gpg import"
+    assert_success
+    grep -q -- '^gpg --import$' "${SECRETS_STUB_LOG}"
+    [[ "$(cat "${SECRETS_FAKE_GPG_IN}")" == "STDIN KEY BLOCK" ]]
+}
+
+@test "gpg import with a missing file exits 1 without calling gpg" {
+    _stub gpg
+    run "${REPO_ROOT}/setup_secrets.sh" gpg import "${INIT_UBUNTU_TEST_SCRATCH}/nope.asc"
+    assert_failure 1
+    run ! grep -q '^gpg' "${SECRETS_STUB_LOG}"
+}
+
+@test "gpg unknown action exits 2" {
+    _stub gpg
+    run "${REPO_ROOT}/setup_secrets.sh" gpg frobnicate
+    assert_failure 2
+}
+
 # ── ssh-key generate: argv hygiene (AC-20) ──────────────────────────────────
 
 @test "ssh-key generate calls ssh-keygen without any passphrase in argv" {

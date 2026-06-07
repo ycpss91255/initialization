@@ -110,6 +110,7 @@ test/
 | `fishtape` | master(jorgebucaran/fishtape) | fish 函式測試 |
 | `kcov` | (用獨立 `kcov/kcov` debian image) | shell script 覆蓋率(產 HTML + cobertura.xml) |
 | `dialog` + `whiptail` | alpine 滾動版 | TUI 後端測試 |
+| `expect` | alpine 滾動版 | AC-10 第二層偽 tty 煙霧測(`test/integration/tui/`,驅動真 dialog/whiptail) |
 | `parallel` | alpine 滾動版 | bats 並行(`--jobs N`) |
 
 所有版本鎖在 `dockerfile/Dockerfile.test-tools`(kcov 除外 — 走 `kcov/kcov` 上游 image,因為 kcov 不在 alpine 任何 repo)。

@@ -302,8 +302,33 @@ function _install_vim() {
 }
 
 function _install_notion() {
-    apt_pkg_manager --install -- "snapd"
-    exec_cmd "sudo snap install notion-desktop"
+    # The notion-desktop snap GPU-crashes on Ubuntu 24.04 (bundled Mesa from
+    # gnome-3-28-1804 lacks iris/swrast). Install the notion-electron .deb
+    # instead (issue #35; long-term home is module/notion.module.sh).
+    local _repo="anechunaev/notion-electron"
+    local _arch=""
+    case "$(uname -m)" in
+        x86_64)  _arch="amd64" ;;
+        aarch64) _arch="arm64" ;;
+        *)
+            log_warn "Skip install 'notion-electron': unsupported architecture '$(uname -m)'."
+            return 0
+            ;;
+    esac
+
+    local _version=""
+    get_github_pkg_latest_version _version "${_repo}"
+
+    local _deb_name="Notion_Electron-${_version}-${_arch}.deb"
+    local _deb_url="https://github.com/${_repo}/releases/latest/download/${_deb_name}"
+    local _tmp_dir=""
+    _tmp_dir="$(mktemp -d)"
+
+    log_info "Install notion-electron ${_version} (${_arch}) from GitHub release..."
+    exec_cmd "curl -fsSL --retry 3 -o \"${_tmp_dir}/${_deb_name}\" \"${_deb_url}\""
+    # apt (not dpkg -i) resolves the .deb's dependencies in one transaction.
+    exec_cmd "sudo apt install -y \"${_tmp_dir}/${_deb_name}\""
+    exec_cmd "rm -rf \"${_tmp_dir}\""
 }
 
 function _install_obs() {

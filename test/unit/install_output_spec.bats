@@ -172,9 +172,13 @@ EOF
     # The cmd_exec event carries exit + duration_ms + the captured output.
     run jq -r 'select(.body=="cmd_exec") | .attributes.exit' "${_log}"
     assert_output "0"
-    run jq -e 'select(.body=="cmd_exec") | .attributes.duration_ms >= 0' \
+    # NOT `jq -e`: jq 1.6 (kcov/kcov debian image) mis-reports exit 4 when
+    # trailing JSONL inputs yield no output through select() even though an
+    # earlier input printed `true` (fixed in jq 1.7, which test-tools:local
+    # ships). Assert the printed value instead — version-independent.
+    run jq -r 'select(.body=="cmd_exec") | .attributes.duration_ms >= 0' \
         "${_log}"
-    assert_success
+    assert_output "true"
     run jq -r 'select(.body=="cmd_exec") | .attributes.output' "${_log}"
     assert_output --partial "CHILD-STDOUT-MARKER"
     assert_output --partial "CHILD-STDERR-MARKER"

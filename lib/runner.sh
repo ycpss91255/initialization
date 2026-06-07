@@ -52,6 +52,37 @@ _runner_snapshot_gpu() {
     detect_get_field gpu.vendor 2>/dev/null || true
 }
 
+# ── Internal: progress rendering helpers (PRD §7.7.1) ───────────────────────
+
+# English verb forms for the human-readable progress lines.
+_runner_phase_gerund() {
+    case "${1}" in
+        install) printf 'installing' ;;
+        remove)  printf 'removing'   ;;
+        purge)   printf 'purging'    ;;
+        upgrade) printf 'upgrading'  ;;
+        verify)  printf 'verifying'  ;;
+        *)       printf '%sing' "${1}" ;;
+    esac
+}
+
+_runner_phase_past() {
+    case "${1}" in
+        install) printf 'installed' ;;
+        remove)  printf 'removed'   ;;
+        purge)   printf 'purged'    ;;
+        upgrade) printf 'upgraded'  ;;
+        verify)  printf 'verified'  ;;
+        *)       printf '%sed' "${1}" ;;
+    esac
+}
+
+# Progress lines print unless --quiet (PRD §7.7.1: quiet keeps warn/error only).
+_runner_progress() {
+    [[ "${INIT_UBUNTU_QUIET:-false}" == "true" ]] && return 0
+    printf '%s\n' "$*"
+}
+
 # ── Internal: run one phase (install/remove/purge) for one module ────────────
 
 # Per-trace monotonic counter backing span_id (`<phase>_<module>_NNN`).
@@ -85,6 +116,12 @@ _runner_run_phase() {
     local _start_ts _end_ts _duration
     _start_ts="$(date +%s)"
 
+    # Per-module child-output buffer (PRD §7.7.1): exec_cmd appends captured
+    # child stdout/stderr here so the failure path can dump the last ~20
+    # lines. Capture mode is enabled for the module sub-shell only.
+    local _cmd_log
+    _cmd_log="$(mktemp)"
+
     # Sub-shell isolation via `(...)` fork (not `bash -c`). Module side-effects
     # (declare, set, cd, alias, export, traps) stay scoped to the subshell.
     # `(...)` is chosen over `bash -c "..."` because the latter launches a
@@ -98,6 +135,8 @@ _runner_run_phase() {
     # already sourced (setup_ubuntu.sh or bats `_load_engine` do this).
     (
         export INIT_UBUNTU_CURRENT_MODULE="${_name}"
+        export INIT_UBUNTU_CMD_CAPTURE=true
+        export INIT_UBUNTU_CMD_OUTPUT_FILE="${_cmd_log}"
         set -euo pipefail
         # shellcheck source=/dev/null  # module path is dynamic; static resolution impossible — https://www.shellcheck.net/wiki/SC1090
         source "${_file}"
@@ -105,7 +144,24 @@ _runner_run_phase() {
             log_error "[${_name}] module does not define ${_phase}() — aborting"
             exit 1
         fi
-        "${_phase}"
+        # Capture the phase's exit code explicitly: the whole call tree sits
+        # under `if _runner_run_phase` in _runner_run_batch, so `set -e` is
+        # suspended here (POSIX: -e is ignored in tested contexts) and the
+        # emit block below must not overwrite the subshell's exit status.
+        _phase_rc=0
+        "${_phase}" || _phase_rc=$?
+        # After a successful install, emit action_required events (PRD
+        # §7.7.2 / module-spec §4.10) while the module arrays are in scope.
+        # The session-end "Action required" block is derived from these.
+        if [[ "${_phase_rc}" -eq 0 && "${_phase}" == "install" ]]; then
+            if declare -F module_emit_post_install >/dev/null 2>&1; then
+                module_emit_post_install
+            fi
+            if declare -F module_emit_reboot_required >/dev/null 2>&1; then
+                module_emit_reboot_required
+            fi
+        fi
+        exit "${_phase_rc}"
     )
     local _rc=$?
 
@@ -114,7 +170,7 @@ _runner_run_phase() {
 
     if [[ "${_rc}" -eq 0 ]]; then
         log_event info "${_name}" "${_phase}_done" "duration_s=${_duration}"
-        log_info "[${_name}] ${_phase} completed (${_duration}s)"
+        _runner_progress "  ✔ ${_name} $(_runner_phase_past "${_phase}") (${_duration}s)"
         # Mirror successful lifecycle to state.json (unless dry-run).
         # Manual flag: true if the user named this module explicitly via
         # the CLI; false if it landed here as a transitive dep. dispatcher
@@ -153,10 +209,59 @@ _runner_run_phase() {
         log_event error "${_name}" "${_phase}_failed" \
             "duration_s=${_duration}" "exit_code=${_rc}"
         log_error "[${_name}] ${_phase} failed (exit=${_rc}, ${_duration}s)"
+        # Failure dump (PRD §7.7.1): last ~20 lines of the module's captured
+        # child output + trace_id + log path. Error-class output — printed
+        # to stderr and NOT silenced by --quiet.
+        if [[ -s "${_cmd_log}" ]]; then
+            printf '  ── last ~20 lines of %s output ──\n' "${_name}" >&2
+            tail -n 20 "${_cmd_log}" >&2
+        fi
+        printf '  trace_id=%s\n' "${INIT_UBUNTU_TRACE_ID:-unknown}" >&2
+        if [[ -n "${INIT_UBUNTU_LOG_FILE:-}" ]]; then
+            printf '  log: %s\n' "${INIT_UBUNTU_LOG_FILE}" >&2
+        fi
     fi
 
+    rm -f "${_cmd_log}"
     unset INIT_UBUNTU_SPAN_ID
     return "${_rc}"
+}
+
+# ── Session-end "Action required" aggregation (PRD §7.7.2, AC-35) ───────────
+#
+# Derives the human-readable block from this session's `action_required`
+# JSONL events (filtered by trace_id). The events are the single source of
+# truth: `jq 'select(.body=="action_required")'` over the session log yields
+# exactly the same module + message content. Pure bash parsing (no jq
+# dependency on the host); the line format is our own log_event writer's.
+_runner_render_action_required() {
+    [[ -n "${INIT_UBUNTU_LOG_FILE:-}" && -f "${INIT_UBUNTU_LOG_FILE}" ]] || return 0
+
+    local _trace="${INIT_UBUNTU_TRACE_ID:-}"
+    local _re_svc='"service\.name":"([^"]*)"'
+    local _re_kind='"kind":"([^"]*)"'
+    local _re_msg='"message":"([^"]*)"'
+    local _line _svc _kind _msg _header_done="false"
+
+    while IFS= read -r _line; do
+        [[ "${_line}" == *'"body":"action_required"'* ]] || continue
+        if [[ -n "${_trace}" && "${_line}" != *"\"trace_id\":\"${_trace}\""* ]]; then
+            continue
+        fi
+        _svc=""; _kind=""; _msg=""
+        [[ "${_line}" =~ ${_re_svc} ]]  && _svc="${BASH_REMATCH[1]}"
+        [[ "${_line}" =~ ${_re_kind} ]] && _kind="${BASH_REMATCH[1]}"
+        [[ "${_line}" =~ ${_re_msg} ]]  && _msg="${BASH_REMATCH[1]}"
+        if [[ "${_header_done}" == "false" ]]; then
+            printf '\n── Action required ─────────────────────\n'
+            _header_done="true"
+        fi
+        case "${_kind}" in
+            reboot) printf '⚠ %s\n' "${_msg}" ;;
+            *)      printf '%s:  %s\n' "${_svc}" "${_msg}" ;;
+        esac
+    done < "${INIT_UBUNTU_LOG_FILE}"
+    return 0
 }
 
 # ── Public: orchestrators for each phase ─────────────────────────────────────
@@ -182,7 +287,10 @@ _runner_run_batch() {
         "gpu=$(_runner_snapshot_gpu)"
 
     local _name _rc _failures=0 _ok=0
+    local _idx=0 _total="${#_modules[@]}"
     for _name in "${_modules[@]}"; do
+        _idx=$(( _idx + 1 ))
+        _runner_progress "[${_idx}/${_total}] ${_name}: $(_runner_phase_gerund "${_phase}")..."
         if _runner_run_phase "${_phase}" "${_name}"; then
             _ok=$(( _ok + 1 ))
         else
@@ -203,6 +311,11 @@ _runner_run_batch() {
         "ok=${_ok}" \
         "skipped=0" \
         "failed=${_failures}"
+
+    # End-of-session "Action required" block (PRD §7.7.2, AC-35). Derived
+    # from this session's events; action-class output, so it is NOT
+    # silenced by --quiet.
+    _runner_render_action_required
 
     # Session-end log retention (PRD §10.2, AC-33): prune the JSONL log dir
     # after session_end so the active file (newest mtime) is never a victim.

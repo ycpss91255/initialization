@@ -1,5 +1,27 @@
 = README
-This repository is a tool I use in Ubuntu, It uses a script to complete the initialization action.
+Personal modular Ubuntu environment initialization tool (`init_ubuntu`): a bash engine + module catalog that installs, upgrades and removes my development environment, apt-style.
+
+== Quick Start
+
+First step on a clean Ubuntu machine is *git clone + run directly* — no installer, no one-liner bootstrap script (PRD §3.4):
+
+[source, shell]
+----
+sudo apt install -y git          # 乾淨 server/container 才需要;desktop 通常已有
+git clone https://github.com/ycpss91255/initialization.git
+cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --recommended
+----
+
+On first run the entrypoint checks the tool's own dependencies (`jq` / `curl` / `git`): if something is missing and sudo is available it asks once whether to `apt install` it (automatic with `-y`); without sudo it fails fast with explicit install instructions.
+
+== Documentation
+
+* link:doc/guide/cli-usage.md[`doc/guide/cli-usage.md`] — apt-style daily flows, exit codes, examples
+* link:doc/guide/troubleshooting.md[`doc/guide/troubleshooting.md`] — doctor, JSONL logs, trace_id, common errors
+* link:doc/guide/module-authoring.md[`doc/guide/module-authoring.md`] — write your own module
+* link:doc/guide/archetype-cookbook.md[`doc/guide/archetype-cookbook.md`] — per-archetype recipes
+* link:doc/module/INDEX.md[`doc/module/INDEX.md`] — auto-generated module catalog
+* link:doc/prd/init-ubuntu.prd.md[`doc/prd/init-ubuntu.prd.md`] — product spec
 
 == tool/ holding area
 

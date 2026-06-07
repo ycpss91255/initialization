@@ -337,8 +337,26 @@ _run_in_container() {
         -e HOST_UID="$(id -u)" \
         -e HOST_GID="$(id -g)" \
         -e COVERAGE="${_coverage}" \
+        -e SYNC_E2E="${SYNC_E2E:-0}" \
         "${_service}" \
         -c "./script/ci/ci.sh ${_container_flag}"
+}
+
+# ── Sync E2E receiver (AC-15, issue #67) ─────────────────────────────────────
+# The integration suite's dual-container sync spec needs the sshd receiver
+# on the same compose network BEFORE the ci container joins it. Profile-gated
+# (sync-e2e) so no other compose workflow ever starts it; the spec itself is
+# gated on SYNC_E2E=1 and skips everywhere else (full `make test`, coverage).
+
+_sync_receiver_up() {
+    _info "Starting sync-receiver (compose profile sync-e2e) for the AC-15 sync E2E"
+    docker compose -f "${REPO_ROOT}/compose.yaml" --profile sync-e2e \
+        up -d sync-receiver
+}
+
+_sync_receiver_down() {
+    docker compose -f "${REPO_ROOT}/compose.yaml" --profile sync-e2e \
+        rm -sf sync-receiver >/dev/null 2>&1 || true
 }
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -408,7 +426,16 @@ main() {
         lint)        _run_in_container ci       --ci-lint        0 ;;
         unit)        _run_in_container ci \
                          "--ci-unit${MODULE_FILTER:+ --module ${MODULE_FILTER}}" 0 ;;
-        integration) _run_in_container ci       --ci-integration 0 ;;
+        integration)
+            # AC-15 sync E2E: receiver up → suite with SYNC_E2E=1 → always
+            # tear the receiver down, then propagate the suite's exit code.
+            _sync_receiver_up
+            local _integration_rc=0
+            SYNC_E2E=1 _run_in_container ci --ci-integration 0 \
+                || _integration_rc=$?
+            _sync_receiver_down
+            return "${_integration_rc}"
+            ;;
         coverage)    _run_in_container coverage --ci             1 ;;
         compose)     _run_in_container ci       --ci             0 ;;
     esac

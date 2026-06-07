@@ -3,6 +3,10 @@ tmp
 # kcov coverage output from `make coverage` (local + CI artefact).
 /coverage/
 
+# Test runtime scratch (`make clean` removes it). Holds throwaway sync-E2E
+# ssh keys (test/integration/sync/receiver-entry.sh) — never commit.
+/.tmp/
+
 # Yazi: ignore `ya pkg` auto-installed packages, keep only manually-tracked plugins
 module/config/yazi/plugins/*
 !module/config/yazi/plugins/dockerfile.yazi

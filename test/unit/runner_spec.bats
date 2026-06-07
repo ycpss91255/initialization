@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # test/unit/runner_spec.bats — lib/runner.sh
 
+bats_require_minimum_version 1.5.0
+
 load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
@@ -132,10 +134,97 @@ EOF
     INIT_UBUNTU_LOG_FILE="${_log}" runner_install echo-mod >/dev/null 2>&1 || true
 
     [[ -f "${_log}" ]]
-    grep -q '"event":"session_start"' "${_log}"
-    grep -q '"event":"install_start"' "${_log}"
-    grep -q '"event":"install_done"' "${_log}"
-    grep -q '"event":"session_end"' "${_log}"
+    grep -q '"body":"session_start"' "${_log}"
+    grep -q '"body":"install_start"' "${_log}"
+    grep -q '"body":"install_done"' "${_log}"
+    grep -q '"body":"session_end"' "${_log}"
+}
+
+@test "runner emits no legacy ts / level / module / event field names" {
+    _load_engine
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/run.jsonl"
+    INIT_UBUNTU_LOG_FILE="${_log}" runner_install echo-mod >/dev/null 2>&1 || true
+
+    run ! grep -q '"ts":' "${_log}"
+    run ! grep -q '"level":' "${_log}"
+    run ! grep -q '"module":' "${_log}"
+    run ! grep -q '"event":' "${_log}"
+}
+
+@test "runner shares one session-level trace_id across all JSONL events" {
+    _load_engine
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/run.jsonl"
+    INIT_UBUNTU_LOG_FILE="${_log}" runner_install echo-mod >/dev/null 2>&1 || true
+
+    run jq -rs '[.[].trace_id] | unique | (length == 1) and (.[0] | length > 0)' "${_log}"
+    assert_success
+    assert_output "true"
+}
+
+@test "runner assigns a phase_module span_id to module lifecycle events" {
+    _load_engine
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/run.jsonl"
+    INIT_UBUNTU_LOG_FILE="${_log}" runner_install echo-mod >/dev/null 2>&1 || true
+
+    run jq -cs '[.[] | select(.body == "install_start" or .body == "install_done") | .span_id] | unique' "${_log}"
+    assert_success
+    assert_output --regexp '^\["install_echo-mod_[0-9]{3}"\]$'
+}
+
+@test "runner emits session_start / session_end with span_id null (engine level)" {
+    _load_engine
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/run.jsonl"
+    INIT_UBUNTU_LOG_FILE="${_log}" runner_install echo-mod >/dev/null 2>&1 || true
+
+    run jq -es '[.[] | select(.body == "session_start" or .body == "session_end")] | (length == 2) and all(.span_id == null) and all(.attributes."service.name" == "engine")' "${_log}"
+    assert_success
+}
+
+@test "runner session_start carries an environment snapshot" {
+    _load_engine
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/run.jsonl"
+    INIT_UBUNTU_LOG_FILE="${_log}" INIT_UBUNTU_FORM_FACTOR="container" \
+        runner_install echo-mod >/dev/null 2>&1 || true
+
+    run jq -es '[.[] | select(.body == "session_start")][0] | (.attributes.form_factor == "container") and (.attributes | has("os") and has("arch") and has("gpu")) and (.attributes.arch | length > 0)' "${_log}"
+    assert_success
+}
+
+@test "runner session_end carries exit_code and ok/skipped/failed stats" {
+    _load_engine
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/run.jsonl"
+    INIT_UBUNTU_LOG_FILE="${_log}" runner_install echo-mod fails >/dev/null 2>&1 || true
+
+    run jq -es '[.[] | select(.body == "session_end")][0] | (.attributes.exit_code == 6) and (.attributes.ok == 1) and (.attributes.failed == 1) and (.attributes.skipped == 0)' "${_log}"
+    assert_success
+}
+
+@test "runner propagates trace_id and span_id into module sub-shell log_event calls" {
+    _load_engine
+
+    cat > "${FAKE_MODULE_DIR}/tracer.module.sh" <<'EOF'
+NAME="tracer"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+
+install() { log_event info "tracer" cmd_exec cmd=true exit=0; return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/run.jsonl"
+    INIT_UBUNTU_LOG_FILE="${_log}" runner_install tracer >/dev/null 2>&1 || true
+
+    # cmd_exec from inside the module sub-shell carries the same trace_id as
+    # session_start and the same span_id as the surrounding install_* events.
+    run jq -rs '([.[].trace_id] | unique | length == 1) and ([.[] | select(.body == "cmd_exec" or .body == "install_start") | .span_id] | unique | length == 1)' "${_log}"
+    assert_success
+    assert_output "true"
 }
 
 # ── upgrade / verify / doctor phase ─────────────────────────────────────────

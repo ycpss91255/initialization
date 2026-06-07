@@ -59,7 +59,9 @@ teardown_test_env() {
           INIT_UBUNTU_STATE_DIR \
           INIT_UBUNTU_CONFIG_DIR \
           INIT_UBUNTU_LOG_FILE \
-          INIT_UBUNTU_CURRENT_MODULE
+          INIT_UBUNTU_CURRENT_MODULE \
+          INIT_UBUNTU_TRACE_ID \
+          INIT_UBUNTU_SPAN_ID
 }
 
 # ── Convenience source helpers ───────────────────────────────────────────────

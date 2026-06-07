@@ -369,3 +369,29 @@ EOF
     assert_success
     [[ ! -s "${_log}" ]]
 }
+
+# ── AC-16: ANSI color auto-off when piped (PRD §7.5, issue #45) ──────────────
+
+@test "AC-16: setup_ubuntu list | cat emits no ANSI escapes" {
+    run bash -c "bash '${REPO_ROOT}/setup_ubuntu.sh' list | cat"
+    assert_success
+    [[ "${output}" != *$'\033'* ]]
+}
+
+@test "setup_ubuntu --color=always forces ANSI escapes even when piped" {
+    run bash -c "bash '${REPO_ROOT}/setup_ubuntu.sh' --color=always verify docker --dry-run | cat"
+    assert_success
+    [[ "${output}" == *$'\033'* ]]
+}
+
+@test "setup_ubuntu --color=never keeps output free of ANSI escapes" {
+    run bash -c "bash '${REPO_ROOT}/setup_ubuntu.sh' --color=never verify docker --dry-run | cat"
+    assert_success
+    [[ "${output}" != *$'\033'* ]]
+}
+
+@test "setup_ubuntu --quiet list suppresses info-level log lines" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" --quiet verify docker --dry-run
+    assert_success
+    [[ "${output}" != *"[INFO]"* ]]
+}

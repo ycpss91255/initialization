@@ -3,7 +3,7 @@
 
 # Module Index
 
-27 modules. Columns come from each module's metadata block
+28 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -13,6 +13,7 @@ to the module source.
 | [anydesk](../../module/anydesk.module.sh) | optional | remote | AnyDesk — remote desktop client (upstream apt repository) |
 | [apt-essentials](../../module/apt-essentials.module.sh) | base | core apt | Universal apt baseline (git, vim, curl, wget, ca-certificates, jq) |
 | [batcat](../../module/batcat.module.sh) | optional | cli-essentials | bat — cat clone with syntax highlighting (Ubuntu binary: batcat) |
+| [claude-code-config](../../module/claude-code-config.module.sh) | optional | agent config dotfile | Personal Claude Code settings (~/.claude: settings.json + statusline) |
 | [claude-code](../../module/claude-code.module.sh) | optional | agent | Anthropic Claude Code CLI agent (official native installer, self-updating) |
 | [codex](../../module/codex.module.sh) | optional | agent | codex — OpenAI Codex CLI coding agent |
 | [docker](../../module/docker.module.sh) | recommended | container devops | Docker Engine + Compose plugin |

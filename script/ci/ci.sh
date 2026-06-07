@@ -73,7 +73,7 @@ _install_deps_for_coverage() {
     apt-get install -y --no-install-recommends \
         bats bats-support bats-assert \
         shellcheck git ca-certificates \
-        parallel make jq curl \
+        parallel make jq curl unzip \
         || _die "apt-get install failed for bats/shellcheck deps."
 
     # bats-mock not in debian bookworm; pin to upstream v1.2.5 for reproducibility.

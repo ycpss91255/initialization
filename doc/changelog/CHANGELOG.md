@@ -40,6 +40,94 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   localized templates; `doctor` validates the statusline launcher.
   80-test bats spec.
 
+- **`setup_secrets.sh`: token / gpg / list / remove subcommands**
+  (issue #68, PRD §14, AC-20): the reserved #44 stubs are now real.
+  `token set <name>` reads the value from a no-echo `/dev/tty` prompt
+  (or from a stdin pipe in automation) — never from argv, so nothing
+  sensitive can land in `ps` output or shell history; `token get <name>`
+  prints the value (and nothing else) on stdout so it is pipe-safe.
+  `gpg generate` delegates to `gpg --full-generate-key` (all prompts,
+  including the passphrase, stay on gpg's own tty); `gpg import [<file>]`
+  imports key material from a file or stdin. `list` prints stored names
+  only — never values — on a log-free stdout; `remove <name>` deletes
+  from the active backend and fails non-zero for unknown names. Token
+  round-trip is covered through the real CLI on all three PRD §14.3
+  backends: encrypted-file for real in Docker, `pass` and `gnome-keyring`
+  via PATH-stub mocks that also assert the secret value never rides argv.
+- **`jetson-stats.module.sh` v2 module** (issue #37, PRD Q51 / §6.3.3 Batch
+  C): new module providing the `jtop` monitor TUI for NVIDIA Jetson Orin on
+  the custom archetype — `sudo pip3 install -U jetson-stats`, falling back
+  to `sudo pipx install` on PEP 668 (externally-managed) Python
+  environments, detected via the stdlib `EXTERNALLY-MANAGED` marker.
+  `SUPPORTED_PLATFORMS=("jetson-orin")` only: `detect()` keys off the
+  engine form factor or `/etc/nv_tegra_release`, and `is_recommended()`
+  answers yes solely on jetson-orin. `doctor()` checks the `jtop.service`
+  state (warn-only — a fresh install legitimately needs a re-login or
+  `sudo systemctl restart jtop.service`, also surfaced as the post-install
+  message). All 10 lifecycle phases run standalone (AC-25); install is
+  idempotent (AC-5); `--dry-run` performs no filesystem writes (AC-12); the
+  version Sidecar (pip-reported version, `pip-managed` fallback) is written
+  on install/upgrade and removed on remove/purge per ADR-0001 while
+  `state.json` is never touched by the module. `remove` keeps the leftover
+  `jtop.service` unit; only `purge` disables the service and deletes the
+  unit file. Tagged `hardware`, `CATEGORY=optional`,
+  `DEPENDS_ON=(apt-essentials)` (Q39).
+- **notion module** (issue #65, PRD §6.3.3 Batch C, Q50 / #35): new
+  `module/notion.module.sh` installs the Notion desktop app from the
+  unofficial notion-electron `.deb` release (anechunaev/notion-electron),
+  replacing the legacy small-tools snap path (the snap is broken on
+  24.04). Rides the github-release archetype but consumes a `.deb`:
+  install resolves the latest tag, downloads the versioned
+  `Notion_Electron-<ver>-{amd64,arm64}.deb` asset, and hands it to
+  `apt-get install ./<deb>` so apt resolves the package's dependencies.
+  `CATEGORY=optional`, `TAGS=(notes)`, `DEPENDS_ON=(apt-essentials)`
+  (Q39), `SUPPORTED_PLATFORMS=(desktop)`; `is_recommended` never
+  pre-ticks on non-desktop form factors. All 10 lifecycle phases run
+  standalone (AC-25); install is idempotent (AC-5); `--dry-run` performs
+  no filesystem writes (AC-12); the version Sidecar is written on
+  install/upgrade and removed on remove/purge per ADR-0001 while
+  `state.json` is never touched by the module.
+
+- **anydesk module** (issue #64, PRD §6.3.3 Batch C, M7): migrated
+  `module/anydesk.sh` to the v2 contract as `module/anydesk.module.sh`
+  on the apt archetype with AnyDesk's vendor repo — install wires the
+  upstream signing key under `/etc/apt/keyrings/anydesk.gpg`
+  (unprivileged `gpg --dearmor` piped into `sudo tee`) plus the
+  `deb.anydesk.com all main` source, then chains to the apt default;
+  remove keeps the repo wiring, purge unhooks source + keyring.
+  Desktop-only `SUPPORTED_PLATFORMS` with a form-factor-gated
+  `is_recommended` (Q49), `DEPENDS_ON=("apt-essentials")` (module names
+  only, Q39), tagged `remote`. All 10 lifecycle phases runnable
+  standalone (AC-25), idempotent install (AC-5), dry-run writes nothing
+  (AC-12), Sidecar per ADR-0001. 76-test bats spec
+  `test/unit/module/anydesk_spec.bats` (Q29 coverage ladder).
+- **TUI skeleton: entry point, backend detection, main menu** (issue
+  #69, PRD §8.1 / §8.5, G4): new `setup_ubuntu_tui.sh` +
+  `lib/tui_backend.sh`. Backend detection prefers `dialog`, falls back
+  to `whiptail`; both missing is fatal with the §8.5 fix guidance (no
+  auto-install). Running without usable sudo exits 4 and suggests CLI
+  mode. The TUI is a pure CLI frontend (G4): menu data comes exclusively
+  from forked `setup_ubuntu list --json` / `detect --json` subprocesses
+  (ADR-0019 schema) — it never sources engine libs and never writes
+  state (pinned by a grep gate in bats). The main menu renders only
+  non-empty CATEGORYs (Q44: `experimental` is hidden while empty and
+  auto-appears once populated); the System Info screen shows forked
+  `detect` output and offers a session-memory platform override.
+  Dispatch mount points are stubbed for #70 (checkbox accumulator +
+  Run/Review), #71 (Quick Setup), and #72 (Manage Installed / Secrets).
+- **yazi module (v2 contract)** (issue #60, PRD §6.3.3 Batch C):
+  `module/yazi.module.sh` migrates `module/submodule/yazi.sh` to the
+  github-release archetype with a zip-aware fetch override (upstream
+  ships `yazi-x86_64-unknown-linux-gnu.zip`, not a tarball; magic-byte
+  validation, flatten-top-dir extract, `unzip` fail-fast). Metadata:
+  `CATEGORY=optional`, `TAGS=(filemgr)`, `DEPENDS_ON=()`, i18n
+  `DESCRIPTION`/`POST_INSTALL_MESSAGE` (en + zh-TW). All 10 lifecycle
+  phases standalone-runnable (AC-25), idempotent install (AC-5),
+  dry-run writes nothing (AC-12), Sidecar on install/upgrade and
+  removed on remove/purge (ADR-0001, AC-23). Appends a guarded
+  `alias yz='yazi'` to existing `~/.bashrc`/`~/.zshrc` — fixing the
+  issue #1 copy-paste bug where the alias targeted `cat`; purge strips
+  it. 68-test bats spec at `test/unit/module/yazi_spec.bats`.
 - **qmk-firmware module** (issue #63, PRD §6.3.3 Batch C, M7): new
   `module/qmk-firmware.module.sh` migrates `module/setup_qmk_firmware.sh`
   to the v2 contract on the custom archetype — apt prereqs (git, python3,

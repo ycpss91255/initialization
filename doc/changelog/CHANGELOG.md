@@ -34,6 +34,25 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   the version Sidecar is written on install/upgrade and removed on
   remove/purge per ADR-0001 while `state.json` is never touched by the
   module. Tagged `cli-essentials`, `CATEGORY=optional`, `DEPENDS_ON=()`.
+- **`setup_secrets.sh` skeleton: storage backend abstraction + ssh-key
+  subcommands** (issue #44, PRD §14, AC-20): new standalone sensitive-data
+  tool (not a module; shares `lib/logger.sh` / `lib/i18n.sh` /
+  `lib/config.sh` only — no engine pipeline coupling, so the TUI can fork
+  it later). New `lib/secrets.sh` implements the generic backend API
+  (`secrets_store/retrieve/exists/list/remove`, stdin/stdout only — secret
+  material never travels through argv) over three backends with PRD §14.3
+  priority: `pass` → `gnome-keyring` (secret-tool + DBus) → encrypted file
+  (`openssl enc` AES-256-CBC + PBKDF2, `~/.config/init_ubuntu/secrets/
+  <name>.enc`, 0600/0700 perms, passphrase via `-pass env:` — never
+  plaintext on disk). Autoselect honors `[secrets] backend` in config.ini
+  and the `INIT_UBUNTU_SECRETS_BACKEND` env override. Subcommands shipped:
+  `ssh-key generate` (passphrase prompting delegated to ssh-keygen's own
+  tty — nothing sensitive in argv or shell history, AC-20), `ssh-key
+  load` (ssh-add), `ssh-key copy <user@host>` (ssh-copy-id, remote
+  failure → exit 7). `gpg` / `token` / `list` / `remove` are reserved
+  stubs for issue #68 and mount directly on the backend API. Test-tools
+  image gains `openssl` so the encrypted-file round-trip is tested for
+  real in the container.
 - **eza module migrated to the v2 contract** (issue #51, PRD §6.3.1
   Batch B): `module/submodule/eza.sh` → `module/eza.module.sh`
   (github-release archetype, `CATEGORY=optional`,

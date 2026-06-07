@@ -159,9 +159,9 @@ EOF
 @test "exec_cmd child output is captured into JSONL cmd_exec, not streamed" {
     _load_engine
     _register_cmdmod
-    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
 
-    run runner_install cmdmod
+    INIT_UBUNTU_LOG_FILE="${_log}" run runner_install cmdmod
     assert_success
     # Child stdout/stderr must NOT stream to the console (PRD §7.7.1)...
     refute_output --partial "CHILD-STDOUT-MARKER"
@@ -170,14 +170,12 @@ EOF
     assert_output --partial "child.sh"
 
     # The cmd_exec event carries exit + duration_ms + the captured output.
-    run jq -r 'select(.body=="cmd_exec") | .attributes.exit' \
-        "${INIT_UBUNTU_LOG_FILE}"
+    run jq -r 'select(.body=="cmd_exec") | .attributes.exit' "${_log}"
     assert_output "0"
     run jq -e 'select(.body=="cmd_exec") | .attributes.duration_ms >= 0' \
-        "${INIT_UBUNTU_LOG_FILE}"
+        "${_log}"
     assert_success
-    run jq -r 'select(.body=="cmd_exec") | .attributes.output' \
-        "${INIT_UBUNTU_LOG_FILE}"
+    run jq -r 'select(.body=="cmd_exec") | .attributes.output' "${_log}"
     assert_output --partial "CHILD-STDOUT-MARKER"
     assert_output --partial "CHILD-STDERR-MARKER"
 }
@@ -185,14 +183,13 @@ EOF
 @test "verbose mode streams child output live (and still captures it)" {
     _load_engine
     _register_cmdmod
-    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
-    export INIT_UBUNTU_VERBOSE=true
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
 
-    run runner_install cmdmod
+    INIT_UBUNTU_LOG_FILE="${_log}" INIT_UBUNTU_VERBOSE=true \
+        run runner_install cmdmod
     assert_success
     assert_output --partial "CHILD-STDOUT-MARKER"
-    run jq -r 'select(.body=="cmd_exec") | .attributes.output' \
-        "${INIT_UBUNTU_LOG_FILE}"
+    run jq -r 'select(.body=="cmd_exec") | .attributes.output' "${_log}"
     assert_output --partial "CHILD-STDOUT-MARKER"
 }
 
@@ -211,9 +208,8 @@ remove()  { return 0; }
 purge()   { return 0; }
 EOF
     registry_load_all "${FAKE_MODULE_DIR}"
-    export INIT_UBUNTU_QUIET=true
 
-    run runner_install depa boom
+    INIT_UBUNTU_QUIET=true run runner_install depa boom
     assert_failure 6
     # No progress headers, no checkmark lines (PRD §7.7.1 --quiet)...
     refute_output --partial "[1/2]"
@@ -235,7 +231,7 @@ EOF
 @test "failure dumps last ~20 child-output lines plus trace_id and log path" {
     _load_engine
     _register_cmdmod
-    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
     # Child emits 30 numbered lines then fails: the dump must contain the
     # tail (line-30) but not the head (line-1).
     cat > "${INIT_UBUNTU_TEST_SCRATCH}/child.sh" <<'EOF'
@@ -244,20 +240,20 @@ for i in $(seq 1 30); do echo "child-line-${i}"; done
 exit 1
 EOF
 
-    run runner_install cmdmod
+    INIT_UBUNTU_LOG_FILE="${_log}" run runner_install cmdmod
     assert_failure 6
     assert_output --partial "child-line-30"
     # tail ~20 of 30 lines keeps 11..30; the exact line "child-line-1" is cut.
     refute_output --partial $'child-line-1\n'
     assert_output --partial "trace_id="
-    assert_output --partial "${INIT_UBUNTU_LOG_FILE}"
+    assert_output --partial "${_log}"
 }
 
 # ── §7.7.2 Action required aggregation (AC-35) ───────────────────────────────
 
 @test "Action required block is derived from action_required JSONL events (AC-35)" {
     _load_engine
-    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
     cat > "${FAKE_MODULE_DIR}/pim.module.sh" <<'EOF'
 NAME="pim"
 CATEGORY="optional"
@@ -276,24 +272,23 @@ purge()   { return 0; }
 EOF
     registry_load_all "${FAKE_MODULE_DIR}"
 
-    run runner_install pim
+    INIT_UBUNTU_LOG_FILE="${_log}" run runner_install pim
     assert_success
     assert_output --partial "Action required"
 
     # Both kinds were emitted as structured events (module-spec §4.10).
-    run jq -r 'select(.body=="action_required") | .attributes.kind' \
-        "${INIT_UBUNTU_LOG_FILE}"
+    run jq -r 'select(.body=="action_required") | .attributes.kind' "${_log}"
     assert_line "post_install"
     assert_line "reboot"
 
     # AC-35: block content identical to the events — every service.name +
     # message pair from `jq 'select(.body=="action_required")'` must appear
     # verbatim in the rendered block.
-    run runner_install pim
+    INIT_UBUNTU_LOG_FILE="${_log}" run runner_install pim
     local _pairs
     _pairs="$(jq -r 'select(.body=="action_required")
         | .attributes["service.name"] + "\t" + .attributes.message' \
-        "${INIT_UBUNTU_LOG_FILE}" | sort -u)"
+        "${_log}" | sort -u)"
     [ -n "${_pairs}" ]
     local _svc _msg
     while IFS=$'\t' read -r _svc _msg; do
@@ -304,8 +299,8 @@ EOF
 
 @test "modules without post-install hints render no Action required block" {
     _load_engine
-    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
-    run runner_install depa
+    INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl" \
+        run runner_install depa
     assert_success
     refute_output --partial "Action required"
 }

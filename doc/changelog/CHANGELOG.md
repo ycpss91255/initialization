@@ -22,6 +22,11 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **Module phase exit codes could be masked in the runner sub-shell**
+  (issue #66 follow-on, `lib/runner.sh`): the module sub-shell runs in an
+  `if`-tested context where `set -e` is suspended, so any command appended
+  after the phase call would overwrite the sub-shell's exit status. The
+  phase exit code is now captured explicitly and re-raised via `exit`.
 - **github-release archetype download URL 404** : `lib/module_helper.sh`
   built `releases/latests/download/` (one-char typo) so every real
   (non-mocked) install of an archetype-B module would 404. Fixed to
@@ -30,6 +35,28 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Install output UX** (issue #66, PRD §7.7, AC-35): the install pipeline
+  now renders human-readable output derived from JSONL events (events are
+  the single source of truth).
+  - Per-module `[i/N] <name>: installing...` progress headers and
+    `✔ <name> installed (Ns)` success lines (`lib/runner.sh`).
+  - `exec_cmd` capture mode (`lib/general.sh`): inside the engine pipeline
+    child stdout/stderr is no longer streamed — it is captured into one
+    `cmd_exec` JSONL event per command (attributes: `cmd` / `exit` /
+    `duration_ms` / `output`). New `--verbose` flag streams child output
+    live (still captured); new `--quiet` flag suppresses progress lines
+    and raises `LOG_LEVEL` to WARN. Legacy standalone `module/setup_*.sh`
+    callers keep the streaming behavior (capture is opt-in via
+    `INIT_UBUNTU_CMD_CAPTURE`, set only by the runner sub-shell).
+  - On module failure: automatic dump of the last ~20 lines of that
+    module's captured child output + `trace_id` + the JSONL log path.
+  - End-of-session **Action required** aggregation (PRD §7.7.2):
+    `module_emit_post_install` / `module_emit_reboot_required` now emit
+    structured `action_required` events (`kind=post_install|reboot`,
+    i18n-resolved message) after a successful install, and the engine
+    derives the human-readable block from this session's events at
+    session end — stdout and `jq 'select(.body=="action_required")'`
+    over the session log never diverge (AC-35).
 - **fdfind module migrated to the v2 contract** (issue #54, PRD §6.3.1
   Batch B): `module/submodule/fdfind.sh` (v1 GitHub tarball install) is
   replaced by `module/fdfind.module.sh` on the apt archetype — Ubuntu

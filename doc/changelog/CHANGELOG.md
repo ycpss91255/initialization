@@ -22,6 +22,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **yazi module (v2 contract)** (issue #60, PRD §6.3.3 Batch C):
+  `module/yazi.module.sh` migrates `module/submodule/yazi.sh` to the
+  github-release archetype with a zip-aware fetch override (upstream
+  ships `yazi-x86_64-unknown-linux-gnu.zip`, not a tarball; magic-byte
+  validation, flatten-top-dir extract, `unzip` fail-fast). Metadata:
+  `CATEGORY=optional`, `TAGS=(filemgr)`, `DEPENDS_ON=()`, i18n
+  `DESCRIPTION`/`POST_INSTALL_MESSAGE` (en + zh-TW). All 10 lifecycle
+  phases standalone-runnable (AC-25), idempotent install (AC-5),
+  dry-run writes nothing (AC-12), Sidecar on install/upgrade and
+  removed on remove/purge (ADR-0001, AC-23). Appends a guarded
+  `alias yz='yazi'` to existing `~/.bashrc`/`~/.zshrc` — fixing the
+  issue #1 copy-paste bug where the alias targeted `cat`; purge strips
+  it. 68-test bats spec at `test/unit/module/yazi_spec.bats`.
+
 - **Color library + global output flags** (issue #45, PRD §5.1 / §7.5,
   M8, AC-16): new `lib/color.sh` decides ANSI color once per run —
   `auto` (default) turns color off for non-tty stdout, `NO_COLOR`,

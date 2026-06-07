@@ -158,6 +158,15 @@ _sidecar_path() {
     printf '%s/versions/yazi' "${INIT_UBUNTU_STATE_DIR}"
 }
 
+# Sandbox paths only (real _yazi_fetch_and_install stays in place) for the
+# fetch-validation tests.
+_sandbox_fetch_paths() {
+    HOME="${TEST_HOME}"
+    INSTALL_DIR="${INIT_UBUNTU_TEST_SCRATCH}/opt/yazi"
+    BIN_LINK="${INIT_UBUNTU_TEST_SCRATCH}/bin/yazi"
+    USE_SUDO=false
+}
+
 # ── is_installed ─────────────────────────────────────────────────────────────
 
 @test "is_installed returns nonzero on a fresh test container" {
@@ -181,14 +190,14 @@ _sidecar_path() {
 
 @test "detect returns 0 on x86_64" {
     _load_module
-    uname() { printf 'x86_64\n'; }
+    eval 'uname() { printf "x86_64\n"; }'
     run detect
     assert_success
 }
 
 @test "detect returns nonzero on aarch64 (no prebuilt gnu zip wired)" {
     _load_module
-    uname() { printf 'aarch64\n'; }
+    eval 'uname() { printf "aarch64\n"; }'
     run detect
     assert_failure
 }
@@ -257,7 +266,7 @@ _sidecar_path() {
 @test "install short-circuits when is_installed returns 0 (idempotency)" {
     _load_module
     _sandbox_module
-    is_installed() { return 0; }
+    eval 'is_installed() { return 0; }'
     run install
     assert_success
     assert_output --partial "already installed"
@@ -428,20 +437,17 @@ _sidecar_path() {
 @test "fetch rejects a download that is not a zip archive" {
     _load_module
     # real _yazi_fetch_and_install, but sandboxed paths + stubbed network
-    HOME="${TEST_HOME}"
-    INSTALL_DIR="${INIT_UBUNTU_TEST_SCRATCH}/opt/yazi"
-    BIN_LINK="${INIT_UBUNTU_TEST_SCRATCH}/bin/yazi"
-    USE_SUDO=false
-    curl() {
+    _sandbox_fetch_paths
+    eval 'curl() {
         # write garbage to the -o target
         local _out=""
         while [[ $# -gt 0 ]]; do
             [[ "${1}" == "-o" ]] && { _out="${2}"; shift; }
             shift
         done
-        printf 'this is not a zip\n' > "${_out}"
-    }
-    get_github_pkg_latest_version() { local -n _o="${1}"; _o="25.5.31"; }
+        printf "this is not a zip\n" > "${_out}"
+    }'
+    eval 'get_github_pkg_latest_version() { local -n _o="${1}"; _o="25.5.31"; }'
     run _yazi_fetch_and_install
     assert_failure
     assert_output --partial "not a zip"
@@ -450,14 +456,11 @@ _sidecar_path() {
 
 @test "fetch fails fast with a clear message when unzip is unavailable" {
     _load_module
-    HOME="${TEST_HOME}"
-    INSTALL_DIR="${INIT_UBUNTU_TEST_SCRATCH}/opt/yazi"
-    BIN_LINK="${INIT_UBUNTU_TEST_SCRATCH}/bin/yazi"
-    USE_SUDO=false
-    command() {
+    _sandbox_fetch_paths
+    eval 'command() {
         if [[ "${1:-}" == "-v" && "${2:-}" == "unzip" ]]; then return 1; fi
         builtin command "$@"
-    }
+    }'
     run _yazi_fetch_and_install
     assert_failure
     assert_output --partial "unzip"
@@ -467,14 +470,14 @@ _sidecar_path() {
 
 @test "is_recommended returns nonzero when already installed" {
     _load_module
-    is_installed() { return 0; }
+    eval 'is_installed() { return 0; }'
     run is_recommended
     assert_failure
 }
 
 @test "is_recommended returns 0 when not installed" {
     _load_module
-    is_installed() { return 1; }
+    eval 'is_installed() { return 1; }'
     run is_recommended
     assert_success
 }
@@ -483,10 +486,10 @@ _sidecar_path() {
 
 @test "is_outdated returns nonzero when no Sidecar exists (no network hit)" {
     _load_module
-    get_github_pkg_latest_version() {
-        printf 'network must not be queried without a Sidecar\n' >&2
+    eval 'get_github_pkg_latest_version() {
+        printf "network must not be queried without a Sidecar\n" >&2
         return 1
-    }
+    }'
     run is_outdated
     assert_failure
     refute_output --partial "network must not be queried"
@@ -496,10 +499,7 @@ _sidecar_path() {
     _load_module
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '0.1.0\n' > "$(_sidecar_path)"
-    get_github_pkg_latest_version() {
-        local -n _out="${1}"
-        _out="99.0.0"
-    }
+    eval 'get_github_pkg_latest_version() { local -n _out="${1}"; _out="99.0.0"; }'
     run is_outdated
     assert_success
 }
@@ -508,10 +508,7 @@ _sidecar_path() {
     _load_module
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '99.0.0\n' > "$(_sidecar_path)"
-    get_github_pkg_latest_version() {
-        local -n _out="${1}"
-        _out="99.0.0"
-    }
+    eval 'get_github_pkg_latest_version() { local -n _out="${1}"; _out="99.0.0"; }'
     run is_outdated
     assert_failure
 }
@@ -520,17 +517,116 @@ _sidecar_path() {
 
 @test "doctor returns nonzero when yazi is not installed" {
     _load_module
-    is_installed() { return 1; }
+    eval 'is_installed() { return 1; }'
     run doctor
     assert_failure
 }
 
 @test "doctor passes and heals a missing Sidecar when yazi runs" {
     _load_module
-    is_installed() { return 0; }
-    yazi() { printf 'Yazi 25.5.31 (f5a1cf0 2025-05-31)\n'; }
+    eval 'is_installed() { return 0; }'
+    eval 'yazi() { printf "Yazi 25.5.31 (f5a1cf0 2025-05-31)\n"; }'
     [[ ! -e "$(_sidecar_path)" ]]
     run doctor
     assert_success
     [[ -f "$(_sidecar_path)" ]]
+}
+
+# ── Engine discovery (registry scan) ─────────────────────────────────────────
+
+@test "registry discovers yazi under --tag=filemgr" {
+    # shellcheck source=../../../lib/logger.sh
+    source "${LIB_DIR}/logger.sh"
+    # shellcheck source=../../../lib/registry.sh
+    source "${LIB_DIR}/registry.sh"
+    export INIT_UBUNTU_USER_MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/user-module"
+    registry_load_all "${MODULE_DIR}"
+    run registry_list_names --tag=filemgr
+    assert_success
+    assert_output --partial "yazi"
+}
+
+# ── Standalone CLI (dual-mode footer, AC-25) ─────────────────────────────────
+
+_standalone_module() {
+    bash "${MODULE_DIR}/yazi.module.sh" "$@"
+}
+
+@test "standalone: with no args prints usage + exits 2" {
+    run _standalone_module
+    assert_failure 2
+    assert_output --partial "Usage:"
+}
+
+@test "standalone: install --dry-run prints DRY-RUN + exits 0" {
+    run _standalone_module install --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: --version prints NAME + VERSION_PROVIDED" {
+    run _standalone_module --version
+    assert_success
+    assert_output --partial "yazi"
+}
+
+@test "standalone: --help shows phases" {
+    run _standalone_module --help
+    assert_success
+    assert_output --partial "install"
+    assert_output --partial "remove"
+    assert_output --partial "purge"
+}
+
+@test "standalone: unknown phase returns exit 2" {
+    run _standalone_module nope
+    assert_failure 2
+}
+
+@test "standalone: info prints metadata (name / category / tags)" {
+    run _standalone_module info
+    assert_success
+    assert_output --partial "name:        yazi"
+    assert_output --partial "category:    optional"
+    assert_output --partial "filemgr"
+}
+
+@test "standalone: info honors --lang=zh-TW" {
+    run _standalone_module info --lang=zh-TW
+    assert_success
+    assert_output --partial "檔案管理"
+}
+
+@test "standalone: status reports installed=no on a fresh container" {
+    HOME="${TEST_HOME}" run _standalone_module status
+    assert_success
+    assert_output --partial "installed:   no"
+}
+
+@test "standalone: all 10 lifecycle phases run without 'not implemented' exit 2 (AC-25)" {
+    local _phase _rc
+    for _phase in install upgrade remove purge verify doctor detect \
+                  is-installed is-recommended is-outdated; do
+        _rc=0
+        HOME="${TEST_HOME}" run _standalone_module "${_phase}" --dry-run
+        _rc="${status}"
+        if [[ "${_rc}" -eq 2 ]] || [[ "${output}" == *"not implemented"* ]]; then
+            printf "phase %s hit not-implemented (rc=%s)\noutput: %s\n" \
+                "${_phase}" "${_rc}" "${output}" >&2
+            return 1
+        fi
+    done
+}
+
+@test "standalone: dry-run install leaves state.json untouched (AC-23)" {
+    printf '{"version":"0.1.0","installed":{}}\n' > "${INIT_UBUNTU_STATE_DIR}/state.json"
+    run _standalone_module install --dry-run
+    assert_success
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == '{"version":"0.1.0","installed":{}}' ]]
+}
+
+@test "standalone: dry-run install writes no Sidecar" {
+    run _standalone_module install --dry-run
+    assert_success
+    [[ ! -e "$(_sidecar_path)" ]]
 }

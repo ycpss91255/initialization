@@ -267,3 +267,8 @@ _yazi_local_version() {
         | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)" || true
     printf '%s' "${_v:-unknown}"
 }
+
+# ── Standalone footer ───────────────────────────────────────────────────────
+if [[ "${MODULE_STANDALONE:-false}" == "true" ]]; then
+    module_standalone_main "$@"
+fi

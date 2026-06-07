@@ -22,6 +22,38 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **TUI Quick Setup multi-step wizard + manual-flag semantics** (issue
+  #71, PRD §8.2.1, ADR-0010): main-menu item 1 is now the real four-step
+  wizard. Step 1/4 confirms the detected platform with an optional
+  override that stays in wizard memory during prepare; Step 2/4 offers
+  recommended modules with the §15.3 filter pipeline (SUPPORTED_PLATFORMS
+  vs the effective form factor first, then the Q36 `[modules.<n>] enabled`
+  tri-state — `false` force-excludes, `true` force-includes checked — then
+  the engine's `is_recommended` verdict preselects); Step 3/4 offers the
+  CLI-essentials suite as whole-suite / pick-individually / skip; Step 4/4
+  is the AI-agent-CLI multi-select (recommended ones preselected). The
+  wizard then reuses the #70 Review & Install screen (refactored into a
+  shared `_tui_screen_review` decision screen: rc 0 = Proceed) and forks
+  the single CLI pipeline via `_tui_exec_install`. The platform override
+  is written only on the Proceed leg — via a forked
+  `setup_ubuntu config set platform.override <v>` followed by
+  `install --profile=<v> <picked...> -y` — so Cancel/SIGINT anywhere
+  before Proceed is a pure cancel (zero config/state writes, fs-snapshot
+  asserted); after Proceed the CLI pipeline owns the terminal and a
+  partial install's exit 6 propagates as the TUI exit code (§8.2.1 stage
+  table, ADR-0015). ADR-0010 manual-flag matrix is guaranteed
+  structurally: the forked argv names only user-picked modules (e.g.
+  neovim/lazygit/eza → `manual=true`), engine-pulled deps
+  (fzf/ripgrep/fdfind/fnm) never appear on it and stay `manual=false` —
+  bats asserts the exact command string. New `lib/tui_backend.sh` helpers:
+  `tui_platform_choices` (shared §7.5 form-factor vocabulary, also reused
+  by System Info), `tui_effective_form_factor`,
+  `tui_qs_recommended_entries`, `tui_qs_tag_entries` (driven by the
+  additive ADR-0019 item fields `recommended` / `enabled`, absent = null
+  = nothing forced). Covered by `test/unit/tui_quick_setup_spec.bats`
+  (helper units + scripted mock-backend e2e: happy path, deferred
+  override write ordering, override narrowing Step 2, pure-cancel
+  fs snapshots, nothing-selected, exit-6 propagation).
 - **TUI Manage Installed / Manage Secrets + destructive confirm dialogs**
   (issue #72, PRD §8.3/§8.4): the main menu's Manage Installed entry now
   lists installed modules (version + installed_at, data source: a forked

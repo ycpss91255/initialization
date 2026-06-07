@@ -178,6 +178,144 @@ _load_state() {
     assert_output "5"
 }
 
+# ── corruption: quarantine + fail fast (PRD §10.1, issue #41) ───────────────
+
+@test "corrupt state.json: read fails (exit 1) and file is quarantined" {
+    _load_state
+    state_init
+    local _p; _p="$(state_get_path)"
+    printf 'not json {{{' > "${_p}"
+
+    run state_is_recorded docker
+    assert_failure
+
+    # quarantined copy exists; original is gone — and NOT silently rebuilt
+    local _q=("${_p}".corrupt.*)
+    [[ -e "${_q[0]}" ]]
+    [[ ! -f "${_p}" ]]
+}
+
+@test "corrupt state.json: recovery guidance mentions rerun-rebuild + manual rename" {
+    _load_state
+    state_init
+    local _p; _p="$(state_get_path)"
+    printf '{"version": broken' > "${_p}"
+
+    run state_list_installed
+    assert_failure
+    assert_output --partial "quarantined"
+    assert_output --partial "re-run"
+    assert_output --partial "rename"
+}
+
+@test "corrupt state.json: write fails fast without silent rebuild" {
+    _load_state
+    state_init
+    local _p; _p="$(state_get_path)"
+    printf '{broken' > "${_p}"
+
+    run state_record_install docker true v1
+    assert_failure
+
+    local _q=("${_p}".corrupt.*)
+    [[ -e "${_q[0]}" ]]
+    [[ ! -f "${_p}" ]]
+}
+
+@test "corrupt state.json: quarantined file preserves original bytes (no data loss)" {
+    _load_state
+    state_init
+    local _p; _p="$(state_get_path)"
+    printf '{"installed":{"docker":{"manual":true}}  TRUNCATED' > "${_p}"
+
+    run state_get_field docker manual
+    assert_failure
+
+    local _q=("${_p}".corrupt.*)
+    [[ "$(cat "${_q[0]}")" == '{"installed":{"docker":{"manual":true}}  TRUNCATED' ]]
+}
+
+@test "non-object JSON state.json (null) is treated as corrupt" {
+    _load_state
+    state_init
+    local _p; _p="$(state_get_path)"
+    printf 'null\n' > "${_p}"
+
+    run state_list_installed
+    assert_failure
+    local _q=("${_p}".corrupt.*)
+    [[ -e "${_q[0]}" ]]
+}
+
+@test "state_init on corrupt state.json quarantines and fails (never recreates in-run)" {
+    _load_state
+    state_init
+    local _p; _p="$(state_get_path)"
+    printf 'garbage' > "${_p}"
+
+    run state_init
+    assert_failure
+    [[ ! -f "${_p}" ]]
+}
+
+# ── lock contention UX (PRD §10.1, issue #41) ───────────────────────────────
+
+# Holds the state flock from a background subshell, recording its PID in
+# <lock>.pid (same convention the writer uses) for <hold-secs> seconds.
+_hold_state_lock() {
+    local _lock="$1" _hold_secs="$2"
+    (
+        exec 9>>"${_lock}"
+        flock -x 9
+        printf '%s' "${BASHPID}" > "${_lock}.pid"
+        sleep "${_hold_secs}"
+    ) &
+    HOLD_LOCK_PID=$!
+    # Wait until the holder has the lock (pid file appears).
+    local _i
+    for _i in $(seq 1 50); do
+        [[ -f "${_lock}.pid" ]] && return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+@test "contended write prints one-line wait notice then succeeds" {
+    _load_state
+    state_init
+    local _lock="${INIT_UBUNTU_STATE_DIR}/.state.lock"
+    _hold_state_lock "${_lock}" 2
+
+    INIT_UBUNTU_LOCK_TIMEOUT=10 run state_record_install docker true v1
+    wait "${HOLD_LOCK_PID}"
+
+    assert_success
+    assert_output --partial "waiting for state lock"
+    local _p; _p="$(state_get_path)"
+    [[ "$(jq -r '.installed.docker.version_provided' "${_p}")" == "v1" ]]
+}
+
+@test "lock timeout exits 1 and prints holder PID + lock file path" {
+    _load_state
+    state_init
+    local _lock="${INIT_UBUNTU_STATE_DIR}/.state.lock"
+    _hold_state_lock "${_lock}" 10
+    local _holder_pid; _holder_pid="$(cat "${_lock}.pid")"
+
+    INIT_UBUNTU_LOCK_TIMEOUT=1 run state_record_install docker true v1
+    kill "${HOLD_LOCK_PID}" 2>/dev/null || true
+    wait "${HOLD_LOCK_PID}" 2>/dev/null || true
+
+    assert_failure
+    assert_output --partial "timed out"
+    assert_output --partial "${_lock}"
+    assert_output --partial "${_holder_pid}"
+
+    # the write must NOT have happened
+    local _p; _p="$(state_get_path)"
+    [[ "$(jq -r '.installed | has("docker")' "${_p}")" == "false" ]]
+}
+
 # ── upgrade / verify recording ──────────────────────────────────────────────
 
 @test "state_record_upgrade stamps version_provided + last_upgraded_at" {

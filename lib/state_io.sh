@@ -111,6 +111,12 @@ state_io_export() {
 
     local _state_path; _state_path="$(state_get_path)"
 
+    # Corruption guard (PRD §10.1): a corrupt state.json is quarantined by
+    # lib/state.sh and the export fails fast — never export from garbage.
+    if declare -F state_validate_file >/dev/null 2>&1; then
+        state_validate_file || return 1
+    fi
+
     # Resolve module name list.
     local -a _names=()
     if [[ -n "${_filter_csv}" ]]; then

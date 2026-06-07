@@ -35,6 +35,47 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   standalone (AC-25), idempotent install (AC-5), dry-run writes nothing
   (AC-12), Sidecar per ADR-0001. 76-test bats spec
   `test/unit/module/anydesk_spec.bats` (Q29 coverage ladder).
+- **TUI skeleton: entry point, backend detection, main menu** (issue
+  #69, PRD §8.1 / §8.5, G4): new `setup_ubuntu_tui.sh` +
+  `lib/tui_backend.sh`. Backend detection prefers `dialog`, falls back
+  to `whiptail`; both missing is fatal with the §8.5 fix guidance (no
+  auto-install). Running without usable sudo exits 4 and suggests CLI
+  mode. The TUI is a pure CLI frontend (G4): menu data comes exclusively
+  from forked `setup_ubuntu list --json` / `detect --json` subprocesses
+  (ADR-0019 schema) — it never sources engine libs and never writes
+  state (pinned by a grep gate in bats). The main menu renders only
+  non-empty CATEGORYs (Q44: `experimental` is hidden while empty and
+  auto-appears once populated); the System Info screen shows forked
+  `detect` output and offers a session-memory platform override.
+  Dispatch mount points are stubbed for #70 (checkbox accumulator +
+  Run/Review), #71 (Quick Setup), and #72 (Manage Installed / Secrets).
+- **yazi module (v2 contract)** (issue #60, PRD §6.3.3 Batch C):
+  `module/yazi.module.sh` migrates `module/submodule/yazi.sh` to the
+  github-release archetype with a zip-aware fetch override (upstream
+  ships `yazi-x86_64-unknown-linux-gnu.zip`, not a tarball; magic-byte
+  validation, flatten-top-dir extract, `unzip` fail-fast). Metadata:
+  `CATEGORY=optional`, `TAGS=(filemgr)`, `DEPENDS_ON=()`, i18n
+  `DESCRIPTION`/`POST_INSTALL_MESSAGE` (en + zh-TW). All 10 lifecycle
+  phases standalone-runnable (AC-25), idempotent install (AC-5),
+  dry-run writes nothing (AC-12), Sidecar on install/upgrade and
+  removed on remove/purge (ADR-0001, AC-23). Appends a guarded
+  `alias yz='yazi'` to existing `~/.bashrc`/`~/.zshrc` — fixing the
+  issue #1 copy-paste bug where the alias targeted `cat`; purge strips
+  it. 68-test bats spec at `test/unit/module/yazi_spec.bats`.
+- **qmk-firmware module** (issue #63, PRD §6.3.3 Batch C, M7): new
+  `module/qmk-firmware.module.sh` migrates `module/setup_qmk_firmware.sh`
+  to the v2 contract on the custom archetype — apt prereqs (git, python3,
+  pipx, build-essential; the package is ensured in `install()` per Q39
+  while `DEPENDS_ON` carries only the `apt-essentials` module), pipx-managed
+  `qmk` CLI, `qmk setup -y` toolchain + `~/qmk_firmware` checkout, and a
+  personal keymap overlay from `module/config/qmk_firmware/keyboards`.
+  Tagged `hardware`; host-only platforms (no wsl/container, US-5); opt-in
+  only (`is_recommended` always declines — enable via
+  `[modules.qmk-firmware]`). All 10 lifecycle phases runnable standalone
+  (AC-25), idempotent install (AC-5), dry-run writes nothing (AC-12),
+  Sidecar per ADR-0001 with PyPI-backed `is_outdated`. 74-test bats spec
+  `test/unit/module/qmk-firmware_spec.bats` (Q29 coverage ladder).
+
 - **claude-code module** (issue #57, PRD §6.3.2, Batch C): new
   `module/claude-code.module.sh` installs the Anthropic Claude Code CLI
   via the official native installer (`https://claude.ai/install.sh`,

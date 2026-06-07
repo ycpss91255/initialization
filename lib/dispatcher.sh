@@ -198,7 +198,7 @@ _dispatcher_lifecycle() {
             -y|--yes)     export INIT_UBUNTU_YES=true ;;
             --dry-run)    export INIT_UBUNTU_DRY_RUN=true ;;
             --no-deps)    export INIT_UBUNTU_NO_DEPS=true ;;
-            --with-orphans|--base|--recommended|--all-base|--category=*|--install-target=*|--force)
+            --with-orphans|--base|--recommended|--all-base|--category=*|--install-target=*|--force|--profile=*)
                 printf "[dispatcher] WARN: %s is stubbed; ignoring\n" "${_arg}" >&2
                 ;;
             -*)

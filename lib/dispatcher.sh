@@ -57,6 +57,13 @@ Deprecated:
 Subcommands (stubbed, later phases):
   self-upgrade           Update the tool itself (planned for 0.3.0)
 
+Global flags (any position):
+  --color=auto|always|never
+                         ANSI color control (default auto: off when piped,
+                         NO_COLOR set, TERM=dumb, or running in background)
+  -v / --verbose         Set log level to DEBUG
+  --quiet                Set log level to WARN (info suppressed)
+
 Common flags:
   -y / --yes             Assume yes to interactive prompts
   --dry-run              Print intended actions without executing
@@ -760,7 +767,37 @@ _dispatcher_stub() {
 
 # ── Main dispatch ────────────────────────────────────────────────────────────
 
+# ── Global flags (PRD §7.5, issue #45) ──────────────────────────────────────
+# Position-independent flags consumed before subcommand routing:
+#   --color=auto|always|never  → color_init (lib/color.sh)
+#   --verbose / -v             → LOG_LEVEL=DEBUG
+#   --quiet                    → LOG_LEVEL=WARN
+# Fills the caller-scoped array DISPATCHER_ARGV with the remaining argv
+# (bash dynamic scoping: dispatcher_dispatch declares it local).
+# Returns 2 on an invalid --color value.
+_dispatcher_parse_global_flags() {
+    DISPATCHER_ARGV=()
+    local _arg
+    for _arg in "$@"; do
+        case "${_arg}" in
+            --color=*)
+                if declare -F color_init >/dev/null 2>&1; then
+                    color_init "${_arg#--color=}" || return 2
+                fi
+                ;;
+            -v|--verbose) export LOG_LEVEL=DEBUG ;;
+            --quiet)      export LOG_LEVEL=WARN ;;
+            *) DISPATCHER_ARGV+=("${_arg}") ;;
+        esac
+    done
+    return 0
+}
+
 dispatcher_dispatch() {
+    local -a DISPATCHER_ARGV=()
+    _dispatcher_parse_global_flags "$@" || return 2
+    set -- ${DISPATCHER_ARGV[@]+"${DISPATCHER_ARGV[@]}"}
+
     if [[ "${1:-}" == "--help" || "${1:-}" == "-h" || -z "${1:-}" ]]; then
         _dispatcher_usage
         return 0

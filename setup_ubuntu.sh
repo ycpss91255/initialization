@@ -30,6 +30,14 @@ export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export LOG_COLOR="${LOG_COLOR:-true}"
 
 # ── Source engine ────────────────────────────────────────────────────────────
+# shellcheck source=lib/color.sh
+source "${LIB_DIR}/color.sh"
+
+# ANSI color auto-detection (PRD §5.1 / §7.5, AC-16): decide once at startup
+# (off when piped / NO_COLOR / TERM=dumb / background). An explicit
+# --color=<mode> flag re-runs color_init inside dispatcher_dispatch.
+color_init auto
+
 # shellcheck source=lib/logger.sh
 source "${LIB_DIR}/logger.sh"
 

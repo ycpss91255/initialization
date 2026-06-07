@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # lib/dispatcher.sh — subcommand parsing and routing
 #
-# Per PRD §7.2 subcommand table. Phase 2 batch B MVP scope:
-#   install / remove / purge / list / show / help / version
-# Other subcommands (update / upgrade / search / detect / doctor / sync /
-# config / import / export) are stubbed to keep the CLI surface stable
-# while later phases fill them in.
+# Per PRD §7.2 subcommand table (PRD 1.2.1):
+#   - `update` is removed (Q40): the registry is in-memory and rebuilt by a
+#     dynamic scan on every run, so there is nothing to refresh. It returns
+#     exit 2 (unknown subcommand) with a hint at `self-upgrade` (0.3.0) and
+#     the gh-latest cache (§7.6).
+#   - `config load` is removed (Q6/Q38): config-drop modules go through the
+#     normal install pipeline. `config get/set/unset/show` remain.
+#   - `status` is deprecated: prints a warning on stderr and forwards to
+#     `list --installed`.
 #
 # Public API:
 #   dispatcher_dispatch <args...>
@@ -28,31 +32,30 @@ _dispatcher_usage() {
     cat <<'EOF'
 Usage: setup_ubuntu <subcommand> [args] [flags]
 
-Subcommands (Phase 2 MVP):
+Subcommands:
   install <module>...    Install modules (with their deps, topologically sorted)
   remove  <module>...    Remove modules (config retained)
   purge   <module>...    Remove modules + their config
-  list                   List registered modules
+  list                   List registered modules (--installed for state.json view)
   show    <module>       Print a module's metadata
   detect                 Print host environment (use --json for machine output)
-  status                 Print modules recorded as installed (use --json)
   export  <file>         Export installed-state payload (use --modules=<csv>)
   import  <file>         Import payload and install the listed modules
-  update                 Re-scan module/ + refresh registry (apt-update analog)
   upgrade [<module>...]  Run upgrade() for given modules (or all installed)
   verify  [<module>...]  Run verify() for given modules (or all installed)
   search  <keyword>      Search modules by name / category / tag
   doctor                 Diff state.json vs system reality
-  config  set|get|unset|show|load <section.key> [<value>]
+  config  set|get|unset|show <section.key> [<value>]
                          Read / write ~/.config/init_ubuntu/config.ini
   sync    <user@host>    Push state via SSH (or --pull for the reverse)
   help    [<subcmd>]     Show this help
   version                Show tool version
 
+Deprecated:
+  status                 Use 'list --installed' (forwards with a warning)
+
 Subcommands (stubbed, later phases):
-  self-upgrade
-  config load|set|get|unset|show
-  sync / import / export
+  self-upgrade           Update the tool itself (planned for 0.3.0)
 
 Common flags:
   -y / --yes             Assume yes to interactive prompts
@@ -60,6 +63,7 @@ Common flags:
   --no-deps              Skip dep resolution (install only the named modules)
   --category=<c>         Filter list by category (base|recommended|optional|experimental)
   --tag=<t>              Filter list by tag
+  --installed            With list: show modules recorded in state.json (--json for raw)
 
 See PRD §7 for the full CLI specification.
 EOF
@@ -71,13 +75,51 @@ _dispatcher_version() {
 
 # ── list / show ──────────────────────────────────────────────────────────────
 
+# list --installed [--json] — the state.json view (replaces `status`, PRD §7.2).
+_dispatcher_list_installed() {
+    local _json="${1:-false}"
+
+    if ! declare -F state_list_installed >/dev/null 2>&1; then
+        printf "[dispatcher] ERROR: state lib not loaded\n" >&2
+        return 1
+    fi
+
+    if [[ "${_json}" == "true" ]]; then
+        local _state_path; _state_path="$(state_get_path)"
+        if [[ -f "${_state_path}" ]]; then
+            cat "${_state_path}"
+        else
+            printf '{"version":"0.1.0","installed":{}}\n'
+        fi
+        return 0
+    fi
+
+    local _names; _names="$(state_list_installed)"
+    if [[ -z "${_names}" ]]; then
+        printf "(no modules recorded as installed)\n"
+        return 0
+    fi
+    printf "%-30s  %-7s  %-12s  %s\n" "MODULE" "MANUAL" "VERSION" "INSTALLED AT"
+    local _n _manual _ver _at
+    while IFS= read -r _n; do
+        _manual="$(state_get_field "${_n}" manual)"
+        _ver="$(state_get_field "${_n}" version_provided)"
+        _at="$(state_get_field "${_n}" installed_at)"
+        printf "%-30s  %-7s  %-12s  %s\n" "${_n}" "${_manual}" "${_ver}" "${_at}"
+    done <<< "${_names}"
+}
+
 _dispatcher_list() {
     local -a _filter_args=()
+    local _installed="false"
+    local _json="false"
     local _arg
     for _arg in "$@"; do
         case "${_arg}" in
             --category=*|--tag=*) _filter_args+=("${_arg}") ;;
-            --installed|--available|--json)
+            --installed) _installed="true" ;;
+            --json)      _json="true" ;;
+            --available|--upgradable)
                 printf "[dispatcher] WARN: %s is stubbed; ignoring\n" "${_arg}" >&2
                 ;;
             *)
@@ -86,6 +128,14 @@ _dispatcher_list() {
                 ;;
         esac
     done
+
+    if [[ "${_installed}" == "true" ]]; then
+        _dispatcher_list_installed "${_json}"
+        return $?
+    fi
+    if [[ "${_json}" == "true" ]]; then
+        printf "[dispatcher] WARN: --json without --installed is stubbed; ignoring\n" >&2
+    fi
 
     if ! declare -F registry_list_names >/dev/null 2>&1; then
         printf "[dispatcher] ERROR: registry not loaded\n" >&2
@@ -204,53 +254,13 @@ _dispatcher_lifecycle() {
     esac
 }
 
-# ── status / import / export ─────────────────────────────────────────────────
+# ── status (deprecated) / import / export ────────────────────────────────────
 
+# status — deprecated alias (PRD §7.2): warn on stderr, forward to
+# `list --installed`. Flag validation is delegated to _dispatcher_list.
 _dispatcher_status() {
-    local _json="false"
-    local _arg
-    for _arg in "$@"; do
-        case "${_arg}" in
-            --json) _json="true" ;;
-            -*)
-                printf "[dispatcher] ERROR: unknown flag %s\n" "${_arg}" >&2
-                return 2
-                ;;
-            *)
-                printf "[dispatcher] ERROR: status takes no positional args (got '%s')\n" "${_arg}" >&2
-                return 2
-                ;;
-        esac
-    done
-
-    if ! declare -F state_list_installed >/dev/null 2>&1; then
-        printf "[dispatcher] ERROR: state lib not loaded\n" >&2
-        return 1
-    fi
-
-    local _state_path; _state_path="$(state_get_path)"
-    if [[ "${_json}" == "true" ]]; then
-        if [[ -f "${_state_path}" ]]; then
-            cat "${_state_path}"
-        else
-            printf '{"version":"0.1.0","installed":{}}\n'
-        fi
-        return 0
-    fi
-
-    local _names; _names="$(state_list_installed)"
-    if [[ -z "${_names}" ]]; then
-        printf "(no modules recorded as installed)\n"
-        return 0
-    fi
-    printf "%-30s  %-7s  %-12s  %s\n" "MODULE" "MANUAL" "VERSION" "INSTALLED AT"
-    local _n _manual _ver _at
-    while IFS= read -r _n; do
-        _manual="$(state_get_field "${_n}" manual)"
-        _ver="$(state_get_field "${_n}" version_provided)"
-        _at="$(state_get_field "${_n}" installed_at)"
-        printf "%-30s  %-7s  %-12s  %s\n" "${_n}" "${_manual}" "${_ver}" "${_at}"
-    done <<< "${_names}"
+    printf "[dispatcher] WARN: 'status' is deprecated; use 'list --installed' instead (forwarding)\n" >&2
+    _dispatcher_list --installed "$@"
 }
 
 _dispatcher_export() {
@@ -382,23 +392,16 @@ _dispatcher_detect() {
     printf 'form_factor:     %s\n' "${_form}"
 }
 
-# ── update / upgrade / search / doctor / config / sync ──────────────────────
+# ── upgrade / search / doctor / config / sync ───────────────────────────────
 
-_dispatcher_update() {
-    if ! declare -F registry_load_all >/dev/null 2>&1; then
-        printf "[dispatcher] ERROR: registry not loaded\n" >&2
-        return 1
-    fi
-    log_info "[dispatcher] re-scanning ${MODULE_DIR:-module}/..."
-    if registry_load_all "${MODULE_DIR:-${REPO_ROOT}/module}"; then
-        local _count
-        _count="$(registry_list_names | wc -l)"
-        log_info "[dispatcher] update complete: ${_count} module(s) registered"
-        return 0
-    else
-        log_warn "[dispatcher] registry_load_all reported a non-zero exit (see warnings above)"
-        return 1
-    fi
+# `update` was removed (PRD §7.2, Q40): the registry is in-memory and
+# rebuilt by a dynamic scan on every run — there is no index to go stale.
+# It is treated as an unknown subcommand (exit 2) with a targeted hint.
+_dispatcher_update_removed() {
+    printf "[dispatcher] ERROR: unknown subcommand 'update' (removed; the registry is rebuilt in-memory on every run)\n" >&2
+    printf "[dispatcher] hint: release freshness comes from the gh-latest cache (TTL 1h, see PRD §7.6);\n" >&2
+    printf "[dispatcher] hint: to update the tool itself, use 'self-upgrade' (planned for 0.3.0).\n" >&2
+    return 2
 }
 
 _dispatcher_search() {
@@ -566,8 +569,9 @@ _dispatcher_doctor() {
 
     if [[ "${_issues}" -gt 0 ]]; then
         printf "\n[dispatcher] doctor found %s drift / inconsistency item(s)\n" "${_issues}" >&2
-        printf "[dispatcher] use 'doctor --fix' (planned) to auto-resolve\n" >&2
-        return 6
+        printf "[dispatcher] use 'doctor --fix' (planned for 0.3.0) to auto-resolve\n" >&2
+        # Diag class (PRD §7.4): 0 = pass, 1 = fail (7 reserved for network).
+        return 1
     fi
     printf "\n[dispatcher] doctor: state.json and system are consistent.\n"
 }
@@ -575,12 +579,6 @@ _dispatcher_doctor() {
 _dispatcher_config() {
     local _action="${1:-}"; shift || true
     case "${_action}" in
-        load)
-            # config load — placeholder: re-apply module/config-*  modules
-            # in v0.1 has no automatic config-load list. Stub-warn until M7.
-            printf "[dispatcher] config load is staged for M7 (module migration). Skipping.\n" >&2
-            return 0
-            ;;
         set)
             if [[ "$#" -lt 2 ]]; then
                 printf "[dispatcher] ERROR: config set needs <section.key> <value>\n" >&2
@@ -606,7 +604,9 @@ _dispatcher_config() {
             config_show "$@"
             ;;
         *)
-            printf "[dispatcher] ERROR: unknown config action '%s' (try load/set/get/unset/show)\n" "${_action}" >&2
+            # `config load` was removed (Q6/Q38): config-drop modules go
+            # through the normal install pipeline (e.g. `install git-config`).
+            printf "[dispatcher] ERROR: unknown config action '%s' (try set/get/unset/show)\n" "${_action}" >&2
             return 2
             ;;
     esac
@@ -685,7 +685,7 @@ dispatcher_dispatch() {
         status)  _dispatcher_status "$@" ;;
         export)  _dispatcher_export "$@" ;;
         import)  _dispatcher_import "$@" ;;
-        update)  _dispatcher_update "$@" ;;
+        update)  _dispatcher_update_removed ;;
         upgrade) _dispatcher_upgrade "$@" ;;
         verify)  _dispatcher_verify "$@" ;;
         search)  _dispatcher_search "$@" ;;

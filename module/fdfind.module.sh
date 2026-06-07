@@ -71,31 +71,31 @@ CONFIG_PATHS=("${HOME}/.config/fd")
 module_use_apt_archetype
 
 # Override install/upgrade (super-call pattern, archetype-cookbook §A):
-# chain to the apt default, then record the version Sidecar (ADR-0001).
+# chain to the apt default, then record the version Sidecar (ADR-0001;
+# module_sidecar_* helpers are dry-run-safe, the explicit guard just
+# skips the pointless dpkg-query).
 install() {
     module_default_apt_install || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    _fdfind_sidecar_write "$(_fdfind_pkg_version)"
+    module_sidecar_write "${NAME}" "$(_fdfind_pkg_version)"
 }
 
 upgrade() {
     module_default_apt_upgrade || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    _fdfind_sidecar_write "$(_fdfind_pkg_version)"
+    module_sidecar_write "${NAME}" "$(_fdfind_pkg_version)"
 }
 
 # Override remove/purge: apt default handles packages/config, then drop
 # the Sidecar — "what version is installed" is state, not user config.
 remove() {
     module_default_apt_remove || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    _fdfind_sidecar_remove
+    module_sidecar_remove "${NAME}"
 }
 
 purge() {
     module_default_apt_purge || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    _fdfind_sidecar_remove
+    module_sidecar_remove "${NAME}"
 }
 
 detect() {
@@ -121,7 +121,7 @@ doctor() {
         log_warn "[${NAME}] doctor: ${_bin} --version failed"
         return 1
     fi
-    [[ -f "$(_fdfind_sidecar_path)" ]] \
+    module_sidecar_get_version "${NAME}" >/dev/null 2>&1 \
         || log_warn "[${NAME}] doctor: sidecar missing (installed outside init_ubuntu?)"
     return 0
 }
@@ -134,26 +134,6 @@ _fdfind_pkg_version() {
     local _ver=""
     _ver="$(dpkg-query -W -f='${Version}' fd-find 2>/dev/null)" || _ver=""
     printf '%s' "${_ver:-apt-managed}"
-}
-
-# Sidecar path per ADR-0001: ${XDG_STATE_HOME}/init_ubuntu/versions/<name>.
-# Honors INIT_UBUNTU_STATE_DIR (engine/test override), like lib/state.sh.
-_fdfind_sidecar_path() {
-    local _dir="${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu}"
-    printf '%s/versions/%s' "${_dir}" "${NAME}"
-}
-
-_fdfind_sidecar_write() {
-    local _ver="${1:-apt-managed}"
-    local _path; _path="$(_fdfind_sidecar_path)"
-    mkdir -p "${_path%/*}"
-    printf '%s\n' "${_ver}" > "${_path}"
-    log_info "[${NAME}] sidecar: ${_path} = ${_ver}"
-}
-
-_fdfind_sidecar_remove() {
-    rm -f "$(_fdfind_sidecar_path)"
-    return 0
 }
 
 # ── Standalone footer ───────────────────────────────────────────────────────

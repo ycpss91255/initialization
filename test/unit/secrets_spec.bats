@@ -73,6 +73,10 @@ _set_agent_sock() {
     export SSH_AUTH_SOCK="$1"
 }
 
+_set_dbus() {
+    export DBUS_SESSION_BUS_ADDRESS="$1"
+}
+
 # ── backend autoselect ──────────────────────────────────────────────────────
 
 @test "autoselect prefers pass when installed" {
@@ -87,7 +91,7 @@ _set_agent_sock() {
     command -v pass >/dev/null 2>&1 && skip "real pass installed in image"
     _load_secrets
     _stub secret-tool
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/fake-bus"
+    _set_dbus "unix:path=/tmp/fake-bus"
     run secrets_backend_resolve
     assert_success
     assert_output "gnome-keyring"
@@ -284,28 +288,146 @@ _set_agent_sock() {
     assert_failure 2
 }
 
-@test "setup_secrets.sh token subcommand is reserved for #68 (exit 2)" {
-    run "${REPO_ROOT}/setup_secrets.sh" token set gh
-    assert_failure 2
-    assert_output --partial "#68"
+# ── token set / token get (issue #68) ───────────────────────────────────────
+
+@test "token set/get round-trip via CLI on encrypted-file backend" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    run bash -c "printf '%s' 'cli-tok-9f2' | '${REPO_ROOT}/setup_secrets.sh' token set gh-token"
+    assert_success
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" token get gh-token
+    assert_success
+    assert_output "cli-tok-9f2"
 }
 
-@test "setup_secrets.sh gpg subcommand is reserved for #68 (exit 2)" {
+@test "token set rejects a value passed as argv (exit 2)" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    run bash -c "'${REPO_ROOT}/setup_secrets.sh' token set gh-token my-secret-value </dev/null"
+    assert_failure 2
+    refute_output --partial "my-secret-value stored"
+}
+
+@test "token get for a missing name fails without leaking anything" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" token get no-such-token
+    assert_failure
+    assert_output ""
+}
+
+@test "token round-trips through a mocked pass backend via CLI" {
+    _set_backend pass
+    export SECRETS_FAKE_PASS_DB="${INIT_UBUNTU_TEST_SCRATCH}/fake-pass-db"
+    _stub pass "case \"\$1\" in
+        insert) cat > \"\${SECRETS_FAKE_PASS_DB:?}\" ;;
+        show)   cat \"\${SECRETS_FAKE_PASS_DB:?}\" ;;
+    esac"
+    run bash -c "printf '%s' 'pass-tok-77' | '${REPO_ROOT}/setup_secrets.sh' token set gh-token"
+    assert_success
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" token get gh-token
+    assert_success
+    assert_output "pass-tok-77"
+    # the secret value must never ride argv into the pass binary
+    run ! grep -q 'pass-tok-77' "${SECRETS_STUB_LOG}"
+}
+
+@test "token round-trips through a mocked gnome-keyring backend via CLI" {
+    _set_backend gnome-keyring
+    _set_dbus "unix:path=/tmp/fake-bus"
+    export SECRETS_FAKE_KEYRING="${INIT_UBUNTU_TEST_SCRATCH}/fake-keyring"
+    _stub secret-tool "case \"\$1\" in
+        store)  cat > \"\${SECRETS_FAKE_KEYRING:?}\" ;;
+        lookup) cat \"\${SECRETS_FAKE_KEYRING:?}\" ;;
+    esac"
+    run bash -c "printf '%s' 'gkr-tok-42' | '${REPO_ROOT}/setup_secrets.sh' token set gh-token"
+    assert_success
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" token get gh-token
+    assert_success
+    assert_output "gkr-tok-42"
+    run ! grep -q 'gkr-tok-42' "${SECRETS_STUB_LOG}"
+}
+
+# ── list / remove (issue #68) ───────────────────────────────────────────────
+
+@test "list prints stored names only — never values" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    printf '%s' 'value-A-canary' | "${REPO_ROOT}/setup_secrets.sh" token set alpha
+    printf '%s' 'value-B-canary' | "${REPO_ROOT}/setup_secrets.sh" token set beta
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" list
+    assert_success
+    assert_line "alpha"
+    assert_line "beta"
+    refute_output --partial 'value-A-canary'
+    refute_output --partial 'value-B-canary'
+}
+
+@test "remove deletes the named secret from the active backend" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    printf '%s' 'v1' | "${REPO_ROOT}/setup_secrets.sh" token set doomed
+    [[ -f "${INIT_UBUNTU_SECRETS_DIR}/doomed.enc" ]]
+    run "${REPO_ROOT}/setup_secrets.sh" remove doomed
+    assert_success
+    [[ ! -e "${INIT_UBUNTU_SECRETS_DIR}/doomed.enc" ]]
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" list
+    assert_success
+    refute_output --partial "doomed"
+}
+
+@test "remove without a name exits 2" {
+    run "${REPO_ROOT}/setup_secrets.sh" remove
+    assert_failure 2
+}
+
+@test "remove of a missing name fails non-zero" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    run "${REPO_ROOT}/setup_secrets.sh" remove never-stored
+    assert_failure
+}
+
+# ── gpg generate / import (issue #68) ───────────────────────────────────────
+
+@test "gpg generate delegates to gpg --full-generate-key with a clean argv" {
+    _stub gpg
     run "${REPO_ROOT}/setup_secrets.sh" gpg generate
-    assert_failure 2
-    assert_output --partial "#68"
+    assert_success
+    grep -q -- '^gpg --full-generate-key' "${SECRETS_STUB_LOG}"
+    # all prompts (incl. passphrase) belong to gpg's own tty — nothing
+    # passphrase-like may ever pass through our argv (AC-20)
+    run ! grep -qE -- '--passphrase|--pinentry' "${SECRETS_STUB_LOG}"
 }
 
-@test "setup_secrets.sh list subcommand is reserved for #68 (exit 2)" {
-    run "${REPO_ROOT}/setup_secrets.sh" list
-    assert_failure 2
-    assert_output --partial "#68"
+@test "gpg import imports key material from a file" {
+    _stub gpg
+    printf '%s\n' 'FAKE KEY BLOCK' > "${INIT_UBUNTU_TEST_SCRATCH}/key.asc"
+    run "${REPO_ROOT}/setup_secrets.sh" gpg import "${INIT_UBUNTU_TEST_SCRATCH}/key.asc"
+    assert_success
+    grep -q -- "^gpg --import ${INIT_UBUNTU_TEST_SCRATCH}/key.asc" "${SECRETS_STUB_LOG}"
 }
 
-@test "setup_secrets.sh remove subcommand is reserved for #68 (exit 2)" {
-    run "${REPO_ROOT}/setup_secrets.sh" remove gh
+@test "gpg import reads key material from stdin when no file is given" {
+    export SECRETS_FAKE_GPG_IN="${INIT_UBUNTU_TEST_SCRATCH}/gpg-stdin"
+    _stub gpg "cat > \"\${SECRETS_FAKE_GPG_IN:?}\""
+    run bash -c "printf '%s' 'STDIN KEY BLOCK' | '${REPO_ROOT}/setup_secrets.sh' gpg import"
+    assert_success
+    grep -q -- '^gpg --import$' "${SECRETS_STUB_LOG}"
+    [[ "$(cat "${SECRETS_FAKE_GPG_IN}")" == "STDIN KEY BLOCK" ]]
+}
+
+@test "gpg import with a missing file exits 1 without calling gpg" {
+    _stub gpg
+    run "${REPO_ROOT}/setup_secrets.sh" gpg import "${INIT_UBUNTU_TEST_SCRATCH}/nope.asc"
+    assert_failure 1
+    run ! grep -q '^gpg' "${SECRETS_STUB_LOG}"
+}
+
+@test "gpg unknown action exits 2" {
+    _stub gpg
+    run "${REPO_ROOT}/setup_secrets.sh" gpg frobnicate
     assert_failure 2
-    assert_output --partial "#68"
 }
 
 # ── ssh-key generate: argv hygiene (AC-20) ──────────────────────────────────

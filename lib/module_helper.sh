@@ -581,20 +581,33 @@ module_standalone_main() {
 
 # ─── 8. Engine-side aggregators ─────────────────────────────────────────────
 #
-# Called by lib/runner.sh at session end to collect cross-module hints.
-# These run in the engine sub-shell after `${_phase}` completes; they read
-# the module-level arrays already in scope.
+# Called by lib/runner.sh in the module sub-shell right after a successful
+# install phase; they read the module-level arrays already in scope and
+# emit `action_required` structured events (PRD §7.7.2). The human-readable
+# "Action required" block is derived from these events at session end —
+# stdout and the JSONL log never diverge (AC-35).
 
-# module_emit_post_install — runner appends this to a session-wide buffer.
+# module_emit_post_install — emit an action_required event (kind=post_install)
+# carrying the i18n-resolved POST_INSTALL_MESSAGE; no-op when empty.
 module_emit_post_install() {
+    # Most modules declare no POST_INSTALL_MESSAGE at all — bail out before
+    # module_i18n_get's nameref deref, which would trip `set -u` on an
+    # undeclared array.
+    declare -p POST_INSTALL_MESSAGE >/dev/null 2>&1 || return 0
     local _msg
     # shellcheck disable=SC2119  # call with no args = use INIT_UBUNTU_LANG default — https://www.shellcheck.net/wiki/SC2119
     _msg="$(module_get_post_install_message)"
     [[ -n "${_msg}" ]] || return 0
-    printf '[%s] %s\n' "${NAME:-?}" "${_msg}"
+    log_event info "${NAME:-}" "action_required" \
+        "kind=post_install" \
+        "message=${_msg}"
 }
 
+# module_emit_reboot_required — emit an action_required event (kind=reboot)
+# when the module declared REBOOT_REQUIRED=true; no-op otherwise.
 module_emit_reboot_required() {
     [[ "${REBOOT_REQUIRED:-false}" == "true" ]] || return 0
-    printf '[%s] reboot required\n' "${NAME:-?}"
+    log_event warn "${NAME:-}" "action_required" \
+        "kind=reboot" \
+        "message=Reboot required (${NAME:-?}). Run: sudo reboot"
 }

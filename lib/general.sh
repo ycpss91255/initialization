@@ -57,6 +57,57 @@ function get_system_param() {
 
 }
 
+# Epoch milliseconds; falls back to second precision *1000 when date lacks
+# %N (busybox / BSD).
+function _general_epoch_ms() {
+    local _ms
+    _ms="$(date +%s%3N 2>/dev/null)"
+    if [[ ! "${_ms}" =~ ^[0-9]+$ ]]; then
+        _ms="$(( $(date +%s) * 1000 ))"
+    fi
+    printf '%s' "${_ms}"
+}
+
+# Capture-mode executor (PRD §7.7.1): child stdout/stderr is NOT streamed —
+# it is captured and emitted as one JSONL `cmd_exec` event (attributes:
+# cmd / exit / duration_ms / output). With INIT_UBUNTU_VERBOSE=true the
+# child output additionally streams live. When INIT_UBUNTU_CMD_OUTPUT_FILE
+# is set (lib/runner.sh per-module buffer), captured output is appended
+# there so the runner can dump the last ~20 lines on failure.
+function _exec_cmd_captured() {
+    local _cmd="$*"
+    local _tmp _rc=0 _start_ms _end_ms
+    _tmp="$(mktemp)"
+    _start_ms="$(_general_epoch_ms)"
+
+    if [[ "${INIT_UBUNTU_VERBOSE:-false}" == "true" ]]; then
+        # Stream live AND capture. Under the module sub-shell's pipefail,
+        # `|| _rc=$?` sees the eval's status (tee itself does not fail).
+        eval "${_cmd}" 2>&1 | tee "${_tmp}" || _rc=$?
+    else
+        eval "${_cmd}" > "${_tmp}" 2>&1 || _rc=$?
+    fi
+
+    _end_ms="$(_general_epoch_ms)"
+
+    if [[ -n "${INIT_UBUNTU_CMD_OUTPUT_FILE:-}" ]]; then
+        cat "${_tmp}" >> "${INIT_UBUNTU_CMD_OUTPUT_FILE}" 2>/dev/null || true
+    fi
+
+    if declare -F log_event >/dev/null 2>&1; then
+        local _severity="info"
+        [[ "${_rc}" -ne 0 ]] && _severity="error"
+        log_event "${_severity}" "${INIT_UBUNTU_CURRENT_MODULE:-}" "cmd_exec" \
+            "cmd=${_cmd}" \
+            "exit=${_rc}" \
+            "duration_ms=$(( _end_ms - _start_ms ))" \
+            "output=$(< "${_tmp}")"
+    fi
+
+    rm -f "${_tmp}"
+    return "${_rc}"
+}
+
 # export EXEC_CMD_NO_PRINT="true"
 # From https://github.com/XuehaiPan/Dev-Setup.git
 function exec_cmd() {
@@ -154,7 +205,15 @@ function exec_cmd() {
                 printf("%s\n", RESET);
             }' >&2
     fi
-    eval "$*"
+
+    # Engine pipeline (lib/runner.sh) sets INIT_UBUNTU_CMD_CAPTURE=true so
+    # child output goes to JSONL instead of the console (PRD §7.7.1).
+    # Legacy standalone module/setup_*.sh callers keep the streaming eval.
+    if [[ "${INIT_UBUNTU_CMD_CAPTURE:-false}" == "true" ]]; then
+        _exec_cmd_captured "$@"
+    else
+        eval "$*"
+    fi
 }
 
 # Check if the user has sudo access.

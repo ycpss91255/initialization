@@ -39,6 +39,23 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   rewritten to the PRD §3.4 three-line bootstrap (apt install git →
   git clone → `./setup_ubuntu_tui.sh`) with a documentation map; the
   README stays `.adoc` (full `.md` conversion is 0.2.0 / AC-28).
+- **`claude-code-config.module.sh` module** (issue #75, PRD §6.3.2 Batch C,
+  M7): new config-drop module applying the personal Claude Code settings
+  shipped in `module/config/claude/` (`settings.json`,
+  `run-statusline.sh`, `settings.statusline.json`) to `~/.claude/`.
+  Built on `module_use_config_archetype` with super-call overrides: the
+  two statusline companions are dropped alongside the primary
+  `settings.json`, template-author `/home/<user>` prefixes are rewritten
+  to the current `$HOME`, and the marker is a JSON key already present in
+  the template so the archetype never injects a `#` comment into JSON.
+  `CATEGORY=optional`, `TAGS=(agent ...)`, `DEPENDS_ON=(claude-code)`
+  (Q39). All 10 lifecycle phases run standalone (AC-25); install is
+  idempotent (AC-5); `--dry-run` performs no filesystem writes (AC-12);
+  the version Sidecar is written on install/upgrade and removed on
+  remove/purge per ADR-0001 while `state.json` is never touched by the
+  module. `is_outdated` reports drift between the dropped files and the
+  localized templates; `doctor` validates the statusline launcher.
+  80-test bats spec.
 
 - **`setup_secrets.sh`: token / gpg / list / remove subcommands**
   (issue #68, PRD §14, AC-20): the reserved #44 stubs are now real.

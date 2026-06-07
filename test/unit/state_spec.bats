@@ -53,29 +53,60 @@ _load_state() {
 
 # ── record_install / record_remove ──────────────────────────────────────────
 
-@test "state_record_install writes all schema fields" {
+@test "state_record_install writes all schema fields under synced (ADR-0018)" {
     _load_state
     state_record_install docker true apt-managed
     local _p; _p="$(state_get_path)"
-    run jq -r '.installed.docker.version_provided' "${_p}"
+    run jq -r '.installed.docker.synced.version_provided' "${_p}"
     assert_success
     assert_output "apt-managed"
-    run jq -r '.installed.docker.manual' "${_p}"
+    run jq -r '.installed.docker.synced.manual' "${_p}"
     assert_success
     assert_output "true"
-    run jq -r '.installed.docker.installed_by' "${_p}"
+    run jq -r '.installed.docker.synced.installed_by' "${_p}"
     assert_success
     assert_output --partial "init_ubuntu"
-    run jq -r '.installed.docker.installed_at' "${_p}"
+    run jq -r '.installed.docker.synced.installed_at' "${_p}"
     assert_success
     assert_output --regexp '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}'
+}
+
+@test "state_record_install creates the synced/local split shape (ADR-0018)" {
+    _load_state
+    state_record_install docker true apt-managed
+    local _p; _p="$(state_get_path)"
+    run jq -r '.installed.docker | has("synced") and has("local")' "${_p}"
+    assert_success
+    assert_output "true"
+    # local starts empty — populated by the local install pipeline only.
+    run jq -r '.installed.docker.local | length' "${_p}"
+    assert_success
+    assert_output "0"
+}
+
+@test "state_record_install records depends_on snapshot (4th arg, csv)" {
+    _load_state
+    state_record_install neovim true v0.10.2 "fzf,lazygit,ripgrep"
+    local _p; _p="$(state_get_path)"
+    run jq -cr '.installed.neovim.synced.depends_on' "${_p}"
+    assert_success
+    assert_output '["fzf","lazygit","ripgrep"]'
+}
+
+@test "state_record_install with no depends_on defaults to []" {
+    _load_state
+    state_record_install docker true
+    local _p; _p="$(state_get_path)"
+    run jq -cr '.installed.docker.synced.depends_on' "${_p}"
+    assert_success
+    assert_output '[]'
 }
 
 @test "state_record_install with no <manual> defaults to manual=false (dep)" {
     _load_state
     state_record_install neovim
     local _p; _p="$(state_get_path)"
-    run jq -r '.installed.neovim.manual' "${_p}"
+    run jq -r '.installed.neovim.synced.manual' "${_p}"
     assert_success
     assert_output "false"
 }
@@ -86,9 +117,21 @@ _load_state() {
     state_record_install b yes
     state_record_install c TRUE
     local _p; _p="$(state_get_path)"
-    [[ "$(jq -r '.installed.a.manual' "${_p}")" == "true" ]]
-    [[ "$(jq -r '.installed.b.manual' "${_p}")" == "true" ]]
-    [[ "$(jq -r '.installed.c.manual' "${_p}")" == "true" ]]
+    [[ "$(jq -r '.installed.a.synced.manual' "${_p}")" == "true" ]]
+    [[ "$(jq -r '.installed.b.synced.manual' "${_p}")" == "true" ]]
+    [[ "$(jq -r '.installed.c.synced.manual' "${_p}")" == "true" ]]
+}
+
+@test "state_record_install preserves existing local section on re-record" {
+    _load_state
+    state_record_install docker false v1
+    local _p; _p="$(state_get_path)"
+    jq '.installed.docker.local.install_target_resolved = "sudo"' "${_p}" \
+        > "${_p}.tmp" && mv "${_p}.tmp" "${_p}"
+    state_record_install docker true v2
+    run jq -r '.installed.docker.local.install_target_resolved' "${_p}"
+    assert_success
+    assert_output "sudo"
 }
 
 @test "state_record_remove drops the entry (idempotent on missing)" {
@@ -108,8 +151,60 @@ _load_state() {
     state_record_install docker false v1
     state_record_install docker true v2
     local _p; _p="$(state_get_path)"
-    [[ "$(jq -r '.installed.docker.version_provided' "${_p}")" == "v2" ]]
-    [[ "$(jq -r '.installed.docker.manual' "${_p}")" == "true" ]]
+    [[ "$(jq -r '.installed.docker.synced.version_provided' "${_p}")" == "v2" ]]
+    [[ "$(jq -r '.installed.docker.synced.manual' "${_p}")" == "true" ]]
+}
+
+# ── synced section accessors (ADR-0018, issue #43) ──────────────────────────
+
+@test "state_get_synced prints the synced JSON object" {
+    _load_state
+    state_record_install docker true v27 "apt-essentials"
+    run state_get_synced docker
+    assert_success
+    echo "${output}" | jq -e '.manual == true and .version_provided == "v27"
+        and .depends_on == ["apt-essentials"]' > /dev/null
+}
+
+@test "state_get_synced on missing module prints nothing" {
+    _load_state
+    state_init
+    run state_get_synced nonexistent
+    assert_success
+    assert_output ""
+}
+
+@test "state_set_synced creates entry with empty local section" {
+    _load_state
+    state_init
+    state_set_synced docker '{"manual":true,"depends_on":[],"version_provided":"v28"}'
+    local _p; _p="$(state_get_path)"
+    run jq -r '.installed.docker.synced.version_provided' "${_p}"
+    assert_success
+    assert_output "v28"
+    run jq -r '.installed.docker.local | length' "${_p}"
+    assert_success
+    assert_output "0"
+}
+
+@test "state_set_synced preserves existing local section" {
+    _load_state
+    state_record_install docker false v1
+    local _p; _p="$(state_get_path)"
+    jq '.installed.docker.local.user_home_root = "/home/u/.local/lib/x"' "${_p}" \
+        > "${_p}.tmp" && mv "${_p}.tmp" "${_p}"
+    state_set_synced docker '{"manual":true,"version_provided":"v2"}'
+    [[ "$(jq -r '.installed.docker.synced.version_provided' "${_p}")" == "v2" ]]
+    [[ "$(jq -r '.installed.docker.local.user_home_root' "${_p}")" == "/home/u/.local/lib/x" ]]
+}
+
+@test "state_set_synced rejects non-object JSON" {
+    _load_state
+    state_init
+    run state_set_synced docker 'not-json'
+    assert_failure
+    run state_set_synced docker '["array"]'
+    assert_failure
 }
 
 # ── read API ────────────────────────────────────────────────────────────────
@@ -292,7 +387,7 @@ _hold_state_lock() {
     assert_success
     assert_output --partial "waiting for state lock"
     local _p; _p="$(state_get_path)"
-    [[ "$(jq -r '.installed.docker.version_provided' "${_p}")" == "v1" ]]
+    [[ "$(jq -r '.installed.docker.synced.version_provided' "${_p}")" == "v1" ]]
 }
 
 @test "lock timeout exits 1 and prints holder PID + lock file path" {
@@ -325,11 +420,11 @@ _hold_state_lock() {
     state_record_upgrade docker "v0.2.0"
 
     local _p; _p="$(state_get_path)"
-    run jq -r '.installed.docker.version_provided' "${_p}"
+    run jq -r '.installed.docker.synced.version_provided' "${_p}"
     assert_success
     assert_output "v0.2.0"
 
-    run jq -r '.installed.docker.last_upgraded_at' "${_p}"
+    run jq -r '.installed.docker.synced.last_upgraded_at' "${_p}"
     assert_success
     # ISO-8601-ish: yyyy-mm-ddThh:mm:ss
     [[ "${output}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2} ]]
@@ -342,11 +437,11 @@ _hold_state_lock() {
     state_record_upgrade docker "v0.2.0"
 
     local _p; _p="$(state_get_path)"
-    run jq -r '.installed.docker.manual' "${_p}"
+    run jq -r '.installed.docker.synced.manual' "${_p}"
     assert_success
     assert_output "true"
 
-    run jq -r '.installed.docker.installed_at' "${_p}"
+    run jq -r '.installed.docker.synced.installed_at' "${_p}"
     assert_success
     [[ -n "${output}" && "${output}" != "null" ]]
 }
@@ -370,7 +465,7 @@ _hold_state_lock() {
     state_record_verify docker
 
     local _p; _p="$(state_get_path)"
-    run jq -r '.installed.docker.last_verified_at' "${_p}"
+    run jq -r '.installed.docker.local.last_verified_at' "${_p}"
     assert_success
     [[ "${output}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2} ]]
 }
@@ -382,7 +477,7 @@ _hold_state_lock() {
     state_record_verify docker
 
     local _p; _p="$(state_get_path)"
-    run jq -r '.installed.docker.version_provided' "${_p}"
+    run jq -r '.installed.docker.synced.version_provided' "${_p}"
     assert_success
     assert_output "v0.1.0"
 }

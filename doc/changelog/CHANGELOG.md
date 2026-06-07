@@ -36,6 +36,163 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   round-trip is covered through the real CLI on all three PRD §14.3
   backends: encrypted-file for real in Docker, `pass` and `gnome-keyring`
   via PATH-stub mocks that also assert the secret value never rides argv.
+- **claude-code module** (issue #57, PRD §6.3.2, Batch C): new
+  `module/claude-code.module.sh` installs the Anthropic Claude Code CLI
+  via the official native installer (`https://claude.ai/install.sh`,
+  user-home install, no sudo) on the custom archetype (D). The tool
+  ships its own auto-updater, so `is_outdated` always returns 1
+  (delegated) and `upgrade` runs `claude update`; `remove` keeps user
+  config (`~/.claude*`), `purge` clears it. Sidecar written on
+  install/upgrade and dropped on remove/purge (ADR-0001); all 10
+  lifecycle phases runnable standalone (AC-25). 74-test bats spec at
+  `test/unit/module/claude-code_spec.bats`.
+
+- **ranger module** (issue #61, PRD §6.3.3 Batch C): new
+  `module/ranger.module.sh` on the apt + config-drop hybrid archetype
+  (super-call pattern) — apt installs the `ranger` package, then the
+  config-drop defaults place the repo-managed
+  `module/config/ranger/rifle.conf` (ranger's file-opener rules) at
+  `~/.config/ranger/rifle.conf` with the managed marker. `is_installed`
+  requires both the package and the marked config, so a deleted
+  rifle.conf re-triggers the drop while a user-edited (still-marked)
+  file is never clobbered; `remove` keeps the config, `purge` deletes
+  `~/.config/ranger`. All 10 lifecycle phases run standalone (AC-25);
+  install is idempotent (AC-5); `--dry-run` performs no filesystem
+  writes (AC-12); the version Sidecar is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. Tagged `filemgr`, `CATEGORY=optional`,
+  `DEPENDS_ON=()` (Q39).
+- **`lnav.module.sh` v2 module** (issue #62, PRD §6.3.3 Batch C):
+  migrates the `module/config/lnav_pkg/` based install (config bundle
+  loaded ad-hoc via `lnav -I <path>`) to the v2 contract on the custom
+  archetype — the apt `lnav` package plus the legacy lnav_pkg config
+  bundle (theme, UI settings, custom log formats) deployed to
+  `~/.config/lnav` so lnav loads it without the `-I` flag. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  (dpkg-reported package version) is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. `remove` keeps the deployed config bundle,
+  `purge` wipes it. Tagged `logs`, `CATEGORY=optional`, `DEPENDS_ON=()`.
+- **vscode module migrated to the v2 contract** (issue #59, PRD §6.3.3
+  Batch C): `module/setup_vscode.sh` (v1) is superseded by
+  `module/vscode.module.sh` on the apt archetype with a Microsoft vendor
+  repo — deb822 source at `/etc/apt/sources.list.d/vscode.sources` signed
+  by a dearmored `/etc/apt/keyrings/microsoft.gpg` (same shape as
+  `docker.module.sh`), then `apt install code`. Demoted from recommended
+  to optional (no longer the primary editor): `CATEGORY=optional`,
+  `TAGS=(editor)`, `DEPENDS_ON=(apt-essentials)` (Q39). All 10 lifecycle
+  phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  (dpkg-reported `code` version) is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. `remove` keeps the vendor repo files for cheap
+  re-install; only `purge` drops them.
+- **codex module** (issue #58, PRD §6.3.2 Batch C, M7): new
+  `module/codex.module.sh` installs the OpenAI Codex CLI from GitHub
+  releases (`openai/codex`, native musl binary, github-release
+  archetype) into `/opt/codex` with a `/usr/local/bin/codex` symlink.
+  Arch-aware asset selection (x86_64 / aarch64), best-effort latest-tag
+  lookup feeds the Sidecar (the download URL itself is
+  version-independent), `rust-vX.Y.Z` tags normalised for
+  `is_outdated`. Tagged `agent`; all 10 lifecycle phases runnable
+  standalone (AC-25), idempotent install (AC-5), dry-run writes nothing
+  (AC-12), Sidecar per ADR-0001. 84-test bats spec
+  `test/unit/module/codex_spec.bats` (Q29 coverage ladder).
+- **Color library + global output flags** (issue #45, PRD §5.1 / §7.5,
+  M8, AC-16): new `lib/color.sh` decides ANSI color once per run —
+  `auto` (default) turns color off for non-tty stdout, `NO_COLOR`,
+  `TERM=dumb`, and background jobs; exposes the `CLR_*` palette
+  (blank-safe when off), `color_enabled`, and a `colorize` helper.
+  `dispatcher_dispatch` pre-parses position-independent global flags:
+  `--color=auto|always|never` (exit 2 on a bad value, `always` forces
+  escapes even piped, `never` strips them on a tty via the
+  `INIT_UBUNTU_COLOR_MODE` override in `lib/logger.sh`),
+  `--verbose`/`-v` sets `LOG_LEVEL=DEBUG`, and `--quiet` sets
+  `LOG_LEVEL=WARN`. e2e bats pin AC-16: `setup_ubuntu list | cat`
+  emits no ANSI escapes.
+
+### Fixed
+
+- **github-release archetype download URL 404** : `lib/module_helper.sh`
+  built `releases/latests/download/` (one-char typo) so every real
+  (non-mocked) install of an archetype-B module would 404. Fixed to
+  `releases/latest/download/` + regression spec. Found independently by
+  three Batch B module agents.
+
+### Added
+
+- **fdfind module migrated to the v2 contract** (issue #54, PRD §6.3.1
+  Batch B): `module/submodule/fdfind.sh` (v1 GitHub tarball install) is
+  replaced by `module/fdfind.module.sh` on the apt archetype — Ubuntu
+  ships fd as the `fd-find` package whose binary is `fdfind`; the
+  POST_INSTALL_MESSAGE explains the `alias fd=fdfind` shortcut. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  (dpkg-reported package version) is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. Tagged `cli-essentials`, `CATEGORY=optional`,
+  `DEPENDS_ON=()` (also a neovim dependency for telescope file finding).
+- **Self-deps preflight in the entrypoint** (issue #40, PRD §3.4 /
+  AC-34): new `lib/preflight.sh` checks the tool's own dependencies
+  (`jq` / `curl` / `git`) before dispatching. Missing + sudo available:
+  prints an apt-style plan and asks once whether to `apt install`
+  (automatic with `-y` / `INIT_UBUNTU_YES=true`); missing + no sudo:
+  fails fast with exit 4 and explicit install guidance. `help` /
+  `version` paths are exempt, and the check runs at most once per run
+  (`INIT_UBUNTU_PREFLIGHT_DONE` guard). Resolves the chicken-and-egg
+  where state/config/detect need `jq` but `jq` ships inside the
+  `apt-essentials` module. Test rig gains `curl` (test-tools image +
+  kcov coverage deps) so e2e specs driving the real entrypoint pass the
+  preflight; the real apt-install path is reserved for the AC-34
+  integration check in a clean CI container (wave 6).
+- **`lazygit.module.sh` v2 module** (issue #48, PRD §6.3.1 Batch B):
+  migrates `module/submodule/lazygit.sh` to the v2 contract on the
+  github-release archetype. Versioned upstream assets
+  (`lazygit_<ver>_Linux_x86_64.tar.gz`) are resolved at run time before
+  super-calling the archetype fetch. All 10 lifecycle phases are
+  runnable standalone (AC-25); the version Sidecar (shared
+  `module_sidecar_*` helpers) is written on install/upgrade and deleted
+  on remove/purge (ADR-0001), with `doctor` flagging
+  Sidecar/install-state drift. Ships
+  `test/unit/module/lazygit_spec.bats` (71 tests, Q29 scope) with
+  mocked GitHub queries (Q46: zero network in gates).
+- **Import/export with the ADR-0013 conflict pipeline** (issue #43,
+  AC-14): `export <file> [--modules=<csv>]` ships only the
+  machine-portable `synced` section of each installed module (ADR-0018);
+  the machine-specific `local` section never leaves the host.
+  `import <file>` runs the same conflict pipeline as `sync --pull`:
+  **dry-run by default** (prints an `IMPORT DIFF` plan, writes nothing),
+  `--apply` commits. Merge rules: union of modules (local-only entries
+  are never deleted), remote-wins on `version_provided` / `depends_on`,
+  `manual` sticky-to-true, and remote-only modules missing from the
+  local catalog are skipped with a warning. The receiver rebuilds
+  `local` sections via its own install pipeline; payload `local` data is
+  never applied. New state helpers `state_get_synced` /
+  `state_set_synced`, plus `state_io_import_plan` /
+  `state_io_import_apply` (payload schema 0.2.0). `sync --apply` is
+  forwarded to the importing side (push: remote `import --apply`; pull:
+  local apply), so sync also defaults to dry-run per ADR-0013.
+- **state.json synced/local split** (issue #43, ADR-0018, PRD §10.1):
+  `installed.<m>` is now split into `synced` (manual, depends_on,
+  version_provided, installed_at, installed_by — travels over
+  sync/export) and `local` (machine-specific facts — never leaves the
+  host). `state_record_install` gains an optional 4th `depends_on` csv
+  arg and preserves the `local` sub-object across re-records;
+  `state_record_upgrade` updates `synced`; `state_record_verify` stamps
+  `local.last_verified_at`; `state_get_field` reads synced-then-local.
+- **batcat module migrated to the v2 contract** (issue #53, PRD §6.3.1
+  Batch B): `module/submodule/batcat.sh` (GitHub-release tarball) is
+  replaced by `module/batcat.module.sh` on the apt archetype — installs
+  the Ubuntu `bat` package (binary ships as `batcat`) and appends guarded
+  `alias cat='batcat'` / `alias bat='batcat'` lines to existing
+  `~/.bashrc` / `~/.zshrc` (alias target asserted against the real binary
+  per the issue #1 copy-paste bug class; `LEGACY_DOTFILE=true` per spec
+  §6.1). All 10 lifecycle phases run standalone (AC-25); install is
+  idempotent (AC-5); `--dry-run` performs no filesystem writes (AC-12);
+  the version Sidecar is written on install/upgrade and removed on
+  remove/purge per ADR-0001 while `state.json` is never touched by the
+  module. Tagged `cli-essentials`, `CATEGORY=optional`, `DEPENDS_ON=()`.
 - **`setup_secrets.sh` skeleton: storage backend abstraction + ssh-key
   subcommands** (issue #44, PRD §14, AC-20): new standalone sensitive-data
   tool (not a module; shares `lib/logger.sh` / `lib/i18n.sh` /

@@ -12,10 +12,12 @@
 #     Ensure state.json exists with the minimum {"version":"0.1.0","installed":{}}
 #     skeleton. Idempotent. Creates parent dirs.
 #
-#   state_record_install <name> [<manual=true|false>] [<version_provided>]
-#     Set installed[<name>] = { version_provided, installed_at, installed_by,
-#     manual }. Default manual=false (i.e. installed as a dep). Default
-#     version_provided="unknown".
+#   state_record_install <name> [<manual=true|false>] [<version_provided>] [<depends_on_csv>]
+#     Set installed[<name>].synced = { manual, depends_on, version_provided,
+#     installed_at, installed_by } (ADR-0018 synced/local split). The
+#     machine-specific `local` sub-object is preserved if present, created
+#     empty otherwise. Default manual=false (i.e. installed as a dep).
+#     Default version_provided="unknown", depends_on=[].
 #
 #   state_record_remove <name>
 #     Drop installed[<name>] from state.json. Idempotent (no-op if absent).
@@ -25,11 +27,21 @@
 #
 #   state_list_installed [--manual-only]
 #     Print one module name per line (sorted). With --manual-only, only the
-#     entries where manual=true.
+#     entries where synced.manual=true.
 #
 #   state_get_field <name> <field>
-#     field ∈ {version_provided, installed_at, installed_by, manual}.
-#     Prints the value on stdout. Empty if module or field missing.
+#     field ∈ {version_provided, installed_at, installed_by, manual, ...}.
+#     Looks in synced first, then local (ADR-0018). Prints the value on
+#     stdout. Empty if module or field missing.
+#
+#   state_get_synced <name>
+#     Print installed[<name>].synced as compact JSON. Empty if absent.
+#
+#   state_set_synced <name> <synced-json>
+#     Replace installed[<name>].synced with the given JSON object,
+#     preserving (or creating empty) the `local` sub-object. Used by the
+#     import/sync conflict pipeline (ADR-0013) — the receiver rebuilds
+#     `local` itself; remote `local` data is never written here.
 #
 #   state_validate_file
 #     Guard against corrupt state.json (PRD §10.1). Returns 0 when the file
@@ -133,9 +145,10 @@ state_init() {
 # ── lock helper ─────────────────────────────────────────────────────────────
 #
 # Usage:
-#   _state_locked_write '<jq-filter>'
-# Reads state.json, applies the jq filter, writes back atomically while
-# holding an exclusive flock on .state.lock.
+#   _state_locked_write '<jq-filter>' [<extra jq args>...]
+# Reads state.json, applies the jq filter (with any extra jq args such as
+# --arg / --argjson), writes back atomically while holding an exclusive
+# flock on .state.lock.
 #
 # Contention UX (PRD §10.1): a contended writer prints a one-line wait
 # notice, waits up to ${INIT_UBUNTU_LOCK_TIMEOUT:-30}s, then gives up with
@@ -182,6 +195,7 @@ _state_flock_acquire() {
 
 _state_locked_write() {
     local _filter="$1"
+    shift
     state_init || return 1
 
     local _path; _path="$(state_get_path)"
@@ -193,7 +207,7 @@ _state_locked_write() {
     (
         _state_flock_acquire "${_timeout}" || exit 1
         printf '%s' "${BASHPID}" > "${_lock}.pid"
-        if jq "${_filter}" "${_path}" > "${_tmp}"; then
+        if jq "$@" "${_filter}" "${_path}" > "${_tmp}"; then
             mv "${_tmp}" "${_path}"
         else
             printf "[state] ERROR: jq filter failed: %s\n" "${_filter}" >&2
@@ -212,6 +226,7 @@ state_record_install() {
     local _name="${1:?state_record_install needs <name>}"
     local _manual="${2:-false}"
     local _version="${3:-unknown}"
+    local _deps_csv="${4:-}"
     local _ts; _ts="$(_state_iso8601)"
     local _by="${STATE_INSTALLED_BY_DEFAULT}"
 
@@ -221,55 +236,112 @@ state_record_install() {
         *) _manual="false" ;;
     esac
 
-    _state_locked_write \
-        ".installed[\"${_name}\"] = {
-             \"version_provided\": \"${_version}\",
-             \"installed_at\": \"${_ts}\",
-             \"installed_by\": \"${_by}\",
-             \"manual\": ${_manual}
-         }"
+    local _deps_json="[]"
+    if [[ -n "${_deps_csv}" ]]; then
+        _deps_json="$(jq -Rc 'split(",") | map(select(length > 0))' <<< "${_deps_csv}")"
+    fi
+
+    # ADR-0018: machine-portable facts go to `synced`; the machine-specific
+    # `local` sub-object is preserved across re-records (rebuilt by the
+    # install pipeline, never clobbered here). \$xxx are jq variables
+    # (bound via --arg/--argjson — injection-safe), not shell expansions.
+    _state_locked_write "
+        .installed[\$name] = {
+            synced: {
+                manual: \$manual,
+                depends_on: \$deps,
+                version_provided: \$version,
+                installed_at: \$ts,
+                installed_by: \$by
+            },
+            local: (.installed[\$name].local // {})
+        }" \
+        --arg name "${_name}" \
+        --argjson manual "${_manual}" \
+        --arg version "${_version}" \
+        --arg ts "${_ts}" \
+        --arg by "${_by}" \
+        --argjson deps "${_deps_json}"
 }
 
 state_record_remove() {
     local _name="${1:?state_record_remove needs <name>}"
-    _state_locked_write "del(.installed[\"${_name}\"])"
+    _state_locked_write "del(.installed[\$name])" --arg name "${_name}"
 }
 
 # state_record_upgrade <name> <version>
-#   Updates an existing installed entry's version_provided + last_upgraded_at.
-#   No-op (jq |= leaves untouched) if the module is not in .installed —
-#   upgrade is meant to run on already-installed modules; engine refuses
-#   upgrade for absent ones at the dispatcher layer.
+#   Updates an existing installed entry's synced.version_provided +
+#   synced.last_upgraded_at. No-op (jq |= leaves untouched) if the module
+#   is not in .installed — upgrade is meant to run on already-installed
+#   modules; engine refuses upgrade for absent ones at the dispatcher layer.
 state_record_upgrade() {
     local _name="${1:?state_record_upgrade needs <name>}"
     local _version="${2:-unknown}"
     local _ts; _ts="$(_state_iso8601)"
 
-    _state_locked_write \
-        ".installed[\"${_name}\"] |= (
-             if . == null then null
-             else . + {
-                 \"version_provided\": \"${_version}\",
-                 \"last_upgraded_at\": \"${_ts}\"
-             }
-             end
-         )"
+    _state_locked_write "
+        .installed[\$name] |= (
+            if . == null then null
+            else .synced = ((.synced // {}) + {
+                version_provided: \$version,
+                last_upgraded_at: \$ts
+            })
+            end
+        )" \
+        --arg name "${_name}" \
+        --arg version "${_version}" \
+        --arg ts "${_ts}"
 }
 
 # state_record_verify <name>
-#   Stamps last_verified_at on an existing installed entry. No-op when the
-#   module is not in .installed (verify on uninstalled is a CLI-layer error,
-#   but the state write should still degrade gracefully).
+#   Stamps local.last_verified_at on an existing installed entry —
+#   verification is a statement about THIS machine, so it lives in `local`
+#   (ADR-0018) and never travels over sync / export. No-op when the module
+#   is not in .installed (verify on uninstalled is a CLI-layer error, but
+#   the state write should still degrade gracefully).
 state_record_verify() {
     local _name="${1:?state_record_verify needs <name>}"
     local _ts; _ts="$(_state_iso8601)"
 
-    _state_locked_write \
-        ".installed[\"${_name}\"] |= (
-             if . == null then null
-             else . + { \"last_verified_at\": \"${_ts}\" }
-             end
-         )"
+    _state_locked_write "
+        .installed[\$name] |= (
+            if . == null then null
+            else .local = ((.local // {}) + { last_verified_at: \$ts })
+            end
+        )" \
+        --arg name "${_name}" \
+        --arg ts "${_ts}"
+}
+
+# ── synced section accessors (ADR-0018 / ADR-0013) ─────────────────────────
+
+state_get_synced() {
+    _state_require_jq || return 1
+    state_validate_file || return 1
+    local _name="${1:?state_get_synced needs <name>}"
+    local _path; _path="$(state_get_path)"
+    [[ -f "${_path}" ]] || return 0
+    jq -c --arg n "${_name}" '.installed[$n].synced // empty' "${_path}"
+}
+
+state_set_synced() {
+    _state_require_jq || return 1
+    local _name="${1:?state_set_synced needs <name>}"
+    local _synced_json="${2:?state_set_synced needs <synced-json>}"
+
+    if ! jq -e 'type == "object"' <<< "${_synced_json}" >/dev/null 2>&1; then
+        printf "[state] ERROR: state_set_synced needs a JSON object, got: %s\n" \
+            "${_synced_json}" >&2
+        return 2
+    fi
+
+    _state_locked_write "
+        .installed[\$name] = {
+            synced: \$synced,
+            local: (.installed[\$name].local // {})
+        }" \
+        --arg name "${_name}" \
+        --argjson synced "${_synced_json}"
 }
 
 # ── public read API ─────────────────────────────────────────────────────────
@@ -293,7 +365,7 @@ state_list_installed() {
     local _path; _path="$(state_get_path)"
     [[ -f "${_path}" ]] || return 0
     if [[ "${_manual_only}" == "true" ]]; then
-        jq -r '.installed | to_entries[] | select(.value.manual == true) | .key' "${_path}" | sort
+        jq -r '.installed | to_entries[] | select(.value.synced.manual == true) | .key' "${_path}" | sort
     else
         jq -r '.installed | keys[]' "${_path}" | sort
     fi
@@ -306,7 +378,14 @@ state_get_field() {
     local _field="${2:?state_get_field needs <field>}"
     local _path; _path="$(state_get_path)"
     [[ -f "${_path}" ]] || return 0
+    # Look in synced first, then local (ADR-0018). The select/first dance
+    # (instead of `//`) keeps legitimate `false` values printable.
     jq -r --arg n "${_name}" --arg f "${_field}" '
-        .installed[$n][$f] // empty
+        .installed[$n] as $e
+        | if $e == null then empty
+          else [ ($e.synced // {})[$f], ($e.local // {})[$f] ]
+               | map(select(. != null))
+               | if length > 0 then .[0] else empty end
+          end
     ' "${_path}"
 }

@@ -136,6 +136,16 @@ _load_engine() {
     assert_success
 }
 
+@test "dispatcher_dispatch install --profile=<x> is stubbed, not fatal (PRD §7.5, TUI #70 wiring)" {
+    # The TUI forks `install --profile=<override> ... -y` when the session
+    # platform override is set (§8.2.1). Until --profile lands in the
+    # engine it must degrade to a WARN like the other stubbed flags.
+    _load_engine
+    run dispatcher_dispatch install noop --profile=server --dry-run
+    assert_success
+    assert_output --partial "stubbed"
+}
+
 @test "dispatcher_dispatch install nonexistent returns exit 2 (resolver unknown)" {
     _load_engine
     run dispatcher_dispatch install nonexistent

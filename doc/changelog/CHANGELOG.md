@@ -22,6 +22,30 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **TUI checkbox accumulator + Run → Review → Proceed** (issue #70, PRD
+  §8.1/§8.2 Q43, AC-10/AC-11): Base / Recommended / Optional submenus are
+  now pure check-lists grouped by `TAGS[0]` with dep chains collapsed to a
+  "will pull N deps" hint (arch Q-A3). `< OK >` stores the page in an
+  in-memory associative-array accumulator inside the TUI process,
+  `< Back >` discards the page — selections never touch disk. `< Run >`
+  (new last main-menu row) is the only batch execution point: it opens
+  Review & Install (full selection list + resolver-computed dep summary
+  via a forked `setup_ubuntu install --dry-run`, expandable details),
+  and Proceed clears the screen and forks one
+  `setup_ubuntu install <modules...> -y` CLI pipeline (G4 — the TUI has
+  no install path of its own, which is what makes AC-11 structural).
+  Back/Cancel return to the main menu keeping selections; Run with
+  nothing selected reports `nothing selected`; `< Exit >` (relabeled
+  Cancel button) drops the process and every selection with zero side
+  effects. New `lib/tui_backend.sh` helpers (`tui_checklist_entries`,
+  `tui_selection_*`, `tui_cli_install_plan`, `tui_plan_deps`,
+  `tui_install_args`, `tui_render_checklist` with `--separate-output` on
+  both backends) are bats-covered, including a scripted mock-backend e2e
+  that asserts the exact generated CLI command string and an fs-snapshot
+  proving Exit writes no files. `install --profile=<x>` is accepted as a
+  stubbed WARN flag so the TUI session platform override can ride the
+  fork before the engine implements it.
+
 - **`claude-code-config.module.sh` module** (issue #75, PRD §6.3.2 Batch C,
   M7): new config-drop module applying the personal Claude Code settings
   shipped in `module/config/claude/` (`settings.json`,

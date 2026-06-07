@@ -22,6 +22,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **claude-code module** (issue #57, PRD §6.3.2, Batch C): new
+  `module/claude-code.module.sh` installs the Anthropic Claude Code CLI
+  via the official native installer (`https://claude.ai/install.sh`,
+  user-home install, no sudo) on the custom archetype (D). The tool
+  ships its own auto-updater, so `is_outdated` always returns 1
+  (delegated) and `upgrade` runs `claude update`; `remove` keeps user
+  config (`~/.claude*`), `purge` clears it. Sidecar written on
+  install/upgrade and dropped on remove/purge (ADR-0001); all 10
+  lifecycle phases runnable standalone (AC-25). 74-test bats spec at
+  `test/unit/module/claude-code_spec.bats`.
+
 - **ranger module** (issue #61, PRD §6.3.3 Batch C): new
   `module/ranger.module.sh` on the apt + config-drop hybrid archetype
   (super-call pattern) — apt installs the `ranger` package, then the

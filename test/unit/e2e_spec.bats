@@ -219,7 +219,7 @@ EOF
     run bash "${REPO_ROOT}/setup_ubuntu.sh" export "${_out}"
     assert_success
     [[ -f "${_out}" ]]
-    jq -r '.version' "${_out}" | grep -q "0.1.0"
+    jq -r '.version' "${_out}" | grep -qE '^0\.'
     jq -e '.modules | type == "array"' "${_out}" > /dev/null
 }
 
@@ -249,19 +249,21 @@ EOF
     [[ "${lines[1]}" == "fzf" ]]
 }
 
-@test "setup_ubuntu import <file> --dry-run prints the install order without writing" {
+@test "setup_ubuntu import <file> defaults to dry-run: prints plan without writing" {
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
     cat > "${_payload}" <<'EOF'
 {
-  "version": "0.1.0",
-  "modules": [{"name":"docker","manual":true}]
+  "version": "0.2.0",
+  "modules": [{"name":"docker","synced":{"manual":true,"version_provided":"v28.0.0"}}]
 }
 EOF
-    # State must stay empty — verify nothing landed in installed{} after.
-    run bash "${REPO_ROOT}/setup_ubuntu.sh" import "${_payload}" --dry-run
+    # No --apply: conflict pipeline prints the plan and writes nothing
+    # (ADR-0013 dry-run default).
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" import "${_payload}"
     assert_success
-    assert_output --partial "DRY-RUN"
-    assert_output --partial "- docker"
+    assert_output --partial "docker"
+    assert_output --partial "install"
+    assert_output --partial "--apply"
     # state.json should still report 0 installed.
     local _state="${INIT_UBUNTU_STATE_DIR}/state.json"
     run jq -r '.installed | length' "${_state}"

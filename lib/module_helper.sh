@@ -14,6 +14,7 @@
 #   4. APT archetype          — lifecycle + macro
 #   5. GitHub-release archetype
 #   6. Config-drop archetype
+#   6.5 Sidecar helpers       — ADR-0001 / module-spec §4.7.4
 #   7. Standalone CLI entry   — module_standalone_main, info, status
 #   8. Engine-side aggregators
 
@@ -69,6 +70,54 @@ module_skip_if_not_installed() {
     is_installed 2>/dev/null && return 1
     log_info "[${NAME:-?}] not installed; nothing to do"
     return 0
+}
+
+# ─── 3b. Sidecar (ADR-0001) ─────────────────────────────────────────────────
+#
+# The Sidecar is a one-line version file at
+#   ${INIT_UBUNTU_STATE_DIR}/versions/<name>
+# written by BOTH Standalone and Engine modes (same code path — ADR-0001).
+# Standalone never touches state.json; only the engine does.
+
+module_sidecar_dir() {
+    printf '%s/versions' \
+        "${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu}"
+}
+
+module_sidecar_path() {
+    local _name="${1:-${NAME:?module_sidecar_path needs <name>}}"
+    printf '%s/%s' "$(module_sidecar_dir)" "${_name}"
+}
+
+# module_sidecar_write <name> [version] — record the installed version.
+# No-op under --dry-run (defense in depth; callers should guard earlier).
+module_sidecar_write() {
+    local _name="${1:-${NAME:?module_sidecar_write needs <name>}}"
+    local _version="${2:-${VERSION_PROVIDED:-unknown}}"
+    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
+    local _dir
+    _dir="$(module_sidecar_dir)"
+    mkdir -p "${_dir}" || {
+        log_warn "[${_name}] cannot create sidecar dir ${_dir}"
+        return 1
+    }
+    printf '%s\n' "${_version}" > "${_dir}/${_name}"
+}
+
+# module_sidecar_remove <name> — drop the version record (remove/purge).
+module_sidecar_remove() {
+    local _name="${1:-${NAME:?module_sidecar_remove needs <name>}}"
+    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
+    rm -f "$(module_sidecar_path "${_name}")"
+}
+
+# module_sidecar_get_version <name> — print recorded version, 1 if absent.
+module_sidecar_get_version() {
+    local _name="${1:-${NAME:?module_sidecar_get_version needs <name>}}"
+    local _f
+    _f="$(module_sidecar_path "${_name}")"
+    [[ -f "${_f}" ]] || return 1
+    cat "${_f}"
 }
 
 # ─── 4. APT archetype ───────────────────────────────────────────────────────
@@ -228,7 +277,7 @@ _module_github_release_fetch_and_install() {
     fi
     [[ -n "${_ver}" ]] && log_info "[${NAME}] target: ${GITHUB_REPO} v${_ver}"
 
-    _url="https://github.com/${GITHUB_REPO}/releases/latests/download/${GITHUB_ASSET_PATTERN}"
+    _url="https://github.com/${GITHUB_REPO}/releases/latest/download/${GITHUB_ASSET_PATTERN}"
     _tmp="$(mktemp 2>/dev/null || printf '/tmp/%s-%s' "${NAME}" "$$")"
     log_info "[${NAME}] download ${_url}"
     if ! curl -fsSL --retry 3 -o "${_tmp}" "${_url}"; then
@@ -368,6 +417,51 @@ module_use_config_archetype() {
     remove()       { module_default_config_remove; }
     purge()        { module_default_config_purge; }
     verify()       { module_default_verify; }
+}
+
+# ─── 6.5 Sidecar helpers (ADR-0001 / module-spec §4.7.4) ────────────────────
+#
+# The Sidecar at ${XDG_STATE_HOME}/init_ubuntu/versions/<name> records the
+# version string installed for one module. Per ADR-0001 the write logic
+# lives here in the module helpers so Standalone and Engine mode share the
+# same code path: modules call module_sidecar_write after a successful
+# install/upgrade and module_sidecar_remove after remove/purge. Writers are
+# dry-run-safe (no-op when INIT_UBUNTU_DRY_RUN=true, AC-12).
+# INIT_UBUNTU_STATE_DIR overrides the base dir (same contract as lib/state.sh).
+
+module_sidecar_path() {
+    local _name="${1:-${NAME:-}}"
+    [[ -n "${_name}" ]] || return 1
+    local _dir="${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu}"
+    printf '%s/versions/%s' "${_dir}" "${_name}"
+}
+
+module_sidecar_write() {
+    local _name="${1:?module_sidecar_write needs <name>}"
+    local _version="${2:-unknown}"
+    if [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]]; then
+        return 0
+    fi
+    local _path; _path="$(module_sidecar_path "${_name}")" || return 1
+    mkdir -p "${_path%/*}"
+    printf '%s\n' "${_version}" > "${_path}"
+}
+
+module_sidecar_remove() {
+    local _name="${1:?module_sidecar_remove needs <name>}"
+    if [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]]; then
+        return 0
+    fi
+    local _path; _path="$(module_sidecar_path "${_name}")" || return 1
+    rm -f "${_path}"
+}
+
+# module_sidecar_get_version <name> — print recorded version; exit 1 if absent.
+module_sidecar_get_version() {
+    local _name="${1:?module_sidecar_get_version needs <name>}"
+    local _path; _path="$(module_sidecar_path "${_name}")" || return 1
+    [[ -f "${_path}" ]] || return 1
+    cat "${_path}"
 }
 
 # ─── 7. Standalone CLI entry ────────────────────────────────────────────────

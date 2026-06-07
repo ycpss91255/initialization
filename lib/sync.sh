@@ -5,15 +5,18 @@
 # Per PRD §16 (Sync mechanism) and doc/architecture.md §16.
 #
 # Public API:
-#   sync_push <user@host> [--modules=<csv>] [--dry-run]
+#   sync_push <user@host> [--modules=<csv>] [--dry-run] [--apply]
 #   sync_pull <user@host> [--dry-run]
-#     Both delegate to lib/state_io.sh + ssh/scp.
+#     Both delegate to lib/state_io.sh + ssh/scp. The receiving side runs
+#     the ADR-0013 conflict pipeline (dry-run default; --apply commits —
+#     for push it is forwarded to the remote `import` invocation).
 #
 # Security (PRD §16.4):
 #   - StrictHostKeyChecking=yes, key auth only (BatchMode=yes prevents any
 #     password prompt). We never run ssh-copy-id — the user is told to use
 #     setup_secrets ssh-key copy first.
-#   - Payload NEVER contains secrets — only module names + manual flags.
+#   - Payload NEVER contains secrets — only module names + their
+#     machine-portable `synced` metadata (ADR-0018; `local` never ships).
 
 if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
@@ -59,11 +62,13 @@ sync_push() {
     local _target=""
     local _modules_csv=""
     local _dry="false"
+    local _apply="false"
     local _arg
     for _arg in "$@"; do
         case "${_arg}" in
             --modules=*) _modules_csv="${_arg#*=}" ;;
             --dry-run) _dry="true" ;;
+            --apply) _apply="true" ;;
             -*) printf "[sync] ERROR: unknown flag %s\n" "${_arg}" >&2; return 2 ;;
             *)
                 if [[ -z "${_target}" ]]; then
@@ -111,7 +116,11 @@ sync_push() {
     }
     rm -f "${_tmp}"
 
-    ssh "${SYNC_SSH_OPTS[@]}" "${_target}" "setup_ubuntu import ${_remote_path}" || {
+    # ADR-0013: the remote import is dry-run by default (prints its diff
+    # back over ssh); --apply commits on the remote side.
+    local _import_cmd="setup_ubuntu import ${_remote_path}"
+    [[ "${_apply}" == "true" ]] && _import_cmd+=" --apply"
+    ssh "${SYNC_SSH_OPTS[@]}" "${_target}" "${_import_cmd}" || {
         printf "[sync] ERROR: remote import failed\n" >&2
         return 7
     }

@@ -488,3 +488,78 @@ _hold_state_lock() {
     run state_record_verify nonexistent
     assert_success
 }
+
+# ── absent state.json: read API degrades gracefully ─────────────────────────
+
+@test "state_is_recorded without state.json returns 1 (no crash)" {
+    _load_state
+    run state_is_recorded docker
+    assert_failure
+}
+
+@test "state_list_installed without state.json prints nothing, exit 0" {
+    _load_state
+    run state_list_installed
+    assert_success
+    assert_output ""
+}
+
+@test "state_get_field without state.json prints nothing, exit 0" {
+    _load_state
+    run state_get_field docker version_provided
+    assert_success
+    assert_output ""
+}
+
+@test "state_get_synced without state.json prints nothing, exit 0" {
+    _load_state
+    run state_get_synced docker
+    assert_success
+    assert_output ""
+}
+
+# ── state_get_field edge semantics (ADR-0018) ───────────────────────────────
+
+@test "state_get_field prints a legitimate false value (manual=false)" {
+    _load_state
+    state_record_install dep-module false v1
+    run state_get_field dep-module manual
+    assert_success
+    assert_output "false"
+}
+
+@test "state_get_field falls back to local section when field absent in synced" {
+    _load_state
+    state_record_install docker true v1
+    local _p; _p="$(state_get_path)"
+    jq '.installed.docker.local.install_target_resolved = "sudo"' "${_p}" \
+        > "${_p}.tmp" && mv "${_p}.tmp" "${_p}"
+    run state_get_field docker install_target_resolved
+    assert_success
+    assert_output "sudo"
+}
+
+@test "state_get_field returns empty for missing field on existing module" {
+    _load_state
+    state_record_install docker true v1
+    run state_get_field docker no_such_field
+    assert_success
+    assert_output ""
+}
+
+@test "state_record_remove keeps other entries intact" {
+    _load_state
+    state_record_install docker true v1
+    state_record_install fzf false v2
+    state_record_remove docker
+    local _p; _p="$(state_get_path)"
+    [[ "$(jq -r '.installed | has("fzf")' "${_p}")" == "true" ]]
+    [[ "$(jq -r '.installed.fzf.synced.version_provided' "${_p}")" == "v2" ]]
+}
+
+@test "state_set_synced without <synced-json> arg fails" {
+    _load_state
+    state_init
+    run state_set_synced docker
+    assert_failure
+}

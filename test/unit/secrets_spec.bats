@@ -270,6 +270,136 @@ _set_dbus() {
     [[ ! -e "${INIT_UBUNTU_SECRETS_DIR}/alpha.enc" ]]
 }
 
+# ── name validation across the generic API ─────────────────────────────────
+
+@test "secrets_retrieve rejects an invalid name (exit 2)" {
+    _load_secrets
+    _set_backend encrypted-file
+    run secrets_retrieve "../evil"
+    assert_failure 2
+    assert_output --partial "invalid secret name"
+}
+
+@test "secrets_exists rejects an invalid name (exit 2)" {
+    _load_secrets
+    _set_backend encrypted-file
+    run secrets_exists "-leading-dash"
+    assert_failure 2
+}
+
+@test "secrets_remove rejects an invalid name (exit 2)" {
+    _load_secrets
+    _set_backend encrypted-file
+    run secrets_remove "a/b"
+    assert_failure 2
+}
+
+@test "secrets_list propagates a backend resolve failure" {
+    command -v pass >/dev/null 2>&1 && skip "real pass installed in image"
+    _load_secrets
+    _set_backend pass
+    run secrets_list
+    assert_failure 3
+}
+
+# ── encrypted-file backend: error paths ─────────────────────────────────────
+
+@test "encrypted-file retrieve of a never-stored name fails before any passphrase use" {
+    _load_secrets
+    _set_backend encrypted-file
+    run secrets_retrieve never-stored
+    assert_failure
+    assert_output --partial "no stored secret"
+}
+
+@test "encrypted-file remove of a never-stored name fails non-zero" {
+    _load_secrets
+    _set_backend encrypted-file
+    run secrets_remove never-stored
+    assert_failure
+    assert_output --partial "no stored secret"
+}
+
+@test "secrets_list on a fresh encrypted-file backend prints nothing" {
+    _load_secrets
+    _set_backend encrypted-file
+    run secrets_list
+    assert_success
+    assert_output ""
+}
+
+@test "empty passphrase file is rejected on store" {
+    _load_secrets
+    _set_backend encrypted-file
+    PASSPHRASE_FILE="${INIT_UBUNTU_TEST_SCRATCH}/pp-empty.txt"
+    : > "${PASSPHRASE_FILE}"
+    export INIT_UBUNTU_SECRETS_PASSPHRASE_FILE="${PASSPHRASE_FILE}"
+    run secrets_store foo <<< "plaintext-x"
+    assert_failure
+    assert_output --partial "empty"
+    [[ ! -e "${INIT_UBUNTU_SECRETS_DIR}/foo.enc" ]]
+}
+
+# ── pass backend: list / remove via stub ────────────────────────────────────
+
+@test "pass backend lists stored names from the password store dir" {
+    _load_secrets
+    _stub pass
+    _set_backend pass
+    export PASSWORD_STORE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/pstore"
+    mkdir -p "${PASSWORD_STORE_DIR}/${SECRETS_PASS_PREFIX}"
+    touch "${PASSWORD_STORE_DIR}/${SECRETS_PASS_PREFIX}/api.gpg" \
+          "${PASSWORD_STORE_DIR}/${SECRETS_PASS_PREFIX}/gh-token.gpg"
+    run secrets_list
+    assert_success
+    assert_line "api"
+    assert_line "gh-token"
+}
+
+@test "pass backend list with no store dir prints nothing" {
+    _load_secrets
+    _stub pass
+    _set_backend pass
+    export PASSWORD_STORE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/no-such-store"
+    run secrets_list
+    assert_success
+    assert_output ""
+}
+
+@test "pass backend remove delegates to pass rm -f under the prefix" {
+    _load_secrets
+    _stub pass
+    _set_backend pass
+    run secrets_remove gh-token
+    assert_success
+    grep -q "^pass rm -f init_ubuntu/gh-token" "${SECRETS_STUB_LOG}"
+}
+
+# ── gnome-keyring backend: list / remove via stub ───────────────────────────
+
+@test "gnome-keyring backend list parses secret-tool search output" {
+    _load_secrets
+    _set_backend gnome-keyring
+    _set_dbus "unix:path=/tmp/fake-bus"
+    _stub secret-tool "case \"\$1\" in
+        search) printf 'attribute.name = alpha\nattribute.name = beta\n' ;;
+    esac"
+    run secrets_list
+    assert_success
+    assert_line "alpha"
+    assert_line "beta"
+}
+
+@test "gnome-keyring backend remove delegates to secret-tool clear" {
+    _load_secrets
+    _set_backend gnome-keyring
+    _set_dbus "unix:path=/tmp/fake-bus"
+    _stub secret-tool
+    run secrets_remove gh-token
+    assert_success
+    grep -q "^secret-tool clear service init_ubuntu name gh-token" "${SECRETS_STUB_LOG}"
+}
+
 # ── setup_secrets.sh CLI dispatcher ─────────────────────────────────────────
 
 @test "setup_secrets.sh --help prints usage and exits 0" {

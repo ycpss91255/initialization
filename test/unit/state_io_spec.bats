@@ -107,6 +107,22 @@ _load_state_io() {
     assert_failure 2
 }
 
+@test "state_io_export on corrupt state.json quarantines and fails (issue #41)" {
+    _load_state_io
+    state_init
+    local _p; _p="$(state_get_path)"
+    printf 'not json' > "${_p}"
+
+    local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    run state_io_export "${_out}"
+    assert_failure
+    [[ ! -f "${_out}" ]]
+
+    local _q=("${_p}".corrupt.*)
+    [[ -e "${_q[0]}" ]]
+    [[ ! -f "${_p}" ]]
+}
+
 # ── import / payload_modules ───────────────────────────────────────────────
 
 @test "state_io_payload_modules prints module names in payload order" {

@@ -31,8 +31,18 @@
 #     field ∈ {version_provided, installed_at, installed_by, manual}.
 #     Prints the value on stdout. Empty if module or field missing.
 #
+#   state_validate_file
+#     Guard against corrupt state.json (PRD §10.1). Returns 0 when the file
+#     is absent or parses as a JSON object. Otherwise quarantines it
+#     (mv → state.json.corrupt.<ts>), prints recovery guidance, returns 1.
+#     NEVER silently rebuilds — manual / dep data must not be lost.
+#     Automated repair belongs to `doctor --fix` (0.3.0), out of scope here.
+#
 # Dependencies: jq (in apt-essentials APT_PKGS; in test-tools image).
 # Concurrency: flock on ${state_dir}/.state.lock for every write.
+#   Contention prints a one-line wait notice; after
+#   ${INIT_UBUNTU_LOCK_TIMEOUT:-30}s the writer gives up with exit code 1
+#   and prints the lock holder info (PID / lock file path).
 
 if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
@@ -73,10 +83,43 @@ _state_iso8601() {
     fi
 }
 
+# ── corruption guard (PRD §10.1) ─────────────────────────────────────────────
+#
+# state_validate_file
+#   Quarantine-then-fail on corrupt state.json. A valid state file must parse
+#   as a JSON object; anything else (truncated JSON, garbage, top-level null)
+#   is moved aside to state.json.corrupt.<ts> and the caller gets exit 1 with
+#   recovery guidance. We never rebuild in place: a silent rebuild would drop
+#   the manual flags and dep snapshot data the user cannot reconstruct.
+
+state_validate_file() {
+    _state_require_jq || return 1
+    local _path; _path="$(state_get_path)"
+    [[ -f "${_path}" ]] || return 0
+    if jq -e 'type == "object"' "${_path}" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    local _ts; _ts="$(date +%Y%m%d-%H%M%S)"
+    local _quarantine="${_path}.corrupt.${_ts}"
+    mv "${_path}" "${_quarantine}"
+    {
+        printf "[state] ERROR: %s is corrupt (not a valid JSON object)\n" "${_path}"
+        printf "[state] quarantined to: %s\n" "${_quarantine}"
+        printf "[state] recovery:\n"
+        printf "[state]   - re-run install: modules are idempotent, records will be rebuilt; or\n"
+        printf "[state]   - manually fix the quarantined file, then rename it back to state.json\n"
+        printf "[state] state.json is never rebuilt silently (manual / dep data must not be lost);\n"
+        printf "[state] automated repair is 'doctor --fix' (planned for 0.3.0)\n"
+    } >&2
+    return 1
+}
+
 # ── init ────────────────────────────────────────────────────────────────────
 
 state_init() {
     _state_require_jq || return 1
+    state_validate_file || return 1
 
     local _path; _path="$(state_get_path)"
     local _dir; _dir="$(dirname "${_path}")"
@@ -93,6 +136,49 @@ state_init() {
 #   _state_locked_write '<jq-filter>'
 # Reads state.json, applies the jq filter, writes back atomically while
 # holding an exclusive flock on .state.lock.
+#
+# Contention UX (PRD §10.1): a contended writer prints a one-line wait
+# notice, waits up to ${INIT_UBUNTU_LOCK_TIMEOUT:-30}s, then gives up with
+# exit code 1 printing the holder info (PID / lock file path). The holder
+# PID is published to <lock>.pid by whichever writer holds the lock.
+
+readonly STATE_LOCK_TIMEOUT_DEFAULT=30
+
+# _state_flock_acquire <timeout-secs>
+#   Acquire an exclusive flock on fd 9 (the caller must have opened fd 9 on
+#   the .state.lock path in append mode — append so the lock file is never
+#   truncated). The lock path is re-derived here via _state_lock_path.
+_state_flock_acquire() {
+    local _timeout="$1"
+    local _lock; _lock="$(_state_lock_path)"
+    local _holder
+
+    if flock -xn 9; then
+        return 0
+    fi
+
+    _holder="$(cat "${_lock}.pid" 2>/dev/null)"
+    printf "[state] waiting for state lock %s (held by PID %s, timeout %ss)\n" \
+        "${_lock}" "${_holder:-unknown}" "${_timeout}" >&2
+
+    # Timed wait via non-blocking retry: BusyBox flock (test-tools image)
+    # has no `-w <secs>`, so poll `flock -n` until the deadline instead.
+    local _deadline=$(( SECONDS + _timeout ))
+    while (( SECONDS < _deadline )); do
+        sleep 0.2
+        if flock -xn 9; then
+            return 0
+        fi
+    done
+
+    _holder="$(cat "${_lock}.pid" 2>/dev/null)"
+    {
+        printf "[state] ERROR: timed out after %ss waiting for state lock\n" "${_timeout}"
+        printf "[state] lock file: %s\n" "${_lock}"
+        printf "[state] lock holder PID: %s\n" "${_holder:-unknown}"
+    } >&2
+    return 1
+}
 
 _state_locked_write() {
     local _filter="$1"
@@ -100,18 +186,24 @@ _state_locked_write() {
 
     local _path; _path="$(state_get_path)"
     local _lock; _lock="$(_state_lock_path)"
+    local _timeout="${INIT_UBUNTU_LOCK_TIMEOUT:-${STATE_LOCK_TIMEOUT_DEFAULT}}"
     local _tmp; _tmp="$(mktemp "${_path}.XXXXXX")"
+    local _rc
 
     (
-        flock -x 9 || { printf "[state] ERROR: could not acquire lock\n" >&2; exit 1; }
+        _state_flock_acquire "${_timeout}" || exit 1
+        printf '%s' "${BASHPID}" > "${_lock}.pid"
         if jq "${_filter}" "${_path}" > "${_tmp}"; then
             mv "${_tmp}" "${_path}"
         else
-            rm -f "${_tmp}"
             printf "[state] ERROR: jq filter failed: %s\n" "${_filter}" >&2
             exit 1
         fi
-    ) 9>"${_lock}"
+        rm -f "${_lock}.pid"
+    ) 9>>"${_lock}"
+    _rc=$?
+    rm -f "${_tmp}"
+    return "${_rc}"
 }
 
 # ── public write API ────────────────────────────────────────────────────────
@@ -184,6 +276,7 @@ state_record_verify() {
 
 state_is_recorded() {
     _state_require_jq || return 1
+    state_validate_file || return 1
     local _name="${1:?state_is_recorded needs <name>}"
     local _path; _path="$(state_get_path)"
     [[ -f "${_path}" ]] || return 1
@@ -192,6 +285,7 @@ state_is_recorded() {
 
 state_list_installed() {
     _state_require_jq || return 1
+    state_validate_file || return 1
     local _manual_only="false"
     if [[ "${1:-}" == "--manual-only" ]]; then
         _manual_only="true"
@@ -207,6 +301,7 @@ state_list_installed() {
 
 state_get_field() {
     _state_require_jq || return 1
+    state_validate_file || return 1
     local _name="${1:?state_get_field needs <name>}"
     local _field="${2:?state_get_field needs <field>}"
     local _path; _path="$(state_get_path)"

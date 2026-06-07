@@ -191,17 +191,27 @@ EOF
 
 # ── status / export / import (M4) ────────────────────────────────────────────
 
-@test "setup_ubuntu status with empty state says 'no modules'" {
+@test "setup_ubuntu status is deprecated and forwards to list --installed" {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" status
     assert_success
+    assert_output --partial "deprecated"
     assert_output --partial "no modules"
 }
 
-@test "setup_ubuntu status --json prints valid state.json shape" {
+@test "setup_ubuntu status --json forwards; stdout stays valid JSON" {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" status --json
     assert_success
-    echo "${output}" | jq -r '.version' | grep -q "0.1.0"
-    echo "${output}" | jq -r '.installed | length' | grep -q "^0$"
+    assert_output --partial "deprecated"
+    # Warning goes to stderr only — stdout must parse as state.json.
+    bash "${REPO_ROOT}/setup_ubuntu.sh" status --json 2>/dev/null \
+        | jq -e '(.version == "0.1.0") and (.installed | length == 0)' > /dev/null
+}
+
+@test "setup_ubuntu list --installed with empty state says 'no modules'" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" list --installed
+    assert_success
+    refute_output --partial "deprecated"
+    assert_output --partial "no modules"
 }
 
 @test "setup_ubuntu export <file> writes a valid payload" {
@@ -267,12 +277,13 @@ EOF
     assert_output --partial "version"
 }
 
-# ── M5: update / search / upgrade / doctor / config / sync ──────────────────
+# ── M5: search / upgrade / doctor / config / sync ───────────────────────────
 
-@test "setup_ubuntu update re-scans module/ and reports count" {
+@test "setup_ubuntu update is removed: exit 2 with self-upgrade hint (Q40)" {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" update
-    assert_success
-    assert_output --partial "update complete"
+    assert_failure 2
+    assert_output --partial "unknown subcommand"
+    assert_output --partial "self-upgrade"
 }
 
 @test "setup_ubuntu search docker finds the docker module" {
@@ -318,6 +329,12 @@ EOF
     run bash "${REPO_ROOT}/setup_ubuntu.sh" config show --json
     assert_success
     echo "${output}" | jq -e '.ui.lang == "zh-TW"' > /dev/null
+}
+
+@test "setup_ubuntu config load is removed: exit 2 (Q38)" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" config load
+    assert_failure 2
+    assert_output --partial "unknown config action"
 }
 
 @test "setup_ubuntu config unset removes the key" {

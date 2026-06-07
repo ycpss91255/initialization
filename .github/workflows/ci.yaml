@@ -160,37 +160,46 @@ jobs:
       - name: run lint (shellcheck + hadolint + fish syntax)
         run: make lint TEST_TOOLS_PREBUILT=1
 
-  # ── Unit tests: core (non-module specs; issue #31) ─────────────────────────
+  # ── Unit tests: core (non-module specs; issue #31 + #28) ───────────────────
   # Engine / lib / hook / script / template specs in one job. Skipped on
   # doc-only changes and on PRs that only touch modules.
+  #
+  # Issue #28: bats runs ONCE, under kcov (`make coverage-unit`) — this
+  # job is both the unit-test gate and the coverage producer for its
+  # shard. It runs in the upstream kcov/kcov debian image (see
+  # compose.yaml `coverage` service), NOT in test-tools:local — kcov is
+  # not packaged for alpine — so it neither needs build-image nor the
+  # image artifact. TEST_TOOLS_PREBUILT=1 only skips the pointless local
+  # rebuild of an image it never uses.
   test-unit-core:
     name: test-unit (core)
-    needs: [changes, discover, build-image]
+    needs: [changes, discover]
     if: >-
       needs.changes.outputs.code == 'true' &&
       needs.discover.outputs.core == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: download test-tools image artifact
-        uses: actions/download-artifact@v4
+      - name: run core unit bats specs once under kcov
+        run: make coverage-unit MODULE=core TEST_TOOLS_PREBUILT=1
+      - name: upload coverage shard
+        uses: actions/upload-artifact@v4
         with:
-          name: test-tools-image
-          path: /tmp
-      - name: load test-tools image
-        run: docker load -i /tmp/test-tools.tar
-      - name: run core unit bats specs
-        run: make test-unit MODULE=core TEST_TOOLS_PREBUILT=1
+          name: coverage-shard-core
+          path: coverage/shard-core/
+          retention-days: 1
 
-  # ── Unit tests: per-module matrix (issue #31, PRD M10) ─────────────────────
+  # ── Unit tests: per-module matrix (issue #31, PRD M10; #28 kcov) ───────────
   # One shard per module from the discover job. PRs get only the shards
   # for changed modules; push to main / tags gets the full matrix. A
-  # module without a spec yet is a green skip inside ci.sh. Empty matrix
-  # (e.g. core-only PR) skips the whole job — ci-passed counts skipped
-  # as pass.
+  # module without a spec yet is a green skip inside ci.sh (then no shard
+  # dir exists — hence if-no-files-found: ignore). Empty matrix (e.g.
+  # core-only PR) skips the whole job — ci-passed counts skipped as pass.
+  # Like test-unit-core, runs bats ONCE under kcov in the kcov/kcov image
+  # (no build-image dependency).
   test-unit-module:
     name: test-unit (${{ matrix.module }})
-    needs: [changes, discover, build-image]
+    needs: [changes, discover]
     if: >-
       needs.changes.outputs.code == 'true' &&
       needs.discover.outputs.modules != '[]'
@@ -199,20 +208,20 @@ jobs:
       matrix:
         module: ${{ fromJson(needs.discover.outputs.modules) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: download test-tools image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: test-tools-image
-          path: /tmp
-      - name: load test-tools image
-        run: docker load -i /tmp/test-tools.tar
-      - name: run module unit bats spec
+      - name: run module unit bats spec once under kcov
         env:
           MODULE: ${{ matrix.module }}
-        run: make test-unit MODULE="${MODULE}" TEST_TOOLS_PREBUILT=1
+        run: make coverage-unit MODULE="${MODULE}" TEST_TOOLS_PREBUILT=1
+      - name: upload coverage shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-shard-${{ matrix.module }}
+          path: coverage/shard-${{ matrix.module }}/
+          if-no-files-found: ignore
+          retention-days: 1
 
   # ── Integration tests (skipped on doc-only changes) ────────────────────────
   test-integration:
@@ -232,26 +241,42 @@ jobs:
       - name: run integration bats specs
         run: make test-integration TEST_TOOLS_PREBUILT=1
 
-  # ── Coverage (skipped on doc-only changes) ─────────────────────────────────
-  # NOTE: coverage runs in the upstream kcov/kcov debian image (see
-  # compose.yaml `coverage` service), NOT in test-tools:local — so it
-  # neither needs build-image nor the artifact. TEST_TOOLS_PREBUILT=1
-  # only skips the pointless local rebuild of an image it never uses.
+  # ── Coverage aggregation (issue #28; skipped on doc-only changes) ──────────
+  # The unit shards above already ran bats under kcov — no second bats
+  # run here. This job downloads every per-shard kcov output, merges
+  # them (`kcov --merge`), and asserts the AC-17 gate (>= 80%) on the
+  # MERGED result — never per shard. Zero downloaded shards (every
+  # selected shard was a spec-less green skip) is itself a green skip
+  # inside ci.sh. Runs after the shards but tolerates skipped ones
+  # (e.g. module-only PRs skip test-unit-core), hence `!cancelled()` +
+  # explicit result checks instead of plain needs gating.
   coverage:
     name: coverage
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
+    needs: [changes, test-unit-core, test-unit-module]
+    if: >-
+      !cancelled() &&
+      needs.changes.outputs.code == 'true' &&
+      needs.test-unit-core.result != 'failure' &&
+      needs.test-unit-core.result != 'cancelled' &&
+      needs.test-unit-module.result != 'failure' &&
+      needs.test-unit-module.result != 'cancelled'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: run coverage (kcov)
-        run: make coverage TEST_TOOLS_PREBUILT=1
-      - name: upload coverage artefacts
+      - name: download coverage shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-shard-*
+          path: coverage
+      - name: merge shards + assert AC-17 gate (>= 80% on merged result)
+        run: make coverage-merge TEST_TOOLS_PREBUILT=1
+      - name: upload merged coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: coverage/
+          path: coverage/merged/
+          if-no-files-found: ignore
           retention-days: 14
 
   # ── Aggregator (single check for required_status_checks) ───────────────────
@@ -292,7 +317,9 @@ jobs:
           # them; module-scoped PRs skip the shards for unchanged
           # modules / core). test-unit-module is the MATRIX AGGREGATE:
           # any failed shard makes it `failure`, all-shards-skipped (or
-          # empty matrix) makes it `skipped`.
+          # empty matrix) makes it `skipped`. coverage is the kcov MERGE
+          # job (issue #28): it asserts the AC-17 gate on the merged
+          # shard results and is skipped on doc-only PRs like the rest.
           for r in \
               "${{ needs.changes.result }}" \
               "${{ needs.discover.result }}" \

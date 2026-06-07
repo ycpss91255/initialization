@@ -119,9 +119,16 @@ test/
 | Image | 用途 | 速度 |
 |---|---|---|
 | `test-tools:local`(alpine,本地 build) | `make test` / `make lint` / `make test-unit` / `make test-integration` | 快(image 內已預裝所有工具) |
-| `kcov/kcov`(debian,從 Docker Hub 拉) | `make coverage` 唯一用途 | 慢(每次 `apt-install` bats + shellcheck) |
+| `kcov/kcov`(debian,從 Docker Hub 拉) | `make coverage` / `make coverage-unit` / `make coverage-merge` | 慢(每次 `apt-install` bats + shellcheck) |
 
 `make coverage` 走慢路徑是有意的:kcov 覆蓋率報告主要給 CI / release 前確認,日常開發循環用 `make test` 即可。
+
+CI 端(issue #28)不再分開跑 test-unit 與 coverage 兩遍:每個
+per-module matrix shard 用 `make coverage-unit MODULE=<name>|core` 在
+kcov 下跑一次 bats(輸出 `coverage/shard-<name>`,上傳 artifact),最後
+`coverage` 聚合 job 用 `make coverage-merge` 做 `kcov --merge` 並在
+**聚合結果**上斷言 AC-17 的 80% gate(`COVERAGE_MIN` 可覆寫)。本地
+`make coverage`(unit + integration 全量)行為不變。
 
 ---
 

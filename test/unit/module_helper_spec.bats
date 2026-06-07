@@ -236,3 +236,12 @@ EOF
     assert_output --partial "outdated:"
     assert_output --partial "yes"
 }
+
+# ── github-release URL regression (one-char typo broke every real install) ──
+
+@test "github-release fetch URL uses releases/latest/download (not latests)" {
+    run grep -n 'releases/latests' "${LIB_DIR}/module_helper.sh"
+    assert_failure
+    run grep -n 'releases/latest/download' "${LIB_DIR}/module_helper.sh"
+    assert_success
+}

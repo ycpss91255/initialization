@@ -41,6 +41,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   stubs for issue #68 and mount directly on the backend API. Test-tools
   image gains `openssl` so the encrypted-file round-trip is tested for
   real in the container.
+- **eza module migrated to the v2 contract** (issue #51, PRD §6.3.1
+  Batch B): `module/submodule/eza.sh` → `module/eza.module.sh`
+  (github-release archetype, `CATEGORY=optional`,
+  `TAGS=("cli-essentials")`). Keeps the legacy behavior — tarball to
+  `/opt/eza`, `/usr/local/bin/eza` symlink, `alias ls='eza'` dropped
+  into `~/.bashrc` / `~/.zshrc` (removed on purge, kept on remove) —
+  and adds Sidecar bookkeeping plus `is_outdated` / `doctor`. New
+  shared Sidecar helpers in `lib/module_helper.sh`
+  (`module_sidecar_write/remove/get_version/path`, ADR-0001) are
+  available to all modules.
 - **zoxide module** (issue #52, PRD §6.3.1 Batch B): migrated
   `module/submodule/zoxide.sh` to the v2 contract as
   `module/zoxide.module.sh` (smarter `cd`; aliases `cd` to `z`).

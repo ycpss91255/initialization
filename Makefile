@@ -16,21 +16,32 @@
 .PHONY: test test-unit test-integration lint coverage build-test-tools clean help
 .DEFAULT_GOAL := help
 
+# ── Prebuilt image escape hatch (CI; issue #26) ──────────────────────────────
+# GitHub Actions builds test-tools:local ONCE in the `build-image` job and
+# `docker load`s it in downstream jobs. Those jobs pass TEST_TOOLS_PREBUILT=1
+# so targets skip the redundant local rebuild. Local dev keeps the default
+# (build before run; cached layers make repeat builds cheap).
+ifeq ($(TEST_TOOLS_PREBUILT),1)
+TEST_TOOLS_DEP :=
+else
+TEST_TOOLS_DEP := build-test-tools
+endif
+
 # ── Development ──────────────────────────────────────────────────────────────
 
-test: build-test-tools ## Run ShellCheck + Bats (unit + integration; no kcov — fast dev loop)
+test: $(TEST_TOOLS_DEP) ## Run ShellCheck + Bats (unit + integration; no kcov — fast dev loop)
 	./script/ci/ci.sh
 
-test-unit: build-test-tools ## Run unit bats only (fastest feedback loop)
+test-unit: $(TEST_TOOLS_DEP) ## Run unit bats only (fastest feedback loop)
 	./script/ci/ci.sh --unit-only
 
-test-integration: build-test-tools ## Run integration bats only (slower; container-based)
+test-integration: $(TEST_TOOLS_DEP) ## Run integration bats only (slower; container-based)
 	./script/ci/ci.sh --integration-only
 
-lint: build-test-tools ## Run ShellCheck + fish syntax + hadolint
+lint: $(TEST_TOOLS_DEP) ## Run ShellCheck + fish syntax + hadolint
 	./script/ci/ci.sh --lint-only
 
-coverage: build-test-tools ## Run ShellCheck + Bats + kcov coverage report
+coverage: $(TEST_TOOLS_DEP) ## Run ShellCheck + Bats + kcov coverage report
 	./script/ci/ci.sh --coverage
 
 # ── Image build ──────────────────────────────────────────────────────────────

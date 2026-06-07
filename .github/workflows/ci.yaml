@@ -2,9 +2,13 @@
 #
 # Aligns with ycpss91255-docker/docker_harness CI conventions:
 # - All test workflows run inside Docker (ADR-0004 hard rule).
-# - Path-filtered: doc-only PRs skip test/coverage; lint still runs.
+# - Path-filtered: doc-only / meta-only PRs (doc/, *.md, .claude/, GH
+#   issue templates, …) skip test/coverage; lint still runs.
 # - Job names match Makefile targets so `required_status_checks` can
 #   pin them by name (see issue #3).
+# - test-tools image is built ONCE in `build-image` (BuildKit + GHA
+#   cache), exported as a tar artifact, and `docker load`-ed by the
+#   downstream jobs instead of each job cold-building it (issue #26).
 #
 # Triggers:
 #   - PRs to main (the primary gating path)
@@ -31,8 +35,9 @@ permissions:
 
 jobs:
   # ── Path filter ────────────────────────────────────────────────────────────
-  # Detect whether the change is doc-only. Other jobs key on this to skip
-  # heavy work for pure markdown / license updates.
+  # Detect whether the change is doc-only / meta-only. Other jobs key on
+  # this to skip heavy work for pure markdown / license / agent-config
+  # updates (issue #27).
   changes:
     name: detect-changes
     runs-on: ubuntu-latest
@@ -43,55 +48,115 @@ jobs:
       - id: filter
         uses: dorny/paths-filter@v3
         with:
-          # `code` = anything that could affect runtime behaviour.
-          # Doc-only = `code` false → heavy jobs skip.
+          # The filter below is all-negated, so it needs `every`: a file
+          # counts as `code` only when EVERY '!' pattern matches it, i.e.
+          # no exclusion applies. The default (`some`) would flag almost
+          # every file as `code` (any file outside ONE exclusion matches
+          # that negation) — see dorny/paths-filter#167.
+          predicate-quantifier: 'every'
+          # `code` = anything that could affect runtime behaviour:
+          # everything not excluded below — lib/, module/, script/,
+          # template/, test/, small-tools/, dockerfile/, compose.yaml,
+          # Makefile, .github/workflows/, … (all-singular dirs, ADR-0021).
+          # Doc-only / meta-only = `code` false → heavy jobs skip;
+          # ci-passed treats their `skipped` result as pass.
           filters: |
             code:
               - '!doc/**'
               - '!**/*.md'
+              - '!**/*.adoc'
               - '!LICENSE'
               - '!LICENSE.*'
               - '!.gitignore'
               - '!.codecov.yaml'
+              - '!.claude/**'
+              - '!.github/ISSUE_TEMPLATE/**'
+
+  # ── Build test-tools image once (issue #26) ────────────────────────────────
+  # Always runs (no path filter) because lint runs on every PR, including
+  # doc-only ones, and lint needs the image. GHA layer cache makes the
+  # doc-only case near-instant after the first build on a ref.
+  build-image:
+    name: build-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: set up docker buildx
+        uses: docker/setup-buildx-action@v3
+      - name: build test-tools image (GHA cache + tar export)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: dockerfile/Dockerfile.test-tools
+          tags: test-tools:local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/test-tools.tar
+      - name: upload test-tools image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-tools-image
+          path: /tmp/test-tools.tar
+          retention-days: 1
 
   # ── Lint (always runs, including doc-only PRs) ─────────────────────────────
   lint:
     name: lint
+    needs: build-image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: build test-tools image
-        run: make build-test-tools
+      - name: download test-tools image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: test-tools-image
+          path: /tmp
+      - name: load test-tools image
+        run: docker load -i /tmp/test-tools.tar
       - name: run lint (shellcheck + hadolint + fish syntax)
-        run: make lint
+        run: make lint TEST_TOOLS_PREBUILT=1
 
   # ── Unit tests (skipped on doc-only changes) ───────────────────────────────
   test-unit:
     name: test-unit
-    needs: changes
+    needs: [changes, build-image]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: build test-tools image
-        run: make build-test-tools
+      - name: download test-tools image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: test-tools-image
+          path: /tmp
+      - name: load test-tools image
+        run: docker load -i /tmp/test-tools.tar
       - name: run unit bats specs
-        run: make test-unit
+        run: make test-unit TEST_TOOLS_PREBUILT=1
 
   # ── Integration tests (skipped on doc-only changes) ────────────────────────
   test-integration:
     name: test-integration
-    needs: changes
+    needs: [changes, build-image]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: build test-tools image
-        run: make build-test-tools
+      - name: download test-tools image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: test-tools-image
+          path: /tmp
+      - name: load test-tools image
+        run: docker load -i /tmp/test-tools.tar
       - name: run integration bats specs
-        run: make test-integration
+        run: make test-integration TEST_TOOLS_PREBUILT=1
 
   # ── Coverage (skipped on doc-only changes) ─────────────────────────────────
+  # NOTE: coverage runs in the upstream kcov/kcov debian image (see
+  # compose.yaml `coverage` service), NOT in test-tools:local — so it
+  # neither needs build-image nor the artifact. TEST_TOOLS_PREBUILT=1
+  # only skips the pointless local rebuild of an image it never uses.
   coverage:
     name: coverage
     needs: changes
@@ -99,10 +164,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: build test-tools image
-        run: make build-test-tools
       - name: run coverage (kcov)
-        run: make coverage
+        run: make coverage TEST_TOOLS_PREBUILT=1
       - name: upload coverage artefacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -118,7 +181,7 @@ jobs:
   # either approach (#3 will decide).
   ci-passed:
     name: ci-passed
-    needs: [changes, lint, test-unit, test-integration, coverage]
+    needs: [changes, build-image, lint, test-unit, test-integration, coverage]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -126,13 +189,17 @@ jobs:
         run: |
           set -euo pipefail
           echo "changes.code=${{ needs.changes.outputs.code }}"
+          echo "build-image=${{ needs.build-image.result }}"
           echo "lint=${{ needs.lint.result }}"
           echo "test-unit=${{ needs.test-unit.result }}"
           echo "test-integration=${{ needs.test-integration.result }}"
           echo "coverage=${{ needs.coverage.result }}"
-          # lint must succeed; the heavy three must succeed-or-skipped.
-          for r in "${{ needs.lint.result }}"; do
-            case "$r" in success) ;; *) echo "lint=$r"; exit 1 ;; esac
+          # build-image + lint must succeed; the heavy three must
+          # succeed-or-skipped (doc-only PRs skip them).
+          for r in \
+              "${{ needs.build-image.result }}" \
+              "${{ needs.lint.result }}"; do
+            case "$r" in success) ;; *) echo "mandatory job=$r"; exit 1 ;; esac
           done
           for r in \
               "${{ needs.test-unit.result }}" \

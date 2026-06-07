@@ -16,11 +16,24 @@
 .PHONY: test test-unit test-integration lint coverage coverage-unit coverage-merge build-test-tools clean help
 .DEFAULT_GOAL := help
 
+# ── Content-keyed image tag (issue #113) ─────────────────────────────────────
+# Parallel worktrees on one host clobbered the single `test-tools:local`
+# tag. The tag is now content-addressed —
+# test-tools:<sha256(Dockerfile.test-tools) first 12> — resolved by
+# script/ci/resolve_test_tools_tag.sh and exported so compose.yaml
+# (${TEST_TOOLS_IMAGE:-test-tools:local}) and ci.sh see the same value.
+# An explicit TEST_TOOLS_IMAGE=<ref> on the make command line / env wins.
+ifeq ($(origin TEST_TOOLS_IMAGE), undefined)
+TEST_TOOLS_IMAGE := $(shell ./script/ci/resolve_test_tools_tag.sh)
+endif
+export TEST_TOOLS_IMAGE
+
 # ── Prebuilt image escape hatch (CI; issue #26) ──────────────────────────────
-# GitHub Actions builds test-tools:local ONCE in the `build-image` job and
-# `docker load`s it in downstream jobs. Those jobs pass TEST_TOOLS_PREBUILT=1
-# so targets skip the redundant local rebuild. Local dev keeps the default
-# (build before run; cached layers make repeat builds cheap).
+# GitHub Actions builds the content-keyed test-tools image ONCE in the
+# `build-image` job and `docker load`s it in downstream jobs. Those jobs pass
+# TEST_TOOLS_PREBUILT=1 so targets skip the redundant local rebuild. Local
+# dev keeps the default (build before run; cached layers make repeat builds
+# cheap).
 ifeq ($(TEST_TOOLS_PREBUILT),1)
 TEST_TOOLS_DEP :=
 else
@@ -66,8 +79,16 @@ coverage-merge: $(TEST_TOOLS_DEP) ## Merge coverage/*shard-* + assert ratchet ga
 
 # ── Image build ──────────────────────────────────────────────────────────────
 
-build-test-tools: ## Build the test-tools:local image used by all targets above
-	docker build -t test-tools:local -f dockerfile/Dockerfile.test-tools .
+# Builds the content-keyed tag (issue #113) and re-points the legacy
+# `test-tools:local` alias at it (muscle memory; plain `docker compose run`
+# without the Makefile keeps working in single-worktree setups).
+build-test-tools: ## Build the content-keyed test-tools image (+ test-tools:local alias)
+	@test -n "$(TEST_TOOLS_IMAGE)" || { \
+		echo "ERROR: could not resolve test-tools image tag" \
+		     "(script/ci/resolve_test_tools_tag.sh failed — see stderr above)" >&2; \
+		exit 1; }
+	docker build -t "$(TEST_TOOLS_IMAGE)" -f dockerfile/Dockerfile.test-tools .
+	docker tag "$(TEST_TOOLS_IMAGE)" test-tools:local
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 

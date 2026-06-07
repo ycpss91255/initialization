@@ -22,9 +22,18 @@ setup() {
     FIXTURE_ROOT="${BATS_TEST_TMPDIR}/repo"
     mkdir -p "${FIXTURE_ROOT}/script/ci" \
              "${FIXTURE_ROOT}/test/unit/module" \
+             "${FIXTURE_ROOT}/dockerfile" \
              "${FIXTURE_ROOT}/bin"
     cp "${REPO_ROOT}/script/ci/ci.sh" "${FIXTURE_ROOT}/script/ci/ci.sh"
     CI_SH="${FIXTURE_ROOT}/script/ci/ci.sh"
+
+    # Host-side compose routes resolve the content-keyed image tag
+    # (issue #113) from a sibling helper + dockerfile/Dockerfile.test-tools
+    # — mirror both into the fixture so SCRIPT_DIR-relative resolution works.
+    cp "${REPO_ROOT}/script/ci/resolve_test_tools_tag.sh" \
+       "${FIXTURE_ROOT}/script/ci/resolve_test_tools_tag.sh"
+    printf 'FROM alpine:3.20\n' \
+        > "${FIXTURE_ROOT}/dockerfile/Dockerfile.test-tools"
 
     # Fixture unit specs (content never executed — bats is stubbed).
     printf '#!/usr/bin/env bats\n' \
@@ -237,4 +246,42 @@ EOF
     # The enforce flag must cross the container boundary (CI sets it on
     # the host-side make invocation).
     assert_output --partial "COVERAGE_ENFORCE=false"
+}
+
+@test "host route exports the content-keyed TEST_TOOLS_IMAGE to compose (issue #113)" {
+    # docker stub records the env var compose would use for the
+    # ${TEST_TOOLS_IMAGE:-test-tools:local} image substitution.
+    cat > "${FIXTURE_ROOT}/bin/docker" <<'EOF'
+#!/usr/bin/env bash
+printf 'TEST_TOOLS_IMAGE=%s\n' "${TEST_TOOLS_IMAGE:-<unset>}" \
+    >> "${STUB_CALL_LOG}/docker.calls"
+EOF
+    chmod +x "${FIXTURE_ROOT}/bin/docker"
+
+    local _expected
+    _expected="test-tools:$(sha256sum \
+        "${FIXTURE_ROOT}/dockerfile/Dockerfile.test-tools" | cut -c1-12)"
+
+    TEST_TOOLS_IMAGE='' run "${CI_SH}" --lint-only
+    assert_success
+
+    run cat "${STUB_CALL_LOG}/docker.calls"
+    assert_success
+    assert_output --partial "TEST_TOOLS_IMAGE=${_expected}"
+}
+
+@test "host route honors a pre-set TEST_TOOLS_IMAGE override (issue #113)" {
+    cat > "${FIXTURE_ROOT}/bin/docker" <<'EOF'
+#!/usr/bin/env bash
+printf 'TEST_TOOLS_IMAGE=%s\n' "${TEST_TOOLS_IMAGE:-<unset>}" \
+    >> "${STUB_CALL_LOG}/docker.calls"
+EOF
+    chmod +x "${FIXTURE_ROOT}/bin/docker"
+
+    TEST_TOOLS_IMAGE="test-tools:pinned" run "${CI_SH}" --lint-only
+    assert_success
+
+    run cat "${STUB_CALL_LOG}/docker.calls"
+    assert_success
+    assert_output --partial "TEST_TOOLS_IMAGE=test-tools:pinned"
 }

@@ -460,12 +460,24 @@ _fix_permissions() {
 # ── Compose wrapper (host-side) ──────────────────────────────────────────────
 
 # Route to a specific compose service:
-#   `ci`        — test-tools:local (alpine; fast lint+bats path)
+#   `ci`        — test-tools:<content-hash> (alpine; fast lint+bats path)
 #   `coverage`  — kcov/kcov (debian; slow kcov path, apt-installs deps)
+#
+# The ci service image tag is content-keyed (issue #113): resolved from
+# sha256(Dockerfile.test-tools) via resolve_test_tools_tag.sh and exported
+# as $TEST_TOOLS_IMAGE so compose's ${TEST_TOOLS_IMAGE:-test-tools:local}
+# substitution picks it up. A pre-set $TEST_TOOLS_IMAGE (Makefile export,
+# CI prebuilt path, manual override) wins — resolution is consistent
+# across Makefile / ci.sh / compose.yaml by construction.
 _run_in_container() {
     local _service="${1:-ci}"
     local _container_flag="${2:---ci}"
     local _coverage="${3:-0}"
+    if [[ -z "${TEST_TOOLS_IMAGE:-}" ]]; then
+        TEST_TOOLS_IMAGE="$("${SCRIPT_DIR}/resolve_test_tools_tag.sh")" \
+            || _die "failed to resolve content-keyed test-tools image tag (issue #113)"
+    fi
+    export TEST_TOOLS_IMAGE
     docker compose -f "${REPO_ROOT}/compose.yaml" run --rm \
         -e HOST_UID="$(id -u)" \
         -e HOST_GID="$(id -g)" \

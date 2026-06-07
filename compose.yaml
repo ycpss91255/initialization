@@ -2,9 +2,14 @@
 #
 # Borrowed from ycpss91255-docker/base v0.28.0 (commit ade915a) compose.yaml
 # Customizations vs upstream:
-#   - Default image is `test-tools:local` (built via `make build-test-tools`)
-#     instead of `ghcr.io/ycpss91255-docker/test-tools:latest` — we don't
-#     publish this repo's image to ghcr (PRD §2 Non-Goals)
+#   - Image comes from $TEST_TOOLS_IMAGE — the content-keyed tag
+#     test-tools:<sha256(Dockerfile.test-tools) first 12> resolved by
+#     script/ci/resolve_test_tools_tag.sh and exported by the Makefile /
+#     ci.sh (issue #113: parallel worktrees clobbered a single shared
+#     tag). Fallback `test-tools:local` is the alias `make
+#     build-test-tools` re-points on every build, so plain
+#     `docker compose run` keeps working in single-worktree setups. We
+#     don't publish this repo's image to ghcr (PRD §2 Non-Goals)
 #   - Removed `ci-behavioural` service (no Docker image build/publish tests)
 #   - Kept the separate `coverage` service backed by kcov/kcov debian image:
 #     kcov is not in alpine main/community/edge/testing (2026-05), so
@@ -13,9 +18,10 @@
 
 services:
   # Fast CI: ShellCheck + fish syntax + Hadolint + Bats (+ Kcov if $COVERAGE=1).
-  # Image is built locally by `make build-test-tools` (or
-  # `docker build -t test-tools:local -f dockerfile/Dockerfile.test-tools .`)
-  # so it's reproducible without depending on an upstream registry.
+  # Image is built locally by `make build-test-tools` under the
+  # content-keyed tag (issue #113), so it's reproducible without
+  # depending on an upstream registry and parallel worktrees with
+  # different Dockerfile contents don't clobber each other.
   ci:
     image: ${TEST_TOOLS_IMAGE:-test-tools:local}
     security_opt:
@@ -46,7 +52,7 @@ services:
   # / edge / testing) as of 2026-05. ci.sh `_install_deps_for_coverage`
   # apt-installs bats + shellcheck + bats-mock inside this container on
   # demand (slower path, kept for the slow `make coverage` workflow only;
-  # fast lint/bats stays on test-tools:local).
+  # fast lint/bats stays on the content-keyed test-tools image).
   coverage:
     image: kcov/kcov
     security_opt:

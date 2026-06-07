@@ -20,6 +20,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Added
+
+- **State robustness** (issue #41, PRD §10.1): reading a corrupt
+  `state.json` now quarantines it (`mv` → `state.json.corrupt.<ts>`) and
+  fails fast (exit 1) with recovery guidance — re-run install to rebuild
+  records (modules are idempotent) or manually fix the quarantined file
+  and rename it back. Never silently rebuilt, so manual / dep snapshot
+  data is never lost (automated repair stays `doctor --fix`, 0.3.0).
+  Contended state writes print a one-line wait notice; after
+  `INIT_UBUNTU_LOCK_TIMEOUT` (default 30 s) the writer exits 1 printing
+  the lock holder info (PID / lock file path).
+
 ### Changed
 
 - **Module tools directory relocated to top-level `tool/`** (issue #46,

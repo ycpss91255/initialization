@@ -22,6 +22,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **fdfind module migrated to the v2 contract** (issue #54, PRD §6.3.1
+  Batch B): `module/submodule/fdfind.sh` (v1 GitHub tarball install) is
+  replaced by `module/fdfind.module.sh` on the apt archetype — Ubuntu
+  ships fd as the `fd-find` package whose binary is `fdfind`; the
+  POST_INSTALL_MESSAGE explains the `alias fd=fdfind` shortcut. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  (dpkg-reported package version) is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. Tagged `cli-essentials`, `CATEGORY=optional`,
+  `DEPENDS_ON=()` (also a neovim dependency for telescope file finding).
 - **Self-deps preflight in the entrypoint** (issue #40, PRD §3.4 /
   AC-34): new `lib/preflight.sh` checks the tool's own dependencies
   (`jq` / `curl` / `git`) before dispatching. Missing + sudo available:

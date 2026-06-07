@@ -22,6 +22,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **zoxide module** (issue #52, PRD §6.3.1 Batch B): migrated
+  `module/submodule/zoxide.sh` to the v2 contract as
+  `module/zoxide.module.sh` (smarter `cd`; aliases `cd` to `z`).
+  Archetype B (github-release) with super-call overrides — the release
+  asset name embeds the version, so install/upgrade resolve the latest
+  tag first, then chain to the archetype default; both wire
+  `zoxide init` + the `cd`→`z` alias into existing bash/zsh rc files
+  (idempotent) and write the version Sidecar; remove/purge delete it
+  (ADR-0001). All 10 lifecycle phases run standalone (AC-25); dry-run
+  performs no filesystem writes (AC-12). New shared `module_sidecar_*`
+  helpers in `lib/module_helper.sh` (path / write / remove /
+  get_version, dry-run-safe) give Standalone and Engine mode one
+  Sidecar code path — closes the cookbook's
+  `module_sidecar_get_version` follow-up. Spec:
+  `test/unit/module/zoxide_spec.bats` (44 tests).
 - **State robustness** (issue #41, PRD §10.1): reading a corrupt
   `state.json` now quarantines it (`mv` → `state.json.corrupt.<ts>`) and
   fails fast (exit 1) with recovery guidance — re-run install to rebuild

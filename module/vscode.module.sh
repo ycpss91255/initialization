@@ -153,7 +153,11 @@ _vscode_setup_apt_repo() {
         return 1
     }
     log_info "[${NAME}] adding Microsoft apt key + source"
-    sudo install -m 0755 -d "${VSCODE_APT_KEYRING%/*}" || return 1
+    # mkdir+chmod instead of `install -d`: this module defines an install()
+    # lifecycle function, and `sudo install` would look like passing a shell
+    # function to an external command (SC2033).
+    sudo mkdir -p "${VSCODE_APT_KEYRING%/*}" || return 1
+    sudo chmod 0755 "${VSCODE_APT_KEYRING%/*}"
     if [[ ! -f "${VSCODE_APT_KEYRING}" ]]; then
         curl -fsSL "${VSCODE_APT_KEY_URL}" \
             | sudo gpg --dearmor -o "${VSCODE_APT_KEYRING}" || {

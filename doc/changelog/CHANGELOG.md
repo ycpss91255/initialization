@@ -20,6 +20,14 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Fixed
+
+- **github-release archetype download URL 404** : `lib/module_helper.sh`
+  built `releases/latests/download/` (one-char typo) so every real
+  (non-mocked) install of an archetype-B module would 404. Fixed to
+  `releases/latest/download/` + regression spec. Found independently by
+  three Batch B module agents.
+
 ### Added
 
 - **New `ripgrep` module on the apt archetype** (issue #55, PRD §6.3.1

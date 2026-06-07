@@ -59,6 +59,11 @@ _mock_version() {
     _claude_code_version() { printf '%s' "${MOCK_CLAUDE_VERSION:-9.9.9}"; }
 }
 
+# uname mock for detect(): MOCK_UNAME (machine string, default x86_64).
+_mock_uname() {
+    uname() { printf '%s' "${MOCK_UNAME:-x86_64}"; }
+}
+
 # Drop a fake `claude` launcher at CLAUDE_BIN that answers --version and
 # records every argv line into ${INIT_UBUNTU_TEST_SCRATCH}/claude-calls.
 _make_fake_claude_bin() {
@@ -387,4 +392,302 @@ EOF
     _mock_is_installed
     run install
     assert_success
+}
+
+# ── is_installed ─────────────────────────────────────────────────────────────
+
+@test "is_installed returns nonzero on a fresh test container" {
+    _load_module
+    CLAUDE_BIN="${INIT_UBUNTU_TEST_SCRATCH}/no-such-claude"
+    mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/empty-bin"
+    PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-bin" run is_installed
+    assert_failure
+}
+
+@test "is_installed returns zero when CLAUDE_BIN is an executable" {
+    _load_module
+    _make_fake_claude_bin
+    run is_installed
+    assert_success
+}
+
+@test "is_installed returns zero when claude is on PATH but not at CLAUDE_BIN" {
+    _load_module
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/path-bin"
+    mkdir -p "${_dir}"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "${_dir}/claude"
+    chmod +x "${_dir}/claude"
+    CLAUDE_BIN="${INIT_UBUNTU_TEST_SCRATCH}/elsewhere/claude"
+    PATH="${_dir}:${PATH}" run is_installed
+    assert_success
+}
+
+# ── detect (native installer ships x64 + arm64 only) ────────────────────────
+
+@test "detect succeeds on x86_64" {
+    _load_module
+    MOCK_UNAME=x86_64
+    _mock_uname
+    run detect
+    assert_success
+}
+
+@test "detect succeeds on aarch64" {
+    _load_module
+    MOCK_UNAME=aarch64
+    _mock_uname
+    run detect
+    assert_success
+}
+
+@test "detect fails on an unsupported architecture" {
+    _load_module
+    MOCK_UNAME=mips
+    _mock_uname
+    run detect
+    assert_failure
+}
+
+# ── upgrade delegates to the tool's self-updater ─────────────────────────────
+
+@test "upgrade runs 'claude update' via the managed launcher" {
+    _load_module
+    _make_fake_claude_bin
+    upgrade
+    grep -q '^update$' "${INIT_UBUNTU_TEST_SCRATCH}/claude-calls"
+}
+
+@test "upgrade falls back to install when not installed" {
+    _load_module
+    _mock_installer
+    _mock_version
+    MOCK_IS_INSTALLED_RC=1
+    _mock_is_installed
+    run upgrade
+    assert_success
+    assert_output --partial "running install instead"
+}
+
+@test "upgrade fails when the self-updater fails" {
+    _load_module
+    MOCK_IS_INSTALLED_RC=0
+    _mock_is_installed
+    MOCK_SELF_UPDATE_RC=1
+    _mock_self_update
+    run upgrade
+    assert_failure
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code" ]]
+}
+
+# ── verify / doctor / is_outdated ────────────────────────────────────────────
+
+@test "verify fails when not installed" {
+    _load_module
+    MOCK_IS_INSTALLED_RC=1
+    _mock_is_installed
+    run verify
+    assert_failure
+}
+
+@test "verify passes when installed and TEST_VERIFY_CMD succeeds" {
+    _load_module
+    MOCK_IS_INSTALLED_RC=0
+    _mock_is_installed
+    TEST_VERIFY_CMD="true"
+    run verify
+    assert_success
+}
+
+@test "doctor fails when not installed" {
+    _load_module
+    MOCK_IS_INSTALLED_RC=1
+    _mock_is_installed
+    run doctor
+    assert_failure
+}
+
+@test "doctor passes when the launcher answers --version" {
+    _load_module
+    _make_fake_claude_bin
+    run doctor
+    assert_success
+}
+
+@test "doctor warns when the sidecar is missing but still passes" {
+    _load_module
+    _make_fake_claude_bin
+    run doctor
+    assert_success
+    assert_output --partial "sidecar missing"
+}
+
+@test "doctor fails when the binary does not answer --version" {
+    _load_module
+    CLAUDE_BIN="${INIT_UBUNTU_TEST_SCRATCH}/bin/claude"
+    mkdir -p "${CLAUDE_BIN%/*}"
+    printf '#!/usr/bin/env bash\nexit 1\n' > "${CLAUDE_BIN}"
+    chmod +x "${CLAUDE_BIN}"
+    run doctor
+    assert_failure
+}
+
+@test "is_outdated always returns 1 — delegated to the built-in auto-updater" {
+    _load_module
+    run is_outdated
+    assert_failure
+}
+
+@test "is_outdated returns 1 even with a stale sidecar present" {
+    _load_module
+    mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
+    printf '0.0.1\n' > "${INIT_UBUNTU_STATE_DIR}/versions/claude-code"
+    run is_outdated
+    assert_failure
+}
+
+# ── Version probe (module-specific) ──────────────────────────────────────────
+
+@test "_claude_code_version parses the first token of claude --version" {
+    _load_module
+    _make_fake_claude_bin
+    run _claude_code_version
+    assert_success
+    assert_output "9.9.9"
+}
+
+@test "_claude_code_version falls back to latest when no binary exists" {
+    _load_module
+    CLAUDE_BIN="${INIT_UBUNTU_TEST_SCRATCH}/no-such-claude"
+    mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/empty-bin"
+    PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-bin" run _claude_code_version
+    assert_success
+    assert_output "latest"
+}
+
+# ── is_recommended ───────────────────────────────────────────────────────────
+
+@test "is_recommended is nonzero when already installed" {
+    _load_module
+    MOCK_IS_INSTALLED_RC=0
+    _mock_is_installed
+    run is_recommended
+    assert_failure
+}
+
+@test "is_recommended is zero when not installed" {
+    _load_module
+    MOCK_IS_INSTALLED_RC=1
+    _mock_is_installed
+    run is_recommended
+    assert_success
+}
+
+# ── Dual-mode standalone CLI ─────────────────────────────────────────────────
+
+@test "standalone: with no args prints usage + exits 2" {
+    run _standalone_module
+    assert_failure 2
+    assert_output --partial "Usage:"
+}
+
+@test "standalone: --help shows phases" {
+    run _standalone_module --help
+    assert_success
+    assert_output --partial "install"
+    assert_output --partial "remove"
+    assert_output --partial "purge"
+}
+
+@test "standalone: --version prints NAME + VERSION_PROVIDED" {
+    run _standalone_module --version
+    assert_success
+    assert_output --partial "claude-code"
+}
+
+@test "standalone: unknown phase returns exit 2" {
+    run _standalone_module nope
+    assert_failure 2
+}
+
+@test "standalone: info prints metadata" {
+    run _standalone_module info
+    assert_success
+    assert_output --partial "name:        claude-code"
+    assert_output --partial "category:    optional"
+    assert_output --partial "agent"
+}
+
+@test "standalone: info --lang=zh-TW prints localized description" {
+    run _standalone_module info --lang=zh-TW
+    assert_success
+    assert_output --partial "自動更新"
+}
+
+@test "standalone: status reports installed + outdated fields" {
+    run _standalone_module status
+    assert_success
+    assert_output --partial "installed:"
+    assert_output --partial "outdated:"
+}
+
+# ── AC-25: all 10 phases runnable, never "not implemented" exit 2 ────────────
+
+@test "standalone: install --dry-run exits 0 with DRY-RUN output" {
+    run _standalone_module install --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: upgrade --dry-run exits 0" {
+    run _standalone_module upgrade --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: remove --dry-run exits 0" {
+    run _standalone_module remove --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: purge --dry-run exits 0" {
+    run _standalone_module purge --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: verify --dry-run exits 0" {
+    run _standalone_module verify --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: detect is implemented (exit != 2)" {
+    run _standalone_module detect
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "standalone: is-installed is implemented (exit != 2)" {
+    run _standalone_module is-installed
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "standalone: is-recommended is implemented (exit != 2)" {
+    run _standalone_module is-recommended
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "standalone: is-outdated is implemented (exit != 2)" {
+    run _standalone_module is-outdated
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "standalone: doctor is implemented (exit != 2)" {
+    run _standalone_module doctor
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }

@@ -22,6 +22,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **claude-code module** (issue #57, PRD §6.3.2, Batch C): new
+  `module/claude-code.module.sh` installs the Anthropic Claude Code CLI
+  via the official native installer (`https://claude.ai/install.sh`,
+  user-home install, no sudo) on the custom archetype (D). The tool
+  ships its own auto-updater, so `is_outdated` always returns 1
+  (delegated) and `upgrade` runs `claude update`; `remove` keeps user
+  config (`~/.claude*`), `purge` clears it. Sidecar written on
+  install/upgrade and dropped on remove/purge (ADR-0001); all 10
+  lifecycle phases runnable standalone (AC-25). 74-test bats spec at
+  `test/unit/module/claude-code_spec.bats`.
+
 - **Color library + global output flags** (issue #45, PRD §5.1 / §7.5,
   M8, AC-16): new `lib/color.sh` decides ANSI color once per run —
   `auto` (default) turns color off for non-tty stdout, `NO_COLOR`,

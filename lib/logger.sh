@@ -169,15 +169,32 @@ function log_warn()  { _logger_print "WARN"  "$*"; }
 function log_error() { _logger_print "ERROR" "$*"; }
 function log_fatal() { _logger_print "FATAL" "$*"; exit 1; }
 
-# ── JSONL structured event log (PRD §10.2) ───────────────────────────────────
+# ── JSONL structured event log (PRD §10.2, ADR-0006) ────────────────────────
+#
+# Schema mirrors the OpenTelemetry Logs Data Model + W3C Trace Context
+# (field names only — no OTel SDK):
+#
+#   {"timestamp":"2026-05-13T14:22:33.123456Z","severity_text":"INFO",
+#    "body":"install_start","trace_id":"<session-uuid>",
+#    "span_id":"install_docker_001",
+#    "attributes":{"service.name":"docker","dry_run":false}}
 #
 # Usage:
-#   log_event <level> <module-or-empty> <event> [key=value ...]
+#   log_event <severity> <service-or-empty> <body> [key=value ...]
 #
 # Behavior:
 #   - No-op when $INIT_UBUNTU_LOG_FILE is unset/empty
 #   - Emits one JSON object per line to the file (JSONL)
-#   - ISO 8601 timestamp (e.g. 2026-05-13T14:22:33+08:00)
+#   - `timestamp`: ISO 8601, UTC, microsecond precision
+#   - `severity_text`: UPPERCASE enum (DEBUG/INFO/WARN/ERROR/FATAL)
+#   - `body`: event-code enum (install_start / cmd_exec / ... — never
+#     free-text sentences)
+#   - `trace_id`: session-level; read from $INIT_UBUNTU_TRACE_ID
+#     (self-generated + exported on first use when unset)
+#   - `span_id`: module×lifecycle-level; read from $INIT_UBUNTU_SPAN_ID
+#     (lib/runner.sh manages it); null when unset
+#   - `attributes`: business payload container; `service.name` is the
+#     module name, or "engine" for engine-level events (empty arg)
 #   - Numeric-looking values emitted as numbers; true/false emitted as
 #     bare booleans; everything else JSON-string-quoted
 #
@@ -208,26 +225,63 @@ _json_value() {
     fi
 }
 
+# Ensure a session-level trace id exists (W3C Trace Context, ADR-0006).
+# setup_ubuntu.sh calls this eagerly at entry so every sub-shell inherits
+# one id; log_event also calls it lazily as a safety net for standalone use.
+_logger_ensure_trace_id() {
+    [[ -n "${INIT_UBUNTU_TRACE_ID:-}" ]] && return 0
+
+    local _id=""
+    if command -v uuidgen >/dev/null 2>&1; then
+        _id="$(uuidgen)"
+    elif [[ -r /proc/sys/kernel/random/uuid ]]; then
+        _id="$(< /proc/sys/kernel/random/uuid)"
+    else
+        _id="$(date +%s%N)"   # nanosecond unix time, last-resort fallback
+    fi
+    export INIT_UBUNTU_TRACE_ID="${_id}"
+}
+
+# ISO 8601 timestamp: UTC, microsecond precision (ADR-0006).
+_logger_utc_timestamp() {
+    local _ts
+    _ts="$(date -u +%Y-%m-%dT%H:%M:%S.%6NZ 2>/dev/null)" || _ts=""
+    if [[ -z "${_ts}" || "${_ts}" == *%* ]]; then
+        # busybox / BSD date: no %N support — pad zero microseconds
+        _ts="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
+    fi
+    printf '%s' "${_ts}"
+}
+
 function log_event() {
     [[ -z "${INIT_UBUNTU_LOG_FILE:-}" ]] && return 0
 
-    local _level="${1:-info}"; shift || true
-    local _module="${1:-}";    shift || true
-    local _event="${1:-?}";    shift || true
+    local _severity="${1:-info}"; shift || true
+    local _service="${1:-}";      shift || true
+    local _body="${1:-?}";        shift || true
+
+    _logger_ensure_trace_id
 
     local _ts
-    if date --version >/dev/null 2>&1; then
-        _ts="$(date -Iseconds)"                  # GNU date
-    else
-        _ts="$(date +%Y-%m-%dT%H:%M:%S%z)"       # busybox / BSD fallback
+    _ts="$(_logger_utc_timestamp)"
+
+    # Engine-level events (empty service arg) log as service.name="engine"
+    # per PRD §10.2.
+    [[ -z "${_service}" ]] && _service="engine"
+
+    local _span_json="null"
+    if [[ -n "${INIT_UBUNTU_SPAN_ID:-}" ]]; then
+        _span_json="\"$(_json_escape "${INIT_UBUNTU_SPAN_ID}")\""
     fi
 
     local _line
     _line="{"
-    _line+="\"ts\":\"${_ts}\","
-    _line+="\"level\":\"$(_json_escape "${_level}")\","
-    _line+="\"module\":$( _json_value "${_module}" ),"
-    _line+="\"event\":\"$(_json_escape "${_event}")\""
+    _line+="\"timestamp\":\"${_ts}\","
+    _line+="\"severity_text\":\"$(_json_escape "${_severity^^}")\","
+    _line+="\"body\":\"$(_json_escape "${_body}")\","
+    _line+="\"trace_id\":\"$(_json_escape "${INIT_UBUNTU_TRACE_ID}")\","
+    _line+="\"span_id\":${_span_json},"
+    _line+="\"attributes\":{\"service.name\":\"$(_json_escape "${_service}")\""
 
     local _kv _k _v
     for _kv in "$@"; do
@@ -237,7 +291,7 @@ function log_event() {
         _line+=",\"$(_json_escape "${_k}")\":$( _json_value "${_v}" )"
     done
 
-    _line+="}"
+    _line+="}}"
 
     printf '%s\n' "${_line}" >> "${INIT_UBUNTU_LOG_FILE}"
 }

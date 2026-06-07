@@ -22,6 +22,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **ranger module** (issue #61, PRD §6.3.3 Batch C): new
+  `module/ranger.module.sh` on the apt + config-drop hybrid archetype
+  (super-call pattern) — apt installs the `ranger` package, then the
+  config-drop defaults place the repo-managed
+  `module/config/ranger/rifle.conf` (ranger's file-opener rules) at
+  `~/.config/ranger/rifle.conf` with the managed marker. `is_installed`
+  requires both the package and the marked config, so a deleted
+  rifle.conf re-triggers the drop while a user-edited (still-marked)
+  file is never clobbered; `remove` keeps the config, `purge` deletes
+  `~/.config/ranger`. All 10 lifecycle phases run standalone (AC-25);
+  install is idempotent (AC-5); `--dry-run` performs no filesystem
+  writes (AC-12); the version Sidecar is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. Tagged `filemgr`, `CATEGORY=optional`,
+  `DEPENDS_ON=()` (Q39).
 - **Color library + global output flags** (issue #45, PRD §5.1 / §7.5,
   M8, AC-16): new `lib/color.sh` decides ANSI color once per run —
   `auto` (default) turns color off for non-tty stdout, `NO_COLOR`,

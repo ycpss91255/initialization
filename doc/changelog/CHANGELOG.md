@@ -33,6 +33,66 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   removed on remove/purge per ADR-0001 while `state.json` is never
   touched by the module. Tagged `cli-essentials`, `CATEGORY=optional`,
   `DEPENDS_ON=()` (also a neovim dependency for telescope file finding).
+- **Self-deps preflight in the entrypoint** (issue #40, PRD §3.4 /
+  AC-34): new `lib/preflight.sh` checks the tool's own dependencies
+  (`jq` / `curl` / `git`) before dispatching. Missing + sudo available:
+  prints an apt-style plan and asks once whether to `apt install`
+  (automatic with `-y` / `INIT_UBUNTU_YES=true`); missing + no sudo:
+  fails fast with exit 4 and explicit install guidance. `help` /
+  `version` paths are exempt, and the check runs at most once per run
+  (`INIT_UBUNTU_PREFLIGHT_DONE` guard). Resolves the chicken-and-egg
+  where state/config/detect need `jq` but `jq` ships inside the
+  `apt-essentials` module. Test rig gains `curl` (test-tools image +
+  kcov coverage deps) so e2e specs driving the real entrypoint pass the
+  preflight; the real apt-install path is reserved for the AC-34
+  integration check in a clean CI container (wave 6).
+- **`lazygit.module.sh` v2 module** (issue #48, PRD §6.3.1 Batch B):
+  migrates `module/submodule/lazygit.sh` to the v2 contract on the
+  github-release archetype. Versioned upstream assets
+  (`lazygit_<ver>_Linux_x86_64.tar.gz`) are resolved at run time before
+  super-calling the archetype fetch. All 10 lifecycle phases are
+  runnable standalone (AC-25); the version Sidecar (shared
+  `module_sidecar_*` helpers) is written on install/upgrade and deleted
+  on remove/purge (ADR-0001), with `doctor` flagging
+  Sidecar/install-state drift. Ships
+  `test/unit/module/lazygit_spec.bats` (71 tests, Q29 scope) with
+  mocked GitHub queries (Q46: zero network in gates).
+- **Import/export with the ADR-0013 conflict pipeline** (issue #43,
+  AC-14): `export <file> [--modules=<csv>]` ships only the
+  machine-portable `synced` section of each installed module (ADR-0018);
+  the machine-specific `local` section never leaves the host.
+  `import <file>` runs the same conflict pipeline as `sync --pull`:
+  **dry-run by default** (prints an `IMPORT DIFF` plan, writes nothing),
+  `--apply` commits. Merge rules: union of modules (local-only entries
+  are never deleted), remote-wins on `version_provided` / `depends_on`,
+  `manual` sticky-to-true, and remote-only modules missing from the
+  local catalog are skipped with a warning. The receiver rebuilds
+  `local` sections via its own install pipeline; payload `local` data is
+  never applied. New state helpers `state_get_synced` /
+  `state_set_synced`, plus `state_io_import_plan` /
+  `state_io_import_apply` (payload schema 0.2.0). `sync --apply` is
+  forwarded to the importing side (push: remote `import --apply`; pull:
+  local apply), so sync also defaults to dry-run per ADR-0013.
+- **state.json synced/local split** (issue #43, ADR-0018, PRD §10.1):
+  `installed.<m>` is now split into `synced` (manual, depends_on,
+  version_provided, installed_at, installed_by — travels over
+  sync/export) and `local` (machine-specific facts — never leaves the
+  host). `state_record_install` gains an optional 4th `depends_on` csv
+  arg and preserves the `local` sub-object across re-records;
+  `state_record_upgrade` updates `synced`; `state_record_verify` stamps
+  `local.last_verified_at`; `state_get_field` reads synced-then-local.
+- **batcat module migrated to the v2 contract** (issue #53, PRD §6.3.1
+  Batch B): `module/submodule/batcat.sh` (GitHub-release tarball) is
+  replaced by `module/batcat.module.sh` on the apt archetype — installs
+  the Ubuntu `bat` package (binary ships as `batcat`) and appends guarded
+  `alias cat='batcat'` / `alias bat='batcat'` lines to existing
+  `~/.bashrc` / `~/.zshrc` (alias target asserted against the real binary
+  per the issue #1 copy-paste bug class; `LEGACY_DOTFILE=true` per spec
+  §6.1). All 10 lifecycle phases run standalone (AC-25); install is
+  idempotent (AC-5); `--dry-run` performs no filesystem writes (AC-12);
+  the version Sidecar is written on install/upgrade and removed on
+  remove/purge per ADR-0001 while `state.json` is never touched by the
+  module. Tagged `cli-essentials`, `CATEGORY=optional`, `DEPENDS_ON=()`.
 - **`setup_secrets.sh` skeleton: storage backend abstraction + ssh-key
   subcommands** (issue #44, PRD §14, AC-20): new standalone sensitive-data
   tool (not a module; shares `lib/logger.sh` / `lib/i18n.sh` /

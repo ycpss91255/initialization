@@ -133,3 +133,132 @@ _load_detect() {
     _b="$(detect_environment)"
     [[ "${_a}" == "${_b}" ]]
 }
+
+# ── env-driven fields ────────────────────────────────────────────────────────
+
+@test "detect_get_field desktop reflects XDG_CURRENT_DESKTOP" {
+    _load_detect
+    export XDG_CURRENT_DESKTOP="ubuntu:GNOME"
+    run detect_get_field desktop
+    assert_success
+    assert_output "ubuntu:GNOME"
+}
+
+@test "detect_get_field desktop is empty when XDG_CURRENT_DESKTOP is unset" {
+    _load_detect
+    unset XDG_CURRENT_DESKTOP
+    run detect_get_field desktop
+    assert_success
+    assert_output ""
+}
+
+@test "detect_get_field session_type reflects XDG_SESSION_TYPE" {
+    _load_detect
+    export XDG_SESSION_TYPE="wayland"
+    run detect_get_field session_type
+    assert_success
+    assert_output "wayland"
+}
+
+@test "WSL env marker (WSL_DISTRO_NAME) flips wsl to true" {
+    _load_detect
+    [[ -e /proc/sys/fs/binfmt_misc/WSLInterop ]] && skip "real WSL host"
+    export WSL_DISTRO_NAME="Ubuntu"
+    run detect_get_field wsl
+    assert_success
+    assert_output "true"
+}
+
+@test "detect_environment JSON-escapes double quotes in env-sourced values" {
+    _load_detect
+    export XDG_CURRENT_DESKTOP='Weird"Desk'
+    run detect_environment
+    assert_success
+    assert_output --partial '"desktop":"Weird\"Desk"'
+}
+
+# ── more single-field accessors ─────────────────────────────────────────────
+
+@test "detect_get_field os.version matches /etc/os-release VERSION_ID" {
+    _load_detect
+    [[ -f /etc/os-release ]] || skip "no /etc/os-release in image"
+    local _expected
+    _expected="$(. /etc/os-release; printf '%s' "${VERSION_ID:-}")"
+    run detect_get_field os.version
+    assert_success
+    [[ "${output}" == "${_expected}" ]]
+}
+
+@test "detect_get_field os.codename matches /etc/os-release VERSION_CODENAME" {
+    _load_detect
+    [[ -f /etc/os-release ]] || skip "no /etc/os-release in image"
+    local _expected
+    _expected="$(. /etc/os-release; printf '%s' "${VERSION_CODENAME:-}")"
+    run detect_get_field os.codename
+    assert_success
+    [[ "${output}" == "${_expected}" ]]
+}
+
+@test "detect_get_field cpu.vendor succeeds and contains no spaces" {
+    _load_detect
+    run detect_get_field cpu.vendor
+    assert_success
+    [[ "${output}" != *" "* ]]
+}
+
+@test "detect_get_field virt.vm is true|false (not unset)" {
+    _load_detect
+    run detect_get_field virt.vm
+    assert_success
+    [[ "${output}" == "true" || "${output}" == "false" ]]
+}
+
+# ── GPU probe classification (lspci stubbed on PATH) ────────────────────────
+
+_stub_lspci() {
+    local _stubdir="${INIT_UBUNTU_TEST_SCRATCH}/stubs"
+    mkdir -p "${_stubdir}"
+    printf '#!/usr/bin/env bash\necho "%s"\n' "$1" > "${_stubdir}/lspci"
+    chmod +x "${_stubdir}/lspci"
+    export PATH="${_stubdir}:${PATH}"
+}
+
+@test "gpu.vendor classifies an NVIDIA VGA line as nvidia" {
+    _load_detect
+    _stub_lspci "01:00.0 VGA compatible controller: NVIDIA Corporation AD102 [GeForce RTX 4090]"
+    run detect_get_field gpu.vendor
+    assert_success
+    assert_output "nvidia"
+}
+
+@test "gpu.model carries the lspci description after the vendor split" {
+    _load_detect
+    _stub_lspci "01:00.0 VGA compatible controller: NVIDIA Corporation AD102 [GeForce RTX 4090]"
+    run detect_get_field gpu.model
+    assert_success
+    assert_output --partial "NVIDIA Corporation AD102"
+}
+
+@test "gpu.vendor classifies an AMD VGA line as amd" {
+    _load_detect
+    _stub_lspci "03:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Navi 31"
+    run detect_get_field gpu.vendor
+    assert_success
+    assert_output "amd"
+}
+
+@test "gpu.vendor falls back to other for unrecognized VGA vendors" {
+    _load_detect
+    _stub_lspci "02:00.0 VGA compatible controller: Matrox Electronics Systems Ltd. MGA G200e"
+    run detect_get_field gpu.vendor
+    assert_success
+    assert_output "other"
+}
+
+@test "gpu.vendor is empty when lspci shows no VGA/3D device" {
+    _load_detect
+    _stub_lspci "00:1f.3 Audio device: Intel Corporation Cannon Lake PCH cAVS"
+    run detect_get_field gpu.vendor
+    assert_success
+    assert_output ""
+}

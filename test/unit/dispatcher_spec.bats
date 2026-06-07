@@ -492,3 +492,272 @@ EOF
     assert_success
     assert_output --partial "Usage: setup_ubuntu"
 }
+
+# ── export subcommand (PRD §7.2) ─────────────────────────────────────────────
+
+@test "dispatcher_dispatch export writes payload and confirms on stdout" {
+    _load_engine
+    state_record_install noop true v1
+    local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    run dispatcher_dispatch export "${_out}"
+    assert_success
+    assert_output --partial "state exported to"
+    run jq -r '.modules[0].name' "${_out}"
+    assert_success
+    assert_output "noop"
+}
+
+@test "dispatcher_dispatch export --modules=<csv> filters the payload" {
+    _load_engine
+    state_record_install noop true v1
+    state_record_install other true v2
+    local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    run dispatcher_dispatch export "${_out}" --modules=noop
+    assert_success
+    run jq -r '.modules | length' "${_out}"
+    assert_output "1"
+}
+
+@test "dispatcher_dispatch export without <out-file> returns 2" {
+    _load_engine
+    run dispatcher_dispatch export
+    assert_failure 2
+}
+
+@test "dispatcher_dispatch export with unknown flag returns 2" {
+    _load_engine
+    run dispatcher_dispatch export "${INIT_UBUNTU_TEST_SCRATCH}/p.json" --bogus
+    assert_failure 2
+}
+
+@test "dispatcher_dispatch export with two out-files returns 2" {
+    _load_engine
+    run dispatcher_dispatch export a.json b.json
+    assert_failure 2
+}
+
+# ── import argv validation ───────────────────────────────────────────────────
+
+@test "dispatcher_dispatch import without <in-file> returns 2" {
+    _load_engine
+    run dispatcher_dispatch import
+    assert_failure 2
+}
+
+@test "dispatcher_dispatch import with unknown flag returns 2" {
+    _load_engine
+    run dispatcher_dispatch import payload.json --bogus
+    assert_failure 2
+}
+
+@test "dispatcher_dispatch import with two in-files returns 2" {
+    _load_engine
+    run dispatcher_dispatch import a.json b.json
+    assert_failure 2
+}
+
+# ── search ───────────────────────────────────────────────────────────────────
+
+@test "dispatcher_dispatch search without keyword returns 2" {
+    _load_engine
+    run dispatcher_dispatch search
+    assert_failure 2
+}
+
+@test "dispatcher_dispatch search matches by name (case-insensitive)" {
+    _load_engine
+    run dispatcher_dispatch search NOOP
+    assert_success
+    assert_output --partial "noop"
+    assert_output --partial "NAME"
+}
+
+@test "dispatcher_dispatch search matches by tag" {
+    _load_engine
+    run dispatcher_dispatch search test
+    assert_success
+    assert_output --partial "noop"
+}
+
+@test "dispatcher_dispatch search with no match says so" {
+    _load_engine
+    run dispatcher_dispatch search zzz-not-a-module
+    assert_success
+    assert_output --partial "no module matches"
+}
+
+# ── show argv validation ────────────────────────────────────────────────────
+
+@test "dispatcher_dispatch show without <module> returns 2" {
+    _load_engine
+    run dispatcher_dispatch show
+    assert_failure 2
+}
+
+# ── upgrade ──────────────────────────────────────────────────────────────────
+
+@test "dispatcher_dispatch upgrade with empty state has nothing to do (exit 0)" {
+    _load_engine
+    state_init
+    run dispatcher_dispatch upgrade
+    assert_success
+    assert_output --partial "nothing to upgrade"
+}
+
+@test "dispatcher_dispatch upgrade <module> --dry-run lists the order" {
+    _load_engine
+    run dispatcher_dispatch upgrade noop --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+    assert_output --partial "noop"
+}
+
+@test "dispatcher_dispatch upgrade without -y on non-tty aborts (conservative [y/N])" {
+    _load_engine
+    run dispatcher_dispatch upgrade noop
+    assert_failure 1
+    assert_output --partial "Proceed? [y/N]"
+    assert_output --partial "Aborted."
+}
+
+@test "dispatcher_dispatch upgrade with unknown flag returns 2" {
+    _load_engine
+    run dispatcher_dispatch upgrade --bogus
+    assert_failure 2
+}
+
+# ── verify ───────────────────────────────────────────────────────────────────
+
+@test "dispatcher_dispatch verify with empty state has nothing to do (exit 0)" {
+    _load_engine
+    state_init
+    run dispatcher_dispatch verify
+    assert_success
+    assert_output --partial "nothing to verify"
+}
+
+@test "dispatcher_dispatch verify <module> --dry-run lists the order" {
+    _load_engine
+    run dispatcher_dispatch verify noop --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+    assert_output --partial "noop"
+}
+
+@test "dispatcher_dispatch verify with unknown flag returns 2" {
+    _load_engine
+    run dispatcher_dispatch verify --bogus
+    assert_failure 2
+}
+
+# ── detect ───────────────────────────────────────────────────────────────────
+
+@test "dispatcher_dispatch detect rejects positional args (exit 2)" {
+    _load_engine
+    run dispatcher_dispatch detect extra-arg
+    assert_failure 2
+}
+
+@test "dispatcher_dispatch detect rejects unknown flag (exit 2)" {
+    _load_engine
+    run dispatcher_dispatch detect --bogus
+    assert_failure 2
+}
+
+@test "dispatcher_dispatch detect errors when detect lib not loaded (exit 1)" {
+    _load_engine
+    run dispatcher_dispatch detect
+    assert_failure 1
+    assert_output --partial "not loaded"
+}
+
+@test "dispatcher_dispatch detect --json emits JSON with form_factor" {
+    _load_engine
+    # shellcheck source=../../lib/detect.sh
+    source "${LIB_DIR}/detect.sh"
+    # shellcheck source=../../lib/platform.sh
+    source "${LIB_DIR}/platform.sh"
+    dispatcher_dispatch detect --json | jq -e '.form_factor | length > 0' > /dev/null
+}
+
+@test "dispatcher_dispatch detect prints human-readable key: value lines" {
+    _load_engine
+    # shellcheck source=../../lib/detect.sh
+    source "${LIB_DIR}/detect.sh"
+    # shellcheck source=../../lib/platform.sh
+    source "${LIB_DIR}/platform.sh"
+    run dispatcher_dispatch detect
+    assert_success
+    assert_output --partial "os.id:"
+    assert_output --partial "form_factor:"
+}
+
+# ── sync argv validation ────────────────────────────────────────────────────
+
+@test "dispatcher_dispatch sync without <user@host> returns 2" {
+    _load_engine
+    run dispatcher_dispatch sync
+    assert_failure 2
+}
+
+@test "dispatcher_dispatch sync with unknown flag returns 2" {
+    _load_engine
+    run dispatcher_dispatch sync user@host --bogus
+    assert_failure 2
+}
+
+@test "dispatcher_dispatch sync with two targets returns 2" {
+    _load_engine
+    run dispatcher_dispatch sync user@host1 user@host2
+    assert_failure 2
+}
+
+# ── install plan + confirm (PRD §7.2) ───────────────────────────────────────
+
+@test "install without -y prints the resolved plan before the prompt" {
+    [[ "${EUID:-$(id -u)}" -eq 0 ]] || skip "relies on root-refusal stopping before runner"
+    _load_engine
+    run dispatcher_dispatch install noop
+    assert_failure 4
+    assert_output --partial "Will install: noop"
+    assert_output --partial "Proceed? [Y/n]"
+}
+
+@test "lifecycle remove --dry-run prints plan without executing" {
+    _load_engine
+    run dispatcher_dispatch remove noop --dry-run
+    assert_success
+    assert_output --partial "would remove"
+    assert_output --partial "noop"
+}
+
+@test "lifecycle purge --dry-run prints plan without executing" {
+    _load_engine
+    run dispatcher_dispatch purge noop --dry-run
+    assert_success
+    assert_output --partial "would purge"
+    assert_output --partial "noop"
+}
+
+# ── list stubbed flags degrade to WARN ──────────────────────────────────────
+
+@test "list --available is stubbed, not fatal" {
+    _load_engine
+    run dispatcher_dispatch list --available
+    assert_success
+    assert_output --partial "stubbed"
+}
+
+@test "list --json without --installed warns and falls through" {
+    _load_engine
+    run dispatcher_dispatch list --json
+    assert_success
+    assert_output --partial "stubbed"
+    assert_output --partial "noop"
+}
+
+@test "status forwards flag validation to list --installed (exit 2 on bogus)" {
+    _load_engine
+    run dispatcher_dispatch status --bogus
+    assert_failure 2
+}

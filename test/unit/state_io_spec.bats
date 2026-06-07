@@ -133,6 +133,34 @@ _set_fake_catalog() {
     assert_output "fzf"
 }
 
+@test "state_io_export rejects too many positional args" {
+    _load_state_io
+    state_init
+    run state_io_export "${INIT_UBUNTU_TEST_SCRATCH}/a.json" "${INIT_UBUNTU_TEST_SCRATCH}/b.json"
+    assert_failure 2
+}
+
+@test "state_io_export without state.json still writes a valid empty payload" {
+    _load_state_io
+    # No state_init: state.json absent — export must not crash.
+    local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    run state_io_export "${_out}"
+    assert_success
+    run jq -r '.modules | length' "${_out}"
+    assert_success
+    assert_output "0"
+}
+
+@test "state_io_export --modules with name absent from state yields empty list" {
+    _load_state_io
+    state_record_install docker true v1
+    local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    state_io_export "${_out}" --modules=not-recorded
+    run jq -r '.modules | length' "${_out}"
+    assert_success
+    assert_output "0"
+}
+
 @test "state_io_export rejects unknown flag" {
     _load_state_io
     state_init
@@ -210,6 +238,15 @@ EOF
     _load_state_io
     run state_io_payload_modules "${INIT_UBUNTU_TEST_SCRATCH}/does-not-exist.json"
     assert_failure 2
+}
+
+@test "state_io_payload_modules rejects a non-object payload (JSON array)" {
+    _load_state_io
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    echo '[]' > "${_payload}"
+    run state_io_payload_modules "${_payload}"
+    assert_failure 2
+    assert_output --partial "not a JSON object"
 }
 
 # ── import plan (ADR-0013 conflict pipeline) ────────────────────────────────
@@ -325,6 +362,44 @@ _write_payload() {
     assert_failure 2
 }
 
+@test "import plan errors on missing payload file (exit 2)" {
+    _load_state_io
+    state_init
+    run state_io_import_plan "${INIT_UBUNTU_TEST_SCRATCH}/missing.json"
+    assert_failure 2
+    assert_output --partial "not found"
+}
+
+@test "import plan on corrupt local state.json fails (quarantine guard)" {
+    _load_state_io
+    _set_fake_catalog docker
+    state_init
+    local _p; _p="$(state_get_path)"
+    printf 'garbage' > "${_p}"
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" \
+        '[{"name":"docker","synced":{"manual":true,"version_provided":"v1"}}]'
+    run state_io_import_plan "${_payload}"
+    assert_failure
+    local _q=("${_p}".corrupt.*)
+    [[ -e "${_q[0]}" ]]
+}
+
+@test "import plan: both sides without version_provided compare as unknown (noop)" {
+    _load_state_io
+    _set_fake_catalog docker
+    state_record_install docker true   # version defaults to "unknown"
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" \
+        '[{"name":"docker","synced":{"manual":true}}]'
+
+    run state_io_import_plan "${_payload}"
+    assert_success
+    echo "${output}" | jq -e '.[0].action == "noop"
+        and .[0].local_version == "unknown"
+        and .[0].remote_version == "unknown"' > /dev/null
+}
+
 # ── import apply ────────────────────────────────────────────────────────────
 
 @test "import apply: union + remote-wins land in state.json" {
@@ -405,6 +480,71 @@ EOF
 
     local _p; _p="$(state_get_path)"
     [[ "$(jq -r '.installed | length' "${_p}")" == "0" ]]
+}
+
+@test "import apply rejects unknown flag (exit 2)" {
+    _load_state_io
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" '[]'
+    run state_io_import_apply "${_payload}" --bogus
+    assert_failure 2
+}
+
+@test "import apply without <in-file> returns 2" {
+    _load_state_io
+    state_init
+    run state_io_import_apply
+    assert_failure 2
+}
+
+@test "import apply rejects too many positional args (exit 2)" {
+    _load_state_io
+    state_init
+    run state_io_import_apply a.json b.json
+    assert_failure 2
+}
+
+@test "import apply --plan with missing file returns 2" {
+    _load_state_io
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" '[]'
+    run state_io_import_apply "${_payload}" "--plan=${INIT_UBUNTU_TEST_SCRATCH}/no-plan.json"
+    assert_failure 2
+}
+
+@test "import apply --plan with non-array JSON returns 2" {
+    _load_state_io
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" '[]'
+    local _plan="${INIT_UBUNTU_TEST_SCRATCH}/plan.json"
+    echo '{"not":"an array"}' > "${_plan}"
+    run state_io_import_apply "${_payload}" "--plan=${_plan}"
+    assert_failure 2
+}
+
+@test "import apply --plan uses the pre-computed plan, not a recompute" {
+    _load_state_io
+    _set_fake_catalog docker
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    # Payload that would NOT plan an install for docker on recompute
+    # (docker absent from the payload entirely).
+    _write_payload "${_payload}" '[]'
+    # Pre-computed plan says install docker (the dispatcher's pre-lifecycle
+    # snapshot semantics).
+    local _plan="${INIT_UBUNTU_TEST_SCRATCH}/plan.json"
+    cat > "${_plan}" <<'EOF'
+[{"name":"docker","action":"install","local_version":null,
+  "remote_version":"v28.0.0",
+  "synced":{"manual":true,"version_provided":"v28.0.0"}}]
+EOF
+    run state_io_import_apply "${_payload}" "--plan=${_plan}"
+    assert_success
+    local _p; _p="$(state_get_path)"
+    [[ "$(jq -r '.installed.docker.synced.version_provided' "${_p}")" == "v28.0.0" ]]
 }
 
 # ── round trip (AC-14) ──────────────────────────────────────────────────────

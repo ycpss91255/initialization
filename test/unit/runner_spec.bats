@@ -263,3 +263,20 @@ EOF
     assert_success
     assert_output --partial "No modules"
 }
+
+# ── Session-end log retention wiring (PRD §10.2, AC-33) ─────────────────────
+
+@test "session end prunes the log directory to <= 100 jsonl files (AC-33)" {
+    _load_engine
+    local _logdir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    mkdir -p "${_logdir}"
+    local _i
+    for (( _i = 1; _i <= 110; _i++ )); do
+        printf '{}\n' > "${_logdir}/$(printf 'old-%03d' "${_i}").jsonl"
+        touch -d "1 day ago" "${_logdir}/$(printf 'old-%03d' "${_i}").jsonl"
+    done
+    INIT_UBUNTU_LOG_FILE="${_logdir}/current.jsonl" runner_install echo-mod >/dev/null 2>&1 || true
+    [[ "$(find "${_logdir}" -maxdepth 1 -type f -name '*.jsonl' | wc -l)" -eq 100 ]]
+    [[ -e "${_logdir}/current.jsonl" ]]
+    grep -q '"body":"log_pruned"' "${_logdir}/current.jsonl"
+}

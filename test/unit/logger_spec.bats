@@ -210,3 +210,142 @@ teardown() {
     run jq -e '.severity_text == "INFO" and .body == "message" and .attributes."service.name" == "docker" and (.attributes.msg | contains("hello from tty"))' "${_log}"
     assert_success
 }
+
+# ── logger_prune_logs retention (PRD §10.2, AC-33) ──────────────────────────
+#
+# Session-end retention: keep the newest 100 `.jsonl` files and none older
+# than 30 days; when either limit is exceeded delete from the oldest.
+
+# Create <count> .jsonl fixtures in <dir>, oldest first (1-minute mtime steps
+# backwards from <base-age-min> minutes ago), named log-001.jsonl ... so the
+# lowest-numbered file is always the oldest.
+_make_jsonl_fixtures() {
+    local _dir="$1" _count="$2" _base_age_min="${3:-60}"
+    local _i _age
+    mkdir -p "${_dir}"
+    for (( _i = 1; _i <= _count; _i++ )); do
+        _age=$(( _base_age_min + _count - _i ))
+        printf '{}\n' > "${_dir}/$(printf 'log-%03d' "${_i}").jsonl"
+        touch -d "${_age} minutes ago" "${_dir}/$(printf 'log-%03d' "${_i}").jsonl"
+    done
+}
+
+_count_jsonl() {
+    find "$1" -maxdepth 1 -type f -name '*.jsonl' | wc -l
+}
+
+_load_logger() {
+    # shellcheck source=../../lib/logger.sh
+    source "${LIB_DIR}/logger.sh"
+}
+
+@test "logger_prune_logs deletes oldest files beyond the 100-file cap" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    _make_jsonl_fixtures "${_dir}" 105
+    _load_logger
+    run logger_prune_logs "${_dir}"
+    assert_success
+    [[ "$(_count_jsonl "${_dir}")" -eq 100 ]]
+    # the 5 oldest are gone, the newest survive
+    [[ ! -e "${_dir}/log-001.jsonl" ]]
+    [[ ! -e "${_dir}/log-005.jsonl" ]]
+    [[ -e "${_dir}/log-006.jsonl" ]]
+    [[ -e "${_dir}/log-105.jsonl" ]]
+}
+
+@test "logger_prune_logs keeps exactly 100 files untouched (count boundary)" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    _make_jsonl_fixtures "${_dir}" 100
+    _load_logger
+    run logger_prune_logs "${_dir}"
+    assert_success
+    [[ "$(_count_jsonl "${_dir}")" -eq 100 ]]
+    [[ -e "${_dir}/log-001.jsonl" ]]
+}
+
+@test "logger_prune_logs deletes .jsonl older than 30 days" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    mkdir -p "${_dir}"
+    printf '{}\n' > "${_dir}/ancient.jsonl"
+    touch -d "31 days ago" "${_dir}/ancient.jsonl"
+    printf '{}\n' > "${_dir}/recent.jsonl"
+    touch -d "1 day ago" "${_dir}/recent.jsonl"
+    _load_logger
+    run logger_prune_logs "${_dir}"
+    assert_success
+    [[ ! -e "${_dir}/ancient.jsonl" ]]
+    [[ -e "${_dir}/recent.jsonl" ]]
+}
+
+@test "logger_prune_logs keeps a file exactly 30 days old (age boundary)" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    mkdir -p "${_dir}"
+    printf '{}\n' > "${_dir}/boundary.jsonl"
+    touch -d "30 days ago" "${_dir}/boundary.jsonl"
+    _load_logger
+    run logger_prune_logs "${_dir}"
+    assert_success
+    [[ -e "${_dir}/boundary.jsonl" ]]
+}
+
+@test "logger_prune_logs is a no-op on an empty directory" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    mkdir -p "${_dir}"
+    _load_logger
+    run logger_prune_logs "${_dir}"
+    assert_success
+    [[ -d "${_dir}" ]]
+}
+
+@test "logger_prune_logs is a no-op when the directory does not exist" {
+    _load_logger
+    run logger_prune_logs "${INIT_UBUNTU_TEST_SCRATCH}/no-such-dir"
+    assert_success
+}
+
+@test "logger_prune_logs leaves non-jsonl files alone" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    mkdir -p "${_dir}"
+    printf 'keep me\n' > "${_dir}/notes.txt"
+    touch -d "90 days ago" "${_dir}/notes.txt"
+    _load_logger
+    run logger_prune_logs "${_dir}"
+    assert_success
+    [[ -e "${_dir}/notes.txt" ]]
+}
+
+@test "logger_prune_logs emits log_pruned OTel event with deleted count" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/events.jsonl"
+    _make_jsonl_fixtures "${_dir}" 3 "$(( 31 * 24 * 60 ))"
+    bash -c "export INIT_UBUNTU_LOG_FILE='${_log}'; source '${LIB_DIR}/logger.sh' && logger_prune_logs '${_dir}'"
+    run jq -e '.severity_text == "INFO" and .body == "log_pruned" and .attributes."service.name" == "engine" and .attributes.deleted_count == 3' "${_log}"
+    assert_success
+}
+
+@test "logger_prune_logs emits no event when nothing was deleted" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/events.jsonl"
+    _make_jsonl_fixtures "${_dir}" 2
+    bash -c "export INIT_UBUNTU_LOG_FILE='${_log}'; source '${LIB_DIR}/logger.sh' && logger_prune_logs '${_dir}'"
+    [[ ! -e "${_log}" ]]
+}
+
+@test "logger_prune_logs defaults to dirname of INIT_UBUNTU_LOG_FILE" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    _make_jsonl_fixtures "${_dir}" 105
+    # active log file exists before pruning, as in a real session
+    printf '{}\n' > "${_dir}/current.jsonl"
+    bash -c "export INIT_UBUNTU_LOG_FILE='${_dir}/current.jsonl'; source '${LIB_DIR}/logger.sh' && logger_prune_logs"
+    [[ "$(_count_jsonl "${_dir}")" -eq 100 ]]
+}
+
+@test "logger_prune_logs never deletes the active INIT_UBUNTU_LOG_FILE" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/logs"
+    _make_jsonl_fixtures "${_dir}" 104
+    # active file is the newest (just written), must survive the count cap
+    printf '{}\n' > "${_dir}/current.jsonl"
+    bash -c "export INIT_UBUNTU_LOG_FILE='${_dir}/current.jsonl'; source '${LIB_DIR}/logger.sh' && logger_prune_logs"
+    [[ -e "${_dir}/current.jsonl" ]]
+    [[ "$(_count_jsonl "${_dir}")" -eq 100 ]]
+}

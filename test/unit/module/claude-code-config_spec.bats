@@ -38,7 +38,10 @@ _load_module() {
 # scratch HOME (the same entry users hit when they type
 # `bash module/claude-code-config.module.sh ...`).
 _standalone_module() {
-    HOME="${TEST_HOME}" XDG_STATE_HOME="${TEST_HOME}/.local/state" \
+    # Drop the test-env state-dir override so the sidecar lands under the
+    # scratch XDG_STATE_HOME, exactly like a real user invocation.
+    env -u INIT_UBUNTU_STATE_DIR \
+        HOME="${TEST_HOME}" XDG_STATE_HOME="${TEST_HOME}/.local/state" \
         bash "${MODULE_DIR}/claude-code-config.module.sh" "$@"
 }
 
@@ -405,4 +408,256 @@ _fake_claude_on_path() {
     assert_success
     run purge
     assert_success
+}
+
+# ── is_installed ─────────────────────────────────────────────────────────────
+
+@test "is_installed fails when settings.json is absent" {
+    _load_module
+    run is_installed
+    assert_failure
+}
+
+@test "is_installed fails when settings.json exists without the marker" {
+    _load_module
+    mkdir -p "${HOME}/.claude"
+    printf '{ "foreign": true }\n' > "${HOME}/.claude/settings.json"
+    run is_installed
+    assert_failure
+}
+
+# ── verify / doctor / is_outdated ────────────────────────────────────────────
+
+@test "verify fails when not installed" {
+    _load_module
+    run verify
+    assert_failure
+}
+
+@test "verify passes after a real install (TEST_VERIFY_CMD)" {
+    _load_module
+    install
+    run verify
+    assert_success
+}
+
+@test "doctor fails when not installed" {
+    _load_module
+    run doctor
+    assert_failure
+}
+
+@test "doctor passes after a real install" {
+    _load_module
+    install
+    run doctor
+    assert_success
+}
+
+@test "doctor fails when run-statusline.sh lost its executable bit" {
+    _load_module
+    install
+    chmod 644 "${HOME}/.claude/run-statusline.sh"
+    run doctor
+    assert_failure
+}
+
+@test "doctor warns (but passes) when the sidecar is missing" {
+    _load_module
+    install
+    rm -f "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config"
+    run doctor
+    assert_success
+    assert_output --partial "sidecar missing"
+}
+
+@test "is_outdated fails when not installed" {
+    _load_module
+    run is_outdated
+    assert_failure
+}
+
+@test "is_outdated fails right after a fresh install (up to date)" {
+    _load_module
+    install
+    run is_outdated
+    assert_failure
+}
+
+@test "is_outdated succeeds when a dropped file drifted from the template" {
+    _load_module
+    install
+    printf '\n' >> "${HOME}/.claude/settings.statusline.json"
+    run is_outdated
+    assert_success
+}
+
+@test "is_outdated succeeds when a companion file was deleted" {
+    _load_module
+    install
+    rm -f "${HOME}/.claude/run-statusline.sh"
+    run is_outdated
+    assert_success
+}
+
+# ── detect / is_recommended ──────────────────────────────────────────────────
+
+@test "detect succeeds with a normal HOME" {
+    _load_module
+    run detect
+    assert_success
+}
+
+@test "detect fails when HOME points nowhere" {
+    _load_module
+    HOME="${INIT_UBUNTU_TEST_SCRATCH}/does-not-exist" run detect
+    assert_failure
+}
+
+@test "is_recommended is zero when claude is on PATH and config not dropped" {
+    _load_module
+    _fake_claude_on_path
+    PATH="${INIT_UBUNTU_TEST_SCRATCH}/bin:${PATH}" run is_recommended
+    assert_success
+}
+
+@test "is_recommended is nonzero when already installed" {
+    _load_module
+    _fake_claude_on_path
+    MOCK_IS_INSTALLED_RC=0
+    _mock_is_installed
+    PATH="${INIT_UBUNTU_TEST_SCRATCH}/bin:${PATH}" run is_recommended
+    assert_failure
+}
+
+@test "is_recommended is nonzero when the claude CLI is absent" {
+    _load_module
+    mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/empty-bin"
+    PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-bin" run is_recommended
+    assert_failure
+}
+
+# ── Dual-mode standalone CLI ─────────────────────────────────────────────────
+
+@test "standalone: with no args prints usage + exits 2" {
+    run _standalone_module
+    assert_failure 2
+    assert_output --partial "Usage:"
+}
+
+@test "standalone: --help shows phases" {
+    run _standalone_module --help
+    assert_success
+    assert_output --partial "install"
+    assert_output --partial "remove"
+    assert_output --partial "purge"
+}
+
+@test "standalone: --version prints NAME + VERSION_PROVIDED" {
+    run _standalone_module --version
+    assert_success
+    assert_output --partial "claude-code-config"
+}
+
+@test "standalone: unknown phase returns exit 2" {
+    run _standalone_module nope
+    assert_failure 2
+}
+
+@test "standalone: info prints metadata" {
+    run _standalone_module info
+    assert_success
+    assert_output --partial "name:        claude-code-config"
+    assert_output --partial "category:    optional"
+    assert_output --partial "agent"
+    assert_output --partial "depends_on:  claude-code"
+}
+
+@test "standalone: info --lang=zh-TW prints localized description" {
+    run _standalone_module info --lang=zh-TW
+    assert_success
+    assert_output --partial "設定"
+}
+
+@test "standalone: status reports installed + outdated fields" {
+    run _standalone_module status
+    assert_success
+    assert_output --partial "installed:"
+    assert_output --partial "outdated:"
+}
+
+# ── Standalone full cycle (AC-23: state.json never touched) ──────────────────
+
+@test "standalone: install -> remove cycle never creates state.json" {
+    run _standalone_module install
+    assert_success
+    [[ -f "${TEST_HOME}/.claude/settings.json" ]]
+    [[ -f "${TEST_HOME}/.local/state/init_ubuntu/versions/claude-code-config" ]]
+    run _standalone_module remove
+    assert_success
+    [[ ! -e "${TEST_HOME}/.claude/settings.json" ]]
+    [[ ! -e "${TEST_HOME}/.local/state/init_ubuntu/versions/claude-code-config" ]]
+    [[ ! -e "${TEST_HOME}/.local/state/init_ubuntu/state.json" ]]
+}
+
+# ── AC-25: all 10 phases runnable, never "not implemented" exit 2 ────────────
+
+@test "standalone: install --dry-run exits 0 with DRY-RUN output" {
+    run _standalone_module install --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: upgrade --dry-run exits 0" {
+    run _standalone_module upgrade --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: remove --dry-run exits 0" {
+    run _standalone_module remove --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: purge --dry-run exits 0" {
+    run _standalone_module purge --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: verify --dry-run exits 0" {
+    run _standalone_module verify --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "standalone: detect is implemented (exit != 2)" {
+    run _standalone_module detect
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "standalone: is-installed is implemented (exit != 2)" {
+    run _standalone_module is-installed
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "standalone: is-recommended is implemented (exit != 2)" {
+    run _standalone_module is-recommended
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "standalone: is-outdated is implemented (exit != 2)" {
+    run _standalone_module is-outdated
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
+}
+
+@test "standalone: doctor is implemented (exit != 2)" {
+    run _standalone_module doctor
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }

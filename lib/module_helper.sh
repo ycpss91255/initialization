@@ -375,7 +375,7 @@ module_use_config_archetype() {
 module_standalone_usage() {
     local _name="${NAME:-?}"
     cat <<EOF
-Usage: bash modules/${_name}.module.sh <phase> [options]
+Usage: bash module/${_name}.module.sh <phase> [options]
 
 Phases:
   install            run install()

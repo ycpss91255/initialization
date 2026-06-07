@@ -1,0 +1,19 @@
+gsettings set org.gnome.settings-daemon.plugins.media-keys home "['<Super>e']"
+
+gsettings set org.gnome.settings-daemon.plugins.media-keys control-center "['<Super>i']"
+
+
+gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-left "['<Super>Up', '<Super>k']"
+gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-right "['<Super>Down', '<Super>j']"
+
+gsettings set org.gnome.desktop.wm.keybindings move-to-side-n "[]"
+gsettings set org.gnome.desktop.wm.keybindings move-to-side-e "[]"
+
+
+gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-left "['<Shift><Super>Left', '<Shift><Super>k']"
+gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-right "['<Shift><Super>Right', '<Shift><Super>j']"
+
+
+# Trash 自動清理（搭配 module/tools/trash-maintenance.sh 容量上限，見 TODO.md）
+gsettings set org.gnome.desktop.privacy remove-old-trash-files true
+gsettings set org.gnome.desktop.privacy old-files-age 'uint32 90'

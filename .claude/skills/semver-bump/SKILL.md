@@ -40,7 +40,7 @@ change shipped as a Z patch is large.
 ### Z bump (bug fix)
 
 ```
-.claude/scripts/release-tag.sh v1.3.1 -m "v1.3.1: <release notes>"
+.claude/script/release-tag.sh v1.3.1 -m "v1.3.1: <release notes>"
 ```
 
 Direct. No RC step.
@@ -49,13 +49,13 @@ Direct. No RC step.
 
 ```
 # 1. Cut RC
-.claude/scripts/release-tag.sh v1.3.0-rc1 -m "v1.3.0-rc1: <notes>"
+.claude/script/release-tag.sh v1.3.0-rc1 -m "v1.3.0-rc1: <notes>"
 
 # 2. Wait CI on the RC tag (use wait-tag-ci skill)
-.claude/scripts/wait-tag-ci.sh --repo ycpss91255-docker/<repo> --branch v1.3.0-rc1
+.claude/script/wait-tag-ci.sh --repo ycpss91255-docker/<repo> --branch v1.3.0-rc1
 
 # 3. Promote to non-RC
-.claude/scripts/release-tag.sh v1.3.0 -m "v1.3.0: <notes>"
+.claude/script/release-tag.sh v1.3.0 -m "v1.3.0: <notes>"
 ```
 
 The script's RC CI query (`gh run list --branch vX.Y.0-rcN`) must
@@ -67,14 +67,14 @@ promote step exits 1 with a hint to cut `rcN+1`.
 ```
 # 1. Ask user in chat: "ok to cut v1.0.0?"
 # 2. Only after explicit user "yes" / "ok":
-.claude/scripts/release-tag.sh v1.0.0-rc1 -m "v1.0.0-rc1: <notes>"
+.claude/script/release-tag.sh v1.0.0-rc1 -m "v1.0.0-rc1: <notes>"
 
 # 3. Wait CI
-.claude/scripts/wait-tag-ci.sh --repo ycpss91255-docker/<repo> --branch v1.0.0-rc1
+.claude/script/wait-tag-ci.sh --repo ycpss91255-docker/<repo> --branch v1.0.0-rc1
 
 # 4. Promote with ACK env (value must equal the tag literal)
 RELEASE_X_BUMP_ACK=v1.0.0 \
-  .claude/scripts/release-tag.sh v1.0.0 -m "v1.0.0: <notes>"
+  .claude/script/release-tag.sh v1.0.0 -m "v1.0.0: <notes>"
 ```
 
 **Claude must not set `RELEASE_X_BUMP_ACK` on its own initiative.**
@@ -102,9 +102,9 @@ If the RC's CI fails (any check `FAILURE` / `CANCELLED` /
 
 ## See also
 
-- `.claude/scripts/release-tag.sh --help`
-- `.claude/hooks/enforce_semver_tag_via_script.sh` -- boundary guard
-- `.claude/hooks/check_tag_version_consistency.sh` -- defensive second
+- `.claude/script/release-tag.sh --help`
+- `.claude/hook/enforce_semver_tag_via_script.sh` -- boundary guard
+- `.claude/hook/check_tag_version_consistency.sh` -- defensive second
   layer (`.version` integrity, kept as belt-and-suspenders)
 - `.claude/commands/release.md` -- orchestration (chore PR + `.version`
   bump + this script)

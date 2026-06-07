@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lib/resolver.sh — dependency resolver (topological sort + cycle detection)
 #
-# Per docs/architecture.md §3.3 and §18.2 Q-A1 (Kahn's algorithm).
+# Per doc/architecture.md §3.3 and §18.2 Q-A1 (Kahn's algorithm).
 #
 # Public API:
 #   resolver_resolve <module> [<module> ...]

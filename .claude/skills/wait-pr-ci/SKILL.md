@@ -11,32 +11,32 @@ Three flavours, one script each:
 
 | Flavour | Script | When |
 |---|---|---|
-| **PR-scoped** (statusCheckRollup) | `.claude/scripts/wait-pr-ci.sh` | After `gh pr create` — single repo, one or several PRs, waiting to merge once green. |
-| **Multi-repo PR-scoped** | `.claude/scripts/wait-pr-ci-batch.sh` | After `/batch-template-upgrade` opens N PRs across N downstream repos — one Monitor for the whole batch instead of N parallel streams. |
-| **Tag/branch-scoped** (`gh run list --branch <ref>`) | `.claude/scripts/wait-tag-ci.sh` | After `git push origin <tag>` triggered `on: push: tags:` workflows like `release-test-tools` or `release-worker` — waiting to verify the release pipeline. |
+| **PR-scoped** (statusCheckRollup) | `.claude/script/wait-pr-ci.sh` | After `gh pr create` — single repo, one or several PRs, waiting to merge once green. |
+| **Multi-repo PR-scoped** | `.claude/script/wait-pr-ci-batch.sh` | After `/batch-template-upgrade` opens N PRs across N downstream repos — one Monitor for the whole batch instead of N parallel streams. |
+| **Tag/branch-scoped** (`gh run list --branch <ref>`) | `.claude/script/wait-tag-ci.sh` | After `git push origin <tag>` triggered `on: push: tags:` workflows like `release-test-tools` or `release-worker` — waiting to verify the release pipeline. |
 
 All three are intentionally siblings — same output shape, same exit codes (`0` = ALL_DONE, `1` = FAIL, `2` = arg error, `124` = max-iter exhausted), same Monitor-wrap pattern. CLI shape differs: `wait-pr-ci.sh` takes `--repo` + `--prs`; `wait-pr-ci-batch.sh` takes positional `<repo>:<pr>` pairs; `wait-tag-ci.sh` takes `--repo` + `--branch`.
 
 ### Cwd assumption (worktree gap, refs #63)
 
-The example `Monitor` blocks below use bare relative paths like `.claude/scripts/wait-pr-ci.sh`. Monitor inherits the agent's cwd at the moment the tool is invoked, and the relative path resolves under whatever that cwd is. Two cases to watch:
+The example `Monitor` blocks below use bare relative paths like `.claude/script/wait-pr-ci.sh`. Monitor inherits the agent's cwd at the moment the tool is invoked, and the relative path resolves under whatever that cwd is. Two cases to watch:
 
 | Agent cwd | Behaviour |
 |---|---|
-| docker_harness root (`/home/.../docker`) | resolves to `<docker>/.claude/scripts/...` — works |
+| docker_harness root (`/home/.../docker`) | resolves to `<docker>/.claude/script/...` — works |
 | worktree of docker_harness (`worktree/docker_harness-NN/`) | the worktree carries `.claude/` — works |
-| worktree of a DIFFERENT downstream repo (e.g. `worktree/ros1_bridge-NN/`) | that worktree has NO `.claude/scripts/`; Monitor exits 127 with `No such file or directory` and no events stream |
+| worktree of a DIFFERENT downstream repo (e.g. `worktree/ros1_bridge-NN/`) | that worktree has NO `.claude/script/`; Monitor exits 127 with `No such file or directory` and no events stream |
 
 `${CLAUDE_PROJECT_DIR}` is set by Claude Code only inside hook script env (the `command:` field of `.claude/settings.json` hook entries), not inside Bash / Monitor tool subprocesses — testing it via `echo "$CLAUDE_PROJECT_DIR"` from a Monitor or Bash command returns empty. So it cannot be used in these examples.
 
-Until a workable absolute-path mechanism lands (issue #63 lists candidates), the safest pattern is: ensure the agent's cwd is the harness root or a docker_harness worktree before launching Monitor. If the agent is in a downstream-repo worktree, either `cd` to the harness root first (the example is a one-line bash prefix: `cd /home/.../docker && .claude/scripts/...` — Monitor's command field is a bash string), or pass an absolute path inline.
+Until a workable absolute-path mechanism lands (issue #63 lists candidates), the safest pattern is: ensure the agent's cwd is the harness root or a docker_harness worktree before launching Monitor. If the agent is in a downstream-repo worktree, either `cd` to the harness root first (the example is a one-line bash prefix: `cd /home/.../docker && .claude/script/...` — Monitor's command field is a bash string), or pass an absolute path inline.
 
 ## PR-scoped — `wait-pr-ci.sh`
 
 ```
 Monitor(
   description: "PR #<num> CI",   # or "PR #N1 + #N2 CI" for batches
-  command: ".claude/scripts/wait-pr-ci.sh --repo <OWNER>/<REPO> --prs <CSV>",
+  command: ".claude/script/wait-pr-ci.sh --repo <OWNER>/<REPO> --prs <CSV>",
   timeout_ms: 1800000,           # 30 min single PR; 2400000 (40 min) for batches
   persistent: false,             # script exits naturally on ALL_DONE / FAIL
 )
@@ -66,7 +66,7 @@ Cross-repo batches: see `wait-pr-ci-batch.sh` below. For N=2-3 spawning N parall
 ```
 Monitor(
   description: "batch PR CI (N repos)",
-  command: ".claude/scripts/wait-pr-ci-batch.sh <repo>:<pr> <repo>:<pr> ... [--check-filter <expr>]",
+  command: ".claude/script/wait-pr-ci-batch.sh <repo>:<pr> <repo>:<pr> ... [--check-filter <expr>]",
   timeout_ms: 2400000,            # 40 min for batches
   persistent: false,
 )
@@ -86,7 +86,7 @@ ycpss91255-docker/claude_code#27: checks=pending mergeable=MERGEABLE
 Mixed-category batch example (single-target containers default to `call-docker-build / docker-build`, multi-distro env repos override to `ci-passed`, `ros1_bridge` to `ci-summary`):
 
 ```
-.claude/scripts/wait-pr-ci-batch.sh \
+.claude/script/wait-pr-ci-batch.sh \
   ai_agent:39 claude_code:38 codex_cli:37 gemini_cli:36 \
   ros_distro:3 ros2_distro:3 ros1_bridge:56 \
   --check-filter '.name=="call-docker-build / docker-build"' \
@@ -102,7 +102,7 @@ Pairs with `wait-pr-ci.sh` for single-repo cases — same skill, same patterns, 
 ```
 Monitor(
   description: "tag v0.12.2 CI",
-  command: ".claude/scripts/wait-tag-ci.sh --repo <OWNER>/<REPO> --branch <tag-or-branch>",
+  command: ".claude/script/wait-tag-ci.sh --repo <OWNER>/<REPO> --branch <tag-or-branch>",
   timeout_ms: 1800000,
   persistent: false,
 )
@@ -141,7 +141,7 @@ The status guard is unconditional and applies on every poll. The `--min-checks <
 For `wait-pr-ci-batch.sh`, `--min-checks` accepts the same two forms as `--check-filter`: a bare integer (global default for every pair) or `<repo>=<N>` per-repo override. Detection rule mirrors `--check-filter` exactly. Mixed-category batch example combining filter + min-checks overrides:
 
 ```
-.claude/scripts/wait-pr-ci-batch.sh \
+.claude/script/wait-pr-ci-batch.sh \
   base:42 ai_agent:39 ros_distro:3 ros1_bridge:56 \
   --check-filter 'base=.name=="test" or (.name|startswith("Integration"))' \
   --check-filter '.name=="call-docker-build / docker-build"' \
@@ -191,7 +191,7 @@ For non-bot PRs, rebase locally + force-push, then re-invoke.
 
 ## See also
 
-- `.claude/scripts/wait-pr-ci.sh` / `.claude/scripts/wait-pr-ci-batch.sh` / `.claude/scripts/wait-tag-ci.sh` — the polling implementations. `--help` prints usage.
-- docs/processes/release.md → "## CI 監控（PR open 後）" — the project-level rule pointing back here.
+- `.claude/script/wait-pr-ci.sh` / `.claude/script/wait-pr-ci-batch.sh` / `.claude/script/wait-tag-ci.sh` — the polling implementations. `--help` prints usage.
+- doc/process/release.md → "## CI 監控（PR open 後）" — the project-level rule pointing back here.
 - `.claude/commands/pr.md` — full PR workflow, calls this skill at step 6 ("Wait for CI").
 - `.claude/commands/release.md` — release / tag workflow that should call the tag flavour after pushing the tag.

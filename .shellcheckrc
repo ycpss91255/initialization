@@ -2,6 +2,6 @@
 #
 # source-path=SCRIPTDIR makes all `# shellcheck source=path` directives
 # resolve relative to the script being checked (not the cwd). This is
-# necessary for `source=../lib/foo.sh` (in modules/) and similar relative
+# necessary for `source=../lib/foo.sh` (in module/) and similar relative
 # paths used after the SC1091/SC1090 migration — see issue #20.
 source-path=SCRIPTDIR

@@ -47,7 +47,7 @@ jobs:
           # Doc-only = `code` false → heavy jobs skip.
           filters: |
             code:
-              - '!docs/**'
+              - '!doc/**'
               - '!**/*.md'
               - '!LICENSE'
               - '!LICENSE.*'

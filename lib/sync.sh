@@ -2,7 +2,7 @@
 # shellcheck disable=SC2029  # SSH cmd strings intentionally expand ${_remote_path} client-side; value is a controlled tmpfile name, never user-tainted — https://www.shellcheck.net/wiki/SC2029
 # lib/sync.sh — SSH push / pull of the install state across machines
 #
-# Per PRD §16 (Sync mechanism) and docs/architecture.md §16.
+# Per PRD §16 (Sync mechanism) and doc/architecture.md §16.
 #
 # Public API:
 #   sync_push <user@host> [--modules=<csv>] [--dry-run]

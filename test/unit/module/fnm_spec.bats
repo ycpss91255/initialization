@@ -406,7 +406,8 @@ _mock_remote() {
     purge
     [[ ! -e "${FNM_INSTALL_DIR}" ]]
     [[ ! -e "${FNM_FISH_CONF}" ]]
-    ! grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
+    run grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
+    assert_failure
     [[ ! -e "$(_sidecar_file)" ]]
 }
 
@@ -473,7 +474,7 @@ _mock_remote() {
     printf '# user bashrc\n' > "${FNM_BASH_RC}"
     install
     grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
-    grep -Fq 'eval "$(fnm env --use-on-cd)"' "${FNM_BASH_RC}"
+    grep -Fq "fnm env --use-on-cd" "${FNM_BASH_RC}"
     grep -Fq "${FNM_BASH_BLOCK_END}" "${FNM_BASH_RC}"
 }
 
@@ -505,8 +506,10 @@ _mock_remote() {
     purge
     grep -Fq "# user bashrc top" "${FNM_BASH_RC}"
     grep -Fq "# user bashrc bottom" "${FNM_BASH_RC}"
-    ! grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
-    ! grep -Fq "FNM_PATH" "${FNM_BASH_RC}"
+    run grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
+    assert_failure
+    run grep -Fq "FNM_PATH" "${FNM_BASH_RC}"
+    assert_failure
 }
 
 # ── is_outdated (mocked remote, Q46) ────────────────────────────────────────

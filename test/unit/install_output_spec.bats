@@ -129,6 +129,59 @@ _load_engine() {
     assert_output --partial "✔ depa installed"
 }
 
+# Helper: register a module whose install() runs a child script via exec_cmd.
+# The marker text lives only in the child script body (not in the command
+# line) so "not streamed" can be asserted without matching the echoed cmd.
+_register_cmdmod() {
+    local _child="${INIT_UBUNTU_TEST_SCRATCH}/child.sh"
+    cat > "${_child}" <<'EOF'
+#!/usr/bin/env bash
+echo "CHILD-STDOUT-MARKER"
+echo "CHILD-STDERR-MARKER" >&2
+exit "${CHILD_EXIT:-0}"
+EOF
+    chmod +x "${_child}"
+    cat > "${FAKE_MODULE_DIR}/cmdmod.module.sh" <<EOF
+NAME="cmdmod"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { exec_cmd "${_child}"; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+}
+
+@test "exec_cmd child output is captured into JSONL cmd_exec, not streamed" {
+    _load_engine
+    _register_cmdmod
+    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
+
+    run runner_install cmdmod
+    assert_success
+    # Child stdout/stderr must NOT stream to the console (PRD §7.7.1)...
+    refute_output --partial "CHILD-STDOUT-MARKER"
+    refute_output --partial "CHILD-STDERR-MARKER"
+    # ...but the highlighted command line itself is printed.
+    assert_output --partial "child.sh"
+
+    # The cmd_exec event carries exit + duration_ms + the captured output.
+    run jq -r 'select(.body=="cmd_exec") | .attributes.exit' \
+        "${INIT_UBUNTU_LOG_FILE}"
+    assert_output "0"
+    run jq -e 'select(.body=="cmd_exec") | .attributes.duration_ms >= 0' \
+        "${INIT_UBUNTU_LOG_FILE}"
+    assert_success
+    run jq -r 'select(.body=="cmd_exec") | .attributes.output' \
+        "${INIT_UBUNTU_LOG_FILE}"
+    assert_output --partial "CHILD-STDOUT-MARKER"
+    assert_output --partial "CHILD-STDERR-MARKER"
+}
+
 @test "upgrade without -y keeps Proceed? [y/N] and non-tty default aborts" {
     _load_engine
     # Upgrade keeps the conservative [y/N] default (PRD §7.6): a non-tty

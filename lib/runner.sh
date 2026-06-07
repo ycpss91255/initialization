@@ -116,6 +116,12 @@ _runner_run_phase() {
     local _start_ts _end_ts _duration
     _start_ts="$(date +%s)"
 
+    # Per-module child-output buffer (PRD §7.7.1): exec_cmd appends captured
+    # child stdout/stderr here so the failure path can dump the last ~20
+    # lines. Capture mode is enabled for the module sub-shell only.
+    local _cmd_log
+    _cmd_log="$(mktemp)"
+
     # Sub-shell isolation via `(...)` fork (not `bash -c`). Module side-effects
     # (declare, set, cd, alias, export, traps) stay scoped to the subshell.
     # `(...)` is chosen over `bash -c "..."` because the latter launches a
@@ -129,6 +135,8 @@ _runner_run_phase() {
     # already sourced (setup_ubuntu.sh or bats `_load_engine` do this).
     (
         export INIT_UBUNTU_CURRENT_MODULE="${_name}"
+        export INIT_UBUNTU_CMD_CAPTURE=true
+        export INIT_UBUNTU_CMD_OUTPUT_FILE="${_cmd_log}"
         set -euo pipefail
         # shellcheck source=/dev/null  # module path is dynamic; static resolution impossible — https://www.shellcheck.net/wiki/SC1090
         source "${_file}"
@@ -186,6 +194,7 @@ _runner_run_phase() {
         log_error "[${_name}] ${_phase} failed (exit=${_rc}, ${_duration}s)"
     fi
 
+    rm -f "${_cmd_log}"
     unset INIT_UBUNTU_SPAN_ID
     return "${_rc}"
 }

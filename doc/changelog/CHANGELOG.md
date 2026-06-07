@@ -20,6 +20,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Added
+
+- **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
+  `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory
+  at session end — keeps the newest 100 `.jsonl` files and none older
+  than 30 days; when either limit is exceeded it deletes from the oldest
+  (logrotate-like, pure bash/find, no external dependency; both limits
+  env-overridable via `INIT_UBUNTU_LOG_RETENTION_{DAYS,FILES}`). Wired
+  into `lib/runner.sh` right after the `session_end` event so the active
+  log file (newest mtime) is never a victim; pruning emits one
+  engine-level `log_pruned` OTel event (ADR-0006 schema) carrying
+  `deleted_count` + retention limits. Boundaries are keep-side inclusive:
+  exactly 100 files / exactly 30 days old are kept.
+
 ### Changed
 
 - **Module tools directory relocated to top-level `tool/`** (issue #46,

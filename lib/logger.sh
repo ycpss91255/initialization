@@ -296,6 +296,92 @@ function log_event() {
     printf '%s\n' "${_line}" >> "${INIT_UBUNTU_LOG_FILE}"
 }
 
+# ── Session-end log retention (PRD §10.2, AC-33) ─────────────────────────────
+#
+# logrotate-like retention for the JSONL log directory, with no external
+# dependency (pure bash + find/sort/coreutils):
+#
+#   - keep at most INIT_UBUNTU_LOG_RETENTION_FILES (default 100) `.jsonl`
+#   - keep none older than INIT_UBUNTU_LOG_RETENTION_DAYS (default 30) days
+#   - when either limit is exceeded, delete from the oldest (mtime)
+#
+# Boundaries are inclusive on the keep side: exactly 100 files and a file
+# exactly 30 days old are both kept.
+
+# Default retention limits (PRD §10.2; env-overridable for tests).
+export INIT_UBUNTU_LOG_RETENTION_DAYS="${INIT_UBUNTU_LOG_RETENTION_DAYS:-30}"
+export INIT_UBUNTU_LOG_RETENTION_FILES="${INIT_UBUNTU_LOG_RETENTION_FILES:-100}"
+
+# logger_prune_logs [<dir>]
+#   <dir> defaults to the directory of $INIT_UBUNTU_LOG_FILE, falling back
+#   to ${XDG_STATE_HOME:-$HOME/.local/state}/init_ubuntu/logs.
+#   The active $INIT_UBUNTU_LOG_FILE itself is never deleted.
+#   Emits one engine-level `log_pruned` OTel event (schema per ADR-0006)
+#   carrying the deleted count when anything was removed.
+#   Missing or empty directory is a silent no-op (returns 0).
+function logger_prune_logs() {
+    local _dir="${1:-}"
+    if [[ -z "${_dir}" ]]; then
+        if [[ -n "${INIT_UBUNTU_LOG_FILE:-}" ]]; then
+            case "${INIT_UBUNTU_LOG_FILE}" in
+                */*) _dir="${INIT_UBUNTU_LOG_FILE%/*}" ;;
+                *)   _dir="." ;;
+            esac
+        else
+            _dir="${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu/logs"
+        fi
+    fi
+    [[ -d "${_dir}" ]] || return 0
+
+    local _days="${INIT_UBUNTU_LOG_RETENTION_DAYS:-30}"
+    local _max_files="${INIT_UBUNTU_LOG_RETENTION_FILES:-100}"
+    local _max_age_min=$(( _days * 24 * 60 ))
+    local _deleted=0
+
+    # List candidates oldest-first as "<epoch-mtime>\t<path>" lines.
+    # Portable glob + stat instead of `find -printf` (GNU-only; the bats
+    # image ships busybox find, which lacks it). Whole-minute age keeps
+    # the 30-day boundary keep-side inclusive, like `find -mmin +N`.
+    local _now _entry _mtime _f
+    local -a _files=() _mtimes=()
+    _now="$(date +%s)"
+    while IFS= read -r _entry; do
+        [[ -z "${_entry}" ]] && continue
+        _mtimes+=("${_entry%%$'\t'*}")
+        _files+=("${_entry#*$'\t'}")
+    done < <(
+        for _f in "${_dir}"/*.jsonl; do
+            [[ -f "${_f}" ]] || continue
+            printf '%s\t%s\n' "$(stat -c %Y -- "${_f}")" "${_f}"
+        done | sort -n
+    )
+
+    # Delete from the oldest when either rule fires:
+    #   Rule 1 — age:   strictly older than _days (whole minutes)
+    #   Rule 2 — count: the first (total - _max_files) entries
+    # The active log file is never a victim.
+    local _total="${#_files[@]}"
+    local _excess=$(( _total > _max_files ? _total - _max_files : 0 ))
+    local _idx
+    for (( _idx = 0; _idx < _total; _idx++ )); do
+        _f="${_files[_idx]}"
+        _mtime="${_mtimes[_idx]}"
+        [[ "${_f}" == "${INIT_UBUNTU_LOG_FILE:-}" ]] && continue
+        if [[ "${_idx}" -lt "${_excess}" ]] || \
+           [[ "$(( (_now - _mtime) / 60 ))" -gt "${_max_age_min}" ]]; then
+            rm -f -- "${_f}" && _deleted=$(( _deleted + 1 ))
+        fi
+    done
+
+    if [[ "${_deleted}" -gt 0 ]]; then
+        log_event info "" "log_pruned" \
+            "deleted_count=${_deleted}" \
+            "retention_days=${_days}" \
+            "retention_max_files=${_max_files}"
+    fi
+    return 0
+}
+
 # ── Initialize colors ────────────────────────────────────────────────────────
 
 _support_color

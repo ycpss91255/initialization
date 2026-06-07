@@ -3,7 +3,7 @@
 
 # Module Index
 
-28 modules. Columns come from each module's metadata block
+30 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -20,6 +20,7 @@ to the module source.
 | [eza](../../module/eza.module.sh) | optional | cli-essentials | Modern ls replacement (eza) + shell alias ls='eza' |
 | [fdfind](../../module/fdfind.module.sh) | optional | cli-essentials | fd (fdfind) — fast, user-friendly alternative to find (apt fd-find) |
 | [fish](../../module/fish.module.sh) | recommended | shell fish | fish shell 4 + fisher plugins + tide prompt + user config |
+| [fnm](../../module/fnm.module.sh) | optional | cli-essentials | fnm Fast Node Manager (Node.js version manager, user-home install) |
 | [font](../../module/font.module.sh) | recommended | font nerd-font desktop | Nerd Font collection (Hack, FiraCode, JetBrainsMono) |
 | [fzf](../../module/fzf.module.sh) | optional | cli-essentials | fzf command-line fuzzy finder (single-binary GitHub release) |
 | [git-config](../../module/git-config.module.sh) | recommended | config git dotfile | Personal ~/.gitconfig (aliases, delta diff, rebase pull, ...) |
@@ -32,6 +33,7 @@ to the module source.
 | [nvidia-driver](../../module/nvidia-driver.module.sh) | optional | gpu nvidia hardware | NVIDIA proprietary driver (auto-detected recommended version via ubuntu-drivers) |
 | [qmk-firmware](../../module/qmk-firmware.module.sh) | optional | hardware | QMK firmware dev environment — qmk CLI (pipx) + toolchain + qmk_firmware checkout |
 | [ranger](../../module/ranger.module.sh) | optional | filemgr | ranger — console file manager with vi key bindings + managed rifle.conf opener rules |
+| [ripgrep](../../module/ripgrep.module.sh) | optional | cli-essentials | ripgrep (rg) — fast, recursive grep alternative (apt ripgrep package) |
 | [shell](../../module/shell.module.sh) | recommended | shell core | Shell session basics: ssh client, keychain, xclip |
 | [ssh-config](../../module/ssh-config.module.sh) | optional | config ssh dotfile | Personal ~/.ssh/config templates (per-host alias and key map) |
 | [tmux](../../module/tmux.module.sh) | recommended | terminal multiplexer | Terminal multiplexer + powerline config |

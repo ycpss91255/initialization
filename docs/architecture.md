@@ -55,7 +55,7 @@ graph TB
     user --> tui
     user --> secrets
     cli --> dispatcher
-    tui --> dispatcher
+    tui --> cli
     secrets --> state
     secrets --> log_svc
 
@@ -379,7 +379,7 @@ sequenceDiagram
     L->>L: 1) export local state (filtered)
     L->>R: 2) SSH: test connection + auth
     L->>R: 3) SCP: payload.json -> /tmp/init_ubuntu_sync.json
-    L->>R: 4) SSH: bootstrap setup_ubuntu (if missing)
+    L->>R: 4) SSH: check setup_ubuntu exists (missing -> exit 7 + bootstrap 教學)
     L->>R: 5) SSH: setup_ubuntu import /tmp/init_ubuntu_sync.json
     R-->>L: 6) apply log streamed back
     L-->>User: summary + exit code
@@ -404,7 +404,7 @@ Payload schema(`payload.json`):
 
 **安全性原則**:
 - payload **絕不含**敏感資料(SSH key / token / 個人 config 內的 secrets)
-- 由 `setup_secrets.sh` 另開獨立流程處理敏感資料(`setup_secrets sync ...` v1.x)
+- 由 `setup_secrets.sh` 另開獨立流程處理敏感資料(`setup_secrets sync` 在 PRD §5.3 Backlog,目前一律手動)
 - SSH 連線**只用既有 key**,不在工具內存任何 password
 - 對方執行前一律 `--dry-run` 預覽,使用者確認後才實際 install
 - 加 `--strict-host-key-checking=yes`,拒絕 unknown host
@@ -445,12 +445,15 @@ argv -> parse_cli_args() -> intent { subcommand, modules, flags }
      -> dispatcher.dispatch(intent)
 ```
 
-### TUI 路徑
+### TUI 路徑(2026-06-06 定稿:TUI = CLI 前端,PRD G4)
 
 ```
-TUI prompts -> collect_tui_selections() -> intent { subcommand, modules, flags }
-            -> dispatcher.dispatch(intent)
+讀:setup_ubuntu list --json / detect --json  -> 選單資料(ADR-0019 schema)
+TUI prompts -> collect_tui_selections() -> 組 CLI 命令字串
+            -> exec setup_ubuntu <subcommand> <modules...> [flags]   # fork 子程序,清幕交棒
 ```
+
+TUI 不 source engine lib、不寫 state;AC-11(CLI/TUI 一致)結構性成立。
 
 ### Secrets-tool 路徑 [N4]
 
@@ -649,12 +652,7 @@ flowchart LR
 
 ### 8.4 Coverage gate
 
-| 階段 | 門檻 |
-|---|---|
-| v0.1 | >= 80% |
-| v0.5 | >= 90% |
-| v1.0 | >= 95% |
-| 之後 | >= 99%(允許 1% 為硬體相關不可測) |
+**80% 為唯一硬門檻**(kcov,PRD G5 / AC-17,2026-06-06 定稿);提升為 best-effort,不設階梯式目標。原 v0.5 ≥90% / v1.0 ≥95% 階梯已撤銷(版本階梯目前至 0.4.0,1.0 暫不規劃)。
 
 ---
 
@@ -715,17 +713,16 @@ install() {
 
 ### 9.4 Log 格式(JSONL,structured logging)
 
-Log **檔案存的是 JSON Lines**(`.jsonl`),主要使用對象是 **agent**(Claude / Codex / Gemini)做問題診斷;stdout 同時印人類可讀單行格式(`tee` 模式)。
+Log **檔案存的是 JSON Lines**(`.jsonl`),主要使用對象是 **agent**(Claude / Codex / Gemini)做問題診斷;人讀 stdout 輸出見 PRD §7.7(進度行 + exec_cmd 命令流,結尾聚合由事件衍生)。
 
 ```jsonl
-{"ts":"2026-05-13T14:22:33+08:00","level":"info","module":"docker","event":"install_start","payload":{"version":"apt-managed","install_target":"sudo","dry_run":false}}
-{"ts":"2026-05-13T14:22:34+08:00","level":"info","module":"docker","event":"cmd_exec","payload":{"cmd":"sudo apt-get update","exit":0,"duration_ms":1430}}
-{"ts":"2026-05-13T14:22:45+08:00","level":"info","module":"docker","event":"cmd_exec","payload":{"cmd":"sudo apt-get install -y docker-ce ...","exit":0,"duration_ms":11200}}
-{"ts":"2026-05-13T14:23:02+08:00","level":"info","module":"docker","event":"install_done","payload":{"status":"ok"}}
+{"timestamp":"2026-05-13T14:22:33.123456Z","severity_text":"INFO","body":"install_start","trace_id":"0193cdef-...","span_id":"install_docker_001","attributes":{"service.name":"docker","version":"apt-managed","install_target":"sudo","dry_run":false}}
+{"timestamp":"2026-05-13T14:22:34.001234Z","severity_text":"INFO","body":"cmd_exec","trace_id":"0193cdef-...","span_id":"install_docker_001","attributes":{"service.name":"docker","cmd":"sudo apt-get update","exit":0,"duration_ms":1430}}
+{"timestamp":"2026-05-13T14:23:02.654321Z","severity_text":"INFO","body":"install_done","trace_id":"0193cdef-...","span_id":"install_docker_001","attributes":{"service.name":"docker","status":"ok"}}
 ```
 
-Schema 見 PRD §10.2。常見 events:
-- `session_start` / `session_end`(engine 層,`module=null`)
+Schema 對齊 ADR-0006(OTel Logs Data Model;舊 `ts/level/module/event/payload` 命名作廢,2026-06-06 與 PRD §10.2 同步)。常見 events(`body` 值):
+- `session_start` / `session_end`(engine 層,`attributes."service.name"="engine"`)
 - `install_start` / `install_done` / `install_failed`
 - `cmd_exec`(每次 `exec_cmd` 呼叫)
 - `dep_resolved`(resolver 完成拓樸排序)
@@ -874,9 +871,9 @@ CLI 旗標 `--color=auto|always|never`(預設 `auto`,套用上述判斷)。
 
 ## 13. 整合與擴充
 
-### 13.1 第三方 module(v1.x)
+### 13.1 第三方 module(已砍,2026-06-06)
 
-`setup_ubuntu module add <git-url>`,clone 到 `~/.local/share/init_ubuntu/modules/`。
+`setup_ubuntu module add <git-url>` **不做**:與「不對外發行」Non-Goal 矛盾;私有擴充由 user-local module 區(`${XDG_CONFIG_HOME}/init_ubuntu/modules/`,PRD Q35)涵蓋。
 
 ### 13.2 與 base repo 的關係
 
@@ -1017,16 +1014,14 @@ setup_ubuntu sync <user@host> [--modules base,recommended] [--include-config] [-
 setup_ubuntu sync <user@host> --pull
 ```
 
-### 16.3 Bootstrap
+### 16.3 對端工具檢查(2026-06-06 定稿:不自動 bootstrap)
 
 對端可能沒裝 `setup_ubuntu`。流程:
 
 1. SSH 連線測試
 2. `which setup_ubuntu` on remote
-3. 若不存在:
-   - rsync 本工具到 `~/init_ubuntu_bootstrap/`(只傳 lib/ + modules/ + setup_ubuntu.sh)
-   - 或下載最新 release tarball
-4. 跑 `setup_ubuntu import payload.json`
+3. 若不存在:**退 code 7,印三行 bootstrap 教學**(同 PRD §3.4:`apt install git` → `git clone` → 執行)。不 rsync(產生無 `.git` 孤兒安裝,self-upgrade 斷裂)、不在遠端無人值守動 sudo
+4. 存在:跑 `setup_ubuntu import payload.json`(版本偏差:state schema 同版即可,ADR-0008 把關;工具版本不同僅 warn)
 
 ### 16.4 SSH 安全
 
@@ -1054,20 +1049,20 @@ v0.1+ 一律序列。`dpkg` lock + sudo 互斥讓 apt module 無法並行;非 ap
 
 | # | 問題 | **決定** |
 |---|---|---|
-| Q-A7 [N8] | sync payload 是否要簽章? | **v0.1 不考慮**;後續若有擴大 user 範圍再評估(加 GPG signature) |
+| Q-A7 [N8] | sync payload 是否要簽章? | **不做,已砍**(2026-06-06 PRD 定稿):sync 走 SSH(strict host key checking + key-only),通道已認證已加密,GPG 簽章為重複防護 |
 | Q-A8 [N4] | secrets 主要後端? | **偵測順序嘗試**:`pass` > `gnome-keyring` > encrypted-file(自動找最好用的);使用者可在 `~/.config/init_ubuntu/config.ini` 寫 `[secrets] backend=pass` 強制指定 |
 | Q-A9 [N9] | RPi / Jetson 是 allowlist 還是 is_recommended? | **allowlist**:`SUPPORTED_PLATFORMS` 為硬限制;沒列就視為不支援(可 `--force` 強裝)。**支援與否的依據**:做 CI 測試 / 看官方資訊確認;沒有官方資訊的就用 CI 測試 |
-| Q-A10 [N3] | 並行安裝預設啟用嗎? | **v0.1 預設關閉**;後續再評估要不要啟動或**直接取消功能**(取決於使用體驗) |
+| Q-A10 [N3] | 並行安裝預設啟用嗎? | **不做**(2026-06-06 PRD 定稿):移入 PRD §5.3 Backlog;`PARALLEL_GROUP` metadata 已砍(PRD Q34) |
 | Q-A11 [N17] | 高風險 module 自動回復的「snapshot」要做到多深? | **預設記前三層**(`lsmod` + `apt-mark showmanual` + 關鍵 config `/etc/X11`、`/etc/modprobe.d`)。**使用者在 install 確認對話框內可勾選是否額外做全機 snapshot**(BTRFS / timeshift),預設不做,需明確選擇 |
 | Q-A12 [N6] | Non-sudo 模式下 `apt-essentials` 怎麼辦? | **檢查每個套件是否已裝且符合最低版本**:已裝 + 版本 OK → 略過此套件繼續其他安裝;沒裝且無法 `apt install` → **跳過該套件**(不是整個 module fail)。**結尾彙報**:哪些套件成功 / 跳過 / 失敗 |
 
-### 18.2 設計階段傾向(尚未經使用者確認,屬於實作層細節)
+### 18.2 設計階段傾向(已全數收斂,2026-06-06 PRD 定稿)
 
-| # | 問題 | 我的傾向 |
+| # | 問題 | **決定** |
 |---|---|---|
-| Q-A1 | resolver 用 Kahn 還是 DFS topo sort? | **Kahn** |
-| Q-A2 | state.json schema migration 策略 | 一個 schema 版本一個 migrator,自動 migrate + 備份 |
-| Q-A3 | TUI dep 鏈是否遞迴展開 | 預設折疊,提供「展開」按鈕 |
-| Q-A4 | log 保留多久 | 預設 30 天 / 100 個檔,類 logrotate |
-| Q-A5 | Module-local i18n? | v0.1 不做 |
-| Q-A6 [N7] | i18n 字典是 bash declare -A 還是外部 JSON? | bash declare -A(對標 base) |
+| Q-A1 | resolver 用 Kahn 還是 DFS topo sort? | **Kahn** — 已實作於 `lib/resolver.sh` |
+| Q-A2 | state.json schema migration 策略 | 由 **ADR-0008**(forward-only migration + 備份)取代 |
+| Q-A3 | TUI dep 鏈是否遞迴展開 | **預設折疊 + 可展開**(「will pull N deps」一行提示;PRD §8.2) |
+| Q-A4 | log 保留多久 | **30 天 / 100 檔**,session 結尾清理;排入 **0.1.0**(PRD §10.2 / AC-33) |
+| Q-A5 | Module-local i18n? | **不另做** — metadata 層 i18n 已由 PRD Q23(`declare -A` + `module_i18n_get`)涵蓋 |
+| Q-A6 [N7] | i18n 字典是 bash declare -A 還是外部 JSON? | bash **declare -A**(PRD Q23 已決定;`lib/module_helper.sh` 已實作) |

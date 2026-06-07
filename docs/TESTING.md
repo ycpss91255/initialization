@@ -157,7 +157,7 @@ tests/
 4. 更新本檔 §5.1 的「借用版本」與 SHA
 5. `make test` 驗證沒壞
 
-未來 v1.x 可考慮寫 `scripts/sync-from-base.sh` 半自動化(PRD §5.2 nice-to-have)。
+未來可考慮寫 `scripts/sync-from-base.sh` 半自動化(不排版本,屬願望性質)。
 
 ---
 
@@ -176,12 +176,7 @@ tests/
 
 ## 7. 覆蓋率目標
 
-| 階段 | 門檻 | 來源 |
-|---|---|---|
-| v0.1 | >= 80% | PRD AC-17;`.codecov.yaml` target |
-| v0.5 | >= 90% | `docs/architecture.md` §8.4 |
-| v1.0 | >= 95% | 同上 |
-| 之後 | >= 99% | 同上(允許 1% 硬體相關不可測) |
+**80% 為唯一硬門檻**(PRD G5 / AC-17;`.codecov.yaml` target),提升為 best-effort。原 v0.5 / v1.0 階梯式目標已撤銷(2026-06-06 PRD 定稿,版本階梯目前至 0.4.0、1.0 暫不規劃;見 `docs/architecture.md` §8.4)。
 
 `.codecov.yaml` 的 `threshold: 1%` 表示「允許 1% 噪音」,實際門檻 = `target - threshold = 79%`。
 

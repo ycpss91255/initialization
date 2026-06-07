@@ -32,6 +32,13 @@ modules/config/fish/fish_variables*
 .agents/
 skills-lock.json
 
+# Generic agent skills are machine-local: installed via the `skills` CLI into
+# .agents/skills/ and symlinked from .claude/skills/ (2026-05-21 migration).
+# Project-specific skills (real directories) stay tracked via the negations.
+.claude/skills/*
+!.claude/skills/semver-bump
+!.claude/skills/wait-pr-ci
+
 # git worktree workspaces — per-branch checkouts for fix/feature work.
 # Convention: worktree/<N>-<slug>/ where N is the issue/task number.
 # The directory itself is tracked (worktree/.gitkeep) so the convention is

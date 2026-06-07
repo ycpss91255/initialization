@@ -201,6 +201,11 @@ _mock_jtop_bin() {
     [[ "${REBOOT_REQUIRED}" == "false" ]]
 }
 
+@test "TEST_VERIFY_CMD exercises the jtop binary" {
+    _load_module
+    [[ "${TEST_VERIFY_CMD}" == *"jtop"* ]]
+}
+
 # ── is_installed: pip metadata or jtop on PATH ───────────────────────────────
 
 @test "is_installed returns zero when pip3 reports jetson-stats" {
@@ -371,7 +376,8 @@ _mock_jtop_bin() {
     _mock_sudo
     install
     grep -q 'pipx install jetson-stats' "${MOCK_SUDO_LOG}"
-    ! grep -q 'pip3 install' "${MOCK_SUDO_LOG}"
+    run grep -q 'pip3 install' "${MOCK_SUDO_LOG}"
+    assert_failure
 }
 
 @test "install skips when already installed (idempotent fast path)" {
@@ -598,11 +604,6 @@ _mock_jtop_bin() {
     TEST_VERIFY_CMD="true"
     run verify
     assert_success
-}
-
-@test "TEST_VERIFY_CMD exercises the jtop binary" {
-    _load_module
-    [[ "${TEST_VERIFY_CMD}" == *"jtop"* ]]
 }
 
 @test "doctor fails when not installed" {

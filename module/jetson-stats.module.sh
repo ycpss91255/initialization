@@ -191,6 +191,14 @@ doctor() {
 
 # ── Private helpers ─────────────────────────────────────────────────────────
 
+# Single privileged-execution seam. Tests intercept it by shadowing `sudo`,
+# and routing pip3/pipx through one indirection keeps shellcheck from
+# pairing a `sudo pip3` literal with the spec's pip3() mock (SC2032 —
+# functions cannot cross the sudo boundary anyway, so make the seam explicit).
+_jetson_stats_sudo() {
+    sudo "$@"
+}
+
 # PEP 668 check: an EXTERNALLY-MANAGED marker in the Python stdlib dir means
 # bare `pip3 install` is refused and pipx is the sanctioned route.
 _jetson_stats_pep668() {
@@ -218,11 +226,11 @@ _jetson_stats_pkg_install() {
                 || sudo apt-get install -y pipx \
                 || { log_error "[${NAME}] PEP 668 environment but pipx is unavailable"; return 1; }
             log_info "[${NAME}] PEP 668 environment — sudo pipx install ${PIP_PKG}"
-            sudo pipx install "${PIP_PKG}" || return 1
+            _jetson_stats_sudo pipx install "${PIP_PKG}" || return 1
             ;;
         *)
             log_info "[${NAME}] sudo pip3 install -U ${PIP_PKG}"
-            sudo pip3 install -U "${PIP_PKG}" || return 1
+            _jetson_stats_sudo pip3 install -U "${PIP_PKG}" || return 1
             ;;
     esac
 }
@@ -233,11 +241,11 @@ _jetson_stats_pkg_upgrade() {
     case "$(_jetson_stats_installer)" in
         pipx)
             log_info "[${NAME}] sudo pipx upgrade ${PIP_PKG}"
-            sudo pipx upgrade "${PIP_PKG}" || return 1
+            _jetson_stats_sudo pipx upgrade "${PIP_PKG}" || return 1
             ;;
         *)
             log_info "[${NAME}] sudo pip3 install -U ${PIP_PKG}"
-            sudo pip3 install -U "${PIP_PKG}" || return 1
+            _jetson_stats_sudo pip3 install -U "${PIP_PKG}" || return 1
             ;;
     esac
 }
@@ -249,10 +257,10 @@ _jetson_stats_pkg_uninstall() {
         || { log_error "[${NAME}] sudo required"; return 1; }
     if pip3 show "${PIP_PKG}" >/dev/null 2>&1; then
         log_info "[${NAME}] sudo pip3 uninstall -y ${PIP_PKG}"
-        sudo pip3 uninstall -y "${PIP_PKG}" || return 1
+        _jetson_stats_sudo pip3 uninstall -y "${PIP_PKG}" || return 1
     else
         log_info "[${NAME}] sudo pipx uninstall ${PIP_PKG}"
-        sudo pipx uninstall "${PIP_PKG}" || return 1
+        _jetson_stats_sudo pipx uninstall "${PIP_PKG}" || return 1
     fi
 }
 

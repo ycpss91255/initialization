@@ -139,3 +139,101 @@ _load_sync() {
     run sync_push user@host --modules=docker
     assert_success
 }
+
+# ── remote tool check (PRD §16.3 step 2): exit 7 + §3.4 bootstrap ───────────
+
+# Make the ssh stub simulate a remote where `setup_ubuntu` is missing:
+# the tool-check remote command exits with the 9 sentinel.
+_stub_remote_without_tool() {
+    cat > "${SYNC_STUB_DIR}/ssh" <<EOF
+#!/usr/bin/env bash
+echo "ssh \$*" >> "${SYNC_STUB_LOG}"
+for _a in "\$@"; do
+    if [[ "\${_a}" == *"command -v setup_ubuntu"* ]]; then
+        exit 9
+    fi
+done
+exit 0
+EOF
+    chmod +x "${SYNC_STUB_DIR}/ssh"
+}
+
+@test "sync_push to a remote without setup_ubuntu exits 7" {
+    _load_sync
+    _stub_remote_without_tool
+    state_record_install docker true
+    run sync_push user@host
+    assert_failure 7
+}
+
+@test "sync_push to a remote without setup_ubuntu prints the 3-line §3.4 bootstrap" {
+    _load_sync
+    _stub_remote_without_tool
+    state_record_install docker true
+    run sync_push user@host
+    assert_failure 7
+    assert_output --partial "sudo apt install -y git"
+    assert_output --partial "git clone https://github.com/ycpss91255/initialization.git"
+    assert_output --partial "cd initialization && ./setup_ubuntu_tui.sh"
+}
+
+@test "sync_push to a remote without setup_ubuntu never scp's nor imports (no auto-rsync, no remote sudo)" {
+    _load_sync
+    _stub_remote_without_tool
+    state_record_install docker true
+    run sync_push user@host
+    assert_failure 7
+    run grep -q "scp " "${SYNC_STUB_LOG}"
+    assert_failure
+    run grep -q "setup_ubuntu import" "${SYNC_STUB_LOG}"
+    assert_failure
+}
+
+@test "sync_pull from a remote without setup_ubuntu exits 7 with the bootstrap" {
+    _load_sync
+    _stub_remote_without_tool
+    run sync_pull user@host
+    assert_failure 7
+    assert_output --partial "git clone https://github.com/ycpss91255/initialization.git"
+}
+
+# ── tool version skew warns only (PRD §16.3 step 2) ─────────────────────────
+
+# Make the ssh stub answer `setup_ubuntu version` with a fixed version
+# (everything else still exits 0 silently).
+_stub_remote_version() {
+    local _ver="$1"
+    cat > "${SYNC_STUB_DIR}/ssh" <<EOF
+#!/usr/bin/env bash
+echo "ssh \$*" >> "${SYNC_STUB_LOG}"
+for _a in "\$@"; do
+    if [[ "\${_a}" == *"setup_ubuntu version"* ]]; then
+        echo "init_ubuntu ${_ver}"
+    fi
+done
+exit 0
+EOF
+    chmod +x "${SYNC_STUB_DIR}/ssh"
+}
+
+@test "sync_push warns but proceeds when remote tool version differs" {
+    _load_sync
+    _stub_remote_version "9.9.9"
+    INIT_UBUNTU_VERSION="0.1.0"
+    state_record_install docker true
+    run sync_push user@host
+    assert_success
+    assert_output --partial "WARN"
+    assert_output --partial "9.9.9"
+    assert_output --partial "pushed state"
+}
+
+@test "sync_push stays quiet when remote tool version matches" {
+    _load_sync
+    _stub_remote_version "0.1.0"
+    INIT_UBUNTU_VERSION="0.1.0"
+    state_record_install docker true
+    run sync_push user@host
+    assert_success
+    refute_output --partial "WARN"
+}

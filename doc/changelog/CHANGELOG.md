@@ -36,6 +36,22 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   round-trip is covered through the real CLI on all three PRD §14.3
   backends: encrypted-file for real in Docker, `pass` and `gnome-keyring`
   via PATH-stub mocks that also assert the secret value never rides argv.
+- **notion module** (issue #65, PRD §6.3.3 Batch C, Q50 / #35): new
+  `module/notion.module.sh` installs the Notion desktop app from the
+  unofficial notion-electron `.deb` release (anechunaev/notion-electron),
+  replacing the legacy small-tools snap path (the snap is broken on
+  24.04). Rides the github-release archetype but consumes a `.deb`:
+  install resolves the latest tag, downloads the versioned
+  `Notion_Electron-<ver>-{amd64,arm64}.deb` asset, and hands it to
+  `apt-get install ./<deb>` so apt resolves the package's dependencies.
+  `CATEGORY=optional`, `TAGS=(notes)`, `DEPENDS_ON=(apt-essentials)`
+  (Q39), `SUPPORTED_PLATFORMS=(desktop)`; `is_recommended` never
+  pre-ticks on non-desktop form factors. All 10 lifecycle phases run
+  standalone (AC-25); install is idempotent (AC-5); `--dry-run` performs
+  no filesystem writes (AC-12); the version Sidecar is written on
+  install/upgrade and removed on remove/purge per ADR-0001 while
+  `state.json` is never touched by the module.
+
 - **anydesk module** (issue #64, PRD §6.3.3 Batch C, M7): migrated
   `module/anydesk.sh` to the v2 contract as `module/anydesk.module.sh`
   on the apt archetype with AnyDesk's vendor repo — install wires the

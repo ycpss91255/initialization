@@ -22,6 +22,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **vscode module migrated to the v2 contract** (issue #59, PRD §6.3.3
+  Batch C): `module/setup_vscode.sh` (v1) is superseded by
+  `module/vscode.module.sh` on the apt archetype with a Microsoft vendor
+  repo — deb822 source at `/etc/apt/sources.list.d/vscode.sources` signed
+  by a dearmored `/etc/apt/keyrings/microsoft.gpg` (same shape as
+  `docker.module.sh`), then `apt install code`. Demoted from recommended
+  to optional (no longer the primary editor): `CATEGORY=optional`,
+  `TAGS=(editor)`, `DEPENDS_ON=(apt-essentials)` (Q39). All 10 lifecycle
+  phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  (dpkg-reported `code` version) is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. `remove` keeps the vendor repo files for cheap
+  re-install; only `purge` drops them.
 - **Color library + global output flags** (issue #45, PRD §5.1 / §7.5,
   M8, AC-16): new `lib/color.sh` decides ANSI color once per run —
   `auto` (default) turns color off for non-tty stdout, `NO_COLOR`,

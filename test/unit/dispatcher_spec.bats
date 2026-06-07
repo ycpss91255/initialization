@@ -33,6 +33,8 @@ teardown() {
 _load_engine() {
     # shellcheck source=../../lib/logger.sh
     source "${LIB_DIR}/logger.sh"
+    # shellcheck source=../../lib/color.sh
+    source "${LIB_DIR}/color.sh"
     # shellcheck source=../../lib/general.sh
     source "${LIB_DIR}/general.sh"
     # shellcheck source=../../lib/state.sh
@@ -132,6 +134,16 @@ _load_engine() {
     _load_engine
     run dispatcher_dispatch install noop --dry-run
     assert_success
+}
+
+@test "dispatcher_dispatch install --profile=<x> is stubbed, not fatal (PRD §7.5, TUI #70 wiring)" {
+    # The TUI forks `install --profile=<override> ... -y` when the session
+    # platform override is set (§8.2.1). Until --profile lands in the
+    # engine it must degrade to a WARN like the other stubbed flags.
+    _load_engine
+    run dispatcher_dispatch install noop --profile=server --dry-run
+    assert_success
+    assert_output --partial "stubbed"
 }
 
 @test "dispatcher_dispatch install nonexistent returns exit 2 (resolver unknown)" {
@@ -425,4 +437,58 @@ EOF
     run dispatcher_dispatch doctor
     assert_success
     assert_output --partial "consistent"
+}
+
+# ── Global flags: --color / --verbose / --quiet (PRD §7.5, issue #45) ───────
+
+@test "global flag --verbose sets LOG_LEVEL=DEBUG" {
+    _load_engine
+    dispatcher_dispatch version --verbose >/dev/null
+    [ "${LOG_LEVEL}" = "DEBUG" ]
+}
+
+@test "global flag -v sets LOG_LEVEL=DEBUG" {
+    _load_engine
+    dispatcher_dispatch version -v >/dev/null
+    [ "${LOG_LEVEL}" = "DEBUG" ]
+}
+
+@test "global flag --quiet sets LOG_LEVEL=WARN" {
+    _load_engine
+    dispatcher_dispatch version --quiet >/dev/null
+    [ "${LOG_LEVEL}" = "WARN" ]
+}
+
+@test "global flags are accepted before the subcommand" {
+    _load_engine
+    dispatcher_dispatch --verbose list >/dev/null
+    [ "${LOG_LEVEL}" = "DEBUG" ]
+}
+
+@test "global flag --color=never is consumed and disables color" {
+    _load_engine
+    dispatcher_dispatch --color=never list >/dev/null
+    [ "${COLOR_ENABLED}" = "false" ]
+    [ "${INIT_UBUNTU_COLOR_MODE}" = "never" ]
+}
+
+@test "global flag --color=always is consumed and enables color" {
+    _load_engine
+    dispatcher_dispatch list --color=always >/dev/null
+    [ "${COLOR_ENABLED}" = "true" ]
+    [ "${INIT_UBUNTU_COLOR_MODE}" = "always" ]
+}
+
+@test "global flag --color=bogus is rejected with exit 2" {
+    _load_engine
+    run dispatcher_dispatch list --color=bogus
+    assert_failure 2
+    assert_output --partial "invalid --color mode"
+}
+
+@test "global flag alone still prints usage" {
+    _load_engine
+    run dispatcher_dispatch --verbose
+    assert_success
+    assert_output --partial "Usage: setup_ubuntu"
 }

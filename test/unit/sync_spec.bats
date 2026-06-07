@@ -119,7 +119,8 @@ _load_sync() {
     state_record_install docker true
     run sync_push user@host
     assert_success
-    ! grep -q -- "--apply" "${SYNC_STUB_LOG}"
+    run grep -q -- "--apply" "${SYNC_STUB_LOG}"
+    assert_failure
 }
 
 @test "sync_push --apply forwards --apply to the remote import" {

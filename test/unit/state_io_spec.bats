@@ -23,10 +23,14 @@ _load_state_io() {
     source "${LIB_DIR}/state_io.sh"
 }
 
-# Fake catalog membership for the conflict pipeline: space-separated names
-# in $FAKE_CATALOG count as locally-defined modules.
+# Fake catalog membership for the conflict pipeline: one module name per
+# line in the scratch fake-catalog file counts as locally defined.
 registry_has() {
-    [[ " ${FAKE_CATALOG:-} " == *" $1 "* ]]
+    grep -qx -- "$1" "${INIT_UBUNTU_TEST_SCRATCH}/fake-catalog" 2>/dev/null
+}
+
+_set_fake_catalog() {
+    printf '%s\n' "$@" > "${INIT_UBUNTU_TEST_SCRATCH}/fake-catalog"
 }
 
 # ── export ──────────────────────────────────────────────────────────────────
@@ -225,7 +229,7 @@ _write_payload() {
 
 @test "import plan: union — local-only kept, remote-only (known) installed" {
     _load_state_io
-    export FAKE_CATALOG="docker"
+    _set_fake_catalog docker
     state_record_install eza true v0.20.0
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
     _write_payload "${_payload}" \
@@ -240,7 +244,7 @@ _write_payload() {
 
 @test "import plan: remote-only module missing from catalog is skipped" {
     _load_state_io
-    export FAKE_CATALOG=""
+    _set_fake_catalog
     state_init
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
     _write_payload "${_payload}" \
@@ -254,7 +258,7 @@ _write_payload() {
 
 @test "import plan: same version on both sides is a noop" {
     _load_state_io
-    export FAKE_CATALOG="docker"
+    _set_fake_catalog docker
     state_record_install docker true v28.0.0
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
     _write_payload "${_payload}" \
@@ -267,7 +271,7 @@ _write_payload() {
 
 @test "import plan: version diff resolves remote-wins (upgrade action)" {
     _load_state_io
-    export FAKE_CATALOG="neovim"
+    _set_fake_catalog neovim
     state_record_install neovim true v0.10.2
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
     _write_payload "${_payload}" \
@@ -284,7 +288,7 @@ _write_payload() {
 
 @test "import plan: manual sticky-to-true survives remote-wins (ADR-0013)" {
     _load_state_io
-    export FAKE_CATALOG="neovim"
+    _set_fake_catalog neovim
     # Local manual=true, remote manual=false + version diff: remote wins on
     # version/depends_on but manual must stay true (sticky, AC-42 pattern).
     state_record_install neovim true v0.10.2
@@ -300,7 +304,7 @@ _write_payload() {
 
 @test "import plan: remote manual=true flips local manual=false (same version)" {
     _load_state_io
-    export FAKE_CATALOG="fzf"
+    _set_fake_catalog fzf
     state_record_install fzf false v0.55
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
     _write_payload "${_payload}" \
@@ -325,7 +329,7 @@ _write_payload() {
 
 @test "import apply: union + remote-wins land in state.json" {
     _load_state_io
-    export FAKE_CATALOG="docker neovim"
+    _set_fake_catalog docker neovim
     state_record_install eza true v0.20.0
     state_record_install neovim true v0.10.2
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
@@ -350,7 +354,7 @@ _write_payload() {
 
 @test "import apply never applies payload local sections (AC, issue #43)" {
     _load_state_io
-    export FAKE_CATALOG="docker"
+    _set_fake_catalog docker
     state_init
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
     # Hand-crafted hostile payload smuggling a local section.
@@ -372,7 +376,7 @@ EOF
 
 @test "import apply --skip excludes named modules from state writes" {
     _load_state_io
-    export FAKE_CATALOG="docker fzf"
+    _set_fake_catalog docker fzf
     state_init
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
     _write_payload "${_payload}" '[
@@ -390,7 +394,7 @@ EOF
 
 @test "import apply: skipped catalog-unknown module is never written" {
     _load_state_io
-    export FAKE_CATALOG=""
+    _set_fake_catalog
     state_init
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
     _write_payload "${_payload}" \
@@ -407,7 +411,7 @@ EOF
 
 @test "round trip: A export -> B import apply gives consistent installed sets (AC-14)" {
     _load_state_io
-    export FAKE_CATALOG="docker neovim fzf"
+    _set_fake_catalog docker neovim fzf
 
     # Machine A state.
     local _state_a="${INIT_UBUNTU_TEST_SCRATCH}/machine-a"

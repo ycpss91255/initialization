@@ -22,6 +22,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **batcat module migrated to the v2 contract** (issue #53, PRD §6.3.1
+  Batch B): `module/submodule/batcat.sh` (GitHub-release tarball) is
+  replaced by `module/batcat.module.sh` on the apt archetype — installs
+  the Ubuntu `bat` package (binary ships as `batcat`) and appends guarded
+  `alias cat='batcat'` / `alias bat='batcat'` lines to existing
+  `~/.bashrc` / `~/.zshrc` (alias target asserted against the real binary
+  per the issue #1 copy-paste bug class; `LEGACY_DOTFILE=true` per spec
+  §6.1). All 10 lifecycle phases run standalone (AC-25); install is
+  idempotent (AC-5); `--dry-run` performs no filesystem writes (AC-12);
+  the version Sidecar is written on install/upgrade and removed on
+  remove/purge per ADR-0001 while `state.json` is never touched by the
+  module. Tagged `cli-essentials`, `CATEGORY=optional`, `DEPENDS_ON=()`.
 - **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
   `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory
   at session end — keeps the newest 100 `.jsonl` files and none older

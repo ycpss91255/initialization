@@ -22,6 +22,22 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **notion module** (issue #65, PRD §6.3.3 Batch C, Q50 / #35): new
+  `module/notion.module.sh` installs the Notion desktop app from the
+  unofficial notion-electron `.deb` release (anechunaev/notion-electron),
+  replacing the legacy small-tools snap path (the snap is broken on
+  24.04). Rides the github-release archetype but consumes a `.deb`:
+  install resolves the latest tag, downloads the versioned
+  `Notion_Electron-<ver>-{amd64,arm64}.deb` asset, and hands it to
+  `apt-get install ./<deb>` so apt resolves the package's dependencies.
+  `CATEGORY=optional`, `TAGS=(notes)`, `DEPENDS_ON=(apt-essentials)`
+  (Q39), `SUPPORTED_PLATFORMS=(desktop)`; `is_recommended` never
+  pre-ticks on non-desktop form factors. All 10 lifecycle phases run
+  standalone (AC-25); install is idempotent (AC-5); `--dry-run` performs
+  no filesystem writes (AC-12); the version Sidecar is written on
+  install/upgrade and removed on remove/purge per ADR-0001 while
+  `state.json` is never touched by the module.
+
 - **vscode module migrated to the v2 contract** (issue #59, PRD §6.3.3
   Batch C): `module/setup_vscode.sh` (v1) is superseded by
   `module/vscode.module.sh` on the apt archetype with a Microsoft vendor

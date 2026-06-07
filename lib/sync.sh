@@ -17,6 +17,16 @@
 #     setup_secrets ssh-key copy first.
 #   - Payload NEVER contains secrets — only module names + their
 #     machine-portable `synced` metadata (ADR-0018; `local` never ships).
+#
+# Remote tool check (PRD §16.3 step 2):
+#   - A remote without `setup_ubuntu` is a hard stop: exit 7 + the 3-line
+#     §3.4 bootstrap. NO auto-rsync (an orphan install without `.git`
+#     breaks self-upgrade) and NO unattended remote sudo.
+#   - Tool version skew is warn-only; the real gate is the state payload
+#     schema version, enforced by state_io inside the import pipeline on
+#     whichever side imports (ADR-0008).
+#   - Remote import/export output streams back over the ssh channel
+#     (PRD §16.3 step 6) — we run ssh in the foreground, unredirected.
 
 if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
@@ -52,6 +62,58 @@ _sync_test_connection() {
         printf "[sync] hint: run 'setup_secrets ssh-key copy %s' to install your key first.\n" "${_target}" >&2
         return 7
     fi
+}
+
+# ── Remote tool check (PRD §16.3 step 2) ────────────────────────────────────
+
+_sync_print_bootstrap() {
+    local _target="$1"
+    {
+        printf "[sync] ERROR: setup_ubuntu not found on %s.\n" "${_target}"
+        printf "[sync] Bootstrap the remote first (PRD §3.4) — run there:\n"
+        printf "    sudo apt install -y git\n"
+        printf "    git clone https://github.com/ycpss91255/initialization.git\n"
+        printf "    cd initialization && ./setup_ubuntu_tui.sh\n"
+    } >&2
+}
+
+# Exit 7 when the remote has no `setup_ubuntu`. The remote command exits
+# with sentinel 9 so a missing tool is distinguishable from ssh transport
+# failures (which surface as other non-zero codes).
+_sync_check_remote_tool() {
+    local _target="$1"
+    ssh "${SYNC_SSH_OPTS[@]}" "${_target}" \
+        "command -v setup_ubuntu >/dev/null 2>&1 || exit 9"
+    local _rc=$?
+    if [[ "${_rc}" -eq 9 ]]; then
+        _sync_print_bootstrap "${_target}"
+        return 7
+    fi
+    if [[ "${_rc}" -ne 0 ]]; then
+        printf "[sync] ERROR: remote tool check failed (ssh exit %s)\n" "${_rc}" >&2
+        return 7
+    fi
+}
+
+# Tool version skew only warns (PRD §16.3 step 2). The hard gate is the
+# state payload schema version, checked by state_io inside the import
+# pipeline on whichever side imports (ADR-0008) — a too-new payload fails
+# the remote/local import with its own error, never silently.
+_sync_warn_tool_version_skew() {
+    local _target="$1"
+    local _local_ver="${INIT_UBUNTU_VERSION:-}"
+    [[ -z "${_local_ver}" ]] && return 0
+    local _remote_out _remote_ver
+    if ! _remote_out="$(ssh "${SYNC_SSH_OPTS[@]}" "${_target}" "setup_ubuntu version" 2>/dev/null)"; then
+        return 0
+    fi
+    _remote_ver="$(awk '/^init_ubuntu /{print $2; exit}' <<< "${_remote_out}")"
+    [[ -z "${_remote_ver}" ]] && return 0
+    if [[ "${_remote_ver}" != "${_local_ver}" ]]; then
+        printf "[sync] WARN: tool version skew — local %s vs remote %s (continuing; payload schema compatibility is enforced by the import pipeline, ADR-0008)\n" \
+            "${_local_ver}" "${_remote_ver}" >&2
+    fi
+    return 0
 }
 
 # ── Public: push ────────────────────────────────────────────────────────────
@@ -97,6 +159,8 @@ sync_push() {
     fi
 
     _sync_test_connection "${_target}" || return $?
+    _sync_check_remote_tool "${_target}" || return $?
+    _sync_warn_tool_version_skew "${_target}"
 
     local _tmp
     _tmp="$(mktemp /tmp/init_ubuntu_sync.XXXXXX.json)"
@@ -162,6 +226,8 @@ sync_pull() {
     fi
 
     _sync_test_connection "${_target}" || return $?
+    _sync_check_remote_tool "${_target}" || return $?
+    _sync_warn_tool_version_skew "${_target}"
 
     local _remote_path="/tmp/init_ubuntu_sync.json"
     ssh "${SYNC_SSH_OPTS[@]}" "${_target}" "setup_ubuntu export ${_remote_path}" || {

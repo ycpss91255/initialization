@@ -121,6 +121,14 @@ _load_engine() {
     assert_output --partial "[2/2] main: installing..."
 }
 
+@test "runner_install prints checkmark success line with duration" {
+    _load_engine
+    run runner_install depa
+    assert_success
+    assert_output --regexp 'installed \([0-9]+s\)'
+    assert_output --partial "✔ depa installed"
+}
+
 @test "upgrade without -y keeps Proceed? [y/N] and non-tty default aborts" {
     _load_engine
     # Upgrade keeps the conservative [y/N] default (PRD §7.6): a non-tty

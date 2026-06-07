@@ -145,7 +145,7 @@ _runner_run_phase() {
 
     if [[ "${_rc}" -eq 0 ]]; then
         log_event info "${_name}" "${_phase}_done" "duration_s=${_duration}"
-        log_info "[${_name}] ${_phase} completed (${_duration}s)"
+        _runner_progress "  ✔ ${_name} $(_runner_phase_past "${_phase}") (${_duration}s)"
         # Mirror successful lifecycle to state.json (unless dry-run).
         # Manual flag: true if the user named this module explicitly via
         # the CLI; false if it landed here as a transitive dep. dispatcher

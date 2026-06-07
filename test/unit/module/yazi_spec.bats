@@ -438,6 +438,14 @@ _sandbox_fetch_paths() {
     _load_module
     # real _yazi_fetch_and_install, but sandboxed paths + stubbed network
     _sandbox_fetch_paths
+    # Stub unzip as PRESENT so the spec exercises the magic-byte branch
+    # deterministically — the coverage image (kcov/kcov, debian) has no
+    # unzip while test-tools:local (alpine) gets one from busybox; the
+    # test must not depend on which container it runs in.
+    eval 'command() {
+        if [[ "${1:-}" == "-v" && "${2:-}" == "unzip" ]]; then return 0; fi
+        builtin command "$@"
+    }'
     eval 'curl() {
         # write garbage to the -o target
         local _out=""

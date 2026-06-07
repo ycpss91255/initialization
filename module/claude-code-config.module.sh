@@ -62,7 +62,7 @@ SUPPORTS_USER_HOME=true
 RISK_LEVEL="low"
 REBOOT_REQUIRED=false
 INSTALL_TARGET_DEFAULT="user-home"
-TEST_VERIFY_CMD='[[ -s "${HOME}/.claude/settings.json" && -x "${HOME}/.claude/run-statusline.sh" ]]'
+TEST_VERIFY_CMD="[[ -s '${HOME}/.claude/settings.json' && -x '${HOME}/.claude/run-statusline.sh' ]]"
 
 # Engine-consumed metadata: the registry/runner read these post-source, and
 # the i18n arrays are dereferenced indirectly via module_i18n_get. Reference

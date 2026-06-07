@@ -259,8 +259,10 @@ _fake_claude_on_path() {
     # No foreign /home/<user> prefix survives; statusLine points at this HOME.
     run grep -RE "/home/[A-Za-z0-9._-]+/" "${HOME}/.claude/settings.json"
     assert_output --partial "${HOME}"
-    ! grep -q "/home/yunchien" "${HOME}/.claude/settings.json"
-    ! grep -q "/home/yunchien" "${HOME}/.claude/settings.statusline.json"
+    run grep -q "/home/yunchien" "${HOME}/.claude/settings.json"
+    assert_failure
+    run grep -q "/home/yunchien" "${HOME}/.claude/settings.statusline.json"
+    assert_failure
 }
 
 @test "install drops valid JSON settings (marker never injected as a comment)" {

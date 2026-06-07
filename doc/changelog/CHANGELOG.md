@@ -22,6 +22,26 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **AC-10 two-layer TUI test harness** (issue #73, PRD §11.1 AC-10):
+  layer 1 — `test/unit/tui_ac10_spec.bats` runs the scripted-widget e2e
+  (now extracted to the reusable `test/helper/tui_harness.bash`: ADR-0019
+  fixtures, sealed-PATH symlink farm, recording mock `setup_ubuntu`,
+  backend-named mock widget) on BOTH backends and asserts the Q43 model —
+  checked pages accumulate → `< Run >` → one exact
+  `install <modules...> -y` CLI command string, byte-identical on dialog
+  and whiptail — plus the argv-level backend differences (dialog
+  `--cancel-label` vs whiptail `--cancel-button`; widget argv otherwise
+  identical across backends) and a whiptail Exit fs-snapshot. Layer 2 —
+  `test/integration/tui/tui_smoke_spec.bats` drives the REAL dialog and
+  whiptail binaries on an expect pseudo-tty (new `expect` in
+  Dockerfile.test-tools) through the literal AC-10 flow: open main menu →
+  enter Optional → check one item → OK → Exit; asserts every screen
+  renders, the checkbox toggles to `[*]`, `< Exit >` exits 0 with zero
+  file writes, and the only CLI forks are `list/detect --json`. The
+  expect proc library (`test/integration/tui/harness/tui_expect_lib.tcl`)
+  is reusable for the upcoming #71/#72 screens. Runs under
+  `make test-integration` (ADR-0004: Docker only).
+
 - **TUI checkbox accumulator + Run → Review → Proceed** (issue #70, PRD
   §8.1/§8.2 Q43, AC-10/AC-11): Base / Recommended / Optional submenus are
   now pure check-lists grouped by `TAGS[0]` with dep chains collapsed to a

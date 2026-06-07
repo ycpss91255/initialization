@@ -13,7 +13,7 @@
 #
 # All test workflows run inside Docker (PRD G5: "全部在 Docker 內驗證").
 
-.PHONY: test test-unit test-integration lint coverage build-test-tools clean help
+.PHONY: test test-unit test-integration lint coverage coverage-unit coverage-merge build-test-tools clean help
 .DEFAULT_GOAL := help
 
 # ── Prebuilt image escape hatch (CI; issue #26) ──────────────────────────────
@@ -46,6 +46,20 @@ lint: $(TEST_TOOLS_DEP) ## Run ShellCheck + fish syntax + hadolint
 
 coverage: $(TEST_TOOLS_DEP) ## Run ShellCheck + Bats + kcov coverage report
 	./script/ci/ci.sh --coverage
+
+# ── Per-shard coverage + merge (CI; issue #28) ───────────────────────────────
+# CI runs each test-unit matrix shard ONCE under kcov (no separate
+# test-unit + coverage double run): `coverage-unit MODULE=<name>|core`
+# writes coverage/shard-<name>; the aggregation job downloads all shard
+# artifacts and runs `coverage-merge`, which kcov-merges them and asserts
+# the AC-17 gate (>= $COVERAGE_MIN, default 80) on the MERGED result.
+# Local dev keeps `make coverage` (full kcov run, unit + integration).
+
+coverage-unit: $(TEST_TOOLS_DEP) ## Run unit bats once under kcov (optional MODULE=<name>|core) → coverage/shard-*
+	./script/ci/ci.sh --unit-only --kcov $(if $(MODULE),--module $(MODULE))
+
+coverage-merge: $(TEST_TOOLS_DEP) ## Merge coverage/*shard-* + assert AC-17 gate (>= 80%) on merged result
+	./script/ci/ci.sh --merge-coverage
 
 # ── Image build ──────────────────────────────────────────────────────────────
 

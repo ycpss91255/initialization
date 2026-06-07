@@ -489,6 +489,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **CI unit tests and coverage merged into a single bats run**
+  (issue #28, AC-17): every `test-unit` matrix shard now runs bats ONCE
+  under kcov (`make coverage-unit MODULE=<name>|core`, new `ci.sh
+  --kcov` flag; shard output `coverage/shard-<name>`, uploaded as a
+  per-shard artifact) instead of the previous separate `test-unit` +
+  `coverage` double run. The standalone `coverage` job becomes an
+  aggregation job: it downloads all shard artifacts, merges them with
+  `kcov --merge` (`make coverage-merge`, new `ci.sh --merge-coverage` /
+  `--ci-merge-coverage` modes), and asserts the AC-17 gate (>= 80%,
+  env-overridable via `COVERAGE_MIN`) on the MERGED result — never per
+  shard. Zero shards (every selected shard was a spec-less green skip)
+  green-skips the merge too; doc-only PRs skip the whole chain and
+  `ci-passed` name/aggregation semantics stay unchanged. Local
+  `make coverage` (full kcov run, unit + integration) is untouched.
 - **Unit tests run as a per-module CI matrix** (issue #31, PRD M10): a
   `discover` job builds the matrix dynamically from `module/*.module.sh`
   (`fail-fast: false`, `timeout-minutes: 5` per shard) and non-module

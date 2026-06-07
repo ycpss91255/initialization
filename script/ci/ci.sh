@@ -25,6 +25,11 @@
 #   ./ci.sh --unit-only --module core     # Host: non-module unit specs only
 #   ./ci.sh --integration-only    # Host: route to --ci-integration via compose
 #   ./ci.sh --coverage            # Host: full + kcov via compose
+#   ./ci.sh --unit-only --kcov --module docker
+#                                 # Host: docker's unit spec ONCE under kcov
+#                                 #   → coverage/shard-docker (issue #28)
+#   ./ci.sh --merge-coverage      # Host: kcov --merge all coverage/*shard-*
+#                                 #   + assert AC-17 gate (>= 80%) on merged
 
 # Only set strict mode when running directly; respect caller when sourced
 if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
@@ -89,6 +94,7 @@ Host-side options (route through compose into test-tools container):
   --unit-only           Bats unit
   --integration-only    Bats integration
   --coverage            Full pipeline with kcov
+  --merge-coverage      Merge coverage/*shard-* dirs + assert AC-17 gate
   (no flag)             Full pipeline (lint + bats, no kcov)
 
 Container-side options (called by compose entrypoint):
@@ -96,6 +102,14 @@ Container-side options (called by compose entrypoint):
   --ci-lint             Lint only
   --ci-unit             Bats unit only
   --ci-integration      Bats integration only
+  --ci-merge-coverage   Merge coverage shards + assert AC-17 gate
+
+Per-shard coverage (issue #28; combine with --unit-only / --ci-unit):
+  --kcov                Run the unit bats invocation ONCE under kcov;
+                        shard output: coverage/shard-<module|core|all>.
+                        Routes to the kcov image (kcov is not available
+                        in alpine test-tools). Gate threshold for
+                        --merge-coverage: $COVERAGE_MIN (default 80).
 
 Unit-scope filter (combine with --unit-only / --ci-unit; issue #31):
   --module <name>       Only run test/unit/module/<name>_spec.bats
@@ -215,13 +229,61 @@ _run_hadolint() {
 # Using an array (vs `printf` of a space-separated string) lets callers
 # expand `"${BATS_ARGS_ARR[@]}"` instead of unquoted `$(_bats_args)`,
 # avoiding SC2046 (unquoted command substitution).
+# Under kcov instrumentation (--kcov; issue #28) bats runs serially —
+# same as the full `_run_coverage` path — because kcov's ptrace tracing
+# of GNU-parallel-forked bats jobs is flaky.
 _set_bats_args_arr() {
     BATS_ARGS_ARR=()
+    [[ "${KCOV_UNIT:-0}" == "1" ]] && return 0
     if command -v parallel >/dev/null 2>&1; then
         local _j
         _j="$(nproc 2>/dev/null || echo 4)"
         BATS_ARGS_ARR=(--jobs "${_j}")
     fi
+}
+
+# Comma-joined kcov --exclude-path list, shared by the full coverage run
+# and the per-shard unit coverage runs (issue #28).
+_kcov_exclude_path() {
+    local _excludes=(
+        "${REPO_ROOT}/test/"
+        "${REPO_ROOT}/script/ci/"
+        "${REPO_ROOT}/dockerfile/"
+        "${REPO_ROOT}/.github/"
+        "${REPO_ROOT}/small-tools/"
+        "${REPO_ROOT}/tool/"
+    )
+    (IFS=,; printf '%s' "${_excludes[*]}")
+}
+
+# Run the unit bats invocation — plain, or wrapped ONCE in kcov when
+# KCOV_UNIT=1 (issue #28: per-module CI matrix shards run bats a single
+# time under kcov instead of a separate test-unit + coverage double run).
+# Shard output dir: coverage/shard-<module|core|all>; the aggregation job
+# merges all shards via --ci-merge-coverage.
+_bats_unit() {
+    if [[ "${KCOV_UNIT:-0}" != "1" ]]; then
+        bats "$@"
+        return
+    fi
+    command -v kcov >/dev/null 2>&1 \
+        || _die "kcov not found in container — per-shard coverage runs in the kcov image (make coverage-unit)"
+    local _shard="${MODULE_FILTER:-all}"
+    local _out="${REPO_ROOT}/coverage/shard-${_shard}"
+    # kcov only creates ONE directory level; coverage/ itself does not
+    # exist on a fresh checkout ("kcov: error: Can't write helper").
+    mkdir -p "${_out}"
+    _info "kcov shard output: ${_out}"
+    kcov \
+        --include-path="${REPO_ROOT}" \
+        --exclude-path="$(_kcov_exclude_path)" \
+        "${_out}" \
+        bats "$@"
+    # kcov leaves absolute-path convenience symlinks (e.g. bats →
+    # /source/coverage/...) that dangle outside the container and can
+    # break the per-shard artifact upload — prune them. `kcov --merge`
+    # reads the real bats.<hash>/ data dirs, not the symlinks.
+    find "${_out}" -maxdepth 1 -type l -delete
 }
 
 # Scope: honors MODULE_FILTER (set via --module; issue #31, PRD M10):
@@ -241,7 +303,7 @@ _run_unit() {
     case "${MODULE_FILTER:-}" in
         "")
             _info "Running Bats unit tests"
-            bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/test/unit/"
+            _bats_unit "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/test/unit/"
             ;;
         core)
             _info "Running Bats unit tests (core: non-module specs)"
@@ -256,7 +318,7 @@ _run_unit() {
                 _info "  no core unit specs found — skipping"
                 return 0
             fi
-            bats "${BATS_ARGS_ARR[@]}" "${_specs[@]}"
+            _bats_unit "${BATS_ARGS_ARR[@]}" "${_specs[@]}"
             ;;
         *)
             local _spec="${REPO_ROOT}/test/unit/module/${MODULE_FILTER}_spec.bats"
@@ -266,7 +328,7 @@ _run_unit() {
                 return 0
             fi
             _info "Running Bats unit tests (module: ${MODULE_FILTER})"
-            bats "${BATS_ARGS_ARR[@]}" "${_spec}"
+            _bats_unit "${BATS_ARGS_ARR[@]}" "${_spec}"
             ;;
     esac
 }
@@ -291,28 +353,73 @@ _run_coverage() {
     if ! command -v kcov >/dev/null 2>&1; then
         _die "kcov not found in container — rebuild test-tools:local (make build-test-tools)"
     fi
-    local _excludes=(
-        "${REPO_ROOT}/test/"
-        "${REPO_ROOT}/script/ci/"
-        "${REPO_ROOT}/dockerfile/"
-        "${REPO_ROOT}/.github/"
-        "${REPO_ROOT}/small-tools/"
-        "${REPO_ROOT}/tool/"
-    )
-    local _exclude_path
-    _exclude_path="$(IFS=,; printf '%s' "${_excludes[*]}")"
-
     _info "Running tests with kcov coverage"
     local -a _targets=()
     [[ -d "${REPO_ROOT}/test/unit" ]] && _targets+=("${REPO_ROOT}/test/unit/")
     [[ -d "${REPO_ROOT}/test/integration" ]] && _targets+=("${REPO_ROOT}/test/integration/")
     kcov \
         --include-path="${REPO_ROOT}" \
-        --exclude-path="${_exclude_path}" \
+        --exclude-path="$(_kcov_exclude_path)" \
         "${REPO_ROOT}/coverage" \
         bats "${_targets[@]}"
 
     _info "Coverage report: ${REPO_ROOT}/coverage/index.html"
+}
+
+# ── Coverage shard merge + AC-17 gate (issue #28) ────────────────────────────
+# The per-module CI matrix uploads one kcov output dir per shard; the
+# aggregation job downloads them under coverage/ and calls this to
+# `kcov --merge` them and assert the AC-17 gate (>= 80%) on the MERGED
+# result — never per shard. Glob matches both the local layout
+# (coverage/shard-<name>) and the CI artifact-download layout
+# (coverage/coverage-shard-<name>).
+
+_merged_coverage_percent() {
+    local _json
+    _json="$(find "${REPO_ROOT}/coverage/merged" -name coverage.json 2>/dev/null | head -n1)"
+    [[ -n "${_json}" ]] \
+        || _die "merged coverage.json not found under coverage/merged"
+    # coverage.json lists per-file entries ({"file": ..., "percent_covered":
+    # ...}) BEFORE the overall "percent_covered" — match only the overall
+    # line (no "file" key on it).
+    grep -v '"file"' "${_json}" \
+        | sed -n 's/.*"percent_covered"[: ]*"\([0-9.]*\)".*/\1/p' \
+        | head -n1
+}
+
+_assert_coverage_gate() {
+    local _min="${COVERAGE_MIN:-80}"
+    local _pct
+    _pct="$(_merged_coverage_percent)"
+    [[ -n "${_pct}" ]] \
+        || _die "could not parse percent_covered from merged coverage.json"
+    _info "Merged unit coverage: ${_pct}% (gate: >= ${_min}%, AC-17)"
+    awk -v p="${_pct}" -v t="${_min}" 'BEGIN { exit (p >= t) ? 0 : 1 }' \
+        || _die "coverage gate failed: ${_pct}% < ${_min}% (AC-17)"
+}
+
+_run_coverage_merge() {
+    local -a _shards=()
+    local _d
+    while IFS= read -r -d '' _d; do
+        _shards+=("${_d}")
+    done < <(find "${REPO_ROOT}/coverage" -mindepth 1 -maxdepth 1 \
+                 -type d -name '*shard-*' -print0 2>/dev/null | sort -z)
+    if [[ "${#_shards[@]}" -eq 0 ]]; then
+        # Zero shards = every selected shard green-skipped (e.g. a PR
+        # touching only a module without a spec yet). Mirror the shard
+        # green-skip contract instead of failing the aggregate.
+        _info "no coverage shards found under coverage/ — nothing to merge, skipping gate"
+        return 0
+    fi
+    command -v kcov >/dev/null 2>&1 \
+        || _die "kcov not found in container — merge runs in the kcov image (make coverage-merge)"
+    _info "Merging ${#_shards[@]} coverage shard(s) into coverage/merged"
+    kcov --merge "${REPO_ROOT}/coverage/merged" "${_shards[@]}"
+    # chown BEFORE the gate assert: a failed gate is an expected outcome
+    # and must not leave root-owned files behind on the host.
+    _fix_permissions
+    _assert_coverage_gate
 }
 
 # ── Permission fix for HOST_UID/GID ──────────────────────────────────────────
@@ -337,6 +444,7 @@ _run_in_container() {
         -e HOST_UID="$(id -u)" \
         -e HOST_GID="$(id -g)" \
         -e COVERAGE="${_coverage}" \
+        -e COVERAGE_MIN="${COVERAGE_MIN:-}" \
         "${_service}" \
         -c "./script/ci/ci.sh ${_container_flag}"
 }
@@ -346,6 +454,7 @@ _run_in_container() {
 main() {
     local mode="compose"
     MODULE_FILTER=""
+    KCOV_UNIT=0
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -354,16 +463,23 @@ main() {
             --ci-lint) mode="ci-lint"; shift ;;
             --ci-unit) mode="ci-unit"; shift ;;
             --ci-integration) mode="ci-integration"; shift ;;
+            --ci-merge-coverage) mode="ci-merge-coverage"; shift ;;
             --lint-only) mode="lint"; shift ;;
             --unit-only) mode="unit"; shift ;;
             --integration-only) mode="integration"; shift ;;
             --coverage) mode="coverage"; shift ;;
+            --merge-coverage) mode="merge-coverage"; shift ;;
+            --kcov) KCOV_UNIT=1; shift ;;
             --module)
                 [[ $# -ge 2 ]] || _die "--module requires a value (module name or 'core')"
                 MODULE_FILTER="$2"; shift 2 ;;
             *) _die "Unknown option: $1" ;;
         esac
     done
+
+    if [[ "${KCOV_UNIT}" == "1" && "${mode}" != "unit" && "${mode}" != "ci-unit" ]]; then
+        _die "--kcov is only valid with --unit-only / --ci-unit"
+    fi
 
     # Module names are kebab-case (PRD Q11); 'core' is the reserved
     # non-module bucket. Validate before interpolating into the compose
@@ -397,19 +513,42 @@ main() {
             _run_hadolint
             ;;
         ci-unit)
+            # Per-shard kcov runs use the kcov/kcov image, which needs the
+            # bats toolchain apt-installed on entry (no-op in test-tools).
+            if [[ "${KCOV_UNIT}" == "1" ]]; then
+                _install_deps_for_coverage
+            fi
             _run_unit
+            if [[ "${KCOV_UNIT}" == "1" ]]; then
+                _fix_permissions
+            fi
             ;;
         ci-integration)
             _run_integration
+            ;;
+        ci-merge-coverage)
+            _run_coverage_merge
+            _fix_permissions
             ;;
         # ── Host-side modes (route through compose) ──
         # service = ci (alpine, fast) for everything except --coverage,
         # which uses the kcov/kcov service.
         lint)        _run_in_container ci       --ci-lint        0 ;;
-        unit)        _run_in_container ci \
-                         "--ci-unit${MODULE_FILTER:+ --module ${MODULE_FILTER}}" 0 ;;
+        unit)
+            # --kcov shards need the kcov image (kcov is not packaged for
+            # alpine, so test-tools:local cannot bundle it).
+            if [[ "${KCOV_UNIT}" == "1" ]]; then
+                _run_in_container coverage \
+                    "--ci-unit${MODULE_FILTER:+ --module ${MODULE_FILTER}} --kcov" 0
+            else
+                _run_in_container ci \
+                    "--ci-unit${MODULE_FILTER:+ --module ${MODULE_FILTER}}" 0
+            fi
+            ;;
         integration) _run_in_container ci       --ci-integration 0 ;;
         coverage)    _run_in_container coverage --ci             1 ;;
+        merge-coverage)
+                     _run_in_container coverage --ci-merge-coverage 0 ;;
         compose)     _run_in_container ci       --ci             0 ;;
     esac
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# test/unit/hooks/enforce_shellcheck_disable_approval_spec.bats
+# test/unit/hook/enforce_shellcheck_disable_approval_spec.bats
 #
 # Integration tests for the enforce_shellcheck_disable_approval.sh hook
 # (issue #17). Tests drive the script as a subprocess (stdin JSON,

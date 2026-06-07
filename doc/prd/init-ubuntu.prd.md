@@ -163,7 +163,7 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 
 | 版本 | 主題 | 內容 |
 |---|---|---|
-| **0.2.0** | 清理與遷移 | state schema migration 機制啟用(AC-30 / AC-31)・`tools/` 各檔去向逐一決定(§6.5)・`small-tools/` 標 deprecated(§6.6)・`.adoc` → `.md` 全轉(AC-28)・`doctor --json`(對齊 ADR-0019 agent-friendly schema) |
+| **0.2.0** | 清理與遷移 | state schema migration 機制啟用(AC-30 / AC-31)・`tool/` 各檔去向逐一決定(§6.5)・`small-tools/` 標 deprecated(§6.6)・`.adoc` → `.md` 全轉(AC-28)・`doctor --json`(對齊 ADR-0019 agent-friendly schema) |
 | **0.3.0** | 便利動詞 | `setup_ubuntu reinstall <m>`(= `remove` + `install`)・`setup_ubuntu autoremove`(清未被 `manual=true` module 依賴的 orphan)・`setup_ubuntu doctor --fix`(自動修復狀態檔失真 + config hand-edit 偵測,§10.3)・`setup_ubuntu self-upgrade`(主路徑 `git pull`,release 亦提供,§17.3)・shell completion(fish + bash:subcommand / module 名 / flag 動態補全,install 時裝進 `~/.config/fish/completions/`) |
 | **0.4.0** | 終局 | `small-tools/` 移除(AC-27)・nvidia-driver 失敗自動回滾(AC-21,ADR-0020)・i18n 四語系全覆蓋(AC-29) |
 
@@ -271,29 +271,29 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 
 > TUI 在 §6.3.3 內進一步按 `TAGS[0]` 子分組顯示(`editor` / `filemgr` / `logs` / `hardware` / `remote` / `notes`)。
 >
-> **gnome-terminal-config 已自 catalog 移除**(Q42,2026-06-06):來源檔 `module/tools/copy_gnome_terminal_config.sh` 隨 §6.5 整批搬遷至 `tools/`,v0.2+ 再個別決定去向 — 修復「同一檔案兩個矛盾去向」。
+> **gnome-terminal-config 已自 catalog 移除**(Q42,2026-06-06):來源檔 `tool/copy_gnome_terminal_config.sh` 隨 §6.5 整批搬遷至 `tool/`,v0.2+ 再個別決定去向 — 修復「同一檔案兩個矛盾去向」。
 
 ### 6.4 experimental(預設不裝,有風險或不穩定)
 
 `experimental` 分類保留,作為未來不穩定 module 的入口。**目前無 module 在此類**(`dual-system-time-sync` / `trash-maintenance` 為一次性腳本,不放 TUI / module pipeline 內,見 §6.5)。
 
-### 6.5 module/tools/* 處理
+### 6.5 tool/* 處理
 
-> **v0.1 整個 `module/tools/` 不處理**;一次性腳本(如 `trash.sh`)不放在 TUI 內 / 不模組化。
+> **v0.1 整個 `tool/` 不處理**;一次性腳本(如 `trash.sh`)不放在 TUI 內 / 不模組化。
 
 **v0.1 操作**:
-- `module/tools/*` 整個目錄**搬遷到 repo 根目錄**(如 `tools/`),作為臨時存放區
+- `tool/*` 整個目錄**搬遷到 repo 根目錄**(如 `tool/`),作為臨時存放區
 - 不進 module catalog、不出現在 TUI、不走 install pipeline
 - 各檔案後續(v0.2+)再個別討論去向
 
 涵蓋的檔案:
-- `module/tools/setup_terminal_font_size.sh`
-- `module/tools/copy_neovim_local_config.sh`
-- `module/tools/copy_gnome_terminal_config.sh`
-- `module/tools/dual_system_time_sync.sh`
-- `module/tools/trash-maintenance.sh`(原規劃 experimental,撤回)
-- `module/tools/ros1/*`
-- `module/tools/remove/*.sh`
+- `tool/setup_terminal_font_size.sh`
+- `tool/copy_neovim_local_config.sh`
+- `tool/copy_gnome_terminal_config.sh`
+- `tool/dual_system_time_sync.sh`
+- `tool/trash-maintenance.sh`(原規劃 experimental,撤回)
+- `tool/ros1/*`
+- `tool/remove/*.sh`
 
 ### 6.6 small-tools/ 退場路徑
 
@@ -1099,7 +1099,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | Q39 | `DEPENDS_ON=("git")` 懸空(`git` 非 module)? | **dep 一律是 module 名**;`git-config` / `lazygit` / `fzf` 三處改 `apt-essentials`;§9.1 補規則,`doctor --validate-modules` lint |
 | Q40 | `update` 要重建的 registry 不存在? | **砍 `update` subcommand**;registry 明定 in-memory(每次執行動態掃);`apt update` 無對應 — 本地檔無 index 可過期;版本情報:gh-latest cache(隨需抓+TTL 1h)/ apt 委派系統(Q31)。supersedes Q16 |
 | Q41 | `ripgrep` 被三處引用但 catalog 漏列? | **補 `ripgrep.module.sh`** 進 §6.3.1(apt archetype,grep 替代);CLI Essentials 8→9;M7 Batch B 同步 |
-| Q42 | `gnome-terminal-config` 去向矛盾(§6.3.3 vs §6.5)? | **從 catalog 移除**;隨 `module/tools/` 整批搬 `tools/`,v0.2+ 逐檔決定;M7 Batch C 11→10 |
+| Q42 | `gnome-terminal-config` 去向矛盾(§6.3.3 vs §6.5)? | **從 catalog 移除**;隨 `tool/` 整批搬 `tool/`,v0.2+ 逐檔決定;M7 Batch C 11→10 |
 | Q43 | TUI「Save & Exit」無物可存? | **勾選累積器模型**:主選單 `< Run >`+`< Exit >`;勾選子選單 `< OK >`+`< Back >`;Run→Review→Proceed 唯一批次執行點;Quick Setup / Manage Installed 自帶執行;AC-10 斷言同步 |
 | Q44 | 空 Advanced 選單(experimental 零 module、custom 無定義)? | **通則:主選單只顯示非空 CATEGORY**;`custom` 字眼廢除(user-local module 依 CATEGORY 歸類) |
 | Q45 | sync `--include-config` 無定義且與 ADR-0018 / §10.3 衝突? | **砍**;§16.2 flag 與 §7.2 對齊;config.ini 是本機生成檔不跨機;個人設定同步由 config-drop module 涵蓋 |
@@ -1305,13 +1305,13 @@ setup_ubuntu_tui                      # 互動式管理
 | `module/function/logger.sh` | `lib/logger.sh` | 整理(可能拆 file logging 出去) |
 | `module/function/general.sh` | `lib/general.sh` + `lib/detect.sh` + `lib/platform.sh` | 拆分(平台分類抽到獨立檔) |
 | `module/function/test/test_*.sh` | `test/unit/logger_spec.bats` 與 `general_spec.bats` | 重寫為 bats |
-| `module/tools/*`(整個目錄) | **搬遷到 repo 根目錄 `tools/`** | v0.1 不處理,僅搬遷;v0.2+ 個別決定 |
-| └ `module/tools/remove/*.sh` | (隨上面整個目錄搬遷) | v0.1 不處理(改寫 remove/purge 邏輯延後) |
-| └ `module/tools/trash-maintenance.sh` | (隨上面搬遷) | **不放 module pipeline / 不放 TUI**(一次性腳本) |
-| └ `module/tools/setup_terminal_font_size.sh` | (隨上面搬遷) | v0.1 不處理 |
-| └ `module/tools/dual_system_time_sync.sh` | (隨上面搬遷) | v0.1 不處理 |
-| └ `module/tools/copy_*.sh` | (隨上面搬遷) | v0.1 不處理 |
-| └ `module/tools/ros1/*` | (隨上面搬遷) | v0.1 不處理 |
+| `tool/*`(整個目錄) | **搬遷到 repo 根目錄 `tool/`** | v0.1 不處理,僅搬遷;v0.2+ 個別決定 |
+| └ `tool/remove/*.sh` | (隨上面整個目錄搬遷) | v0.1 不處理(改寫 remove/purge 邏輯延後) |
+| └ `tool/trash-maintenance.sh` | (隨上面搬遷) | **不放 module pipeline / 不放 TUI**(一次性腳本) |
+| └ `tool/setup_terminal_font_size.sh` | (隨上面搬遷) | v0.1 不處理 |
+| └ `tool/dual_system_time_sync.sh` | (隨上面搬遷) | v0.1 不處理 |
+| └ `tool/copy_*.sh` | (隨上面搬遷) | v0.1 不處理 |
+| └ `tool/ros1/*` | (隨上面搬遷) | v0.1 不處理 |
 | `module/config/*` | 不動 — 由各對應 module 引用 | 保留 |
 | `template/*_tmp.sh` | `template/module-{apt,github-release,config,custom}.template.sh` + `template/test.template.bats` | 改寫為新契約模板(4 個 archetype 各一,共用 shared sections,drift 由 `template_consistency_spec.bats` 把關) |
 | `small-tools/*` | 0.4.0 移除,內容已分散到對應 module | deprecation 路徑(§6.6) |

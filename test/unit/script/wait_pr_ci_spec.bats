@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# test/unit/scripts/wait_pr_ci_spec.bats
+# test/unit/script/wait_pr_ci_spec.bats
 #
 # Tests for `.claude/script/wait-pr-ci.sh` watch-start / stale-window
 # guards (issue #22).

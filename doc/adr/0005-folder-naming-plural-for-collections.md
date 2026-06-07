@@ -137,7 +137,7 @@ Renamed:
 `doc/agent/` → `docs/agents/`,
 `doc/process/` → `docs/processes/`,
 `module/` → `modules/`,
-`module/tool/` → `modules/tools/`,
+`module/tool/` → `tool/`,
 `script/` → `scripts/`,
 `script/hook/test-must-use-docker.sh` → `.claude/hooks/test-must-use-docker.sh`
 (also relocated from `scripts/hook/` to `.claude/hooks/` since all

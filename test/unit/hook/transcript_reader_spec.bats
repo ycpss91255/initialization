@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# test/unit/hooks/transcript_reader_spec.bats
+# test/unit/hook/transcript_reader_spec.bats
 #
 # Unit tests for `read_latest_user_message` in
 # .claude/hook/enforce_shellcheck_disable_approval.sh (issue #17).

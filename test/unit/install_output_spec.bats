@@ -253,6 +253,63 @@ EOF
     assert_output --partial "${INIT_UBUNTU_LOG_FILE}"
 }
 
+# ── §7.7.2 Action required aggregation (AC-35) ───────────────────────────────
+
+@test "Action required block is derived from action_required JSONL events (AC-35)" {
+    _load_engine
+    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
+    cat > "${FAKE_MODULE_DIR}/pim.module.sh" <<'EOF'
+NAME="pim"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+declare -A POST_INSTALL_MESSAGE=(
+    [en]="Run 'newgrp pim' or re-login to use pim."
+)
+REBOOT_REQUIRED=true
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+
+    run runner_install pim
+    assert_success
+    assert_output --partial "Action required"
+
+    # Both kinds were emitted as structured events (module-spec §4.10).
+    run jq -r 'select(.body=="action_required") | .attributes.kind' \
+        "${INIT_UBUNTU_LOG_FILE}"
+    assert_line "post_install"
+    assert_line "reboot"
+
+    # AC-35: block content identical to the events — every service.name +
+    # message pair from `jq 'select(.body=="action_required")'` must appear
+    # verbatim in the rendered block.
+    run runner_install pim
+    local _pairs
+    _pairs="$(jq -r 'select(.body=="action_required")
+        | .attributes["service.name"] + "\t" + .attributes.message' \
+        "${INIT_UBUNTU_LOG_FILE}" | sort -u)"
+    [ -n "${_pairs}" ]
+    local _svc _msg
+    while IFS=$'\t' read -r _svc _msg; do
+        assert_output --partial "${_svc}"
+        assert_output --partial "${_msg}"
+    done <<< "${_pairs}"
+}
+
+@test "modules without post-install hints render no Action required block" {
+    _load_engine
+    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
+    run runner_install depa
+    assert_success
+    refute_output --partial "Action required"
+}
+
 @test "upgrade without -y keeps Proceed? [y/N] and non-tty default aborts" {
     _load_engine
     # Upgrade keeps the conservative [y/N] default (PRD §7.6): a non-tty

@@ -144,7 +144,24 @@ _runner_run_phase() {
             log_error "[${_name}] module does not define ${_phase}() — aborting"
             exit 1
         fi
-        "${_phase}"
+        # Capture the phase's exit code explicitly: the whole call tree sits
+        # under `if _runner_run_phase` in _runner_run_batch, so `set -e` is
+        # suspended here (POSIX: -e is ignored in tested contexts) and the
+        # emit block below must not overwrite the subshell's exit status.
+        _phase_rc=0
+        "${_phase}" || _phase_rc=$?
+        # After a successful install, emit action_required events (PRD
+        # §7.7.2 / module-spec §4.10) while the module arrays are in scope.
+        # The session-end "Action required" block is derived from these.
+        if [[ "${_phase_rc}" -eq 0 && "${_phase}" == "install" ]]; then
+            if declare -F module_emit_post_install >/dev/null 2>&1; then
+                module_emit_post_install
+            fi
+            if declare -F module_emit_reboot_required >/dev/null 2>&1; then
+                module_emit_reboot_required
+            fi
+        fi
+        exit "${_phase_rc}"
     )
     local _rc=$?
 
@@ -210,6 +227,43 @@ _runner_run_phase() {
     return "${_rc}"
 }
 
+# ── Session-end "Action required" aggregation (PRD §7.7.2, AC-35) ───────────
+#
+# Derives the human-readable block from this session's `action_required`
+# JSONL events (filtered by trace_id). The events are the single source of
+# truth: `jq 'select(.body=="action_required")'` over the session log yields
+# exactly the same module + message content. Pure bash parsing (no jq
+# dependency on the host); the line format is our own log_event writer's.
+_runner_render_action_required() {
+    [[ -n "${INIT_UBUNTU_LOG_FILE:-}" && -f "${INIT_UBUNTU_LOG_FILE}" ]] || return 0
+
+    local _trace="${INIT_UBUNTU_TRACE_ID:-}"
+    local _re_svc='"service\.name":"([^"]*)"'
+    local _re_kind='"kind":"([^"]*)"'
+    local _re_msg='"message":"([^"]*)"'
+    local _line _svc _kind _msg _header_done="false"
+
+    while IFS= read -r _line; do
+        [[ "${_line}" == *'"body":"action_required"'* ]] || continue
+        if [[ -n "${_trace}" && "${_line}" != *"\"trace_id\":\"${_trace}\""* ]]; then
+            continue
+        fi
+        _svc=""; _kind=""; _msg=""
+        [[ "${_line}" =~ ${_re_svc} ]]  && _svc="${BASH_REMATCH[1]}"
+        [[ "${_line}" =~ ${_re_kind} ]] && _kind="${BASH_REMATCH[1]}"
+        [[ "${_line}" =~ ${_re_msg} ]]  && _msg="${BASH_REMATCH[1]}"
+        if [[ "${_header_done}" == "false" ]]; then
+            printf '\n── Action required ─────────────────────\n'
+            _header_done="true"
+        fi
+        case "${_kind}" in
+            reboot) printf '⚠ %s\n' "${_msg}" ;;
+            *)      printf '%s:  %s\n' "${_svc}" "${_msg}" ;;
+        esac
+    done < "${INIT_UBUNTU_LOG_FILE}"
+    return 0
+}
+
 # ── Public: orchestrators for each phase ─────────────────────────────────────
 
 _runner_run_batch() {
@@ -257,6 +311,11 @@ _runner_run_batch() {
         "ok=${_ok}" \
         "skipped=0" \
         "failed=${_failures}"
+
+    # End-of-session "Action required" block (PRD §7.7.2, AC-35). Derived
+    # from this session's events; action-class output, so it is NOT
+    # silenced by --quiet.
+    _runner_render_action_required
 
     # Session-end log retention (PRD §10.2, AC-33): prune the JSONL log dir
     # after session_end so the active file (newest mtime) is never a victim.

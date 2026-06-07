@@ -22,6 +22,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **TUI skeleton: entry point, backend detection, main menu** (issue
+  #69, PRD §8.1 / §8.5, G4): new `setup_ubuntu_tui.sh` +
+  `lib/tui_backend.sh`. Backend detection prefers `dialog`, falls back
+  to `whiptail`; both missing is fatal with the §8.5 fix guidance (no
+  auto-install). Running without usable sudo exits 4 and suggests CLI
+  mode. The TUI is a pure CLI frontend (G4): menu data comes exclusively
+  from forked `setup_ubuntu list --json` / `detect --json` subprocesses
+  (ADR-0019 schema) — it never sources engine libs and never writes
+  state (pinned by a grep gate in bats). The main menu renders only
+  non-empty CATEGORYs (Q44: `experimental` is hidden while empty and
+  auto-appears once populated); the System Info screen shows forked
+  `detect` output and offers a session-memory platform override.
+  Dispatch mount points are stubbed for #70 (checkbox accumulator +
+  Run/Review), #71 (Quick Setup), and #72 (Manage Installed / Secrets).
+
 - **Color library + global output flags** (issue #45, PRD §5.1 / §7.5,
   M8, AC-16): new `lib/color.sh` decides ANSI color once per run —
   `auto` (default) turns color off for non-tty stdout, `NO_COLOR`,

@@ -127,8 +127,13 @@ CI 端(issue #28)不再分開跑 test-unit 與 coverage 兩遍:每個
 per-module matrix shard 用 `make coverage-unit MODULE=<name>|core` 在
 kcov 下跑一次 bats(輸出 `coverage/shard-<name>`,上傳 artifact),最後
 `coverage` 聚合 job 用 `make coverage-merge` 做 `kcov --merge` 並在
-**聚合結果**上斷言 AC-17 的 80% gate(`COVERAGE_MIN` 可覆寫)。本地
-`make coverage`(unit + integration 全量)行為不變。
+**聚合結果**上斷言 coverage gate(`COVERAGE_MIN` 可覆寫,預設 66 —
+ratchet 基線,2026-06-07 實測 66.70%;AC-17 的 80% 終值不變,待
+#122/#123 補強 lib/engine specs 後由 #124 翻到 80)。gate 只在
+**完整矩陣** run(push to main / shared fan-out)強制;窄矩陣 PR(只跑
+changed shards)因未跑 shard 的檔案仍計入分母而結構性偏低,改為
+report-only(`COVERAGE_ENFORCE=false`,由 discover job 的 `full` 輸出
+決定)。本地 `make coverage`(unit + integration 全量)行為不變。
 
 ---
 
@@ -184,6 +189,10 @@ kcov 下跑一次 bats(輸出 `coverage/shard-<name>`,上傳 artifact),最後
 ## 7. 覆蓋率目標
 
 **80% 為唯一硬門檻**(PRD G5 / AC-17;`.codecov.yaml` target),提升為 best-effort。原 v0.5 / v1.0 階梯式目標已撤銷(2026-06-06 PRD 定稿,版本階梯目前至 0.4.0、1.0 暫不規劃;見 `doc/architecture.md` §8.4)。
+
+過渡期 ratchet:CI merge gate 目前以誠實基線 66(2026-06-07 實測
+66.70%)防回歸,#122(lib specs)/#123(engine specs)補強後由 #124
+把預設翻回 80 — AC-17 終值不變。
 
 `.codecov.yaml` 的 `threshold: 1%` 表示「允許 1% 噪音」,實際門檻 = `target - threshold = 79%`。
 

@@ -8,6 +8,13 @@
 #
 #   modules=["docker","fish"]    JSON array for the test-module matrix
 #   core=true|false              whether the `test-unit (core)` job runs
+#   full=true|false              whether the selection is the FULL
+#                                cartesian (every module + core). The
+#                                coverage merge job keys on this: only
+#                                full-matrix runs enforce the coverage
+#                                gate; narrow PR matrices are report-only
+#                                (issue #28 — unrun shards' files still
+#                                count in the merged denominator)
 #
 # Selection rules:
 #   1. push event (main / tags)        → full matrix + core
@@ -50,7 +57,7 @@ Usage: select_unit_matrix.sh --event <event_name> --changed <json-array>
   --changed  JSON array of matched paths-filter names, e.g.
              '["shared","module-docker","core"]'
 
-Emits `modules=<json-array>` and `core=<bool>` lines on stdout.
+Emits `modules=<json-array>`, `core=<bool>` and `full=<bool>` lines on stdout.
 EOF
     exit 0
 }
@@ -104,18 +111,24 @@ main() {
         || [[ "${relevant}" == "[]" ]]; then
         printf 'modules=%s\n' "${all_json}"
         printf 'core=true\n'
+        printf 'full=true\n'
         return 0
     fi
 
     # Rule 4: only the matched module-<X> filters (∩ discovered modules)
-    # + core iff its filter matched.
-    local mods core
+    # + core iff its filter matched. `full` stays honest even here: a PR
+    # whose matched filters happen to cover every module + core IS a
+    # full-cartesian run (both arrays are sorted, so string-compare works).
+    local mods core full
     mods="$(jq -c --argjson all "${all_json}" \
         '[.[] | select(startswith("module-")) | sub("^module-"; "")]
          | map(select(. as $m | $all | index($m))) | sort' <<<"${changed}")"
     core="$(jq -r 'index("core") != null' <<<"${changed}")"
+    full="false"
+    [[ "${core}" == "true" && "${mods}" == "${all_json}" ]] && full="true"
     printf 'modules=%s\n' "${mods}"
     printf 'core=%s\n' "${core}"
+    printf 'full=%s\n' "${full}"
 }
 
 main "$@"

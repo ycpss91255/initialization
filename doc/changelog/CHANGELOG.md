@@ -42,6 +42,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   image gains `openssl` so the encrypted-file round-trip is tested for
   real in the container.
 
+- **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
+  `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory
+  at session end — keeps the newest 100 `.jsonl` files and none older
+  than 30 days; when either limit is exceeded it deletes from the oldest
+  (logrotate-like, pure bash/find, no external dependency; both limits
+  env-overridable via `INIT_UBUNTU_LOG_RETENTION_{DAYS,FILES}`). Wired
+  into `lib/runner.sh` right after the `session_end` event so the active
+  log file (newest mtime) is never a victim; pruning emits one
+  engine-level `log_pruned` OTel event (ADR-0006 schema) carrying
+  `deleted_count` + retention limits. Boundaries are keep-side inclusive:
+  exactly 100 files / exactly 30 days old are kept.
 - **State robustness** (issue #41, PRD §10.1): reading a corrupt
   `state.json` now quarantines it (`mv` → `state.json.corrupt.<ts>`) and
   fails fast (exit 1) with recovery guidance — re-run install to rebuild
@@ -54,6 +65,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Unit tests run as a per-module CI matrix** (issue #31, PRD M10): a
+  `discover` job builds the matrix dynamically from `module/*.module.sh`
+  (`fail-fast: false`, `timeout-minutes: 5` per shard) and non-module
+  specs (engine/lib/hook/script/template) run in a single
+  `test-unit (core)` job. `make test-unit MODULE=<name>` (and
+  `MODULE=core`) narrows the bats run via the new `ci.sh --module` flag;
+  a module without a spec yet is a green skip. Runtime-generated
+  `dorny/paths-filter` filters (`script/ci/generate_module_filters.sh` +
+  `script/ci/select_unit_matrix.sh`) make PRs run only the shards for
+  changed modules — `lib/`/`script/`/`Makefile`/workflow changes (or any
+  code change outside the known filters) fan out to the full matrix, and
+  pushes to main / tags always run the full matrix. `ci-passed` name and
+  aggregation semantics unchanged (skipped shards still count as pass);
+  every shard reuses the `build-image` test-tools artifact (#26).
 - **Module tools directory relocated to top-level `tool/`** (issue #46,
   PRD §6.5): holding area for one-off scripts — not in the module
   catalog, not in the TUI, not in the install pipeline; per-file

@@ -41,6 +41,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   stubs for issue #68 and mount directly on the backend API. Test-tools
   image gains `openssl` so the encrypted-file round-trip is tested for
   real in the container.
+- **lazydocker module migrated to the v2 contract** (issue #49, PRD
+  §6.3.1 Batch B): `module/lazydocker.module.sh` (docker TUI,
+  github-release archetype with a version-aware fetch override —
+  upstream asset names embed the release version). Metadata per PRD
+  §9.1 (`CATEGORY=optional`, `TAGS=(cli-essentials)`,
+  `DEPENDS_ON=(docker)`, i18n `DESCRIPTION`). All 10 lifecycle phases
+  run standalone (AC-25); install is idempotent (AC-5); `--dry-run`
+  writes nothing (AC-12). New `module_sidecar_*` helpers in
+  `lib/module_helper.sh` implement the ADR-0001 Sidecar (written on
+  install/upgrade, dropped on remove/purge, never touching
+  `state.json` in standalone mode); `is_outdated` compares the Sidecar
+  version against the latest GitHub release.
 
 - **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
   `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory

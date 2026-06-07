@@ -182,6 +182,56 @@ EOF
     assert_output --partial "CHILD-STDERR-MARKER"
 }
 
+@test "verbose mode streams child output live (and still captures it)" {
+    _load_engine
+    _register_cmdmod
+    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/session.jsonl"
+    export INIT_UBUNTU_VERBOSE=true
+
+    run runner_install cmdmod
+    assert_success
+    assert_output --partial "CHILD-STDOUT-MARKER"
+    run jq -r 'select(.body=="cmd_exec") | .attributes.output' \
+        "${INIT_UBUNTU_LOG_FILE}"
+    assert_output --partial "CHILD-STDOUT-MARKER"
+}
+
+@test "quiet mode suppresses progress lines but keeps errors" {
+    _load_engine
+    cat > "${FAKE_MODULE_DIR}/boom.module.sh" <<'EOF'
+NAME="boom"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 1; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    export INIT_UBUNTU_QUIET=true
+
+    run runner_install depa boom
+    assert_failure 6
+    # No progress headers, no checkmark lines (PRD §7.7.1 --quiet)...
+    refute_output --partial "[1/2]"
+    refute_output --partial "✔"
+    # ...but warn/error survive.
+    assert_output --partial "install failed"
+}
+
+@test "dispatcher install accepts --verbose and --quiet flags" {
+    _load_engine
+    run dispatcher_dispatch install main --dry-run --verbose
+    assert_success
+    refute_output --partial "unknown flag"
+    run dispatcher_dispatch install main --dry-run --quiet
+    assert_success
+    refute_output --partial "unknown flag"
+}
+
 @test "upgrade without -y keeps Proceed? [y/N] and non-tty default aborts" {
     _load_engine
     # Upgrade keeps the conservative [y/N] default (PRD §7.6): a non-tty

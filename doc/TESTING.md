@@ -176,14 +176,12 @@ report-only(`COVERAGE_ENFORCE=false`,由 discover job 的 `full` 輸出
 
 ## 6. CI/CD pipeline 對應
 
-| 階段 | 本地命令 | CI workflow(Phase 7 將建)|
+| 階段 | 本地命令 | CI workflow(`.github/workflows/ci.yaml`)|
 |---|---|---|
 | Lint | `make lint` | `lint` job |
-| Unit | `make test-unit` | `unit` job |
-| Integration | `make test-integration` | `integration-{22,24,26}.04` matrix |
-| Coverage | `make coverage` | `coverage` job + codecov upload |
-
-`.github/workflows/ci.yaml` 將於 PRD §12 M12(Coverage + CI)階段建立。
+| Unit | `make test-unit` | `test-unit (core)` + `test-unit (<module>)` matrix(#31/#28)|
+| Integration | `make test-integration` | `test-integration (ubuntu:{22,24,26}.04)` Docker image matrix(#29;runner 固定 `ubuntu-24.04`,矩陣維度是 image,PRD §11.1)|
+| Coverage | `make coverage` | `coverage` 聚合 job(kcov merge,#28)|
 
 ---
 

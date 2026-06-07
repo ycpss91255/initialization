@@ -9,6 +9,9 @@
 # - test-tools image is built ONCE in `build-image` (BuildKit + GHA
 #   cache), exported as a tar artifact, and `docker load`-ed by the
 #   downstream jobs instead of each job cold-building it (issue #26).
+# - Integration tests fan out over the Ubuntu version matrix — the matrix
+#   dimension is the DOCKER IMAGE (ubuntu:22.04 / 24.04 / 26.04), not the
+#   GHA runner version (issue #29; PRD §11.1, AC-3 / AC-18).
 #
 # Triggers:
 #   - PRs to main (the primary gating path)
@@ -228,12 +231,24 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
-  # ── Integration tests (skipped on doc-only changes) ────────────────────────
+  # ── Integration tests: Ubuntu version matrix (issue #29; AC-3 / AC-18) ─────
+  # PRD §11.1 (2026-06-06 定稿): the matrix dimension is the DOCKER IMAGE
+  # (`ubuntu:22.04` / `24.04` / `26.04`), NOT the GHA runner version —
+  # tests run inside containers per ADR-0004, so the runner is pinned to
+  # stable `ubuntu-24.04` and `ubuntu-26.04` runner GA status is
+  # irrelevant. 26.04 is mandatory from day one: no `continue-on-error`
+  # on any shard (AC-3 / AC-18 carry no exemption). Skipped on doc-only
+  # changes like the other heavy jobs.
   test-integration:
-    name: test-integration
+    name: test-integration (ubuntu:${{ matrix.ubuntu }})
     needs: [changes, build-image]
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu: ['22.04', '24.04', '26.04']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: download test-tools image artifact
@@ -243,7 +258,27 @@ jobs:
           path: /tmp
       - name: load test-tools image
         run: docker load -i /tmp/test-tools.tar
-      - name: run integration bats specs
+      # The shard's matrix image must exist AND boot on the 24.04 runner
+      # (PRD §11.1 transition concern: 26.04 container on a 24.04 host).
+      # Asserting /etc/os-release pins each shard to its real image —
+      # three genuinely distinct containers, not three identical runs.
+      - name: pull + verify matrix image ubuntu:${{ matrix.ubuntu }}
+        env:
+          UBUNTU_IMAGE: ubuntu:${{ matrix.ubuntu }}
+          UBUNTU_EXPECTED: ${{ matrix.ubuntu }}
+        run: |
+          docker pull "${UBUNTU_IMAGE}"
+          docker run --rm -e EXPECTED="${UBUNTU_EXPECTED}" "${UBUNTU_IMAGE}" \
+            bash -ec '. /etc/os-release
+                      echo "image reports VERSION_ID=${VERSION_ID}"
+                      test "${VERSION_ID}" = "${EXPECTED}"'
+      - name: run integration bats specs (ubuntu:${{ matrix.ubuntu }} shard)
+        env:
+          # Contract var for the M11 install-cycle specs (PRD §12 M11 /
+          # doc/TESTING.md §3 matrix/): they run the real install cycle
+          # inside this image. Exported now so landing those specs needs
+          # no workflow change.
+          INIT_UBUNTU_TEST_IMAGE: ubuntu:${{ matrix.ubuntu }}
         run: make test-integration TEST_TOOLS_PREBUILT=1
 
   # ── Coverage aggregation (issue #28; skipped on doc-only changes) ──────────
@@ -331,7 +366,12 @@ jobs:
           # them; module-scoped PRs skip the shards for unchanged
           # modules / core). test-unit-module is the MATRIX AGGREGATE:
           # any failed shard makes it `failure`, all-shards-skipped (or
-          # empty matrix) makes it `skipped`. coverage is the kcov MERGE
+          # empty matrix) makes it `skipped`. test-integration is
+          # likewise a matrix aggregate over the ubuntu:22.04 / 24.04 /
+          # 26.04 Docker image shards (issue #29, AC-3 / AC-18): any
+          # failed shard — 26.04 included, no continue-on-error — fails
+          # the aggregate, so requiring ci-passed covers all three
+          # shards. coverage is the kcov MERGE
           # job (issue #28): it asserts the ratchet coverage gate on the
           # merged shard results — enforced on full-matrix runs only,
           # report-only on narrow PR matrices — and is skipped on

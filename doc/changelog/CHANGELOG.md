@@ -20,6 +20,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Added
+
+- **Color library + global output flags** (issue #45, PRD §5.1 / §7.5,
+  M8, AC-16): new `lib/color.sh` decides ANSI color once per run —
+  `auto` (default) turns color off for non-tty stdout, `NO_COLOR`,
+  `TERM=dumb`, and background jobs; exposes the `CLR_*` palette
+  (blank-safe when off), `color_enabled`, and a `colorize` helper.
+  `dispatcher_dispatch` pre-parses position-independent global flags:
+  `--color=auto|always|never` (exit 2 on a bad value, `always` forces
+  escapes even piped, `never` strips them on a tty via the
+  `INIT_UBUNTU_COLOR_MODE` override in `lib/logger.sh`),
+  `--verbose`/`-v` sets `LOG_LEVEL=DEBUG`, and `--quiet` sets
+  `LOG_LEVEL=WARN`. e2e bats pin AC-16: `setup_ubuntu list | cat`
+  emits no ANSI escapes.
+
 ### Fixed
 
 - **github-release archetype download URL 404** : `lib/module_helper.sh`

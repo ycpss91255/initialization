@@ -516,6 +516,27 @@ _dispatcher_upgrade() {
         return 0
     fi
 
+    # Plan + confirm (PRD §7.6): upgrade keeps the conservative [y/N]
+    # default (unlike install's [Y/n]). Non-tty stdin has nobody to
+    # answer, so the default (no) applies and the run aborts.
+    if [[ "${INIT_UBUNTU_YES}" != "true" ]]; then
+        printf 'Will upgrade %s module(s): %s\n' "${#_modules[@]}" "${_modules[*]}"
+        printf 'Proceed? [y/N] '
+        local _ans=""
+        if [[ -t 0 ]]; then
+            read -r _ans || _ans=""
+        else
+            printf '\n'
+        fi
+        case "${_ans}" in
+            [yY]*) ;;
+            *)
+                printf 'Aborted.\n'
+                return 1
+                ;;
+        esac
+    fi
+
     # Real run: refuse root (PRD §10). Check is HERE so dry-run + empty
     # paths above stay root-safe for CI / bats.
     if [[ "${EUID:-0}" -eq 0 ]]; then

@@ -54,6 +54,7 @@ SUPPORTED_PLATFORMS=()
 DEPENDS_ON=("depa" "depb")
 CONFLICTS_WITH=()
 install() { return 0; }
+upgrade() { echo "MAIN-UPGRADE-RAN"; return 0; }
 remove()  { return 0; }
 purge()   { return 0; }
 EOF
@@ -108,4 +109,16 @@ _load_engine() {
     run dispatcher_dispatch install main --dry-run
     assert_success
     refute_output --partial "Proceed?"
+}
+
+@test "upgrade without -y keeps Proceed? [y/N] and non-tty default aborts" {
+    _load_engine
+    # Upgrade keeps the conservative [y/N] default (PRD §7.6): a non-tty
+    # stdin means nobody can answer, so the default (no) applies and the
+    # runner is never reached.
+    run dispatcher_dispatch upgrade main
+    assert_failure 1
+    assert_output --partial "Proceed? [y/N]"
+    assert_output --partial "Aborted"
+    refute_output --partial "MAIN-UPGRADE-RAN"
 }

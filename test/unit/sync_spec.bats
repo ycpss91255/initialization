@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
-# tests/unit/sync_spec.bats — lib/sync.sh
+# test/unit/sync_spec.bats — lib/sync.sh
 #
 # Real SSH/scp is stubbed via a PATH override. We assert: option flags
 # (StrictHostKeyChecking=yes, BatchMode=yes), target string, remote
 # commands. Real ssh end-to-end testing lives in integration (Phase 9).
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

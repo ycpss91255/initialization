@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # shellcheck disable=SC2034,SC2317  # SC2034: test setups stage module metadata vars (NAME / APT_PKGS / ...) that the function-under-test reads after sourcing module_helper. SC2317: test mocks (is_installed/install) dispatched indirectly via the module's macro wrappers — https://www.shellcheck.net/wiki/SC2034 + https://www.shellcheck.net/wiki/SC2317
-# tests/unit/module_helper_spec.bats — direct unit tests on lib/module_helper.sh
+# test/unit/module_helper_spec.bats — direct unit tests on lib/module_helper.sh
 #
 # Tests the helper functions in isolation (no module file):
 #   - module_i18n_get with various languages + fallback to en
@@ -11,7 +11,7 @@
 #   - module_default_apt_install in dry-run does not call apt-get
 #   - module_default_config_install drops a marker
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

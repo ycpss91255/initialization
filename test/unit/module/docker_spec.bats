@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 # shellcheck disable=SC2317  # test mocks (e.g. command_v) dispatched indirectly when docker module's install() resolves shell functions — https://www.shellcheck.net/wiki/SC2317
-# tests/unit/modules/docker_spec.bats — modules/docker.module.sh
+# test/unit/module/docker_spec.bats — module/docker.module.sh
 
-load "${BATS_TEST_DIRNAME}/../../helpers/common"
+load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
     setup_test_env
@@ -21,7 +21,7 @@ _load_module() {
     source "${LIB_DIR}/general.sh"
     # shellcheck source=../../../lib/module_helper.sh
     source "${LIB_DIR}/module_helper.sh"
-    # shellcheck source=../../../modules/docker.module.sh
+    # shellcheck source=../../../module/docker.module.sh
     source "${MODULE_DIR}/docker.module.sh"
 }
 

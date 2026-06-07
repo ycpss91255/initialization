@@ -2,13 +2,13 @@
 # lib/general.sh — init_ubuntu general helpers
 #
 # Note: this library does NOT declare `set -euo pipefail` at top level —
-# the original modules/function/general.sh did, but that leaks strict mode
+# the original module/function/general.sh did, but that leaks strict mode
 # into every caller. The lib/ convention is: callers (setup_ubuntu.sh,
 # bats tests, module sub-shells) set strict mode themselves.
 
 if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not a executable script.\n" "${BASH_SOURCE[0]##*/}"
-    printf "To learn how to use it, please refer to '%s'\n" "./tests/test_logger.sh"
+    printf "To learn how to use it, please refer to '%s'\n" "./test/test_logger.sh"
     return 0 2>/dev/null
 fi
 

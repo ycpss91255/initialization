@@ -1,6 +1,6 @@
 # ADR-0005: Folder naming follows plural-for-collections + singular-for-concepts
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0021
 - **Date:** 2026-05-16
 - **Supersedes:** the implicit "all folders singular" hard rule set during
   M7-A (commit 6fc3d6c, AGENTS.md "Hard rule #2") is replaced by this

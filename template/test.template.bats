@@ -1,14 +1,14 @@
 #!/usr/bin/env bats
 # shellcheck disable=SC2317  # mocks defined inside @test blocks (e.g. `is_installed() { return 0; }`) are dispatched indirectly via the module under test or `run` — https://www.shellcheck.net/wiki/SC2317
-# tests/unit/modules/<NAME>_spec.bats — bats spec for modules/<NAME>.module.sh
+# test/unit/module/<NAME>_spec.bats — bats spec for module/<NAME>.module.sh
 #
 # Quick start:
-#   1. cp templates/test.template.bats tests/unit/modules/<your-name>_spec.bats
+#   1. cp template/test.template.bats test/unit/module/<your-name>_spec.bats
 #   2. Replace every <MODULE-NAME> below with your module name (no quotes).
 #   3. Search for <TODO> markers and fill them in.
 #   4. Run: make test-unit
 #
-# What this template covers (the docs/module-spec.md §7 minimum):
+# What this template covers (the doc/module-spec.md §7 minimum):
 #   - Metadata sanity (NAME / CATEGORY match)
 #   - is_installed reports the right state under stub conditions
 #   - install / remove / purge are no-ops in --dry-run mode
@@ -42,7 +42,7 @@ _load_module() {
 }
 
 # _standalone_module runs the module as a self-contained CLI (the same
-# entry users hit when they type `bash modules/<x>.module.sh ...`).
+# entry users hit when they type `bash module/<x>.module.sh ...`).
 _standalone_module() {
     bash "${MODULE_DIR}/<MODULE-NAME>.module.sh" "$@"
 }
@@ -100,7 +100,7 @@ _standalone_module() {
     is_installed() { return 0; }
     run install
     assert_success
-    # docs/module-spec.md §4.2 lets install() either skip or re-install;
+    # doc/module-spec.md §4.2 lets install() either skip or re-install;
     # most modules log a "already installed" hint we can grep for.
     assert_output --partial "already installed"
 }
@@ -115,9 +115,9 @@ _standalone_module() {
 }
 
 # ── Dual-mode standalone ─────────────────────────────────────────────────────
-# These ensure `bash modules/<x>.module.sh ...` works as a self-contained CLI.
+# These ensure `bash module/<x>.module.sh ...` works as a self-contained CLI.
 # DO NOT delete — they guard against accidentally breaking the standalone
-# entry footer (one of templates/module-{apt,github-release,config,custom}.template.sh).
+# entry footer (one of template/module-{apt,github-release,config,custom}.template.sh).
 
 @test "standalone: with no args prints usage + exits 2" {
     run _standalone_module

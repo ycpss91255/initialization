@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/unit/template_consistency_spec.bats — guard against drift between
+# test/unit/template_consistency_spec.bats — guard against drift between
 # the 4 archetype templates.
 #
 # The 4 templates (module-{apt,github-release,config,custom}.template.sh)
@@ -17,7 +17,7 @@
 #   # ── END: <section-name> ──...
 # which makes them robust to line-number shifts.
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 ARCHETYPES=(apt github-release config custom)
 
@@ -78,7 +78,7 @@ _assert_shared_section_identical() {
     done
 }
 
-@test "the legacy unified templates/module.template.sh no longer exists" {
+@test "the legacy unified template/module.template.sh no longer exists" {
     [[ ! -f "${TEMPLATE_DIR}/module.template.sh" ]] || {
         printf "legacy unified template still present: %s\n" "${TEMPLATE_DIR}/module.template.sh" >&2
         return 1

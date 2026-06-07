@@ -1,18 +1,18 @@
 #!/usr/bin/env bats
-# tests/unit/scripts/wait_pr_ci_spec.bats
+# test/unit/scripts/wait_pr_ci_spec.bats
 #
-# Tests for `.claude/scripts/wait-pr-ci.sh` watch-start / stale-window
+# Tests for `.claude/script/wait-pr-ci.sh` watch-start / stale-window
 # guards (issue #22).
 #
 # Strategy: PATH-stub `gh` to return a canned `gh pr view --json …`
 # response, then drive the script with --max-iterations 1 --interval 0
 # so the polling loop runs exactly once.
 
-load "${BATS_TEST_DIRNAME}/../../helpers/common"
+load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
     setup_test_env
-    SCRIPT="${REPO_ROOT}/.claude/scripts/wait-pr-ci.sh"
+    SCRIPT="${REPO_ROOT}/.claude/script/wait-pr-ci.sh"
     STUB_DIR="${BATS_TEST_TMPDIR}/bin"
     mkdir -p "${STUB_DIR}"
     FIXTURE_JSON="${BATS_TEST_TMPDIR}/gh-response.json"

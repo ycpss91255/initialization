@@ -5,7 +5,7 @@ All notable changes to `init_ubuntu` are documented here.
 The format is based on
 [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning 2.0.0](https://semver.org/),
-with project-specific bump rules (see `docs/processes/release.md`):
+with project-specific bump rules (see `doc/process/release.md`):
 
 - **X bump** (`v1.0.0`, `v2.0.0`) — ceremonial; requires explicit user ACK.
 - **Y bump** (`v0.1.0`, `v0.2.0`) — features + breaking changes; requires
@@ -20,24 +20,37 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Changed
+
+- **Folder naming reverted to all-singular** (issue #32, ADR-0021
+  supersedes ADR-0005): `docs/`→`doc/`, `tests/`→`test/`
+  (`helpers/`→`helper/`, `unit/modules/`→`unit/module/`),
+  `scripts/`→`script/`, `modules/`→`module/`, `templates/`→`template/`,
+  `.claude/hooks/`→`.claude/hook/`, `.claude/scripts/`→`.claude/script/`,
+  `docs/agents/`→`doc/agent/`, `docs/processes/`→`doc/process/`,
+  `docs/guides/`→`doc/guide/`. Upstream-imposed dirs and acronyms
+  (`adr/`, `prd/`, `ci/`) unchanged; file names ending in `s` deferred
+  to 0.2.0. User-local module dir is now
+  `${XDG_CONFIG_HOME}/init_ubuntu/module/` (was `.../modules/`).
+
 ### Added
 
 #### M1 — PRD + architecture + module contract (commit 50a41eb)
 
-- Product spec at `docs/prd/init-ubuntu.prd.md` covering MVP scope, milestones
+- Product spec at `doc/prd/init-ubuntu.prd.md` covering MVP scope, milestones
   (M1-M15), acceptance criteria, exit codes, CLI surface, state model.
-- System architecture at `docs/architecture.md` covering engine layering
+- System architecture at `doc/architecture.md` covering engine layering
   (dispatcher / runner / registry / resolver / state).
-- Module v1 contract at `docs/module-spec.md` defining metadata schema,
+- Module v1 contract at `doc/module-spec.md` defining metadata schema,
   lifecycle functions, archetype concepts.
 
 #### M2 — Test harness (commit 82b5a7e)
 
 - Borrowed + customized `ycpss91255-docker/base` v0.28.0 test rig.
-- Docker-only test execution via `Makefile` + `scripts/ci/ci.sh` +
+- Docker-only test execution via `Makefile` + `script/ci/ci.sh` +
   `compose.yaml`.
-- bats unit + integration test infrastructure at `tests/unit/` and
-  `tests/integration/`.
+- bats unit + integration test infrastructure at `test/unit/` and
+  `test/integration/`.
 
 #### M3 — Engine basics: logger, helpers, environment detection (commits 4502ecc, 62b173f)
 
@@ -56,10 +69,10 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   JSONL phase events, state.json recording.
 - `lib/state.sh` — `${XDG_STATE_HOME}/init_ubuntu/state.json` with flock,
   import/export, atomic writes.
-- `modules/apt-essentials.module.sh` — reference module (apt archetype).
-- `modules/docker.module.sh` — reference module (custom archetype).
-- `templates/module.template.sh` — v1 module skeleton.
-- `tests/unit/e2e_spec.bats` — end-to-end install/remove dry-run.
+- `module/apt-essentials.module.sh` — reference module (apt archetype).
+- `module/docker.module.sh` — reference module (custom archetype).
+- `template/module.template.sh` — v1 module skeleton.
+- `test/unit/e2e_spec.bats` — end-to-end install/remove dry-run.
 
 #### M5 — CLI + sync + apt-style subcommands (commit be6e5b1)
 
@@ -80,7 +93,7 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 - i18n migrated from scalar `DESCRIPTION_EN` / `_ZH_TW` to associative
   array `declare -gA DESCRIPTION=([en]=... [zh-TW]=...)`. Supported langs:
   en, zh-TW, zh-CN, ja.
-- Standalone vs Engine dual-mode header: `bash modules/foo.module.sh install`
+- Standalone vs Engine dual-mode header: `bash module/foo.module.sh install`
   works as a self-contained CLI without `setup_ubuntu` (ADR-0001 defines
   the Sidecar vs state.json write split).
 - Archetype macros `module_use_apt_archetype` / `_github_release_` /
@@ -88,11 +101,11 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 - Metadata fields trimmed: dropped MAINTAINER, RECOVERY_FALLBACK,
   PARALLEL_GROUP, INSTALL_TIME_ESTIMATE, DISK_SPACE_ESTIMATE.
 - Folder naming convention enforced (singular):
-  `docs/` → `docs/`, `tests/helpers/` → `tests/helpers/`,
-  `tests/unit/modules/` → `tests/unit/modules/`, `modules/tools/` →
-  `modules/tools/`. Hook `.claude/hooks/test-must-use-docker.sh` enforces
+  `doc/` → `doc/`, `test/helper/` → `test/helper/`,
+  `test/unit/module/` → `test/unit/module/`, `module/tools/` →
+  `module/tools/`. Hook `.claude/hook/test-must-use-docker.sh` enforces
   Docker-only test execution (ADR-0004).
-- ADRs 0001-0004 introduced (`docs/adr/`):
+- ADRs 0001-0004 introduced (`doc/adr/`):
   0001 standalone/engine state boundary,
   0002 all 10 lifecycle functions mandatory,
   0003 language choice + migration triggers,
@@ -103,17 +116,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 #### M7-#68 — Template split into 4 archetypes (commit 57df2e3)
 
-- `templates/module.template.sh` (unified, all archetypes commented out)
+- `template/module.template.sh` (unified, all archetypes commented out)
   replaced with 4 specialized templates:
-  - `templates/module-apt.template.sh` (archetype A)
-  - `templates/module-github-release.template.sh` (archetype B)
-  - `templates/module-config.template.sh` (archetype C)
-  - `templates/module-custom.template.sh` (archetype D, hand-written)
-- `tests/unit/template_consistency_spec.bats` — hash-compares shared
+  - `template/module-apt.template.sh` (archetype A)
+  - `template/module-github-release.template.sh` (archetype B)
+  - `template/module-config.template.sh` (archetype C)
+  - `template/module-custom.template.sh` (archetype D, hand-written)
+- `test/unit/template_consistency_spec.bats` — hash-compares shared
   sentinel-delimited sections (shared-bootstrap / shared-metadata /
   shared-lifecycle-stubs / shared-footer) across the 4 templates to
   detect drift.
-- `tests/unit/template_smoke_spec.bats` — rewritten to iterate the 18
+- `test/unit/template_smoke_spec.bats` — rewritten to iterate the 18
   smoke checks (`--help` / `--version` / install/upgrade/remove/purge/
   verify --dry-run / is-installed / is-outdated / doctor / info /
   status / source-mode / no-side-effects) across all 4 archetypes.
@@ -132,7 +145,7 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
     heavy three either passed or skipped. Single check name for
     `required_status_checks` to anchor on (#3).
 - Path filter via `dorny/paths-filter@v3`: `code` output is `false`
-  for changes touching only `docs/**`, `**/*.md`, `LICENSE*`,
+  for changes touching only `doc/**`, `**/*.md`, `LICENSE*`,
   `.gitignore`, `.codecov.yaml`.
 - Triggers: PR to `main`, push to `main`, push to `v*` tags (so
   `release-tag.sh`'s CI-conclusion query for RC tags works).
@@ -145,13 +158,13 @@ call site with a wiki-link rationale, matching the upstream
 `ycpss91255-docker/base` pattern. Lint level stays at shellcheck's
 default severity (style/info/warning/error all reported).
 
-- `scripts/ci/ci.sh`:
-  - Fix exclude-path typo `modules/tool` → `modules/tools` (post-
+- `script/ci/ci.sh`:
+  - Fix exclude-path typo `module/tool` → `module/tools` (post-
     ADR-0005 plural rename had not been propagated).
   - Extend `_find_lintable_sh` to pick up `*.bash` + `*.bats` too.
   - Exclude legacy paths slated for removal per PRD §6.5/§6.6:
-    `modules/submodule/`, `modules/function/`, `modules/setup_*.sh`,
-    `modules/anydesk.sh`, `install-nvidia-driver.sh` — these predate
+    `module/submodule/`, `module/function/`, `module/setup_*.sh`,
+    `module/anydesk.sh`, `install-nvidia-driver.sh` — these predate
     the v2 module pattern; their shellcheck disables stay as-is until
     relocation.
   - Add `jq` to `_install_deps_for_coverage` apt-get list (kcov/kcov
@@ -164,30 +177,30 @@ default severity (style/info/warning/error all reported).
     pattern (SC1083 — literal `}` matches JSON `null}` object close).
   - `lib/module_helper.sh`: remove `"$@"` from 18 archetype inner
     wrappers — never called with args, fixes SC2119/SC2120.
-  - All `lib/*.sh` + `modules/*.module.sh` + `templates/*.sh`:
+  - All `lib/*.sh` + `module/*.module.sh` + `template/*.sh`:
     defensive `${BASH_SOURCE[0]:-}` / `${0:-}` (matches base).
-  - `tests/unit/module_helper_spec.bats:205`: use
+  - `test/unit/module_helper_spec.bats:205`: use
     `declare -A DESCRIPTION=([en]="...")` for assoc array (SC2190).
-  - `modules/font.module.sh`: `command -v X && X || true` → explicit
+  - `module/font.module.sh`: `command -v X && X || true` → explicit
     `if ... then ... fi` (SC2015).
 - Disable-with-rationale (wiki-link inline at each disable):
-  - 10 `modules/*.module.sh` + 4 `templates/module-*.template.sh`:
+  - 10 `module/*.module.sh` + 4 `template/module-*.template.sh`:
     file-top SC2034 — metadata vars consumed by engine post-source.
-  - 1 `tests/unit/module_helper_spec.bats` file-top SC2034/SC2317.
-  - 6 `tests/unit/*_spec.bats`: file-top SC1091 — tests source libs
+  - 1 `test/unit/module_helper_spec.bats` file-top SC2034/SC2317.
+  - 6 `test/unit/*_spec.bats`: file-top SC1091 — tests source libs
     via runtime `${LIB_DIR}` shellcheck can't statically resolve.
   - `lib/module_helper.sh`: file-top SC2317 — archetype-macro inner
     wrappers dispatched indirectly via `${_phase}` (lib/runner.sh).
   - `lib/sync.sh`: file-top SC2029 — SSH cmds expand `${_remote_path}`
     client-side intentionally.
-  - `modules/docker.module.sh`: per-fn SC2032/SC2033 above `install()`
+  - `module/docker.module.sh`: per-fn SC2032/SC2033 above `install()`
     — function name shadows `/usr/bin/install`; harmless because `sudo
     install` invokes the binary (sudo clears function table).
-  - `tests/unit/i18n_spec.bats`: file-top SC2030/SC2031 — bats `run`
+  - `test/unit/i18n_spec.bats`: file-top SC2030/SC2031 — bats `run`
     spawns subshell, test setups `export LANG=...` stage env.
-  - `tests/unit/modules/docker_spec.bats`, `templates/test.template.bats`:
+  - `test/unit/module/docker_spec.bats`, `template/test.template.bats`:
     file-top SC2317 — test mocks dispatched indirectly.
-  - `tests/unit/template_smoke_spec.bats:34`: per-block SC2016 above
+  - `test/unit/template_smoke_spec.bats:34`: per-block SC2016 above
     multi-line `sed` with literal `${MODULE_DIR}` template placeholders.
   - `lib/module_helper.sh:45`: per-line SC2120 on i18n wrapper —
     optional `<lang>` arg.
@@ -218,7 +231,7 @@ still `source`s the module file itself and dispatches to `${_phase}`.
 
 #### ADR-0006 — OTel-aligned logger schema (decision only; issue #8)
 
-- `docs/adr/0006-otel-aligned-logger-schema.md` — decision to migrate
+- `doc/adr/0006-otel-aligned-logger-schema.md` — decision to migrate
   `lib/logger.sh` `log_event` JSONL output to mirror the OpenTelemetry
   Logs Data Model + W3C Trace Context, without adopting the OTel SDK
   or Collector. Sourced from the project author's observability
@@ -237,14 +250,14 @@ still `source`s the module file itself and dispatches to `${_phase}`.
   - Per-session log file rotation:
     `${XDG_STATE_HOME}/init_ubuntu/logs/<trace_id>.jsonl` + `latest`
     symlink.
-  - `docs/guides/log-queries.md` will ship lnav format file with
+  - `doc/guide/log-queries.md` will ship lnav format file with
     `opid-field: trace_id` (free timeline view) + jq snippet library.
 - Implementation deferred to issue #8; gated on PRs #4 / #6 / #7
   merging first to avoid CHANGELOG and `lib/runner.sh` conflicts.
 
 #### Archetype cookbook (issue #5, task #69)
 
-- `docs/guides/archetype-cookbook.md` — companion to the 4 archetype
+- `doc/guide/archetype-cookbook.md` — companion to the 4 archetype
   templates. Documents:
   - Decision tree for picking archetype A / B / C / D.
   - Pure-archetype usage (apt-essentials, neovim, git-config, font).
@@ -260,7 +273,7 @@ still `source`s the module file itself and dispatches to `${_phase}`.
     `declare -gA`, `cd` outside subshell, standalone vs engine
     state writes (ADR-0001), `update` vs `upgrade` naming.
 - Templates' authoring docstring paths fixed:
-  `docs/guide/archetype-cookbook.md` → `docs/guides/archetype-cookbook.md`
+  `doc/guide/archetype-cookbook.md` → `doc/guide/archetype-cookbook.md`
   (per ADR-0005, plural for the collection dir).
 
 #### wait-pr-ci skill + hook (issue #15)
@@ -269,7 +282,7 @@ Port of docker_harness's `wait-pr-ci` triple so `gh pr create` is
 followed by a non-context-burning CI monitor instead of a sleep
 poll. Three components:
 
-- `.claude/scripts/wait-pr-ci.sh` — the polling primitive. Wraps
+- `.claude/script/wait-pr-ci.sh` — the polling primitive. Wraps
   `gh pr view` + `gh pr checks` with terminal-state detection
   (success / failure / merged / closed). Designed to be the body
   of a Claude Code Monitor invocation. SKIPPED checks count as
@@ -278,7 +291,7 @@ poll. Three components:
 - `.claude/skills/wait-pr-ci/SKILL.md` — agent-facing flow doc.
   When to invoke (post `gh pr create`, post force-push, when
   checking on another agent's PR), how to read the output.
-- `.claude/hooks/remind_pr_wait_ci.sh` — PreToolUse Bash hook.
+- `.claude/hook/remind_pr_wait_ci.sh` — PreToolUse Bash hook.
   Fires when the agent is about to run `gh pr create` and emits
   a non-blocking systemMessage reminding to invoke the skill
   after the PR opens. Registered as the 8th entry in
@@ -287,8 +300,8 @@ poll. Three components:
 #### User-local module discovery (issue #13, PRD §13.2 Q35)
 
 - `lib/registry.sh`: `registry_load_all` now scans a second directory
-  after the bundled `modules/` — defaults to
-  `${INIT_UBUNTU_USER_MODULE_DIR:-${XDG_CONFIG_HOME:-${HOME}/.config}/init_ubuntu/modules}`.
+  after the bundled `module/` — defaults to
+  `${INIT_UBUNTU_USER_MODULE_DIR:-${XDG_CONFIG_HOME:-${HOME}/.config}/init_ubuntu/module}`.
   Skipped silently if absent (engine works on hosts that never opt in).
 - Name collision: user-local wins by overwriting the bundled entry;
   `log_warn` (or stderr fallback if logger not loaded) reports the
@@ -297,7 +310,7 @@ poll. Three components:
   `_registry_load_one_dir(dir, is_user_local)` helper. Public API
   `registry_load_all` keeps backwards-compatible single-arg
   signature.
-- Tests: 267 → 271 (4 new in `tests/unit/registry_spec.bats`):
+- Tests: 267 → 271 (4 new in `test/unit/registry_spec.bats`):
   - user-local module appears in `registry_list_names`
   - user-local NAME collision overrides bundled metadata
   - collision emits `user-local override` warn line
@@ -363,29 +376,29 @@ doctor()) is decided.
 
 Alignment with `ycpss91255-docker/docker_harness` release infrastructure:
 
-- `.claude/scripts/release-tag.sh` — canonical primitive for cutting
+- `.claude/script/release-tag.sh` — canonical primitive for cutting
   version tags. Decision tree: RC tag short-circuits; `Z>0` patch
   short-circuits; `Y` bump requires passing `vX.Y.0-rcN` CI; `X` bump
   also requires `RELEASE_X_BUMP_ACK=<tag>`. Verifies `.version`
   literal matches the tag.
 - `.claude/skills/semver-bump/SKILL.md` — agent-facing companion.
-- `.claude/hooks/enforce_semver_tag_via_script.sh` — DENIES ad-hoc
+- `.claude/hook/enforce_semver_tag_via_script.sh` — DENIES ad-hoc
   `git tag v*` / `git push origin v*` / `git push --tags`; forces
   callers through `release-tag.sh`.
-- `.claude/hooks/check_main_fresh_before_worktree.sh` — BLOCKs
+- `.claude/hook/check_main_fresh_before_worktree.sh` — BLOCKs
   `git worktree add ... main` when local main is behind origin/main.
-- `.claude/hooks/remind_main_sync.sh` — non-blocking reminder on
+- `.claude/hook/remind_main_sync.sh` — non-blocking reminder on
   `gh pr merge` to `git pull --ff-only origin main` after merge.
-- `.claude/hooks/check_changelog_drift.sh` — non-blocking reminder when
+- `.claude/hook/check_changelog_drift.sh` — non-blocking reminder when
   `git commit` stages non-doc code without a CHANGELOG entry.
-- `.claude/hooks/enforce_gh_body_file.sh` — enforces `--body-file`
+- `.claude/hook/enforce_gh_body_file.sh` — enforces `--body-file`
   convention on `gh issue/pr create/comment` (docker_harness
   gh-artifact-format skill rules 1-8).
-- `.claude/hooks/enforce_gh_english.sh` — **new (not in docker_harness)**:
+- `.claude/hook/enforce_gh_english.sh` — **new (not in docker_harness)**:
   DENIES `gh issue/pr create/comment` whose title / body contains CJK
   characters. Project rule: GitHub interaction is English-only.
-- `docs/processes/release.md` — release workflow documentation.
-- `docs/processes/worktree.md` — already in [Unreleased] under Phase 1
+- `doc/process/release.md` — release workflow documentation.
+- `doc/process/worktree.md` — already in [Unreleased] under Phase 1
   (commit 6e840d1).
 - `.version` — `v0.0.0` baseline (commit 6e840d1).
 - All 7 hooks registered in `.claude/settings.json`.
@@ -396,15 +409,15 @@ Codifies the ShellCheck base-alignment discipline (`# shellcheck disable=...`
 gated by wiki-link rationale + user approval) from PR #4 into an enforceable
 hook plus rationale doc:
 
-- `docs/adr/0007-exit-code-contract-scripts-default-to-set-uo.md` — ADR
+- `doc/adr/0007-exit-code-contract-scripts-default-to-set-uo.md` — ADR
   documenting the project convention that exit-code-contract scripts
-  (`.claude/hooks/*.sh`, `.claude/scripts/release-tag.sh`) default to
+  (`.claude/hook/*.sh`, `.claude/script/release-tag.sh`) default to
   `set -uo pipefail` (not `-euo`). Cites BashFAQ #105 + Google Shell
   Style Guide; lists exception criteria for `-euo` (always-act scripts
   like `test-must-use-docker.sh`).
 - `CLAUDE.md` (`AGENTS.md`) — new `## Script conventions` section
   indexing ADR-0007 and the new hook for agent-facing discoverability.
-- `.claude/hooks/enforce_shellcheck_disable_approval.sh` — PreToolUse
+- `.claude/hook/enforce_shellcheck_disable_approval.sh` — PreToolUse
   hook on `Edit|Write|MultiEdit`. Blocks (`permissionDecision: deny`)
   any newly added `# shellcheck disable=SC<code>` directive unless the
   user has explicitly approved that code in their most recent message
@@ -416,7 +429,7 @@ hook plus rationale doc:
 - Internal modules (functions sourced for bats testing in isolation):
   `read_latest_user_message`, `new_shellcheck_disables`,
   `is_disable_approved`, `main`.
-- `tests/unit/hooks/{transcript_reader,disable_diff,approval_check,enforce_shellcheck_disable_approval}_spec.bats`
+- `test/unit/hooks/{transcript_reader,disable_diff,approval_check,enforce_shellcheck_disable_approval}_spec.bats`
   — bats specs for each module + integration test for the hook entry.
 - `.claude/settings.json` — hook registered as the 2nd `PreToolUse`
   matcher block (`Edit|Write|MultiEdit`).
@@ -429,18 +442,18 @@ hook plus rationale doc:
   plural for collections (Linux kernel, Python, Rust, Git internals);
   sibling repo `ycpss91255-docker/docker_harness` is itself mixed; the
   exception list for upstream-mandated plurals kept growing. Renames:
-  `doc/` → `docs/`, `doc/agent/` → `docs/agents/`,
-  `doc/process/` → `docs/processes/`, `module/` → `modules/`,
-  `module/tool/` → `modules/tools/`, `script/` → `scripts/`,
-  `script/hook/test-must-use-docker.sh` → `.claude/hooks/test-must-use-docker.sh`
+  `doc/` → `doc/`, `doc/agent/` → `doc/agent/`,
+  `doc/process/` → `doc/process/`, `module/` → `module/`,
+  `module/tool/` → `module/tools/`, `script/` → `script/`,
+  `script/hook/test-must-use-docker.sh` → `.claude/hook/test-must-use-docker.sh`
   (also relocated since all hooks are Claude PreToolUse, matching
-  docker_harness `.claude/hooks/`), `test/` → `tests/`,
-  `test/helper/` → `tests/helpers/`,
-  `test/unit/module/` → `tests/unit/modules/`,
-  `template/` → `templates/`. Kept singular: `lib/`, `docs/adr/`,
-  `docs/changelog/`, `docs/prd/`, `modules/config/`,
-  `modules/submodule/` (deprecated path), `scripts/ci/`,
-  `tests/unit/`, `tests/integration/`. AGENTS.md Hard rule #2
+  docker_harness `.claude/hook/`), `test/` → `test/`,
+  `test/helper/` → `test/helper/`,
+  `test/unit/module/` → `test/unit/module/`,
+  `template/` → `template/`. Kept singular: `lib/`, `doc/adr/`,
+  `doc/changelog/`, `doc/prd/`, `module/config/`,
+  `module/submodule/` (deprecated path), `script/ci/`,
+  `test/unit/`, `test/integration/`. AGENTS.md Hard rule #2
   rewritten to point at ADR-0005.
 - **Lifecycle phase rename: `update()` → `upgrade()`** (commit 57df2e3).
   PRD §5.1 / §13.2 has long aligned the CLI with apt
@@ -451,12 +464,12 @@ hook plus rationale doc:
     standalone CLI accepted phases, dryrun_guard labels, `--help` text.
   - 6 v2 modules (apt-essentials, docker, fish, font, nvidia-driver,
     tmux).
-  - `tests/unit/module_helper_spec.bats` archetype function-list assertion.
+  - `test/unit/module_helper_spec.bats` archetype function-list assertion.
   - `setup_ubuntu update` (registry rescan subcommand) **unchanged**.
 - **File rename: `lib/module_helpers.sh` → `lib/module_helper.sh`**
   (commit 57df2e3). Folder-name singular convention extended to filenames;
   `git mv` preserves history; all 16 references updated.
-- AGENTS.md + `docs/agents/{issue-tracker,triage-labels,domain}.md` added
+- AGENTS.md + `doc/agent/{issue-tracker,triage-labels,domain}.md` added
   (commit 68dcf55) for `setup-matt-pocock-skills` scaffolding;
   `CLAUDE.md` is a symlink to `AGENTS.md` so Claude Code and
   AGENTS.md-aware CLIs read the same content.
@@ -468,12 +481,12 @@ hook plus rationale doc:
 
 ### Fixed
 
-- `modules/submodule/yazi.sh`: alias clobbered `cat` instead of installing
+- `module/submodule/yazi.sh`: alias clobbered `cat` instead of installing
   `yz` (issue #1). The script wrote `command -v yazi &>/dev/null &&
   alias cat='yazi'` to `~/.bashrc` and `~/.zshrc` — looked like a
   copy-paste leftover from `batcat.sh` where `alias cat=bat` is the
   intended override. Now matches the fish config
-  (`modules/config/fish/conf.d/alias.fish`) which already uses
+  (`module/config/fish/conf.d/alias.fish`) which already uses
   `alias yz=yazi`. Users with the bad alias already in their rc files
   should `unalias cat` + remove the line manually (no auto-cleanup).
 
@@ -497,8 +510,8 @@ hook plus rationale doc:
 
 ### Removed
 
-- Legacy `templates/{func,module,submodule,test}_tmp.sh` (commit 6fc3d6c).
-- Legacy `modules/setup_*.sh` scripts being replaced by v2 modules
+- Legacy `template/{func,module,submodule,test}_tmp.sh` (commit 6fc3d6c).
+- Legacy `module/setup_*.sh` scripts being replaced by v2 modules
   (incremental, per M7 batch).
 - 5 metadata fields no longer carried: MAINTAINER, RECOVERY_FALLBACK,
   PARALLEL_GROUP, INSTALL_TIME_ESTIMATE, DISK_SPACE_ESTIMATE (commit

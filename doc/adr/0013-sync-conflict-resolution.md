@@ -13,7 +13,7 @@ multi-machine personal setup:
    versions.
 2. **One-sided modules.** Remote has `obscure-tool`; local engine has
    no module definition for it (e.g. it was a user-local module in
-   `${XDG_CONFIG_HOME}/init_ubuntu/modules/`).
+   `${XDG_CONFIG_HOME}/init_ubuntu/module/`).
 3. **Dep snapshot divergence.** Same `neovim`, but `depends_on`
    snapshots differ because the modules' `DEPENDS_ON` metadata moved
    between installs.
@@ -92,8 +92,8 @@ local catalog, the dry-run diff prints:
 ```
 
 With `--include-user-local-modules`, sync additionally rsyncs
-`${XDG_CONFIG_HOME}/init_ubuntu/modules/` from remote to local.
-**Repo-tracked modules (`./modules/*.module.sh`) are never
+`${XDG_CONFIG_HOME}/init_ubuntu/module/` from remote to local.
+**Repo-tracked modules (`./module/*.module.sh`) are never
 transferred over sync** — those belong in git and should be moved
 via `git pull` / `git push`.
 
@@ -142,7 +142,7 @@ prints a diff back, user re-runs with `--apply`.
   --autostash` — show, then commit. Users who want yolo mode use
   `--apply -y`.
 - Catalog drift across machines is surfaced explicitly. A user can
-  copy missing module defs over via `rsync modules/`, then re-sync.
+  copy missing module defs over via `rsync module/`, then re-sync.
 - `manual` sticky-to-true means a module manually installed on
   either side stays manual everywhere. Aligns with apt-mark.
 - AC additions:

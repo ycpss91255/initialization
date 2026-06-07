@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034  # module metadata vars (NAME / DESCRIPTION / CATEGORY / TAGS / ...) consumed by engine post-source — https://www.shellcheck.net/wiki/SC2034
-# modules/apt-essentials.module.sh — minimal apt baseline for the rest of the catalog
+# module/apt-essentials.module.sh — minimal apt baseline for the rest of the catalog
 #
 # Per-package fallback strategy (PRD §18.1 Q-A12 / A-N6):
 #   - Already installed + OK   -> skip this pkg, continue
@@ -26,7 +26,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     source "${LIB_DIR}/module_helper.sh"
 fi
 
-# ── Metadata (docs/module-spec.md §3) ───────────────────────────────────────
+# ── Metadata (doc/module-spec.md §3) ───────────────────────────────────────
 NAME="apt-essentials"
 VERSION_PROVIDED="apt-managed"
 CATEGORY="base"

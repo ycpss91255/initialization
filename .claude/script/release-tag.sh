@@ -47,7 +47,7 @@ Rules (init_ubuntu / docker_harness#106):
   vX.Y.0 (Y bumped) -> require passing vX.Y.0-rcN CI
   vX.0.0 (X bumped) -> require passing RC AND RELEASE_X_BUMP_ACK=<tag>
 
-Companion: .claude/skills/semver-bump/SKILL.md, docs/processes/release.md.
+Companion: .claude/skills/semver-bump/SKILL.md, doc/process/release.md.
 EOF
 }
 
@@ -198,7 +198,7 @@ main() {
     if [[ -z "${ack}" ]]; then
       err "X bump (${prev_max:-v0.0.0} -> ${tag}) requires explicit user consent."
       err "  After user OK in chat, re-run with the ACK env var:"
-      err "    RELEASE_X_BUMP_ACK=${tag} .claude/scripts/release-tag.sh ${tag} ..."
+      err "    RELEASE_X_BUMP_ACK=${tag} .claude/script/release-tag.sh ${tag} ..."
       err "  See .claude/skills/semver-bump/SKILL.md."
       return 1
     fi

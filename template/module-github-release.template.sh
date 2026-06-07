@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034  # module metadata vars (NAME / DESCRIPTION / CATEGORY / TAGS / ...) consumed by engine post-source — https://www.shellcheck.net/wiki/SC2034
-# modules/<NAME>.module.sh — <one-line summary>  [archetype: github-release]
+# module/<NAME>.module.sh — <one-line summary>  [archetype: github-release]
 #
-# Authoring guide (docs/module-spec.md §3, §4; cookbook: docs/guides/archetype-cookbook.md):
-#   1. cp templates/module-github-release.template.sh modules/<your-name>.module.sh
+# Authoring guide (doc/module-spec.md §3, §4; cookbook: doc/guide/archetype-cookbook.md):
+#   1. cp template/module-github-release.template.sh module/<your-name>.module.sh
 #   2. Fill metadata (NAME / DESCRIPTION / CATEGORY / DEPENDS_ON / ...).
 #   3. Fill GITHUB_REPO / GITHUB_ASSET_PATTERN / INSTALL_DIR / BIN_NAME in the
 #      archetype block below.
 #   4. Implement detect() and is_recommended() — these are always module-specific.
 #   5. Optionally implement is_outdated() / doctor() for richer engine support.
-#   6. cp templates/test.template.bats tests/unit/modules/<your-name>_spec.bats
+#   6. cp template/test.template.bats test/unit/module/<your-name>_spec.bats
 #   7. Run: make test-unit   (Docker-only; see ADR-0004)
 #
 # Standalone usage:
-#   bash modules/<x>.module.sh install [--dry-run]
-#   bash modules/<x>.module.sh upgrade / remove / purge / verify
-#   bash modules/<x>.module.sh detect / is-installed / is-recommended / is-outdated
-#   bash modules/<x>.module.sh info / status        (read-only metadata views)
+#   bash module/<x>.module.sh install [--dry-run]
+#   bash module/<x>.module.sh upgrade / remove / purge / verify
+#   bash module/<x>.module.sh detect / is-installed / is-recommended / is-outdated
+#   bash module/<x>.module.sh info / status        (read-only metadata views)
 #
 # Engine usage (resolves DEPENDS_ON, batches with state.json):
 #   setup_ubuntu install <x>
@@ -29,7 +29,7 @@
 
 # ── BEGIN: shared-bootstrap ─────────────────────────────────────────────────
 # Dual-mode entry detection.
-# When invoked directly (`bash modules/<x>.module.sh ...`), MODULE_STANDALONE
+# When invoked directly (`bash module/<x>.module.sh ...`), MODULE_STANDALONE
 # becomes "true": we bootstrap env + source lib helpers, then the footer
 # below dispatches to module_standalone_main "$@".
 # When source'd by lib/runner.sh into its sub-shell, MODULE_STANDALONE is
@@ -43,7 +43,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     shopt -s inherit_errexit 2>/dev/null || true
 
     # Resolve paths. Env vars take precedence so tests + relocations work:
-    # `LIB_DIR=/path/to/lib bash modules/foo.module.sh install` is honored.
+    # `LIB_DIR=/path/to/lib bash module/foo.module.sh install` is honored.
     MODULE_DIR="${MODULE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")" && pwd -P)}"
     REPO_ROOT="${REPO_ROOT:-$(cd -- "${MODULE_DIR}/.." && pwd -P)}"
     LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
@@ -86,7 +86,7 @@ declare -gA WARN_MESSAGE=(
 
 # 3. Environment constraints
 SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")
-SUPPORTED_PLATFORMS=("desktop" "server" "wsl")   # adjust per docs/module-spec.md §3.3
+SUPPORTED_PLATFORMS=("desktop" "server" "wsl")   # adjust per doc/module-spec.md §3.3
 DEPENDS_ON=()                                     # e.g. ("apt-essentials" "fzf")
 CONFLICTS_WITH=()
 SUPPORTS_USER_HOME=false                          # true if pure $HOME/.local install works
@@ -134,7 +134,7 @@ is_recommended() {
 
 # is_outdated: OPTIONAL. 0 = newer version available. Engine uses this for
 # `setup_ubuntu status <m>` and to decide whether `upgrade` actually does work.
-# See docs/guides/archetype-cookbook.md for archetype-specific examples.
+# See doc/guide/archetype-cookbook.md for archetype-specific examples.
 # is_outdated() {
 #     return 1
 # }
@@ -149,7 +149,7 @@ is_recommended() {
 
 # ── BEGIN: shared-footer ────────────────────────────────────────────────────
 # Standalone entry footer — DO NOT REMOVE.
-# Lets `bash modules/<name>.module.sh install --dry-run` work as a
+# Lets `bash module/<name>.module.sh install --dry-run` work as a
 # self-contained command. Skipped automatically when source'd by lib/runner.sh.
 
 if [[ "${MODULE_STANDALONE:-false}" == "true" ]]; then

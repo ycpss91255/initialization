@@ -125,7 +125,7 @@ if m:
   in CJK belong in commit messages or chat, not on GitHub artifacts that
   are public + indexed.
 
-  Hook source: .claude/hooks/enforce_gh_english.sh"
+  Hook source: .claude/hook/enforce_gh_english.sh"
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

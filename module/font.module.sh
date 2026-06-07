@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034  # module metadata vars (NAME / DESCRIPTION / CATEGORY / TAGS / ...) consumed by engine post-source — https://www.shellcheck.net/wiki/SC2034
-# modules/font.module.sh — Nerd Font (Hack + FiraCode + JetBrainsMono) install
+# module/font.module.sh — Nerd Font (Hack + FiraCode + JetBrainsMono) install
 
 # ── Dual-mode header ────────────────────────────────────────────────────────
 MODULE_STANDALONE="true"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# .claude/hooks/test-must-use-docker.sh — Claude PreToolUse Bash hook.
+# .claude/hook/test-must-use-docker.sh — Claude PreToolUse Bash hook.
 #
 # Enforces ADR-0004: tests / Module Action Phases MUST run in Docker, never
 # on the host. This hook receives the Bash tool input as JSON on stdin and
@@ -11,7 +11,7 @@
 #       {
 #         "matcher": "Bash",
 #         "hooks": [
-#           { "type": "command", "command": ".claude/hooks/test-must-use-docker.sh" }
+#           { "type": "command", "command": ".claude/hook/test-must-use-docker.sh" }
 #         ]
 #       }
 #     ]
@@ -65,7 +65,7 @@ _block() {
     local _reason="$1"
     printf '[hook:test-must-use-docker] BLOCKED — %s\n' "${_reason}" >&2
     printf '[hook:test-must-use-docker] Command: %s\n' "${_cmd}" >&2
-    printf '[hook:test-must-use-docker] See docs/adr/0004-tests-must-run-in-docker-only.md\n' >&2
+    printf '[hook:test-must-use-docker] See doc/adr/0004-tests-must-run-in-docker-only.md\n' >&2
     printf '[hook:test-must-use-docker] Use: make test-unit / make test-integration / make coverage\n' >&2
     exit 2
 }
@@ -76,8 +76,8 @@ if [[ "${_cmd}" =~ (^|[[:space:];|&])bats([[:space:]]|$) ]]; then
 fi
 
 # 2. Module Action Phase on host (install / upgrade / remove / purge).
-#    Matches both 'bash modules/foo.module.sh install' and direct './modules/foo.module.sh install'.
-if [[ "${_cmd}" =~ (bash[[:space:]]+)?(\.?/)?modules/[a-z0-9-]+\.module\.sh[[:space:]]+(install|upgrade|remove|purge) ]]; then
+#    Matches both 'bash module/foo.module.sh install' and direct './module/foo.module.sh install'.
+if [[ "${_cmd}" =~ (bash[[:space:]]+)?(\.?/)?module/[a-z0-9-]+\.module\.sh[[:space:]]+(install|upgrade|remove|purge) ]]; then
     _block "module Action Phase on host — use 'make test-unit' or 'docker compose run --rm ci ...'"
 fi
 

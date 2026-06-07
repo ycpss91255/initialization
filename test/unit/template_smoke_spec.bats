@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/unit/template_smoke_spec.bats — verify templates/module-*.template.sh
+# test/unit/template_smoke_spec.bats — verify template/module-*.template.sh
 #
 # Smoke-tests a copy of each archetype template (with TODOs filled) through
 # the full standalone CLI surface. Catches drift at the template level so
@@ -7,7 +7,7 @@
 #
 # Archetypes covered: apt | github-release | config | custom
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 ARCHETYPES=(apt github-release config custom)
 
@@ -17,10 +17,10 @@ setup() {
     export LOG_COLOR=false
     export INIT_UBUNTU_LANG=en
     # Template header honors LIB_DIR / REPO_ROOT env vars, so a fixture in
-    # /tmp/.../scratch/modules/ can still locate the real lib helpers.
+    # /tmp/.../scratch/module/ can still locate the real lib helpers.
     export LIB_DIR REPO_ROOT
 
-    FIXTURE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/modules"
+    FIXTURE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/module"
     mkdir -p "${FIXTURE_DIR}"
 
     # Materialise a fixture for each archetype.
@@ -56,7 +56,7 @@ teardown() {
 
 # Helper: full path to a fixture for a given archetype.
 _smoke() {
-    printf '%s/smoke-%s.module.sh' "${INIT_UBUNTU_TEST_SCRATCH}/modules" "${1}"
+    printf '%s/smoke-%s.module.sh' "${INIT_UBUNTU_TEST_SCRATCH}/module" "${1}"
 }
 
 # Helper: assert a phase succeeds for every archetype, with DRY-RUN output.

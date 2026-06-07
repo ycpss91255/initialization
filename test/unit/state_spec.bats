@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# tests/unit/state_spec.bats — lib/state.sh
+# test/unit/state_spec.bats — lib/state.sh
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

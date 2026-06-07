@@ -7,7 +7,7 @@ management vocabulary on `apt` so user mental models transfer.
 
 ### Module
 
-**Module**: a single `modules/<name>.module.sh` file that declares metadata and
+**Module**: a single `module/<name>.module.sh` file that declares metadata and
 implements 10 lifecycle functions. Each module manages exactly one tool/feature.
 _Avoid_: package, plugin, script, recipe.
 
@@ -22,7 +22,7 @@ from an Archetype macro): `detect`, `is_recommended`, `is_installed`, `install`,
 _Avoid_: phase (reserved — see below), action, hook.
 
 **Phase**: the verb invoked at runtime — same word in CLI (`setup_ubuntu install`)
-and standalone (`bash modules/x.module.sh install`). A Phase maps 1:1 to a
+and standalone (`bash module/x.module.sh install`). A Phase maps 1:1 to a
 Lifecycle function plus two helper-provided phases (`info`, `status`).
 _Avoid_: command, action.
 
@@ -34,7 +34,7 @@ Registry + Resolver. Knows about cross-Module concerns (DEPENDS_ON tree, state.j
 **Engine Mode**: invocation via `setup_ubuntu <phase> <module>`. Engine resolves
 DEPENDS_ON, updates state.json, batches Modules.
 
-**Standalone Mode**: invocation via `bash modules/<name>.module.sh <phase>`.
+**Standalone Mode**: invocation via `bash module/<name>.module.sh <phase>`.
 Single-Module direct run. Writes Sidecar + prints messages, does NOT resolve
 DEPENDS_ON or update state.json.
 
@@ -44,7 +44,7 @@ Runner / Resolver / Registry as needed.
 **Runner** (`lib/runner.sh`): executes a Module's Lifecycle Phase inside an
 isolated sub-shell with helpers pre-sourced.
 
-**Registry** (`lib/registry.sh`): discovers Modules by globbing `modules/*.module.sh`
+**Registry** (`lib/registry.sh`): discovers Modules by globbing `module/*.module.sh`
 at startup; exposes lookup by name / category / tag.
 
 **Resolver** (`lib/resolver.sh`): topo-sorts DEPENDS_ON graph; rejects cycles.
@@ -88,7 +88,7 @@ The CLI verbs intentionally mirror `apt`:
 | `remove <m>` | `apt remove` | remove, keep config |
 | `purge <m>` | `apt purge` | remove + config |
 | `upgrade [<m>]` | `apt upgrade` | upgrade Module to latest |
-| `update` | `apt update` | rescan `modules/` directory (registry refresh) |
+| `update` | `apt update` | rescan `module/` directory (registry refresh) |
 | `list` | `apt list` | enumerate Modules; `--installed`/`--upgradable` flags |
 | `show <m>` | `apt show` | print Module metadata |
 | `search <term>` | `apt search` | search Modules |
@@ -132,7 +132,7 @@ avoid name collision with the Engine-level `setup_ubuntu update` (registry resca
   is deprecated; use `setup_ubuntu list --installed`. Module helper `status`
   Phase (standalone only) prints installed/outdated for one Module — different
   scope, kept.
-- "config" meant both Module-bundled template files (`modules/config/<name>/…`)
+- "config" meant both Module-bundled template files (`module/config/<name>/…`)
   and user-level `config.ini`. Resolved: Module-bundled = "config template";
   user-level = **Config**. Avoid bare "config" without qualifier.
 - "info" vs "show" — resolved: `setup_ubuntu show <m>` is the canonical user
@@ -141,5 +141,5 @@ avoid name collision with the Engine-level `setup_ubuntu update` (registry resca
 - "run a test locally" — resolved: there is no "local" test execution. All
   test invocations must be `make test-unit` / `make test-integration` /
   `make coverage`, which route through `docker compose run --rm ci ...`.
-  Running `bats` or `bash modules/<x>.module.sh <action-phase>` on the host
+  Running `bats` or `bash module/<x>.module.sh <action-phase>` on the host
   is prohibited by ADR-0004 and blocked by the PreToolUse Bash hook.

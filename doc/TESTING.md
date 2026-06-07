@@ -1,6 +1,6 @@
 # Testing Guide — init_ubuntu
 
-> 本文檔說明如何跑測試、CI 框架的組成、以及這些檔案的**借用來源與 sync 流程**。閱讀 PRD §11 / `docs/architecture.md` §7 了解測試策略。
+> 本文檔說明如何跑測試、CI 框架的組成、以及這些檔案的**借用來源與 sync 流程**。閱讀 PRD §11 / `doc/architecture.md` §7 了解測試策略。
 
 ---
 
@@ -10,8 +10,8 @@
 `make test-integration` / `make coverage`(內部都走 `docker compose run --rm ci ...`)。
 
 **禁止行為:**
-- ❌ `bats tests/unit/...`(host bats)
-- ❌ `bash modules/<name>.module.sh install`(host module Action Phase)
+- ❌ `bats test/unit/...`(host bats)
+- ❌ `bash module/<name>.module.sh install`(host module Action Phase)
 - ❌ `sudo apt-get install ...` 直接驗證 module 邏輯(host apt)
 
 **允許行為:**
@@ -24,7 +24,7 @@
 只差一個忘記的 flag 就清掉 dev 機。Docker 是唯一安全隔離邊界。
 
 **強制機制:** 完整理由與例外處理見 [ADR-0004](./adr/0004-tests-must-run-in-docker-only.md)。
-`.claude/hooks/test-must-use-docker.sh` 是 Claude PreToolUse hook,自動 block 違規
+`.claude/hook/test-must-use-docker.sh` 是 Claude PreToolUse hook,自動 block 違規
 Bash 呼叫。
 
 ---
@@ -62,7 +62,7 @@ make help
 
 - **Docker**(必要):所有測試在 `test-tools:local` 容器內跑
 - **GNU make**(本地調度 `make` target)
-- **bash 4+**(`scripts/ci/ci.sh` 用了 bash 4 array 語法)
+- **bash 4+**(`script/ci/ci.sh` 用了 bash 4 array 語法)
 
 **主機端不需要** bats / shellcheck / fish / kcov — 全部在容器內。
 
@@ -70,17 +70,17 @@ make help
 
 ## 3. 測試結構(規劃)
 
-> Phase 1(本階段)只建框架,tests/ 內容會在 Phase 2+ 逐步加。所以 `make test` 現在跑會 skip bats(目錄不存在),但 lint 會跑。
+> Phase 1(本階段)只建框架,test/ 內容會在 Phase 2+ 逐步加。所以 `make test` 現在跑會 skip bats(目錄不存在),但 lint 會跑。
 
 ```
-tests/
+test/
 ├── helpers/
 │   └── common.bash          # bats 共用 setup/teardown / load 引用
 ├── unit/                    # bats unit (用 bats-mock 攔截 apt/curl/sudo)
 │   ├── dispatcher_spec.bats
 │   ├── registry_spec.bats
 │   ├── ... (one per lib/*.sh)
-│   └── modules/
+│   └── module/
 │       └── <name>_spec.bats # 每個 module 一個
 ├── integration/             # 真實裝 / 拆 / 重灌(在 Ubuntu container 內)
 │   ├── install_cycle_spec.bats
@@ -93,7 +93,7 @@ tests/
     └── help_output_spec.bats
 ```
 
-`docs/architecture.md` §7 與 PRD §11 是權威來源。
+`doc/architecture.md` §7 與 PRD §11 是權威來源。
 
 ---
 
@@ -131,7 +131,7 @@ tests/
 |---|---|---|
 | `dockerfile/Dockerfile.test-tools` | `dockerfile/Dockerfile.test-tools` | 加 fish/fishtape/kcov/dialog/whiptail;移除 docker-cli/buildx |
 | `Makefile` | `Makefile.ci`(改名) | 移除 `test-behavioural` / `init` / `upgrade` / `upgrade-check`;加 `test-unit` / `test-integration` / `build-test-tools` |
-| `scripts/ci/ci.sh` | `scripts/ci/ci.sh` | 用 inline `_die` 取代 base `_lib.sh`;改 lint 範圍;加 fish 語法檢查;移除 behavioural |
+| `script/ci/ci.sh` | `script/ci/ci.sh` | 用 inline `_die` 取代 base `_lib.sh`;改 lint 範圍;加 fish 語法檢查;移除 behavioural |
 | `.codecov.yaml` | `.codecov.yaml` | target 改為 `"80%"`(從 `"auto"`);擴充 ignore[] |
 | `compose.yaml` | `compose.yaml` | default image 改為 `test-tools:local`;移除 `ci-behavioural`;coverage 不另開 service |
 
@@ -145,7 +145,7 @@ tests/
 
 `ycpss91255-docker/base` 的 `init.sh` 預設你的 repo 是「會 build/publish Docker image」的 container repo(會建 `build.sh` / `run.sh` / `exec.sh` symlinks 與 `Dockerfile` 等)。本 repo 是 **Ubuntu host installer**,不打算發佈 image(PRD §2 Non-Goals)。所以我們**只借 5 個檔案**,不做 `git subtree add` / `init.sh`。
 
-詳見 `docs/architecture.md` §13.2 與 PRD §17.2。
+詳見 `doc/architecture.md` §13.2 與 PRD §17.2。
 
 ### 5.3 怎麼同步 upstream 更新
 
@@ -157,7 +157,7 @@ tests/
 4. 更新本檔 §5.1 的「借用版本」與 SHA
 5. `make test` 驗證沒壞
 
-未來可考慮寫 `scripts/sync-from-base.sh` 半自動化(不排版本,屬願望性質)。
+未來可考慮寫 `script/sync-from-base.sh` 半自動化(不排版本,屬願望性質)。
 
 ---
 
@@ -176,7 +176,7 @@ tests/
 
 ## 7. 覆蓋率目標
 
-**80% 為唯一硬門檻**(PRD G5 / AC-17;`.codecov.yaml` target),提升為 best-effort。原 v0.5 / v1.0 階梯式目標已撤銷(2026-06-06 PRD 定稿,版本階梯目前至 0.4.0、1.0 暫不規劃;見 `docs/architecture.md` §8.4)。
+**80% 為唯一硬門檻**(PRD G5 / AC-17;`.codecov.yaml` target),提升為 best-effort。原 v0.5 / v1.0 階梯式目標已撤銷(2026-06-06 PRD 定稿,版本階梯目前至 0.4.0、1.0 暫不規劃;見 `doc/architecture.md` §8.4)。
 
 `.codecov.yaml` 的 `threshold: 1%` 表示「允許 1% 噪音」,實際門檻 = `target - threshold = 79%`。
 
@@ -187,11 +187,11 @@ tests/
 ### Q: 第一次跑 `make test` 卡很久?
 A: 在 build `test-tools:local`,需要下載 alpine + bats + fishtape 等(~150 MB)。後續 build cache 命中只需 1-2s。
 
-### Q: 為什麼 `make test` 顯示「tests/unit/ does not exist yet — skipping」?
+### Q: 為什麼 `make test` 顯示「test/unit/ does not exist yet — skipping」?
 A: Phase 1 只建測試框架,實際 bats spec 從 Phase 2 才開始加。Lint 部分(shellcheck + fish syntax + hadolint)會跑。
 
 ### Q: 我的覆蓋率被低估?(明明測了卻顯示沒覆蓋)
-A: 確認 `scripts/ci/ci.sh` 的 `_run_coverage` 中 `--include-path` 與 `--exclude-path` 有沒有把你的檔案放對位置。`small-tools/` 與 `modules/tools/` 是有意排除的(deprecated)。
+A: 確認 `script/ci/ci.sh` 的 `_run_coverage` 中 `--include-path` 與 `--exclude-path` 有沒有把你的檔案放對位置。`small-tools/` 與 `module/tools/` 是有意排除的(deprecated)。
 
 ### Q: 為什麼 ANSI 色彩在 CI log 內看不到?
 A: ci.sh 預設不主動加色;CI runner 的 terminal 一般是非 tty,符合 PRD §7.5 `--color=auto` 設計。要強制色彩用 `--color=always`(實作後)。
@@ -199,7 +199,7 @@ A: ci.sh 預設不主動加色;CI runner 的 terminal 一般是非 tty,符合 PR
 ### Q: 怎麼跑單一 bats 檔?
 A: 進容器手動跑:
 ```bash
-docker compose -f compose.yaml run --rm ci -c 'bats /source/tests/unit/specific_spec.bats'
+docker compose -f compose.yaml run --rm ci -c 'bats /source/test/unit/specific_spec.bats'
 ```
 
 ---

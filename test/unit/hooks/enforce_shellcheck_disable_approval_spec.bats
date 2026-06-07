@@ -1,16 +1,16 @@
 #!/usr/bin/env bats
-# tests/unit/hooks/enforce_shellcheck_disable_approval_spec.bats
+# test/unit/hooks/enforce_shellcheck_disable_approval_spec.bats
 #
 # Integration tests for the enforce_shellcheck_disable_approval.sh hook
 # (issue #17). Tests drive the script as a subprocess (stdin JSON,
 # stdout permissionDecision JSON or empty) the same way Claude Code
 # invokes it.
 
-load "${BATS_TEST_DIRNAME}/../../helpers/common"
+load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
     setup_test_env
-    HOOK_SH="${REPO_ROOT}/.claude/hooks/enforce_shellcheck_disable_approval.sh"
+    HOOK_SH="${REPO_ROOT}/.claude/hook/enforce_shellcheck_disable_approval.sh"
     FIXTURE_DIR="${BATS_TEST_TMPDIR}/fixtures"
     mkdir -p "${FIXTURE_DIR}"
 

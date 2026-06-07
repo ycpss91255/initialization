@@ -270,7 +270,7 @@ function _install_tmux() {
     # install new plugin manager and plugins
     exec_cmd "git clone --depth 1 \
             \"https://github.com/tmux-plugins/tpm\" \"${_tpm_dir}\" && \
-        \"${_tpm_dir}/scripts/install_plugins.sh\""
+        \"${_tpm_dir}/script/install_plugins.sh\""
 }
 
 function _install_spotify() {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034  # module metadata vars (NAME / DESCRIPTION / CATEGORY / TAGS / ...) consumed by engine post-source — https://www.shellcheck.net/wiki/SC2034
-# modules/fish.module.sh — fish shell 4 + fisher plugins + user config
+# module/fish.module.sh — fish shell 4 + fisher plugins + user config
 
 # ── Dual-mode header ────────────────────────────────────────────────────────
 MODULE_STANDALONE="true"

@@ -1,7 +1,7 @@
 # Archetype Cookbook
 
-Companion to `docs/module-spec.md` and the 4 archetype templates.
-This file is referenced from every `templates/module-*.template.sh`
+Companion to `doc/module-spec.md` and the 4 archetype templates.
+This file is referenced from every `template/module-*.template.sh`
 authoring docstring.
 
 The 4 archetypes (A apt / B github-release / C config-drop / D
@@ -50,7 +50,7 @@ D instead. The macros are convenience, not a contract.
 
 ### Pure apt
 
-`modules/apt-essentials.module.sh` — installs a list of packages,
+`module/apt-essentials.module.sh` — installs a list of packages,
 no extra work:
 
 ```bash
@@ -158,7 +158,7 @@ is_outdated() {
 `module_use_github_release_archetype` binds lifecycle to
 `module_default_github_release_*` (see `lib/module_helper.sh §5`).
 
-`modules/neovim.module.sh` is the reference:
+`module/neovim.module.sh` is the reference:
 
 ```bash
 GITHUB_REPO="neovim/neovim"
@@ -214,7 +214,7 @@ is_installed() {
 `module_use_config_archetype` binds lifecycle to
 `module_default_config_*` (see `lib/module_helper.sh §6`).
 
-`modules/git-config.module.sh` and `modules/ssh-config.module.sh`
+`module/git-config.module.sh` and `module/ssh-config.module.sh`
 are the references. Drops one file from
 `${MODULE_DIR}/config/<tool>/<file>` to `${HOME}/.config/<tool>/<file>`:
 
@@ -252,8 +252,8 @@ Used when none of A/B/C fits. You implement all 6 lifecycle functions
 yourself (`is_installed`, `install`, `upgrade`, `remove`, `purge`,
 `verify`) and any optional functions (`is_outdated`, `doctor`).
 
-`modules/font.module.sh` and `modules/nvidia-driver.module.sh` are the
-references. They use `templates/module-custom.template.sh` as the
+`module/font.module.sh` and `module/nvidia-driver.module.sh` are the
+references. They use `template/module-custom.template.sh` as the
 starting point.
 
 ### When to choose D over hybrid-A
@@ -313,15 +313,15 @@ commented out in the template. Engine's `status` subcommand will show
    from your module — let the engine handle it (ADR-0001).
 
 5. **`upgrade` is for the lifecycle phase, `update` is for registry rescan.**
-   `setup_ubuntu update` rescans `modules/`. `setup_ubuntu upgrade
+   `setup_ubuntu update` rescans `module/`. `setup_ubuntu upgrade
    <module>` runs your module's `upgrade()` function. Don't define
    an `update()` function in your module — the macros and standalone
    CLI expect `upgrade`.
 
 ## See also
 
-- `docs/module-spec.md` §2 (the v2 contract).
-- `docs/adr/0001-standalone-engine-state-boundary.md`.
-- `docs/adr/0002-all-lifecycle-functions-mandatory.md`.
+- `doc/module-spec.md` §2 (the v2 contract).
+- `doc/adr/0001-standalone-engine-state-boundary.md`.
+- `doc/adr/0002-all-lifecycle-functions-mandatory.md`.
 - `lib/module_helper.sh` — the macros and `module_default_*` functions.
-- `templates/module-{apt,github-release,config,custom}.template.sh`.
+- `template/module-{apt,github-release,config,custom}.template.sh`.

@@ -5,7 +5,7 @@
 # (`gh pr create ...`), emit a JSON systemMessage reminding to use the
 # /wait-pr-ci skill instead of sleep-polling. Non-blocking (always exit 0).
 #
-# Why: docs/processes/release.md (CI monitoring)明文要求用 wait-pr-ci skill；
+# Why: doc/process/release.md (CI monitoring)明文要求用 wait-pr-ci skill；
 # 過去常見錯誤是 PR 開完後直接 `sleep 60 && gh pr checks` 輪詢，會把
 # context 噴爆且 agent 被 sleep 卡住。
 #

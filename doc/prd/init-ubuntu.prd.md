@@ -9,7 +9,7 @@ updated: 2026-06-07
 
 # PRD: init_ubuntu — Ubuntu 環境初始化工具
 
-> 將既有的 `setup_ubuntu.sh` / `modules/setup_*.sh` 重新組織為一套**模組化、可測試、有 CLI + TUI 雙前端、支援 install / remove / purge / upgrade / sync 等 apt-style 完整生命週期**的 Ubuntu 環境初始化工具。
+> 將既有的 `setup_ubuntu.sh` / `module/setup_*.sh` 重新組織為一套**模組化、可測試、有 CLI + TUI 雙前端、支援 install / remove / purge / upgrade / sync 等 apt-style 完整生命週期**的 Ubuntu 環境初始化工具。
 
 ---
 
@@ -105,7 +105,7 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 | US-7 | 進階使用者 | 用 `setup_ubuntu install --no-deps neovim` 跳過依賴 | 手動掌控依賴版本 |
 | US-8 | 無 sudo 使用者 | 工具自動偵測並 fallback 到 user-home 安裝 | 在受限環境下也能用 |
 | US-9 | 多平台使用者(RPi / Jetson) | 工具偵測 form factor 並只推薦該平台合理的 module | 一套工具走多個平台 |
-| US-10 | 開發者 | 寫一個新的 `modules/myrust.module.sh` 就能加入工具 | 不必改 engine 程式碼 |
+| US-10 | 開發者 | 寫一個新的 `module/myrust.module.sh` 就能加入工具 | 不必改 engine 程式碼 |
 | US-11 | CI 使用者 | 在 Docker 內 `make test` 跑完所有測試 | 在 GitHub Actions 持續驗證 |
 | US-12 | 安全意識使用者 | 用 `setup_secrets ssh-key generate` 互動產 key 並安全儲存 token | 不會忘記安全性的細節 |
 
@@ -116,7 +116,7 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 ### 5.1 必備(v0.1 MVP)
 
 **Engine**
-- Module engine(loader + registry + dispatcher + dependency resolver);registry 為 **in-memory** — 每次執行動態掃 `modules/` + user-local 區重建,無持久化 index(Q40)
+- Module engine(loader + registry + dispatcher + dependency resolver);registry 為 **in-memory** — 每次執行動態掃 `module/` + user-local 區重建,無持久化 index(Q40)
 - 環境偵測引擎(JSON 輸出,含 form_factor 平台分類)
 - 依賴解析(拓樸排序、循環偵測)
 - 狀態追蹤(`${XDG_STATE_HOME}/init_ubuntu/state.json`)+ per-module Sidecar(`versions/<name>`)
@@ -124,7 +124,7 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 - Module 生命週期:**全 10 個 mandatory** — `detect` / `is_recommended` / `is_installed` / `install` / `upgrade` / `remove` / `purge` / `verify` / `is_outdated` / `doctor`(ADR-0002)
 - Sudo 偵測 + non-sudo fallback(user-home install,可由 `--install-target` 覆寫)
 - 4 層分類:`base` / `recommended` / `optional` / `experimental`
-- User-local module 區:除了 repo `modules/`,Engine 額外掃 `${XDG_CONFIG_HOME}/init_ubuntu/modules/`(使用者私有模組,同 NAME 撞名時 user-local 勝)
+- User-local module 區:除了 repo `module/`,Engine 額外掃 `${XDG_CONFIG_HOME}/init_ubuntu/module/`(使用者私有模組,同 NAME 撞名時 user-local 勝)
 - Self-deps preflight(`jq` / `curl` / `git` 檢查 + 一次性安裝詢問,§3.4 / AC-34)
 
 **CLI subcommands(對標 apt 的常用使用方式)**
@@ -196,7 +196,7 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 | Module 檔名 | 來源 | 說明 | 依賴 |
 |---|---|---|---|
 | `apt-essentials.module.sh` | (新建) | Universal devel base:`git` / `vim` / `curl` / `wget` / `ca-certificates` / `build-essential` / `htop` / `unzip` / `jq` / `software-properties-common`。Engine 透過 `INCOMPAT_BY_PLATFORM` map 排除不相容的(例:`container` 默認排除 `build-essential`)。實際裝的 list freeze 入 state.json(ADR-0011)| — |
-| `shell.module.sh` | `modules/setup_shell.sh` | bash 設定 + 基本 alias | apt-essentials |
+| `shell.module.sh` | `module/setup_shell.sh` | bash 設定 + 基本 alias | apt-essentials |
 
 ### 6.2 recommended(環境感知,預設勾選但可取消)
 
@@ -210,14 +210,14 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 
 | Module 檔名 | 來源 | 說明 | 依賴 | `is_recommended` 觸發條件 |
 |---|---|---|---|---|
-| `nvidia-driver.module.sh` | `modules/setup_nvidia_driver.sh` | NVIDIA 顯卡驅動(`RISK_LEVEL=high`,含失敗回復機制,見 §11.3) | apt-essentials | 偵測到 NVIDIA GPU **且** 非 VM/container/WSL/jetson |
-| `docker.module.sh` | `modules/setup_docker.sh` | Docker Engine + Compose plugin | apt-essentials | 非 container 內 |
-| `fish.module.sh` | `modules/config/fish/` 為基礎 | Fish shell + 個人 config | apt-essentials | 永遠 |
-| `neovim.module.sh` | `modules/setup_neovim.sh`(拆分) | Neovim + 推薦勾選 nvimdots(default Enter 即裝) | apt-essentials, git-config, fzf, lazygit, ripgrep, fdfind, fnm | desktop / server / SBC 皆 yes(個人主力編輯器) |
-| `font.module.sh` | `modules/setup_font.sh` | Nerd Font(Cascadia / FiraCode) | apt-essentials | 有桌面環境 |
-| `tmux.module.sh` | `modules/config/tmux/` | tmux + 個人 config | apt-essentials | 永遠(日用必裝) |
-| `ssh-config.module.sh` | `modules/config/ssh_config` | SSH client 設定 | — | 永遠(日用必裝) |
-| `git-config.module.sh` | `modules/config/git_config` | git 全域設定 | apt-essentials | 永遠(日用必裝) |
+| `nvidia-driver.module.sh` | `module/setup_nvidia_driver.sh` | NVIDIA 顯卡驅動(`RISK_LEVEL=high`,含失敗回復機制,見 §11.3) | apt-essentials | 偵測到 NVIDIA GPU **且** 非 VM/container/WSL/jetson |
+| `docker.module.sh` | `module/setup_docker.sh` | Docker Engine + Compose plugin | apt-essentials | 非 container 內 |
+| `fish.module.sh` | `module/config/fish/` 為基礎 | Fish shell + 個人 config | apt-essentials | 永遠 |
+| `neovim.module.sh` | `module/setup_neovim.sh`(拆分) | Neovim + 推薦勾選 nvimdots(default Enter 即裝) | apt-essentials, git-config, fzf, lazygit, ripgrep, fdfind, fnm | desktop / server / SBC 皆 yes(個人主力編輯器) |
+| `font.module.sh` | `module/setup_font.sh` | Nerd Font(Cascadia / FiraCode) | apt-essentials | 有桌面環境 |
+| `tmux.module.sh` | `module/config/tmux/` | tmux + 個人 config | apt-essentials | 永遠(日用必裝) |
+| `ssh-config.module.sh` | `module/config/ssh_config` | SSH client 設定 | — | 永遠(日用必裝) |
+| `git-config.module.sh` | `module/config/git_config` | git 全域設定 | apt-essentials | 永遠(日用必裝) |
 
 > **vscode 從 recommended 降級為 optional**(已不是主力編輯器)— 見 §6.3。
 > **tmux / ssh-config / git-config 從 optional 升級為 recommended**(本人日用必裝)。
@@ -233,13 +233,13 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 
 | Module 檔名 | 來源 | 說明 | 依賴 |
 |---|---|---|---|
-| `lazygit.module.sh` | `modules/submodules/lazygit.sh` | Git TUI | apt-essentials |
-| `lazydocker.module.sh` | `modules/submodules/lazydocker.sh` | Docker TUI | docker |
-| `fzf.module.sh` | `modules/submodules/fzf.sh` | Fuzzy finder | apt-essentials |
-| `eza.module.sh` | `modules/submodules/eza.sh` | `ls` 替代 | — |
-| `zoxide.module.sh` | `modules/submodules/zoxide.sh` | `cd` 替代 | — |
-| `batcat.module.sh` | `modules/submodules/batcat.sh` | `cat` 替代(語法高亮) | — |
-| `fdfind.module.sh` | `modules/submodules/fdfind.sh` | `find` 替代 | — |
+| `lazygit.module.sh` | `module/submodules/lazygit.sh` | Git TUI | apt-essentials |
+| `lazydocker.module.sh` | `module/submodules/lazydocker.sh` | Docker TUI | docker |
+| `fzf.module.sh` | `module/submodules/fzf.sh` | Fuzzy finder | apt-essentials |
+| `eza.module.sh` | `module/submodules/eza.sh` | `ls` 替代 | — |
+| `zoxide.module.sh` | `module/submodules/zoxide.sh` | `cd` 替代 | — |
+| `batcat.module.sh` | `module/submodules/batcat.sh` | `cat` 替代(語法高亮) | — |
+| `fdfind.module.sh` | `module/submodules/fdfind.sh` | `find` 替代 | — |
 | `ripgrep.module.sh` | (新建,apt archetype;Q41) | `grep` 替代(`rg`) | — |
 | `fnm.module.sh` | (新建,拆自 setup_neovim.sh) | Fast Node Manager | — |
 
@@ -254,46 +254,46 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 | `claude-code.module.sh` | (新建) | Anthropic Claude Code CLI(官方 native installer,archetype D;自帶 auto-update,`is_outdated` 委派之) | — |
 | `codex.module.sh` | (新建) | OpenAI Codex CLI(github-release archetype,原生 binary) | — |
 | `gemini.module.sh` | (新建) | Google Gemini CLI(npm 安裝 — npm-only 發行) | fnm |
-| `claude-code-config.module.sh` | `modules/config/claude/` | Claude Code 個人 settings(裝完 claude-code 才裝) | claude-code |
+| `claude-code-config.module.sh` | `module/config/claude/` | Claude Code 個人 settings(裝完 claude-code 才裝) | claude-code |
 
 #### 6.3.3 其他(各種 `TAGS[0]`)— 環境/硬體特定或備選
 
 | Module 檔名 | 來源 | 說明 | 依賴 | TAGS[0] |
 |---|---|---|---|---|
-| `vscode.module.sh` | `modules/setup_vscode.sh` | VS Code(從 recommended 降級) | apt-essentials | editor |
-| `yazi.module.sh` | `modules/submodules/yazi.sh` | TUI file manager | — | filemgr |
-| `ranger.module.sh` | `modules/config/ranger/rifle.conf` | ranger 檔案管理 | — | filemgr |
-| `lnav.module.sh` | `modules/config/lnav_pkg/` | log navigator | — | logs |
-| `qmk-firmware.module.sh` | `modules/setup_qmk_firmware.sh` | QMK 韌體開發環境 | apt-essentials, build-essential | hardware |
-| `anydesk.module.sh` | `modules/anydesk.sh` | AnyDesk 遠端桌面(`SUPPORTED_PLATFORMS=("desktop")`,Q49) | apt-essentials | remote |
+| `vscode.module.sh` | `module/setup_vscode.sh` | VS Code(從 recommended 降級) | apt-essentials | editor |
+| `yazi.module.sh` | `module/submodules/yazi.sh` | TUI file manager | — | filemgr |
+| `ranger.module.sh` | `module/config/ranger/rifle.conf` | ranger 檔案管理 | — | filemgr |
+| `lnav.module.sh` | `module/config/lnav_pkg/` | log navigator | — | logs |
+| `qmk-firmware.module.sh` | `module/setup_qmk_firmware.sh` | QMK 韌體開發環境 | apt-essentials, build-essential | hardware |
+| `anydesk.module.sh` | `module/anydesk.sh` | AnyDesk 遠端桌面(`SUPPORTED_PLATFORMS=("desktop")`,Q49) | apt-essentials | remote |
 | `notion.module.sh` | (新建,Q50 / #35) | Notion 桌面版(github-release archetype 吃 notion-electron `.deb`;取代 small-tools snap 路徑;`SUPPORTED_PLATFORMS=("desktop")`) | apt-essentials | notes |
 | `jetson-stats.module.sh` | (新建,Q51 / #37) | jetson-stats(`jtop` 監控 TUI;pip 安裝;`SUPPORTED_PLATFORMS=("jetson-orin")`) | apt-essentials | hardware |
 
 > TUI 在 §6.3.3 內進一步按 `TAGS[0]` 子分組顯示(`editor` / `filemgr` / `logs` / `hardware` / `remote` / `notes`)。
 >
-> **gnome-terminal-config 已自 catalog 移除**(Q42,2026-06-06):來源檔 `modules/tools/copy_gnome_terminal_config.sh` 隨 §6.5 整批搬遷至 `tools/`,v0.2+ 再個別決定去向 — 修復「同一檔案兩個矛盾去向」。
+> **gnome-terminal-config 已自 catalog 移除**(Q42,2026-06-06):來源檔 `module/tools/copy_gnome_terminal_config.sh` 隨 §6.5 整批搬遷至 `tools/`,v0.2+ 再個別決定去向 — 修復「同一檔案兩個矛盾去向」。
 
 ### 6.4 experimental(預設不裝,有風險或不穩定)
 
 `experimental` 分類保留,作為未來不穩定 module 的入口。**目前無 module 在此類**(`dual-system-time-sync` / `trash-maintenance` 為一次性腳本,不放 TUI / module pipeline 內,見 §6.5)。
 
-### 6.5 modules/tools/* 處理
+### 6.5 module/tools/* 處理
 
-> **v0.1 整個 `modules/tools/` 不處理**;一次性腳本(如 `trash.sh`)不放在 TUI 內 / 不模組化。
+> **v0.1 整個 `module/tools/` 不處理**;一次性腳本(如 `trash.sh`)不放在 TUI 內 / 不模組化。
 
 **v0.1 操作**:
-- `modules/tools/*` 整個目錄**搬遷到 repo 根目錄**(如 `tools/`),作為臨時存放區
+- `module/tools/*` 整個目錄**搬遷到 repo 根目錄**(如 `tools/`),作為臨時存放區
 - 不進 module catalog、不出現在 TUI、不走 install pipeline
 - 各檔案後續(v0.2+)再個別討論去向
 
 涵蓋的檔案:
-- `modules/tools/setup_terminal_font_size.sh`
-- `modules/tools/copy_neovim_local_config.sh`
-- `modules/tools/copy_gnome_terminal_config.sh`
-- `modules/tools/dual_system_time_sync.sh`
-- `modules/tools/trash-maintenance.sh`(原規劃 experimental,撤回)
-- `modules/tools/ros1/*`
-- `modules/tools/remove/*.sh`
+- `module/tools/setup_terminal_font_size.sh`
+- `module/tools/copy_neovim_local_config.sh`
+- `module/tools/copy_gnome_terminal_config.sh`
+- `module/tools/dual_system_time_sync.sh`
+- `module/tools/trash-maintenance.sh`(原規劃 experimental,撤回)
+- `module/tools/ros1/*`
+- `module/tools/remove/*.sh`
 
 ### 6.6 small-tools/ 退場路徑
 
@@ -339,7 +339,7 @@ setup_ubuntu <subcommand> [args] [flags]
 | `help` | `[<subcommand>]` | — | 顯示說明 | `apt --help` |
 | `version` | — | — | 顯示版本 | `apt --version` |
 
-> **`apt update` 無對應子命令**(Q40,2026-06-06,原 `update` 已砍):module 來源是本地檔案(repo `modules/` + user-local),registry 每次執行 in-memory 動態重建,無 index 可過期;GitHub release 版本情報走 gh-latest cache(§7.6,查詢時隨需抓 + TTL 1h),apt 索引 freshness 委派系統(Q31);工具自身更新走 `self-upgrade`(0.3.0,§17.3)。
+> **`apt update` 無對應子命令**(Q40,2026-06-06,原 `update` 已砍):module 來源是本地檔案(repo `module/` + user-local),registry 每次執行 in-memory 動態重建,無 index 可過期;GitHub release 版本情報走 gh-latest cache(§7.6,查詢時隨需抓 + TTL 1h),apt 索引 freshness 委派系統(Q31);工具自身更新走 `self-upgrade`(0.3.0,§17.3)。
 
 ### 7.3 範例
 
@@ -665,7 +665,7 @@ fi
 
 ## 9. Module Contract(完整定義)
 
-> 完整 spec 在 `docs/module-spec.md`。Author 操作指南在 `docs/guides/module-authoring.md`。此處為摘要。
+> 完整 spec 在 `doc/module-spec.md`。Author 操作指南在 `doc/guide/module-authoring.md`。此處為摘要。
 
 ### 9.1 Required metadata(放檔頭)
 
@@ -732,7 +732,7 @@ Archetype A/B/C(apt / github-release / config-drop)的 `module_use_*_archetype` 
 
 ```bash
 #!/usr/bin/env bash
-# modules/docker.module.sh
+# module/docker.module.sh
 
 # ── Dual-mode header(standalone vs engine 自動切換)─────────
 MODULE_STANDALONE="true"
@@ -775,7 +775,7 @@ install() {
     # ... apt repo 設定 + apt-get install + usermod -aG docker
 }
 # upgrade / remove / purge / verify / is_outdated / doctor 同上 pattern
-# 完整範例見 docs/modules/docker.md
+# 完整範例見 doc/module/docker.md
 
 # ── Standalone footer ───────────────────────────────────────
 if [[ "${MODULE_STANDALONE:-false}" == "true" ]]; then
@@ -783,7 +783,7 @@ if [[ "${MODULE_STANDALONE:-false}" == "true" ]]; then
 fi
 ```
 
-**Pure archetype 範例(neovim)** 用 `module_use_github_release_archetype` 一行綁定 10 個 lifecycle,作者只填 metadata + GITHUB_REPO/INSTALL_DIR 等資料欄位 + 寫 detect/is_recommended。完整範例見 `docs/guides/archetype-cookbook.md`。
+**Pure archetype 範例(neovim)** 用 `module_use_github_release_archetype` 一行綁定 10 個 lifecycle,作者只填 metadata + GITHUB_REPO/INSTALL_DIR 等資料欄位 + 寫 detect/is_recommended。完整範例見 `doc/guide/archetype-cookbook.md`。
 
 ---
 
@@ -989,9 +989,9 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | AC-19 | 寫一個新的 dummy module(<10 行)能被 engine 自動發現並列入 `list` | v0.1-mandatory |
 | AC-20 | `setup_secrets ssh-key generate` 互動產 key 不入 shell history | v0.1-mandatory |
 | AC-22 | `setup_ubuntu upgrade neovim` 跑完(GitHub API 以 bats-mock 固定 latest 回應,Q46 — gate 零網路依賴),Sidecar `${XDG_STATE_HOME}/init_ubuntu/versions/neovim` 內版本與 mock latest 對齊;真實 API 驗證為本機手動 best-effort | v0.1-mandatory |
-| AC-23 | `bash modules/docker.module.sh install --dry-run` 跑完,Sidecar 寫入正確(Standalone 模式)但 `state.json` 完全沒變(ADR-0001) | v0.1-mandatory |
+| AC-23 | `bash module/docker.module.sh install --dry-run` 跑完,Sidecar 寫入正確(Standalone 模式)但 `state.json` 完全沒變(ADR-0001) | v0.1-mandatory |
 | AC-24 | `setup_ubuntu doctor` 印出 env detect 結果 + 所有 installed module 的 `doctor()` 結果;`--validate-modules` flag 額外驗證每個 module 的 metadata 合法 | v0.1-mandatory |
-| AC-25 | 全 10 個 lifecycle 函式對每個 module 都能跑(`bash modules/<m>.module.sh <phase>` 都 exit 0 或預期 Query-no 的 exit 1,絕無「not implemented」exit 2) | v0.1-mandatory |
+| AC-25 | 全 10 個 lifecycle 函式對每個 module 都能跑(`bash module/<m>.module.sh <phase>` 都 exit 0 或預期 Query-no 的 exit 1,絕無「not implemented」exit 2) | v0.1-mandatory |
 | AC-32 | docker daemon 停掉 → `doctor docker` exit 1 而 `verify docker` exit 0(ADR-0009) | v0.1-mandatory |
 | AC-33 | 任一 session 結束後,`logs/` 內 `.jsonl` 不超過 100 檔且無超過 30 天的檔(保留策略生效,§10.2) | v0.1-mandatory |
 | AC-34 | 乾淨 container(無 jq)內 `setup_ubuntu install --base -y` 經 preflight 自動裝 jq 後成功;無 sudo 時 fail-fast 退 code 4 並印安裝指引(§3.4) | v0.1-mandatory |
@@ -1019,8 +1019,8 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 
 | Milestone | Plan |
 |---|---|
-| M0 - Discovery | `docs/prd/` + `docs/architecture.md` + `docs/module-spec.md` + `CONTEXT.md` + `docs/adr/` |
-| M1 - Test harness | 借用 base 的 `Dockerfile.test-tools` + `Makefile` + `scripts/ci/ci.sh`(bats + bats-assert + bats-mock) |
+| M0 - Discovery | `doc/prd/` + `doc/architecture.md` + `doc/module-spec.md` + `CONTEXT.md` + `doc/adr/` |
+| M1 - Test harness | 借用 base 的 `Dockerfile.test-tools` + `Makefile` + `script/ci/ci.sh`(bats + bats-assert + bats-mock) |
 | M2 - Engine core | `lib/dispatcher.sh` + `lib/registry.sh` + `lib/runner.sh` + `lib/resolver.sh` + `lib/module_helper.sh` + 10 v2 modules |
 | M3 - Detect engine | `lib/detect.sh` + `lib/platform.sh` + `setup_ubuntu detect` |
 | M4 - State + log | `lib/state.sh` + `lib/state_io.sh` + `lib/logger.sh`(JSONL + 30 天/100 檔保留,AC-33)+ flock concurrency |
@@ -1029,11 +1029,11 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | M7 - Module migration | Batch A(10 個 v2 module + helpers + template)/ Batch B(cli-essentials 9 個,含新建 ripgrep,Q41)/ Batch C(agent + 其他 optional 12 個,Q42 / Q50 / Q51) |
 | M8 - i18n + color | `lib/i18n.sh`(`i18n_detect_lang` / `i18n_sanitize_lang`,對標 base)+ `lib/color.sh`;module 用 `declare -A` + `module_i18n_get` |
 | M9 - Sync + Secrets | `lib/sync.sh`(SSH push/pull)+ `setup_secrets.sh`(SSH key / GPG / token) |
-| M10 - Unit tests 80% | 239 + N modules × ~50 tests ≈ 600+ unit tests。CI 切「per-module job」(每 module 一個 job,matrix 從 `ls modules/*.module.sh` discover step 動態生;`fail-fast: false`;`timeout-minutes: 5`;`make test-unit MODULE=<name>` 入口);path-filter(dorny/paths-filter)讓 PR 只跑改動的 module job,main push 跑完整 cartesian |
+| M10 - Unit tests 80% | 239 + N modules × ~50 tests ≈ 600+ unit tests。CI 切「per-module job」(每 module 一個 job,matrix 從 `ls module/*.module.sh` discover step 動態生;`fail-fast: false`;`timeout-minutes: 5`;`make test-unit MODULE=<name>` 入口);path-filter(dorny/paths-filter)讓 PR 只跑改動的 module job,main push 跑完整 cartesian |
 | M11 - Integration tests | `ubuntu:22.04` + `ubuntu:24.04` + `ubuntu:26.04` 矩陣 |
 | M12 - Coverage + CI | kcov + GitHub Actions |
 | M13 - Code review | code-reviewer x 2 + security-reviewer 並行 |
-| M14 - Docs | `docs/guides/` 4 篇手寫 + `docs/modules/` 自動 INDEX + per-module 文件;README 改寫(`.adoc`→`.md` 全轉屬 0.2.0,AC-28) |
+| M14 - Docs | `doc/guide/` 4 篇手寫 + `doc/module/` 自動 INDEX + per-module 文件;README 改寫(`.adoc`→`.md` 全轉屬 0.2.0,AC-28) |
 | M15 - Post-install management 驗收 | 確認裝完後 CLI + TUI 仍可管理(install / upgrade / remove / verify / doctor / sync) |
 
 > 原 M16(Coverage 100%)已撤銷(同 AC-26,2026-06-06):80% gate 由 M10 / AC-17 把關,提升為 best-effort。
@@ -1049,7 +1049,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | Q3 | `neovim` 是否拆分 dep? | **拆開**;先安裝 dep(`fzf` / `lazygit` / `ripgrep` / `fdfind` / `fnm`)才安裝 nvim,讓 dep 可重用 |
 | Q4 | `fnm` 該獨立 module 還是埋在 neovim? | **獨立**,符合 Q3 精神;依「可複用 + 好管理」為主,不要為單一 tool 把 dep 綁定 |
 | Q5 | `nvimdots` config 是 module 一部分還是另一個 module? | **內嵌**在 `neovim.module.sh`;但 install 時**顯示推薦勾選**,user 按 Enter 或確認即安裝(default 同意) |
-| Q6 | `modules/config/` 內的 config 檔該怎麼套用? | **配 config-drop archetype 走正常 install pipeline**(ADR-0014,2026-05-20):每個 config bundle 有 `<name>-config.module.sh`,用 `setup_ubuntu install <name>-config` 套用;批次用 `install --tag=config`。**`config load` subcommand 已砍**(與 `config get/set/unset/show` 名稱重疊易混) |
+| Q6 | `module/config/` 內的 config 檔該怎麼套用? | **配 config-drop archetype 走正常 install pipeline**(ADR-0014,2026-05-20):每個 config bundle 有 `<name>-config.module.sh`,用 `setup_ubuntu install <name>-config` 套用;批次用 `install --tag=config`。**`config load` subcommand 已砍**(與 `config get/set/unset/show` 名稱重疊易混) |
 | Q7 | `experimental` 分類是否保留? | **保留**作為未來不穩定 module 入口;但 `dual-system-time-sync` 不該放這層,後續重新分類 |
 | Q8 | 是否要在 v0.1 就支援 import / export state? | **v0.1 就要有**(已從 nice-to-have 提前到必備) |
 | Q9 | `setup_ubuntu install --recommended` 是否包含 `nvidia-driver`? | **可包含**,但需使用者 dual-check 確認(`RISK_LEVEL=high` 觸發 `WARN_MESSAGE` 顯示在 install 之前);failure recovery 透過 `POST_INSTALL_MESSAGE` 提示使用者手動切回 nouveau,**v0.1 不自動回滾**;自動回滾排入 **0.4.0**(AC-21,ADR-0020;見 §13.2 Q22 metadata 收斂) |
@@ -1057,7 +1057,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | Q11 | Module 檔名 kebab-case 還是 snake_case? | **kebab-case** |
 | Q12 | 是否要支援 `setup_ubuntu rollback`? | **不做**;移入 Backlog(§5.3)。upgrade 失敗的 archetype rollback(§7.6)已涵蓋主要需求 |
 
-> 設計細節層次的決定(parallel 預設、sync 簽章、secrets backend 選擇、平台 allowlist 策略、高風險 module snapshot 範圍、non-sudo 模式 apt-essentials 處理)收斂進 `docs/architecture.md` §18 開放問題與決定。
+> 設計細節層次的決定(parallel 預設、sync 簽章、secrets backend 選擇、平台 allowlist 策略、高風險 module snapshot 範圍、non-sudo 模式 apt-essentials 處理)收斂進 `doc/architecture.md` §18 開放問題與決定。
 
 ### 13.2 v2 contract 細則決議(2026-05 grilling)
 
@@ -1085,9 +1085,9 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | Q32 | `CONFLICTS_WITH` 檢查時機? | install + upgrade 兩處都檢查;觸發時 exit 5 |
 | Q33 | Module cwd 規範? | 只准 subshell `(cd ...; cmd)`,禁 `cd` / `pushd` |
 | Q34 | Parallel install? | **不做**;`dpkg` lock + sudo 互斥讓 apt 不可並行;非 apt 並行收益不足 |
-| Q35 | User-local module 區? | Engine 額外掃 `${XDG_CONFIG_HOME}/init_ubuntu/modules/`,撞名時 user-local 勝(log_warn 提示) |
+| Q35 | User-local module 區? | Engine 額外掃 `${XDG_CONFIG_HOME}/init_ubuntu/module/`,撞名時 user-local 勝(log_warn 提示) |
 | Q36 | Module 「disable / 強制裝」機制? | `[modules.<name>] enabled = true|false|未設` 三態;影響 Quick Setup / `--recommended` 過濾 |
-| Q37 | 文件分層? | `docs/guides/` 4 篇手寫 + `docs/modules/INDEX.md` 自動生成 + 每 module 一個 `docs/modules/<name>.md` 寫架構流程 |
+| Q37 | 文件分層? | `doc/guide/` 4 篇手寫 + `doc/module/INDEX.md` 自動生成 + 每 module 一個 `doc/module/<name>.md` 寫架構流程 |
 
 ### 13.3 Round-4 grilling 決議(2026-06-06,PRD 1.1.0)
 
@@ -1099,7 +1099,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | Q39 | `DEPENDS_ON=("git")` 懸空(`git` 非 module)? | **dep 一律是 module 名**;`git-config` / `lazygit` / `fzf` 三處改 `apt-essentials`;§9.1 補規則,`doctor --validate-modules` lint |
 | Q40 | `update` 要重建的 registry 不存在? | **砍 `update` subcommand**;registry 明定 in-memory(每次執行動態掃);`apt update` 無對應 — 本地檔無 index 可過期;版本情報:gh-latest cache(隨需抓+TTL 1h)/ apt 委派系統(Q31)。supersedes Q16 |
 | Q41 | `ripgrep` 被三處引用但 catalog 漏列? | **補 `ripgrep.module.sh`** 進 §6.3.1(apt archetype,grep 替代);CLI Essentials 8→9;M7 Batch B 同步 |
-| Q42 | `gnome-terminal-config` 去向矛盾(§6.3.3 vs §6.5)? | **從 catalog 移除**;隨 `modules/tools/` 整批搬 `tools/`,v0.2+ 逐檔決定;M7 Batch C 11→10 |
+| Q42 | `gnome-terminal-config` 去向矛盾(§6.3.3 vs §6.5)? | **從 catalog 移除**;隨 `module/tools/` 整批搬 `tools/`,v0.2+ 逐檔決定;M7 Batch C 11→10 |
 | Q43 | TUI「Save & Exit」無物可存? | **勾選累積器模型**:主選單 `< Run >`+`< Exit >`;勾選子選單 `< OK >`+`< Back >`;Run→Review→Proceed 唯一批次執行點;Quick Setup / Manage Installed 自帶執行;AC-10 斷言同步 |
 | Q44 | 空 Advanced 選單(experimental 零 module、custom 無定義)? | **通則:主選單只顯示非空 CATEGORY**;`custom` 字眼廢除(user-local module 依 CATEGORY 歸類) |
 | Q45 | sync `--include-config` 無定義且與 ADR-0018 / §10.3 衝突? | **砍**;§16.2 flag 與 §7.2 對齊;config.ini 是本機生成檔不跨機;個人設定同步由 config-drop module 涵蓋 |
@@ -1120,7 +1120,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 
 ## 14. Sensitive Tools sub-tool [N4]
 
-> 完整設計見 `docs/architecture.md` §15。
+> 完整設計見 `doc/architecture.md` §15。
 
 ### 14.1 範疇
 
@@ -1161,7 +1161,7 @@ setup_secrets remove <name>
 
 ## 15. Multi-Platform Support [N9]
 
-> 完整設計見 `docs/architecture.md` §14。
+> 完整設計見 `doc/architecture.md` §14。
 
 ### 15.1 支援的 form factor
 
@@ -1183,7 +1183,7 @@ setup_secrets remove <name>
 
 ### 15.3 Module 平台支援宣告
 
-Module metadata 加 `SUPPORTED_PLATFORMS`(string[],見 `docs/module-spec.md` §3.3):
+Module metadata 加 `SUPPORTED_PLATFORMS`(string[],見 `doc/module-spec.md` §3.3):
 
 ```bash
 SUPPORTED_PLATFORMS=("desktop" "server")    # 不支援 SBC
@@ -1204,7 +1204,7 @@ SUPPORTED_PLATFORMS=("desktop" "server")    # 不支援 SBC
 
 ## 16. Sync 機制 [N8]
 
-> 完整設計見 `docs/architecture.md` §16。
+> 完整設計見 `doc/architecture.md` §16。
 
 ### 16.1 目標
 
@@ -1288,34 +1288,34 @@ setup_ubuntu_tui                      # 互動式管理
 | `setup_ubuntu.sh` | `setup_ubuntu.sh`(同名重寫) | 改寫為 CLI dispatcher |
 | (無) | `setup_ubuntu_tui.sh` | 新建 |
 | (無) | `setup_secrets.sh` | 新建(§14) |
-| `modules/setup_docker.sh` | `modules/docker.module.sh` | 改寫 |
-| `modules/setup_font.sh` | `modules/font.module.sh` | 改寫 |
-| `modules/setup_neovim.sh` | `modules/neovim.module.sh` + 拆出 `fnm` `fzf` `zoxide` `lazygit` `fdfind` 各自 module | 大幅拆分(Q3 + Q4) |
-| `modules/setup_nvidia_driver.sh` | `modules/nvidia-driver.module.sh` | 改寫(加 RISK_LEVEL=high + 失敗回復,Q9) |
-| `modules/setup_qmk_firmware.sh` | `modules/qmk-firmware.module.sh` | 改寫 |
-| `modules/setup_shell.sh` | `modules/shell.module.sh` | 改寫 |
-| `modules/setup_small_tools.sh` | (拆成各自 module) | 刪除 |
-| `modules/setup_vscode.sh` | `modules/vscode.module.sh`(optional) | 改寫(從 recommended 降級) |
-| `modules/anydesk.sh` | `modules/anydesk.module.sh` | 改寫 |
-| `modules/submodules/*.sh` (8 個) | `modules/<name>.module.sh`(8 個 `cli-essentials` optional module,見 §6.3.1) | 改寫 |
-| (無) | `modules/ripgrep.module.sh` | 新建(apt archetype,grep 替代;Q41) |
-| (無) | `modules/claude-code.module.sh` / `codex.module.sh` / `gemini.module.sh` | 新建(3 大 agent) |
-| (無) | `modules/notion.module.sh` | 新建(github-release archetype,notion-electron `.deb`;Q50 / #35) |
-| (無) | `modules/jetson-stats.module.sh` | 新建(pip 安裝 `jtop`,jetson-orin only;Q51 / #37) |
-| `modules/function/logger.sh` | `lib/logger.sh` | 整理(可能拆 file logging 出去) |
-| `modules/function/general.sh` | `lib/general.sh` + `lib/detect.sh` + `lib/platform.sh` | 拆分(平台分類抽到獨立檔) |
-| `modules/function/tests/test_*.sh` | `tests/unit/logger_spec.bats` 與 `general_spec.bats` | 重寫為 bats |
-| `modules/tools/*`(整個目錄) | **搬遷到 repo 根目錄 `tools/`** | v0.1 不處理,僅搬遷;v0.2+ 個別決定 |
-| └ `modules/tools/remove/*.sh` | (隨上面整個目錄搬遷) | v0.1 不處理(改寫 remove/purge 邏輯延後) |
-| └ `modules/tools/trash-maintenance.sh` | (隨上面搬遷) | **不放 module pipeline / 不放 TUI**(一次性腳本) |
-| └ `modules/tools/setup_terminal_font_size.sh` | (隨上面搬遷) | v0.1 不處理 |
-| └ `modules/tools/dual_system_time_sync.sh` | (隨上面搬遷) | v0.1 不處理 |
-| └ `modules/tools/copy_*.sh` | (隨上面搬遷) | v0.1 不處理 |
-| └ `modules/tools/ros1/*` | (隨上面搬遷) | v0.1 不處理 |
-| `modules/config/*` | 不動 — 由各對應 module 引用 | 保留 |
-| `templates/*_tmp.sh` | `templates/module-{apt,github-release,config,custom}.template.sh` + `templates/test.template.bats` | 改寫為新契約模板(4 個 archetype 各一,共用 shared sections,drift 由 `template_consistency_spec.bats` 把關) |
+| `module/setup_docker.sh` | `module/docker.module.sh` | 改寫 |
+| `module/setup_font.sh` | `module/font.module.sh` | 改寫 |
+| `module/setup_neovim.sh` | `module/neovim.module.sh` + 拆出 `fnm` `fzf` `zoxide` `lazygit` `fdfind` 各自 module | 大幅拆分(Q3 + Q4) |
+| `module/setup_nvidia_driver.sh` | `module/nvidia-driver.module.sh` | 改寫(加 RISK_LEVEL=high + 失敗回復,Q9) |
+| `module/setup_qmk_firmware.sh` | `module/qmk-firmware.module.sh` | 改寫 |
+| `module/setup_shell.sh` | `module/shell.module.sh` | 改寫 |
+| `module/setup_small_tools.sh` | (拆成各自 module) | 刪除 |
+| `module/setup_vscode.sh` | `module/vscode.module.sh`(optional) | 改寫(從 recommended 降級) |
+| `module/anydesk.sh` | `module/anydesk.module.sh` | 改寫 |
+| `module/submodules/*.sh` (8 個) | `module/<name>.module.sh`(8 個 `cli-essentials` optional module,見 §6.3.1) | 改寫 |
+| (無) | `module/ripgrep.module.sh` | 新建(apt archetype,grep 替代;Q41) |
+| (無) | `module/claude-code.module.sh` / `codex.module.sh` / `gemini.module.sh` | 新建(3 大 agent) |
+| (無) | `module/notion.module.sh` | 新建(github-release archetype,notion-electron `.deb`;Q50 / #35) |
+| (無) | `module/jetson-stats.module.sh` | 新建(pip 安裝 `jtop`,jetson-orin only;Q51 / #37) |
+| `module/function/logger.sh` | `lib/logger.sh` | 整理(可能拆 file logging 出去) |
+| `module/function/general.sh` | `lib/general.sh` + `lib/detect.sh` + `lib/platform.sh` | 拆分(平台分類抽到獨立檔) |
+| `module/function/test/test_*.sh` | `test/unit/logger_spec.bats` 與 `general_spec.bats` | 重寫為 bats |
+| `module/tools/*`(整個目錄) | **搬遷到 repo 根目錄 `tools/`** | v0.1 不處理,僅搬遷;v0.2+ 個別決定 |
+| └ `module/tools/remove/*.sh` | (隨上面整個目錄搬遷) | v0.1 不處理(改寫 remove/purge 邏輯延後) |
+| └ `module/tools/trash-maintenance.sh` | (隨上面搬遷) | **不放 module pipeline / 不放 TUI**(一次性腳本) |
+| └ `module/tools/setup_terminal_font_size.sh` | (隨上面搬遷) | v0.1 不處理 |
+| └ `module/tools/dual_system_time_sync.sh` | (隨上面搬遷) | v0.1 不處理 |
+| └ `module/tools/copy_*.sh` | (隨上面搬遷) | v0.1 不處理 |
+| └ `module/tools/ros1/*` | (隨上面搬遷) | v0.1 不處理 |
+| `module/config/*` | 不動 — 由各對應 module 引用 | 保留 |
+| `template/*_tmp.sh` | `template/module-{apt,github-release,config,custom}.template.sh` + `template/test.template.bats` | 改寫為新契約模板(4 個 archetype 各一,共用 shared sections,drift 由 `template_consistency_spec.bats` 把關) |
 | `small-tools/*` | 0.4.0 移除,內容已分散到對應 module | deprecation 路徑(§6.6) |
-| `gh-upgrade-README.md` | 評估歸入 `docs/` 或保留 | 評估 |
-| `install-nvidia-driver.sh` | 與 `modules/nvidia-driver.module.sh` 整合 | 整合 |
+| `gh-upgrade-README.md` | 評估歸入 `doc/` 或保留 | 評估 |
+| `install-nvidia-driver.sh` | 與 `module/nvidia-driver.module.sh` 整合 | 整合 |
 | `run_claude.sh` | 不動 | 保留 |
 | `*.adoc` | `*.md`(rewrite,不只是改副檔名) | 全改 |

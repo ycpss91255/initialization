@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# tests/unit/config_spec.bats — lib/config.sh
+# test/unit/config_spec.bats — lib/config.sh
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

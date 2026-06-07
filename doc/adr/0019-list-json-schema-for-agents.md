@@ -91,7 +91,7 @@ same state.
 
 ### Where each field comes from
 
-- Catalog-side (always available from `modules/*.module.sh`
+- Catalog-side (always available from `module/*.module.sh`
   metadata): `name`, `category`, `tags`, `description`,
   `version_provided`, `supports_user_home`, `supported_platforms`,
   `supported_ubuntu`, `risk_level`, `reboot_required`, `homepage`.

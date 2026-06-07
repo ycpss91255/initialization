@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# tests/unit/registry_spec.bats — lib/registry.sh
+# test/unit/registry_spec.bats — lib/registry.sh
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env
@@ -9,7 +9,7 @@ setup() {
     export LOG_COLOR=false
 
     # Fake module dir with synthetic fixtures.
-    FAKE_MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/modules"
+    FAKE_MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/module"
     mkdir -p "${FAKE_MODULE_DIR}"
 
     cat > "${FAKE_MODULE_DIR}/alpha.module.sh" <<'EOF'
@@ -159,7 +159,7 @@ EOF
     assert_success
 }
 
-@test "registry_load_all on real modules/ at least finds docker" {
+@test "registry_load_all on real module/ at least finds docker" {
     # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     registry_load_all "${MODULE_DIR}"

@@ -6,7 +6,7 @@
 
 ## Context
 
-PRD §13.1 Q6 originally answered "how do `modules/config/*` get
+PRD §13.1 Q6 originally answered "how do `module/config/*` get
 applied?" with two mechanisms:
 
 1. Each config bundle gets a paired `<name>-config.module.sh`
@@ -36,7 +36,7 @@ installed via the standard archetype C lifecycle.
 |---|---|
 | Single config bundle | `setup_ubuntu install git-config` |
 | All config bundles in one shot | `setup_ubuntu install --tag=config` |
-| Single bundle without engine state tracking | `bash modules/git-config.module.sh install` (standalone) |
+| Single bundle without engine state tracking | `bash module/git-config.module.sh install` (standalone) |
 | Sync config bundles across machines | `setup_ubuntu sync user@host --modules=git-config,fish-config` |
 
 ### CLI surface after change

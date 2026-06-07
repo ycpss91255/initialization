@@ -6,7 +6,7 @@
   - BashFAQ #105 — http://mywiki.wooledge.org/BashFAQ/105
   - Google Shell Style Guide — https://google.github.io/styleguide/shellguide.html
   - Bash Pitfalls — http://mywiki.wooledge.org/BashPitfalls
-  - ADR-0004 (test isolation) — `docs/adr/0004-tests-must-run-in-docker-only.md`
+  - ADR-0004 (test isolation) — `doc/adr/0004-tests-must-run-in-docker-only.md`
   - Issue #17 (PRD for shellcheck disable approval hook)
 
 ## Context
@@ -15,11 +15,11 @@
 
 1. **Exit-code-contract scripts** — they decide an outcome and report it
    through stdout / stderr / exit code, then the caller acts on it. The
-   `.claude/hooks/*.sh` PreToolUse hooks (`enforce_gh_body_file.sh`,
+   `.claude/hook/*.sh` PreToolUse hooks (`enforce_gh_body_file.sh`,
    `enforce_gh_english.sh`, `check_changelog_drift.sh`,
    `remind_main_sync.sh`, `enforce_semver_tag_via_script.sh`,
    `check_main_fresh_before_worktree.sh`, `remind_pr_wait_ci.sh`) and
-   `.claude/scripts/release-tag.sh` fall in this group. They must reach
+   `.claude/script/release-tag.sh` fall in this group. They must reach
    `main()` `return` / `exit <code>` with a deliberate value — Claude
    Code reads the exit code (and `permissionDecision` JSON) to decide
    allow vs deny.
@@ -123,7 +123,7 @@ A script may use `-euo pipefail` when **all** of the following hold:
 
 Current `-euo` scripts that satisfy this:
 
-- `.claude/hooks/test-must-use-docker.sh` — single fail-closed
+- `.claude/hook/test-must-use-docker.sh` — single fail-closed
   decision: matches a banned pattern, denies; otherwise allows.
 
 Module action phases (`install` / `upgrade` / `remove` / `purge`)
@@ -143,7 +143,7 @@ inherited from the module template.
   correctly.
 - **Negative:** Removing `-e` means relying on test coverage to catch
   bugs that `-e` would have flagged at runtime. Mitigation: every
-  hook has bats tests under `tests/unit/hooks/` covering its
+  hook has bats tests under `test/unit/hooks/` covering its
   observable outputs (introduced alongside this ADR for the new
   `enforce_shellcheck_disable_approval.sh` hook).
 - **Negative:** A future contributor (human or agent) may copy a hook

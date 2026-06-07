@@ -2,7 +2,7 @@
 # enforce_semver_tag_via_script.sh -- Claude Code PreToolUse hook (matcher: Bash).
 #
 # DENIES ad-hoc `git tag v*` / `git push.*v[0-9]` / `git push --tags`
-# invocations. Forces the caller through .claude/scripts/release-tag.sh,
+# invocations. Forces the caller through .claude/script/release-tag.sh,
 # which encodes:
 #   - .version integrity check
 #   - RC tag + CI requirement for Y / X bumps
@@ -59,9 +59,9 @@ main() {
   local msg
   msg="release-tag flow gate (issue #106): ad-hoc \`git tag\` / \`git push\` for version tags is denied.
 Use the canonical script:
-  .claude/scripts/release-tag.sh <vX.Y.Z> -m \"<message>\"
+  .claude/script/release-tag.sh <vX.Y.Z> -m \"<message>\"
 X bump (e.g. v1.0.0) also requires explicit user ACK:
-  RELEASE_X_BUMP_ACK=v1.0.0 .claude/scripts/release-tag.sh v1.0.0 -m \"...\"
+  RELEASE_X_BUMP_ACK=v1.0.0 .claude/script/release-tag.sh v1.0.0 -m \"...\"
 The script encodes:
   - .version integrity check
   - RC tag + CI requirement for Y / X bumps

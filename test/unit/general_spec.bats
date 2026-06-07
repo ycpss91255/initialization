@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
-# tests/unit/general_spec.bats — smoke + targeted unit tests for lib/general.sh
+# test/unit/general_spec.bats — smoke + targeted unit tests for lib/general.sh
 #
 # batch A scope: confirm general.sh sources cleanly and the key helper
 # functions are defined. Full behavior tests for sudo / apt_pkg_manager /
 # get_github_pkg_latest_version land in Phase 7 (module migration), when
 # we also split out lib/detect.sh / lib/platform.sh / lib/install_target.sh.
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

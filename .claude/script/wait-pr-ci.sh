@@ -240,7 +240,7 @@ main() {
     if [[ -n "${fail_pr}" ]]; then
       case "${fail_reason:-}" in
         conflict)
-          printf 'FAIL %s (mergeable=CONFLICTING). Rebase:\n  .claude/scripts/rebase-pr.sh %s --repo %s\nSee .claude/skills/rebase-pr/SKILL.md.\n' \
+          printf 'FAIL %s (mergeable=CONFLICTING). Rebase:\n  .claude/script/rebase-pr.sh %s --repo %s\nSee .claude/skills/rebase-pr/SKILL.md.\n' \
             "${fail_pr}" "${fail_pr}" "${repo}"
           ;;
         *)

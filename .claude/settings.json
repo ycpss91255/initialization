@@ -6,35 +6,35 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/test-must-use-docker.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/test-must-use-docker.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/check_main_fresh_before_worktree.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/check_main_fresh_before_worktree.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/check_changelog_drift.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/check_changelog_drift.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/remind_main_sync.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/remind_main_sync.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/enforce_semver_tag_via_script.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/enforce_semver_tag_via_script.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/enforce_gh_body_file.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/enforce_gh_body_file.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/enforce_gh_english.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/enforce_gh_english.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/remind_pr_wait_ci.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/remind_pr_wait_ci.sh"
           }
         ]
       },
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/enforce_shellcheck_disable_approval.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/enforce_shellcheck_disable_approval.sh"
           }
         ]
       }

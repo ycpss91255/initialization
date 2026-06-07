@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# tests/helpers/common.bash — shared bats test helpers
+# test/helper/common.bash — shared bats test helpers
 #
 # Loaded by each spec via:
-#   load "${BATS_TEST_DIRNAME}/../helpers/common"
+#   load "${BATS_TEST_DIRNAME}/../helper/common"
 #
 # Provides:
 #   - REPO_ROOT / LIB_DIR / MODULE_DIR / TEMPLATE_DIR path exports
@@ -18,9 +18,9 @@ REPO_ROOT="$(cd -- "${COMMON_HELPER_DIR}/../.." && pwd -P)"
 export REPO_ROOT
 
 export LIB_DIR="${REPO_ROOT}/lib"
-export MODULE_DIR="${REPO_ROOT}/modules"
-export TEMPLATE_DIR="${REPO_ROOT}/templates"
-export TEST_DIR="${REPO_ROOT}/tests"
+export MODULE_DIR="${REPO_ROOT}/module"
+export TEMPLATE_DIR="${REPO_ROOT}/template"
+export TEST_DIR="${REPO_ROOT}/test"
 
 # ── Load bats-* extensions ───────────────────────────────────────────────────
 # The test-tools:local image bakes these at /usr/lib/bats/{bats-support,

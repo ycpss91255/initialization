@@ -4,7 +4,7 @@
 # }
 
 # Load local secrets if present (e.g. TMUX_POWERLINE_SEG_MAILCOUNT_GMAIL_PASSWORD).
-# Deploy with: cp modules/config/tmux/tmux-powerline/secrets.sh ~/.config/tmux-powerline/ ; chmod 600
+# Deploy with: cp module/config/tmux/tmux-powerline/secrets.sh ~/.config/tmux-powerline/ ; chmod 600
 # (Tracked in repo — file holds no plaintext, just looks values up via secret-tool.)
 _tmux_pl_secrets="${XDG_CONFIG_HOME:-$HOME/.config}/tmux-powerline/secrets.sh"
 [ -f "$_tmux_pl_secrets" ] && . "$_tmux_pl_secrets"

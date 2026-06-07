@@ -1,14 +1,14 @@
 #!/usr/bin/env bats
-# tests/unit/dispatcher_spec.bats — lib/dispatcher.sh
+# test/unit/dispatcher_spec.bats — lib/dispatcher.sh
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env
     export LOG_LEVEL=INFO
     export LOG_COLOR=false
 
-    FAKE_MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/modules"
+    FAKE_MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/module"
     mkdir -p "${FAKE_MODULE_DIR}"
 
     cat > "${FAKE_MODULE_DIR}/noop.module.sh" <<'EOF'

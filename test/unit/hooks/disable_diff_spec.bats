@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# tests/unit/hooks/disable_diff_spec.bats
+# test/unit/hooks/disable_diff_spec.bats
 #
 # Unit tests for `new_shellcheck_disables` in
-# .claude/hooks/enforce_shellcheck_disable_approval.sh (issue #17).
+# .claude/hook/enforce_shellcheck_disable_approval.sh (issue #17).
 #
 # Module contract:
 #   - Args: $1 = new_content_str, $2 = existing_file_path (may not exist)
@@ -10,12 +10,12 @@
 #     multi-code directives (`disable=SC2034,SC2317`) split into codes
 #   - Exit: 0 always
 
-load "${BATS_TEST_DIRNAME}/../../helpers/common"
+load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
     setup_test_env
-    HOOK_SH="${REPO_ROOT}/.claude/hooks/enforce_shellcheck_disable_approval.sh"
-    # shellcheck source=../../../.claude/hooks/enforce_shellcheck_disable_approval.sh
+    HOOK_SH="${REPO_ROOT}/.claude/hook/enforce_shellcheck_disable_approval.sh"
+    # shellcheck source=../../../.claude/hook/enforce_shellcheck_disable_approval.sh
     source "${HOOK_SH}"
     FIXTURE_DIR="${BATS_TEST_TMPDIR}/contents"
     mkdir -p "${FIXTURE_DIR}"

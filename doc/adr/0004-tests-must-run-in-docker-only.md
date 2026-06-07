@@ -3,7 +3,7 @@
 All `bats` / module-lifecycle invocations execute inside the
 `test-tools:local` container via `make test-unit` / `make test-integration` /
 `make coverage`. **Running `bats` directly on the host, or invoking
-`bash modules/<x>.module.sh install` on the host, is prohibited — no
+`bash module/<x>.module.sh install` on the host, is prohibited — no
 exceptions, no temporary debug shortcuts, no "just this once."**
 
 The rule exists because Module Action Phases (`install` / `upgrade` /
@@ -25,15 +25,15 @@ working machine. Docker provides the only safe isolation boundary.
 
 ## Enforcement
 
-1. `Makefile` test targets exclusively call `scripts/ci/ci.sh` which routes
+1. `Makefile` test targets exclusively call `script/ci/ci.sh` which routes
    through `docker compose run --rm ci ...`.
-2. `.claude/hooks/test-must-use-docker.sh` — a Claude PreToolUse Bash hook
+2. `.claude/hook/test-must-use-docker.sh` — a Claude PreToolUse Bash hook
    that blocks the following patterns on the host:
    - `bats ` / `bats -` (direct bats invocation)
-   - `bash modules/*.module.sh <action-phase>` (Action Phase = install /
+   - `bash module/*.module.sh <action-phase>` (Action Phase = install /
      upgrade / remove / purge)
    - `sudo apt-get install` / `sudo apt install` (apt install outside container)
-3. Documented as a hard rule in `docs/TESTING.md` (banner at top).
+3. Documented as a hard rule in `doc/TESTING.md` (banner at top).
 4. CI matrix (GitHub Actions) also runs through Docker, mirroring the
    developer workflow exactly.
 

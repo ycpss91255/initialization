@@ -226,7 +226,7 @@ main() {
         return 0
     fi
 
-    local reason="ShellCheck disable approval required (issue #17, hook source: .claude/hooks/enforce_shellcheck_disable_approval.sh).
+    local reason="ShellCheck disable approval required (issue #17, hook source: .claude/hook/enforce_shellcheck_disable_approval.sh).
 
 The following new \`# shellcheck disable=...\` directive(s) were detected but have not been approved by the user in their most recent message:
 "

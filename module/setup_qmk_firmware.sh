@@ -90,8 +90,8 @@ qmk flash -kb "<keyboard>" -km "<keymap>"
 
 # ref: https://docs.qmk.fm/
 
-modules/config/qmk_firmware/keyboards
-modules/config/qmk_firmware/keyboards/boardsource
-modules/config/qmk_firmware/keyboards/boardsource/unicorne
-modules/config/qmk_firmware
-modules/config/qmk_firmware/keyboards/boardsource/unicorne/keymap
+module/config/qmk_firmware/keyboards
+module/config/qmk_firmware/keyboards/boardsource
+module/config/qmk_firmware/keyboards/boardsource/unicorne
+module/config/qmk_firmware
+module/config/qmk_firmware/keyboards/boardsource/unicorne/keymap

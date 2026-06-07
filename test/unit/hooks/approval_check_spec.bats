@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# tests/unit/hooks/approval_check_spec.bats
+# test/unit/hooks/approval_check_spec.bats
 #
 # Unit tests for `is_disable_approved` in
-# .claude/hooks/enforce_shellcheck_disable_approval.sh (issue #17).
+# .claude/hook/enforce_shellcheck_disable_approval.sh (issue #17).
 #
 # Module contract:
 #   - Args: $1 = SC<code>, $2 = user_msg_text
@@ -10,12 +10,12 @@
 #     (case-insensitive on the verb, exact case on the code)
 #   - Exit 1 otherwise
 
-load "${BATS_TEST_DIRNAME}/../../helpers/common"
+load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
     setup_test_env
-    HOOK_SH="${REPO_ROOT}/.claude/hooks/enforce_shellcheck_disable_approval.sh"
-    # shellcheck source=../../../.claude/hooks/enforce_shellcheck_disable_approval.sh
+    HOOK_SH="${REPO_ROOT}/.claude/hook/enforce_shellcheck_disable_approval.sh"
+    # shellcheck source=../../../.claude/hook/enforce_shellcheck_disable_approval.sh
     source "${HOOK_SH}"
 }
 

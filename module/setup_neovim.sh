@@ -266,10 +266,10 @@ bash "${_tmp_nvimdots}" || true
 # codecompanion.nvim
 
 # NOTE: remove lsp_signature.nvim doc tags to avoid error
-# find ~/.local ~/.config/ -type f -path "*/lsp_signature*/docs/tags" -exec rm -f {} \;
-# rm ${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/docs/tags
+# find ~/.local ~/.config/ -type f -path "*/lsp_signature*/doc/tags" -exec rm -f {} \;
+# rm ${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/doc/tags
 log_info "Remove lsp_signature.nvim doc tags to avoid error"
-exec_cmd "rm -f \"${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/docs/tags\" || true"
+exec_cmd "rm -f \"${HOME}/.local/share/nvim/site/lazy/lsp_signature.nvim/doc/tags\" || true"
 
 log_info "Copy nvimdots configuration files"
 _nvimdots_sur_dir="${CONFIG_PATH}/neovim/nvimdots_config"

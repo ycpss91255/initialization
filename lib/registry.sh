@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lib/registry.sh — module metadata scanner / registry
 #
-# Per docs/architecture.md §5 (Module Dynamic Loading) and docs/module-spec.md.
+# Per doc/architecture.md §5 (Module Dynamic Loading) and doc/module-spec.md.
 #
 # Public API:
 #   registry_load_all [<module-dir>]
@@ -151,8 +151,8 @@ _registry_load_one_dir() {
 }
 
 registry_load_all() {
-    local _bundled_dir="${1:-${MODULE_DIR:-${REPO_ROOT:-.}/modules}}"
-    local _user_dir="${INIT_UBUNTU_USER_MODULE_DIR:-${XDG_CONFIG_HOME:-${HOME}/.config}/init_ubuntu/modules}"
+    local _bundled_dir="${1:-${MODULE_DIR:-${REPO_ROOT:-.}/module}}"
+    local _user_dir="${INIT_UBUNTU_USER_MODULE_DIR:-${XDG_CONFIG_HOME:-${HOME}/.config}/init_ubuntu/module}"
 
     MODULES_NAME=()
     MODULES_CATEGORY=()

@@ -43,7 +43,7 @@ executes undefined behaviour:
 - `SUPPORTED_UBUNTU` not containing the current Ubuntu version →
   exit code 3. Error message: "Module 'docker' does not support
   Ubuntu 30.04 (SUPPORTED_UBUNTU=22.04 24.04 26.04). To attempt
-  anyway, edit the metadata in modules/docker.module.sh."
+  anyway, edit the metadata in module/docker.module.sh."
 - `CONFLICTS_WITH` matching an installed module → exit code 5. Same
   rationale: the module declared it cannot coexist.
 - `detect()` returning non-zero → exit code 3, **unless** the
@@ -59,7 +59,7 @@ until reboot. For these heuristic detects, the module author can
 opt in to `--force` bypass:
 
 ```bash
-# In modules/nvidia-driver.module.sh metadata:
+# In module/nvidia-driver.module.sh metadata:
 DETECT_OVERRIDE=true
 ```
 

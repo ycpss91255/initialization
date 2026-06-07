@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # lib/<name>.sh — <one-line summary of what this library provides>
 #
-# Authoring guide (docs/architecture.md §4):
-#   1. cp templates/lib.template.sh lib/<your-name>.sh
+# Authoring guide (doc/architecture.md §4):
+#   1. cp template/lib.template.sh lib/<your-name>.sh
 #   2. Replace the header above + define your functions.
 #   3. NO top-level `set -euo pipefail` — callers (lib/runner.sh sub-shell,
 #      tests under bats, setup_ubuntu.sh) already declare strict mode and

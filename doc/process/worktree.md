@@ -91,8 +91,8 @@ If there's no issue yet (exploratory branch), open the issue first via
 
 | Hook | Purpose |
 |---|---|
-| `.claude/hooks/check_main_fresh_before_worktree.sh` | BLOCKs `git worktree add ... main` when local main is behind origin/main |
-| `.claude/hooks/remind_main_sync.sh` | Reminds to `git pull --ff-only` after `gh pr merge` |
+| `.claude/hook/check_main_fresh_before_worktree.sh` | BLOCKs `git worktree add ... main` when local main is behind origin/main |
+| `.claude/hook/remind_main_sync.sh` | Reminds to `git pull --ff-only` after `gh pr merge` |
 
 ## Branch naming
 
@@ -103,7 +103,7 @@ The branch name inside a worktree follows conventional-commits prefix:
 | `feat/<slug>` | new feature / behaviour change(Y bump candidate) |
 | `fix/<slug>` | bug fix(Z bump candidate) |
 | `refactor/<slug>` | internal restructure, no behaviour change |
-| `docs/<slug>` | doc-only |
+| `doc/<slug>` | doc-only |
 | `chore/<slug>` | tooling / housekeeping |
 | `chore/release-<vX.Y.Z>` | release PR — see [release.md](release.md) |
 

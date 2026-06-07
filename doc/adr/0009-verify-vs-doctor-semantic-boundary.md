@@ -97,7 +97,7 @@ modules with **no runtime surface**:
 | C (config-drop) | usually none — file presence is the contract | no |
 | D (custom) | author decides | author judges |
 
-`templates/module-*.template.sh` carries a `# Override doctor() if this
+`template/module-*.template.sh` carries a `# Override doctor() if this
 module has a daemon, group requirement, or runtime config dependency.`
 hint per archetype.
 

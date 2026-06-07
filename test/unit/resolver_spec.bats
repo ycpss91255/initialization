@@ -1,14 +1,14 @@
 #!/usr/bin/env bats
-# tests/unit/resolver_spec.bats — lib/resolver.sh (Kahn topo sort + cycle detect)
+# test/unit/resolver_spec.bats — lib/resolver.sh (Kahn topo sort + cycle detect)
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env
     export LOG_LEVEL=INFO
     export LOG_COLOR=false
 
-    FAKE_MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/modules"
+    FAKE_MODULE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/module"
     mkdir -p "${FAKE_MODULE_DIR}"
 }
 

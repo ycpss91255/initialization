@@ -1,15 +1,15 @@
 #!/usr/bin/env bats
-# tests/unit/e2e_spec.bats — end-to-end review path
+# test/unit/e2e_spec.bats — end-to-end review path
 #
 # These specs exercise the real setup_ubuntu.sh entry point (not a wrapper)
-# in --dry-run mode against the real modules/ directory. This is the spec
+# in --dry-run mode against the real module/ directory. This is the spec
 # set the human reviewer runs to verify "the engine actually works"
 # without touching any real apt / sudo / curl.
 #
 # Per PRD §11 AC-11 (--dry-run does not write fs) — this file holds the
 # bats assertions backing that.
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env
@@ -40,7 +40,7 @@ teardown() {
 
 # ── list + show against the real registry ────────────────────────────────────
 
-@test "setup_ubuntu list discovers docker and apt-essentials from modules/" {
+@test "setup_ubuntu list discovers docker and apt-essentials from module/" {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" list
     assert_success
     assert_output --partial "docker"
@@ -269,7 +269,7 @@ EOF
 
 # ── M5: update / search / upgrade / doctor / config / sync ──────────────────
 
-@test "setup_ubuntu update re-scans modules/ and reports count" {
+@test "setup_ubuntu update re-scans module/ and reports count" {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" update
     assert_success
     assert_output --partial "update complete"

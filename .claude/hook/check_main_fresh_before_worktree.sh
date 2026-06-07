@@ -15,7 +15,7 @@
 #   - Local main is already even with or ahead of origin/main
 #   - The repo has no origin/main yet (fresh clone before first fetch)
 #
-# Why: docs/processes/worktree.md ("Lifecycle > Cleanup")明文「主 checkout
+# Why: doc/process/worktree.md ("Lifecycle > Cleanup")明文「主 checkout
 # 永遠停在 origin/main」— 意指 ff-tracking origin/main HEAD,不是凍結。
 # PR #89 那次正是因為從 stale base 起 worktree、後來才被迫 rebase。
 # Hook 層補上預防,不再依賴 agent 記得先 pull。
@@ -83,7 +83,7 @@ main() {
   [[ -z "${behind}" ]] && return 0
   (( behind > 0 )) || return 0
 
-  msg="$(printf 'Local main is %d commit(s) behind origin/main in %s.\nStarting a worktree from a stale base risks merge conflicts later (see docker_harness#89 for the precedent that motivated this hook).\nRun this first, then retry:\n  git -C %s pull --ff-only origin main\nSee docs/processes/worktree.md ("Lifecycle > Cleanup").' \
+  msg="$(printf 'Local main is %d commit(s) behind origin/main in %s.\nStarting a worktree from a stale base risks merge conflicts later (see docker_harness#89 for the precedent that motivated this hook).\nRun this first, then retry:\n  git -C %s pull --ff-only origin main\nSee doc/process/worktree.md ("Lifecycle > Cleanup").' \
     "${behind}" "${repo_root}" "${repo_root}")"
 
   jq -n --arg m "${msg}" '{

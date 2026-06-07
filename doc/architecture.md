@@ -1,6 +1,6 @@
 # Architecture: init_ubuntu
 
-> 本文檔說明 `init_ubuntu` 工具的內部結構、資料流、與測試邊界。閱讀 PRD(`docs/prd/init-ubuntu.prd.md`)以了解產品需求,本文則聚焦於**如何實現**。
+> 本文檔說明 `init_ubuntu` 工具的內部結構、資料流、與測試邊界。閱讀 PRD(`doc/prd/init-ubuntu.prd.md`)以了解產品需求,本文則聚焦於**如何實現**。
 >
 > **本版整合 PRD 補充的 N1-N19 新需求**(apt-style subcommand、Ubuntu 26.04、敏感工具、non-sudo fallback、server/desktop 雙模式、多平台、sync、ANSI 自動偵測、tag 分組 TUI、import/export 提前等)。每個新增/修訂段落會以 `[N#]` 標出對應的需求編號,便於追溯。
 
@@ -38,7 +38,7 @@ graph TB
         color["lib/color.sh<br/>[N12] ANSI 自動偵測"]
     end
 
-    subgraph modules["Modules (modules/*.module.sh)"]
+    subgraph modules["Modules (module/*.module.sh)"]
         m_docker["docker.module.sh"]
         m_neovim["neovim.module.sh"]
         m_etc["..."]
@@ -85,7 +85,7 @@ graph TB
 ### 設計原則
 
 1. **CLI、TUI、Secrets-tool 三個前端共用同一個 Engine** — 業務邏輯絕不分散在前端
-2. **Module 是 plug-in** — Engine 只認契約(`docs/module-spec.md`),module 增刪不需要改 engine
+2. **Module 是 plug-in** — Engine 只認契約(`doc/module-spec.md`),module 增刪不需要改 engine
 3. **狀態無副作用** — state.json 是真實狀態的**快取**,實況以 `is_installed()` 為準
 4. **Sudo 集中在 module 內** — Engine 不直接 `sudo`;module 若無 sudo 走 user-home fallback [N6]
 5. **可測試性優先** — 所有 module 內呼叫的系統 helper 都可被 `bats-mock` 攔截
@@ -120,9 +120,9 @@ initialization/
 │   ├── color.sh                        # [N12] ANSI 偵測 + escape
 │   ├── tui_backend.sh                  # dialog/whiptail wrapper
 │   ├── secrets.sh                      # setup_secrets 共用 helper
-│   ├── general.sh                      # 從 modules/function/general.sh 遷移
-│   └── logger.sh                       # 從 modules/function/logger.sh 遷移
-├── modules/
+│   ├── general.sh                      # 從 module/function/general.sh 遷移
+│   └── logger.sh                       # 從 module/function/logger.sh 遷移
+├── module/
 │   ├── apt-essentials.module.sh        # base (依平台動態挑套件 [N9])
 │   ├── shell.module.sh                 # base
 │   ├── docker.module.sh                # recommended
@@ -154,15 +154,15 @@ initialization/
 │       ├── neovim/
 │       ├── fish/
 │       └── ...
-├── templates/
+├── template/
 │   ├── module-apt.template.sh         # archetype A: apt packages
 │   ├── module-github-release.template.sh # archetype B: GitHub release tarball
 │   ├── module-config.template.sh      # archetype C: config file drop
 │   ├── module-custom.template.sh      # archetype D: hand-written lifecycle
 │   ├── test.template.bats              # 新 test 範本
 │   └── README.md
-├── tests/
-│   ├── helpers/common.bash
+├── test/
+│   ├── helper/common.bash
 │   ├── unit/
 │   │   ├── dispatcher_spec.bats
 │   │   ├── registry_spec.bats
@@ -178,7 +178,7 @@ initialization/
 │   │   ├── color_spec.bats             # [N12]
 │   │   ├── i18n_spec.bats
 │   │   ├── secrets_spec.bats           # [N4]
-│   │   └── modules/
+│   │   └── module/
 │   │       └── ...
 │   ├── integration/
 │   │   ├── install_cycle_spec.bats
@@ -193,10 +193,10 @@ initialization/
 │       └── help_output_spec.bats
 ├── dockerfile/
 │   └── Dockerfile.test-tools           # 從 base repo 借用 + 客製
-├── scripts/
+├── script/
 │   └── ci/
 │       └── ci.sh                       # 從 base repo 借用 + 客製
-├── docs/
+├── doc/
 │   ├── architecture.md                 # 本檔
 │   ├── module-spec.md
 │   ├── TESTING.md
@@ -204,7 +204,7 @@ initialization/
 │   ├── SYNC.md                         # [N8] sync 設計與安全性
 │   ├── SECRETS.md                      # [N4] setup_secrets 使用手冊
 │   └── PLATFORMS.md                    # [N9] 支援平台與差異
-├── docs/prd/init-ubuntu.prd.md       # (was .claude/prds/ before)
+├── doc/prd/init-ubuntu.prd.md       # (was .claude/prds/ before)
 ├── .github/workflows/ci.yaml
 ├── Makefile
 ├── compose.yaml
@@ -272,7 +272,7 @@ sequenceDiagram
 | `install <m>` | `apt install <pkg>` | 接 module name(不是 apt 套件名) |
 | `remove <m>` | `apt remove <pkg>` | 保留 module 自管的 config |
 | `purge <m>` | `apt purge <pkg>` | 連 config 一起清 |
-| `update` | `apt update` | 重新掃描 modules/ 目錄、刷新 GitHub release 版本快取(**不**動 apt 套件清單) |
+| `update` | `apt update` | 重新掃描 module/ 目錄、刷新 GitHub release 版本快取(**不**動 apt 套件清單) |
 | `upgrade [<m>]` | `apt upgrade` | 重裝 latest 版的 module(用各 module 的 `install()` 重跑) |
 | `search <kw>` | `apt search` | 在 NAME / DESCRIPTION / TAGS 內搜尋 |
 | `show <m>` | `apt show` | 印出 module 完整 metadata |
@@ -280,7 +280,7 @@ sequenceDiagram
 | `status [<m>]` | (無對應) | 列已裝 module + 版本 |
 | `detect` | (無對應) | 環境偵測 |
 | `doctor` | (無對應) | 健康檢查 |
-| `config load` | (無對應) | [A6] 批次套用 modules/config/* |
+| `config load` | (無對應) | [A6] 批次套用 module/config/* |
 | `sync <user@ip>` | (無對應) | [N8] 跨機同步 |
 | `import <file>` / `export <file>` | (無對應) | [N16] state 匯出入 |
 | `help` / `version` | `apt --help` / `apt --version` | 標準 |
@@ -468,7 +468,7 @@ setup_secrets.sh -> dispatcher.secrets_dispatch(intent)
 
 ## 5. Module 動態載入機制
 
-`registry.sh` 在啟動時掃描 `modules/*.module.sh`:
+`registry.sh` 在啟動時掃描 `module/*.module.sh`:
 
 1. `bash -n` 語法檢查
 2. `source` 到 sub-shell 並讀取 metadata
@@ -553,14 +553,14 @@ exec 200>&-
 
 ```mermaid
 graph LR
-    subgraph unit["tests/unit/ (用 bats-mock)"]
+    subgraph unit["test/unit/ (用 bats-mock)"]
         u1[engine logic]
         u2[module lifecycle 各別]
         u3[helpers]
         u4[sync/import/export]
     end
 
-    subgraph integration["tests/integration/ (Ubuntu container 內真實裝)"]
+    subgraph integration["test/integration/ (Ubuntu container 內真實裝)"]
         i1[install + idempotency]
         i2[install -> remove -> install]
         i3[purge cleans config]
@@ -568,7 +568,7 @@ graph LR
         i5[sync e2e (mock SSH server)]
     end
 
-    subgraph smoke["tests/smoke/"]
+    subgraph smoke["test/smoke/"]
         s1[help output]
         s2[detect runs]
         s3[list --json valid]
@@ -675,7 +675,7 @@ flowchart LR
 部分 module(如 `nvidia-driver`)失敗會讓系統處於無法開機狀態。對這類**高風險** module:
 
 ```bash
-# modules/nvidia-driver.module.sh
+# module/nvidia-driver.module.sh
 RISK_LEVEL="high"          # 標記為高風險;engine pre-install 顯示 WARN_MESSAGE
 declare -gA WARN_MESSAGE=(
     [en]="If install fails, manually switch back to 'nouveau' via the kernel command-line."
@@ -772,7 +772,7 @@ SUPPORTS_USER_HOME=true   # 或 false
 `apt-essentials` 是 base 層,內含一組 apt 套件(`git` / `vim` / `curl` / `wget` / ...)。無 sudo 時的處理**不採用「整個 module 跳過」**,而是**逐套件檢查**:
 
 ```bash
-# modules/apt-essentials.module.sh (節選邏輯)
+# module/apt-essentials.module.sh (節選邏輯)
 install() {
     local _failed=() _skipped=() _ok=()
     for pkg in "${APT_PKGS[@]}"; do
@@ -809,7 +809,7 @@ install() {
 
 ### 11.1 介面
 
-`lib/i18n.sh` 模仿 `ycpss91255-docker/base/scripts/docker/i18n.sh`:
+`lib/i18n.sh` 模仿 `ycpss91255-docker/base/script/docker/i18n.sh`:
 
 ```bash
 # Source the dict for the detected language
@@ -873,11 +873,11 @@ CLI 旗標 `--color=auto|always|never`(預設 `auto`,套用上述判斷)。
 
 ### 13.1 第三方 module(已砍,2026-06-06)
 
-`setup_ubuntu module add <git-url>` **不做**:與「不對外發行」Non-Goal 矛盾;私有擴充由 user-local module 區(`${XDG_CONFIG_HOME}/init_ubuntu/modules/`,PRD Q35)涵蓋。
+`setup_ubuntu module add <git-url>` **不做**:與「不對外發行」Non-Goal 矛盾;私有擴充由 user-local module 區(`${XDG_CONFIG_HOME}/init_ubuntu/module/`,PRD Q35)涵蓋。
 
 ### 13.2 與 base repo 的關係
 
-只**借用 4 個檔案**:`Dockerfile.test-tools` / `Makefile.ci` / `scripts/ci/ci.sh` / `.codecov.yaml`。i18n 設計**對標**但不直接 copy(因為 base 的 i18n 對應 Docker container repo 用途,我們是 host installer)。
+只**借用 4 個檔案**:`Dockerfile.test-tools` / `Makefile.ci` / `script/ci/ci.sh` / `.codecov.yaml`。i18n 設計**對標**但不直接 copy(因為 base 的 i18n 對應 Docker container repo 用途,我們是 host installer)。
 
 ### 13.3 與既有 `general.sh` 整合
 
@@ -945,7 +945,7 @@ Engine 啟動時:
 | `font` | 推薦 | 不裝 | 不裝 | 不裝 |
 | `docker` | 推薦 | 推薦 | 推薦(NVIDIA Container Toolkit 變體) | 推薦(用 Docker Desktop integration) |
 
-詳見 `docs/PLATFORMS.md`(將於 Phase 7 補齊)。
+詳見 `doc/PLATFORMS.md`(將於 Phase 7 補齊)。
 
 ---
 
@@ -994,7 +994,7 @@ setup_secrets remove <name>
 - 加密用的 key 從使用者 passphrase 推導(`argon2id` KDF)
 - 對 `--dry-run` 仍提示但不寫入
 
-詳見 `docs/SECRETS.md`(將於 Phase 後段補齊)。
+詳見 `doc/SECRETS.md`(將於 Phase 後段補齊)。
 
 ---
 
@@ -1033,7 +1033,7 @@ setup_ubuntu sync <user@host> --pull
 
 詳見 §3.5。
 
-詳見 `docs/SYNC.md`(將於後續補齊)。
+詳見 `doc/SYNC.md`(將於後續補齊)。
 
 ---
 

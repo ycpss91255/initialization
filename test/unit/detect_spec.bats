@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# tests/unit/detect_spec.bats — lib/detect.sh
+# test/unit/detect_spec.bats — lib/detect.sh
 
-load "${BATS_TEST_DIRNAME}/../helpers/common"
+load "${BATS_TEST_DIRNAME}/../helper/common"
 
 setup() {
     setup_test_env

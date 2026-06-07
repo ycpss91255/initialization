@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# tests/unit/hooks/transcript_reader_spec.bats
+# test/unit/hooks/transcript_reader_spec.bats
 #
 # Unit tests for `read_latest_user_message` in
-# .claude/hooks/enforce_shellcheck_disable_approval.sh (issue #17).
+# .claude/hook/enforce_shellcheck_disable_approval.sh (issue #17).
 #
 # Module contract:
 #   - Args: $1 = transcript_path
@@ -11,12 +11,12 @@
 #
 # Test fixtures are inline minimal JSONL written under BATS_TEST_TMPDIR.
 
-load "${BATS_TEST_DIRNAME}/../../helpers/common"
+load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
     setup_test_env
-    HOOK_SH="${REPO_ROOT}/.claude/hooks/enforce_shellcheck_disable_approval.sh"
-    # shellcheck source=../../../.claude/hooks/enforce_shellcheck_disable_approval.sh
+    HOOK_SH="${REPO_ROOT}/.claude/hook/enforce_shellcheck_disable_approval.sh"
+    # shellcheck source=../../../.claude/hook/enforce_shellcheck_disable_approval.sh
     source "${HOOK_SH}"
     FIXTURE_DIR="${BATS_TEST_TMPDIR}/transcripts"
     mkdir -p "${FIXTURE_DIR}"

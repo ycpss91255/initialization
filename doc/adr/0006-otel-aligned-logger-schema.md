@@ -127,7 +127,7 @@ JSONL stream is the complete record. TTY output unchanged.
 
 ### Tooling
 
-`docs/guides/log-queries.md` ships:
+`doc/guide/log-queries.md` ships:
 - A copy-pasteable `~/.lnav/formats/installed/init_ubuntu.json` with
   `opid-field: trace_id` (gives `lnav Shift+T` free timeline view)
 - 5+ `jq` snippets for common queries (failures per module, p99
@@ -194,13 +194,13 @@ Tracked by issue #8. Phases:
 
 1. **Schema rename + nest payload** + `service.name` / `service.lang`
    / `code.*` SemConv fields. Update all existing `log_event`
-   callers in `lib/`. Update `tests/unit/logger_spec.bats` expected
+   callers in `lib/`. Update `test/unit/logger_spec.bats` expected
    shapes.
 2. **`trace_id` + `span_id` propagation.** Generate at
    `setup_ubuntu.sh` entry, inherit via env. Update
    `_runner_run_phase` to manage span lifecycle.
 3. **Per-session log file rotation** + `latest` symlink.
-4. **`docs/guides/log-queries.md`** with lnav format + jq snippets.
+4. **`doc/guide/log-queries.md`** with lnav format + jq snippets.
 
 Implementation gated on PRs #4 / #6 / #7 merging first (to avoid
 CHANGELOG and `lib/runner.sh` merge conflicts).

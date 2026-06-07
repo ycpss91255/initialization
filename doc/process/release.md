@@ -12,7 +12,7 @@ with X / Y / Z bump rules and RC gating.
 | `vX.0.0` where `X` bumped | ceremonial | **yes** | **yes** (`RELEASE_X_BUMP_ACK`) |
 | `vX.Y.Z-rcN` | the RC tag itself | n/a | n/a |
 
-All tag-creation must go through `.claude/scripts/release-tag.sh`. Direct
+All tag-creation must go through `.claude/script/release-tag.sh`. Direct
 `git tag v*` / `git push origin v*` is **denied** by the
 `enforce_semver_tag_via_script.sh` PreToolUse hook.
 
@@ -28,7 +28,7 @@ All tag-creation must go through `.claude/scripts/release-tag.sh`. Direct
 
 ### 2. Cut a release PR
 
-In a worktree (per `docs/processes/worktree.md`):
+In a worktree (per `doc/process/worktree.md`):
 
 ```bash
 cd ~/Desktop/initialization
@@ -40,7 +40,7 @@ printf 'vX.Y.Z\n' > .version
 
 # Promote CHANGELOG: change [Unreleased] heading to [vX.Y.Z] - YYYY-MM-DD
 # Insert a fresh empty [Unreleased] heading above it.
-$EDITOR docs/changelog/CHANGELOG.md
+$EDITOR doc/changelog/CHANGELOG.md
 
 git add -A && git commit -m "chore: release vX.Y.Z"
 git push -u origin chore/release-vX.Y.Z
@@ -76,15 +76,15 @@ git pull --ff-only origin main
 cd ~/Desktop/initialization
 
 # Z bump:
-.claude/scripts/release-tag.sh vX.Y.Z -m "v0.x.Z bug fixes: ..."
+.claude/script/release-tag.sh vX.Y.Z -m "v0.x.Z bug fixes: ..."
 
 # Y bump — cut RC first:
-.claude/scripts/release-tag.sh vX.Y.0-rc1 -m "rc1 release notes ..."
+.claude/script/release-tag.sh vX.Y.0-rc1 -m "rc1 release notes ..."
 # Wait CI on the RC tag, then:
-.claude/scripts/release-tag.sh vX.Y.0 -m "vX.Y.0 release notes ..."
+.claude/script/release-tag.sh vX.Y.0 -m "vX.Y.0 release notes ..."
 
 # X bump — same as Y plus the ACK env var:
-RELEASE_X_BUMP_ACK=v1.0.0 .claude/scripts/release-tag.sh v1.0.0 -m "..."
+RELEASE_X_BUMP_ACK=v1.0.0 .claude/script/release-tag.sh v1.0.0 -m "..."
 ```
 
 The script:
@@ -114,13 +114,13 @@ git branch -D chore/release-vX.Y.Z
 
 | Hook | Behaviour |
 |---|---|
-| `.claude/hooks/enforce_semver_tag_via_script.sh` | BLOCKs ad-hoc `git tag v*` / `git push.*v[0-9]` / `git push --tags`; redirects to `release-tag.sh` |
-| `.claude/hooks/check_changelog_drift.sh` | Reminds if `git commit` stages code without `docs/changelog/CHANGELOG.md` update |
-| `.claude/hooks/check_main_fresh_before_worktree.sh` | BLOCKs `git worktree add ... main` when local main is behind origin/main |
-| `.claude/hooks/remind_main_sync.sh` | After `gh pr merge`, reminds to `git pull --ff-only origin main` |
+| `.claude/hook/enforce_semver_tag_via_script.sh` | BLOCKs ad-hoc `git tag v*` / `git push.*v[0-9]` / `git push --tags`; redirects to `release-tag.sh` |
+| `.claude/hook/check_changelog_drift.sh` | Reminds if `git commit` stages code without `doc/changelog/CHANGELOG.md` update |
+| `.claude/hook/check_main_fresh_before_worktree.sh` | BLOCKs `git worktree add ... main` when local main is behind origin/main |
+| `.claude/hook/remind_main_sync.sh` | After `gh pr merge`, reminds to `git pull --ff-only origin main` |
 
 ## Companion docs
 
 - [worktree.md](worktree.md) — the worktree workflow used to cut the chore PR
-- [`docs/adr/0005-folder-naming-plural-for-collections.md`](../adr/0005-folder-naming-plural-for-collections.md) — folder naming
+- [`doc/adr/0005-folder-naming-plural-for-collections.md`](../adr/0005-folder-naming-plural-for-collections.md) — folder naming
 - [`.claude/skills/semver-bump/SKILL.md`](../../.claude/skills/semver-bump/SKILL.md) — agent-facing skill summarising the same flow

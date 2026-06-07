@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034  # module metadata vars (NAME / DESCRIPTION / CATEGORY / TAGS / ...) consumed by engine post-source — https://www.shellcheck.net/wiki/SC2034
-# modules/docker.module.sh — Docker Engine + Compose plugin
+# module/docker.module.sh — Docker Engine + Compose plugin
 #
-# Reference module per docs/module-spec.md. Docker's apt setup needs custom
+# Reference module per doc/module-spec.md. Docker's apt setup needs custom
 # repo keys + sources.list.d entry, so we DON'T use module_use_apt_archetype;
 # we hand-write install/remove/purge but reuse module_default_apt_is_installed
 # + module_default_verify.
@@ -24,7 +24,7 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
     source "${LIB_DIR}/module_helper.sh"
 fi
 
-# ── Metadata (docs/module-spec.md §3) ───────────────────────────────────────
+# ── Metadata (doc/module-spec.md §3) ───────────────────────────────────────
 NAME="docker"
 VERSION_PROVIDED="apt-managed"
 CATEGORY="recommended"

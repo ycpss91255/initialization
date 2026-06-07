@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ci.sh — Run init_ubuntu CI pipeline (ShellCheck + fish syntax + Hadolint + Bats [+ Kcov])
 #
-# Borrowed from ycpss91255-docker/base v0.28.0 (commit ade915a) scripts/ci/ci.sh
+# Borrowed from ycpss91255-docker/base v0.28.0 (commit ade915a) script/ci/ci.sh
 # Customizations vs upstream:
 #   - Replaced `_log_err` from base's _lib.sh with inline `_die`
 #     (we don't borrow base's docker/_lib.sh per PRD §13.2)
 #   - shellcheck path glob: lint all *.sh under repo; exclude small-tools/
-#     (deprecated, PRD §6.6) and modules/tools/ (pending relocation, §6.5)
+#     (deprecated, PRD §6.6) and module/tools/ (pending relocation, §6.5)
 #   - Added fish syntax check (`fish -n`) for all *.fish
 #   - Added hadolint on dockerfile/Dockerfile.test-tools
 #   - Removed `--behavioural` mode (no Docker image build per PRD §2)
@@ -103,15 +103,15 @@ EOF
 # ── Lint discovery (exclude deprecated paths per PRD §6.5/§6.6) ──────────────
 #
 # Pruned directories (slated for relocation or already vendored upstream):
-#   small-tools/             — legacy install scripts, replaced by modules/
-#   modules/tools/           — staging for one-off scripts (PRD §6.5)
-#   modules/config/          — third-party config files (vendored upstream)
-#   modules/submodule/       — v1 sub-tool helpers (predates v2 module pattern)
-#   modules/function/        — v1 lib/ location (moved to lib/)
+#   small-tools/             — legacy install scripts, replaced by module/
+#   module/tools/           — staging for one-off scripts (PRD §6.5)
+#   module/config/          — third-party config files (vendored upstream)
+#   module/submodule/       — v1 sub-tool helpers (predates v2 module pattern)
+#   module/function/        — v1 lib/ location (moved to lib/)
 #
 # Pruned files (legacy install scripts that predate the v2 module pattern):
-#   modules/setup_*.sh       — old all-in-one installers; not migrated yet
-#   modules/anydesk.sh       — legacy one-off
+#   module/setup_*.sh       — old all-in-one installers; not migrated yet
+#   module/anydesk.sh       — legacy one-off
 #   install-nvidia-driver.sh — legacy one-off at repo root
 
 _find_lintable_sh() {
@@ -120,13 +120,13 @@ _find_lintable_sh() {
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
-           -path "${REPO_ROOT}/modules/tools" -o \
-           -path "${REPO_ROOT}/modules/config" -o \
-           -path "${REPO_ROOT}/modules/submodule" -o \
-           -path "${REPO_ROOT}/modules/function" \) -prune -o \
+           -path "${REPO_ROOT}/module/tools" -o \
+           -path "${REPO_ROOT}/module/config" -o \
+           -path "${REPO_ROOT}/module/submodule" -o \
+           -path "${REPO_ROOT}/module/function" \) -prune -o \
         -type f \( -name "*.sh" -o -name "*.bash" -o -name "*.bats" \) \
-        ! -path "${REPO_ROOT}/modules/setup_*.sh" \
-        ! -path "${REPO_ROOT}/modules/anydesk.sh" \
+        ! -path "${REPO_ROOT}/module/setup_*.sh" \
+        ! -path "${REPO_ROOT}/module/anydesk.sh" \
         ! -path "${REPO_ROOT}/install-nvidia-driver.sh" \
         -print0
 }
@@ -137,10 +137,10 @@ _find_lintable_fish() {
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
-           -path "${REPO_ROOT}/modules/tools" -o \
-           -path "${REPO_ROOT}/modules/config" -o \
-           -path "${REPO_ROOT}/modules/submodule" -o \
-           -path "${REPO_ROOT}/modules/function" \) -prune -o \
+           -path "${REPO_ROOT}/module/tools" -o \
+           -path "${REPO_ROOT}/module/config" -o \
+           -path "${REPO_ROOT}/module/submodule" -o \
+           -path "${REPO_ROOT}/module/function" \) -prune -o \
         -type f -name "*.fish" -print0
 }
 
@@ -216,50 +216,50 @@ _set_bats_args_arr() {
 }
 
 _run_unit() {
-    if [[ ! -d "${REPO_ROOT}/tests/unit" ]]; then
-        _info "tests/unit/ does not exist yet — skipping (Phase 1 bootstrap)"
+    if [[ ! -d "${REPO_ROOT}/test/unit" ]]; then
+        _info "test/unit/ does not exist yet — skipping (Phase 1 bootstrap)"
         return 0
     fi
     _info "Running Bats unit tests"
     _set_bats_args_arr
-    bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/tests/unit/"
+    bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/test/unit/"
 }
 
 _run_integration() {
-    if [[ ! -d "${REPO_ROOT}/tests/integration" ]]; then
-        _info "tests/integration/ does not exist yet — skipping (Phase 1 bootstrap)"
+    if [[ ! -d "${REPO_ROOT}/test/integration" ]]; then
+        _info "test/integration/ does not exist yet — skipping (Phase 1 bootstrap)"
         return 0
     fi
     _info "Running Bats integration tests"
     _set_bats_args_arr
-    bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/tests/integration/"
+    bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/test/integration/"
 }
 
 # ── Kcov coverage ────────────────────────────────────────────────────────────
 
 _run_coverage() {
-    if [[ ! -d "${REPO_ROOT}/tests/unit" ]] && [[ ! -d "${REPO_ROOT}/tests/integration" ]]; then
-        _info "No tests/ subdirs yet — skipping kcov (Phase 1 bootstrap)"
+    if [[ ! -d "${REPO_ROOT}/test/unit" ]] && [[ ! -d "${REPO_ROOT}/test/integration" ]]; then
+        _info "No test/ subdirs yet — skipping kcov (Phase 1 bootstrap)"
         return 0
     fi
     if ! command -v kcov >/dev/null 2>&1; then
         _die "kcov not found in container — rebuild test-tools:local (make build-test-tools)"
     fi
     local _excludes=(
-        "${REPO_ROOT}/tests/"
-        "${REPO_ROOT}/scripts/ci/"
+        "${REPO_ROOT}/test/"
+        "${REPO_ROOT}/script/ci/"
         "${REPO_ROOT}/dockerfile/"
         "${REPO_ROOT}/.github/"
         "${REPO_ROOT}/small-tools/"
-        "${REPO_ROOT}/modules/tools/"
+        "${REPO_ROOT}/module/tools/"
     )
     local _exclude_path
     _exclude_path="$(IFS=,; printf '%s' "${_excludes[*]}")"
 
     _info "Running tests with kcov coverage"
     local -a _targets=()
-    [[ -d "${REPO_ROOT}/tests/unit" ]] && _targets+=("${REPO_ROOT}/tests/unit/")
-    [[ -d "${REPO_ROOT}/tests/integration" ]] && _targets+=("${REPO_ROOT}/tests/integration/")
+    [[ -d "${REPO_ROOT}/test/unit" ]] && _targets+=("${REPO_ROOT}/test/unit/")
+    [[ -d "${REPO_ROOT}/test/integration" ]] && _targets+=("${REPO_ROOT}/test/integration/")
     kcov \
         --include-path="${REPO_ROOT}" \
         --exclude-path="${_exclude_path}" \
@@ -292,7 +292,7 @@ _run_in_container() {
         -e HOST_GID="$(id -g)" \
         -e COVERAGE="${_coverage}" \
         "${_service}" \
-        -c "./scripts/ci/ci.sh ${_container_flag}"
+        -c "./script/ci/ci.sh ${_container_flag}"
 }
 
 # ── Main ─────────────────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ How the engineering skills should consume this repo's domain documentation when
 exploring the codebase.
 
 > **Repo convention**: Folder names are singular here (hard rule). ADR path is
-> `docs/adr/`, not `docs/adr/`. The seed templates in the upstream skill use
+> `doc/adr/`, not `doc/adr/`. The seed templates in the upstream skill use
 > plural names — translate accordingly when reading skill instructions.
 
 ## Before exploring, read these
@@ -12,15 +12,15 @@ exploring the codebase.
 - **`CONTEXT.md`** at the repo root — domain glossary (Module / Archetype /
   Lifecycle / Phase / Engine / Standalone / Sidecar / State / Config / Manual
   flag + flagged ambiguities).
-- **`docs/adr/`** — read ADRs that touch the area you're about to work in:
+- **`doc/adr/`** — read ADRs that touch the area you're about to work in:
   - `0001-standalone-engine-state-boundary.md`
   - `0002-all-lifecycle-functions-mandatory.md`
   - `0003-language-choice-and-migration-triggers.md`
   - `0004-tests-must-run-in-docker-only.md`
-- **`docs/module-spec.md`** — single source of truth for module v2 contract.
-- **`docs/prd/init-ubuntu.prd.md`** — product spec, §13.2 captures past
+- **`doc/module-spec.md`** — single source of truth for module v2 contract.
+- **`doc/prd/init-ubuntu.prd.md`** — product spec, §13.2 captures past
   grilling decisions (Q1–Q31).
-- **`docs/architecture.md`** — engine layering, state.json + sidecar locations.
+- **`doc/architecture.md`** — engine layering, state.json + sidecar locations.
 
 If any of these don't exist, **proceed silently**. Don't flag absence; don't
 suggest creating them upfront. The producer skill (`/grill-with-docs`) creates
@@ -33,7 +33,7 @@ This is a single-context repo:
 ```
 /
 ├── CONTEXT.md
-├── docs/
+├── doc/
 │   ├── adr/
 │   │   ├── 0001-standalone-engine-state-boundary.md
 │   │   ├── 0002-all-lifecycle-functions-mandatory.md
@@ -44,8 +44,8 @@ This is a single-context repo:
 │   ├── prd/
 │   └── TESTING.md
 ├── lib/
-├── modules/
-└── tests/
+├── module/
+└── test/
 ```
 
 No `CONTEXT-MAP.md` — there is exactly one context for the whole repo.
@@ -68,5 +68,5 @@ silently overriding:
 > _Contradicts ADR-0004 (Docker-only tests) — but worth reopening because…_
 
 Note that ADR-0004 is enforced via a PreToolUse hook
-(`.claude/hooks/test-must-use-docker.sh`); contradicting it isn't just a docs
+(`.claude/hook/test-must-use-docker.sh`); contradicting it isn't just a docs
 issue, it'll get blocked at tool invocation time.

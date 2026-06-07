@@ -111,6 +111,12 @@ function _logger_header_color() {
 
 function _logger_color_control() {
     local _fd="${1:?"${FUNCNAME[0]} need fd."}";
+    # Explicit --color override (lib/color.sh, PRD §7.5): `always` forces
+    # color even when piped; `never` strips it even on a tty.
+    case "${INIT_UBUNTU_COLOR_MODE:-}" in
+        always) return 0 ;;
+        never)  return 1 ;;
+    esac
     if { [[ -t 1 && "${_fd}" -eq 1 ]] || [[ -t 2 && "${_fd}" -eq 2 ]]; } && \
     [[ "${LOG_COLOR}" != "false" ]]; then
         return 0

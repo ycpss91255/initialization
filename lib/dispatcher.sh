@@ -225,6 +225,43 @@ _dispatcher_lifecycle() {
         done <<< "${_resolved}"
     fi
 
+    # Plan + confirm (PRD §7.2, 2026-06-06): without -y, print the resolved
+    # plan after dep resolution and ask `Proceed? [Y/n]` (install defaults
+    # to yes). Non-tty stdin has nobody to answer, so the default applies.
+    # --dry-run executes nothing, so it never prompts.
+    if [[ "${_phase}" == "install" \
+          && "${INIT_UBUNTU_DRY_RUN}" != "true" \
+          && "${INIT_UBUNTU_YES}" != "true" ]]; then
+        local -a _plan_deps=()
+        local _n
+        for _n in "${_order[@]}"; do
+            [[ " ${_modules[*]} " == *" ${_n} "* ]] && continue
+            _plan_deps+=("${_n}")
+        done
+        local _plan="Will install: ${_modules[*]}"
+        if [[ "${#_plan_deps[@]}" -gt 0 ]]; then
+            local _dep_word="deps"
+            [[ "${#_plan_deps[@]}" -eq 1 ]] && _dep_word="dep"
+            local _dep_csv
+            printf -v _dep_csv '%s, ' "${_plan_deps[@]}"
+            _plan+=" + ${#_plan_deps[@]} ${_dep_word} (${_dep_csv%, })"
+        fi
+        printf '%s\n' "${_plan}"
+        printf 'Proceed? [Y/n] '
+        local _ans=""
+        if [[ -t 0 ]]; then
+            read -r _ans || _ans=""
+        else
+            printf '\n'
+        fi
+        case "${_ans}" in
+            [nN]*)
+                printf 'Aborted.\n'
+                return 1
+                ;;
+        esac
+    fi
+
     # Refuse root only when we'll actually mutate the system (PRD §10).
     # Resolved AFTER resolver so unknown-module / cycle errors still surface
     # their own exit codes (2 / 5) rather than getting masked by exit 4.

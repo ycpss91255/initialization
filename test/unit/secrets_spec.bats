@@ -73,6 +73,10 @@ _set_agent_sock() {
     export SSH_AUTH_SOCK="$1"
 }
 
+_set_dbus() {
+    export DBUS_SESSION_BUS_ADDRESS="$1"
+}
+
 # ── backend autoselect ──────────────────────────────────────────────────────
 
 @test "autoselect prefers pass when installed" {
@@ -87,7 +91,7 @@ _set_agent_sock() {
     command -v pass >/dev/null 2>&1 && skip "real pass installed in image"
     _load_secrets
     _stub secret-tool
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/fake-bus"
+    _set_dbus "unix:path=/tmp/fake-bus"
     run secrets_backend_resolve
     assert_success
     assert_output "gnome-keyring"
@@ -314,11 +318,11 @@ _set_agent_sock() {
 
 @test "token round-trips through a mocked pass backend via CLI" {
     _set_backend pass
-    export SECRETS_FAKE_PASS_STORE="${INIT_UBUNTU_TEST_SCRATCH}/fake-pass-store"
-    _stub pass 'case "$1" in
-        insert) cat > "${SECRETS_FAKE_PASS_STORE:?}" ;;
-        show)   cat "${SECRETS_FAKE_PASS_STORE:?}" ;;
-    esac'
+    export SECRETS_FAKE_PASS_DB="${INIT_UBUNTU_TEST_SCRATCH}/fake-pass-db"
+    _stub pass "case \"\$1\" in
+        insert) cat > \"\${SECRETS_FAKE_PASS_DB:?}\" ;;
+        show)   cat \"\${SECRETS_FAKE_PASS_DB:?}\" ;;
+    esac"
     run bash -c "printf '%s' 'pass-tok-77' | '${REPO_ROOT}/setup_secrets.sh' token set gh-token"
     assert_success
     run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" token get gh-token
@@ -330,12 +334,12 @@ _set_agent_sock() {
 
 @test "token round-trips through a mocked gnome-keyring backend via CLI" {
     _set_backend gnome-keyring
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/fake-bus"
+    _set_dbus "unix:path=/tmp/fake-bus"
     export SECRETS_FAKE_KEYRING="${INIT_UBUNTU_TEST_SCRATCH}/fake-keyring"
-    _stub secret-tool 'case "$1" in
-        store)  cat > "${SECRETS_FAKE_KEYRING:?}" ;;
-        lookup) cat "${SECRETS_FAKE_KEYRING:?}" ;;
-    esac'
+    _stub secret-tool "case \"\$1\" in
+        store)  cat > \"\${SECRETS_FAKE_KEYRING:?}\" ;;
+        lookup) cat \"\${SECRETS_FAKE_KEYRING:?}\" ;;
+    esac"
     run bash -c "printf '%s' 'gkr-tok-42' | '${REPO_ROOT}/setup_secrets.sh' token set gh-token"
     assert_success
     run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" token get gh-token
@@ -406,7 +410,7 @@ _set_agent_sock() {
 
 @test "gpg import reads key material from stdin when no file is given" {
     export SECRETS_FAKE_GPG_IN="${INIT_UBUNTU_TEST_SCRATCH}/gpg-stdin"
-    _stub gpg 'cat > "${SECRETS_FAKE_GPG_IN:?}"'
+    _stub gpg "cat > \"\${SECRETS_FAKE_GPG_IN:?}\""
     run bash -c "printf '%s' 'STDIN KEY BLOCK' | '${REPO_ROOT}/setup_secrets.sh' gpg import"
     assert_success
     grep -q -- '^gpg --import$' "${SECRETS_STUB_LOG}"

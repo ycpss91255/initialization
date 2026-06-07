@@ -72,6 +72,9 @@ RUN apk add --no-cache curl xz && \
 #   - newt               [init_ubuntu addition] provides `whiptail`, the
 #                        fallback TUI backend; alpine packages it under
 #                        "newt"
+#   - curl               [init_ubuntu addition] tool self-dep (preflight,
+#                        PRD §3.4): e2e specs drive the real entrypoint,
+#                        which gates non-help subcommands on jq/curl/git
 #   - openssl            [init_ubuntu addition] secrets encrypted-file
 #                        backend round-trip tests run real `openssl enc`
 #                        inside the container (PRD §14.3, issue #44)
@@ -90,7 +93,7 @@ RUN apk add --no-cache \
         fish \
         dialog ncurses-terminfo \
         newt \
-        jq \
+        jq curl \
         openssl \
         openssh
 

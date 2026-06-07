@@ -20,6 +20,14 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Fixed
+
+- **github-release archetype download URL 404** : `lib/module_helper.sh`
+  built `releases/latests/download/` (one-char typo) so every real
+  (non-mocked) install of an archetype-B module would 404. Fixed to
+  `releases/latest/download/` + regression spec. Found independently by
+  three Batch B module agents.
+
 ### Added
 
 - **Sync SSH end-to-end** (issue #67, PRD §16, AC-15): `lib/sync.sh` now
@@ -45,6 +53,41 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   → teardown; other workflows skip the spec. `openssh` is baked into
   the test-tools image, and `/.tmp/` (throwaway E2E ssh keys) is now
   gitignored.
+- **fdfind module migrated to the v2 contract** (issue #54, PRD §6.3.1
+  Batch B): `module/submodule/fdfind.sh` (v1 GitHub tarball install) is
+  replaced by `module/fdfind.module.sh` on the apt archetype — Ubuntu
+  ships fd as the `fd-find` package whose binary is `fdfind`; the
+  POST_INSTALL_MESSAGE explains the `alias fd=fdfind` shortcut. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  (dpkg-reported package version) is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. Tagged `cli-essentials`, `CATEGORY=optional`,
+  `DEPENDS_ON=()` (also a neovim dependency for telescope file finding).
+- **Self-deps preflight in the entrypoint** (issue #40, PRD §3.4 /
+  AC-34): new `lib/preflight.sh` checks the tool's own dependencies
+  (`jq` / `curl` / `git`) before dispatching. Missing + sudo available:
+  prints an apt-style plan and asks once whether to `apt install`
+  (automatic with `-y` / `INIT_UBUNTU_YES=true`); missing + no sudo:
+  fails fast with exit 4 and explicit install guidance. `help` /
+  `version` paths are exempt, and the check runs at most once per run
+  (`INIT_UBUNTU_PREFLIGHT_DONE` guard). Resolves the chicken-and-egg
+  where state/config/detect need `jq` but `jq` ships inside the
+  `apt-essentials` module. Test rig gains `curl` (test-tools image +
+  kcov coverage deps) so e2e specs driving the real entrypoint pass the
+  preflight; the real apt-install path is reserved for the AC-34
+  integration check in a clean CI container (wave 6).
+- **`lazygit.module.sh` v2 module** (issue #48, PRD §6.3.1 Batch B):
+  migrates `module/submodule/lazygit.sh` to the v2 contract on the
+  github-release archetype. Versioned upstream assets
+  (`lazygit_<ver>_Linux_x86_64.tar.gz`) are resolved at run time before
+  super-calling the archetype fetch. All 10 lifecycle phases are
+  runnable standalone (AC-25); the version Sidecar (shared
+  `module_sidecar_*` helpers) is written on install/upgrade and deleted
+  on remove/purge (ADR-0001), with `doctor` flagging
+  Sidecar/install-state drift. Ships
+  `test/unit/module/lazygit_spec.bats` (71 tests, Q29 scope) with
+  mocked GitHub queries (Q46: zero network in gates).
 - **Import/export with the ADR-0013 conflict pipeline** (issue #43,
   AC-14): `export <file> [--modules=<csv>]` ships only the
   machine-portable `synced` section of each installed module (ADR-0018);

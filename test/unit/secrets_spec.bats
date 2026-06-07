@@ -315,13 +315,17 @@ _set_agent_sock() {
     run "${REPO_ROOT}/setup_secrets.sh" ssh-key generate \
         --file "${INIT_UBUNTU_TEST_SCRATCH}/sshkey" --comment test@host
     assert_success
-    grep -q '^ssh-keygen ' "${SECRETS_STUB_LOG}"
-    grep -q -- '-t ed25519' "${SECRETS_STUB_LOG}"
-    grep -q -- "-f ${INIT_UBUNTU_TEST_SCRATCH}/sshkey" "${SECRETS_STUB_LOG}"
-    grep -q -- '-C test@host' "${SECRETS_STUB_LOG}"
-    # passphrase prompting is delegated to ssh-keygen's own tty prompt:
-    # nothing sensitive may ever travel through argv (AC-20)
-    run ! grep -q -- '-N' "${SECRETS_STUB_LOG}"
+    # Exact whole-argv assertion (AC-20): passphrase prompting is delegated
+    # to ssh-keygen's own tty prompt, so the recorded argv must be exactly
+    # -t/-f/-C and nothing else — no -N, no passphrase, no extra flags.
+    #
+    # Deliberately NOT a substring `grep -- '-N'` absence check: the -f path
+    # lives under bats' mktemp run dir (bats-run-XXXXXX), and whenever the
+    # random suffix starts with "N" the path itself contains "-N", which
+    # made the old assertion flake (~1/62 runs).
+    grep -qxF \
+        "ssh-keygen -t ed25519 -f ${INIT_UBUNTU_TEST_SCRATCH}/sshkey -C test@host" \
+        "${SECRETS_STUB_LOG}"
 }
 
 @test "ssh-key generate --no-passphrase passes only an empty -N" {

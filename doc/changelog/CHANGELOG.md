@@ -22,6 +22,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`jetson-stats.module.sh` v2 module** (issue #37, PRD Q51 / §6.3.3 Batch
+  C): new module providing the `jtop` monitor TUI for NVIDIA Jetson Orin on
+  the custom archetype — `sudo pip3 install -U jetson-stats`, falling back
+  to `sudo pipx install` on PEP 668 (externally-managed) Python
+  environments, detected via the stdlib `EXTERNALLY-MANAGED` marker.
+  `SUPPORTED_PLATFORMS=("jetson-orin")` only: `detect()` keys off the
+  engine form factor or `/etc/nv_tegra_release`, and `is_recommended()`
+  answers yes solely on jetson-orin. `doctor()` checks the `jtop.service`
+  state (warn-only — a fresh install legitimately needs a re-login or
+  `sudo systemctl restart jtop.service`, also surfaced as the post-install
+  message). All 10 lifecycle phases run standalone (AC-25); install is
+  idempotent (AC-5); `--dry-run` performs no filesystem writes (AC-12); the
+  version Sidecar (pip-reported version, `pip-managed` fallback) is written
+  on install/upgrade and removed on remove/purge per ADR-0001 while
+  `state.json` is never touched by the module. `remove` keeps the leftover
+  `jtop.service` unit; only `purge` disables the service and deletes the
+  unit file. Tagged `hardware`, `CATEGORY=optional`,
+  `DEPENDS_ON=(apt-essentials)` (Q39).
 - **ranger module** (issue #61, PRD §6.3.3 Batch C): new
   `module/ranger.module.sh` on the apt + config-drop hybrid archetype
   (super-call pattern) — apt installs the `ranger` package, then the

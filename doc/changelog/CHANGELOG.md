@@ -22,6 +22,28 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **TUI Manage Installed / Manage Secrets + destructive confirm dialogs**
+  (issue #72, PRD §8.3/§8.4): the main menu's Manage Installed entry now
+  lists installed modules (version + installed_at, data source: a forked
+  `setup_ubuntu list --installed --json`) with a flat ↔ group-by-`TAGS[0]`
+  view toggle. Per-module actions fork the matching CLI subcommand (G4 —
+  the TUI has no pipeline of its own): Update → `upgrade <m> -y`,
+  Remove → `remove --no-deps <m> -y`, Purge → `purge --no-deps <m> -y`
+  (`--no-deps` so tearing down a module never cascades into shared
+  dependencies). Remove / Purge go through a §8.4 confirm dialog that
+  enumerates the concrete actions — the exact command to be forked, the
+  module plan derived from a forked `<action> --dry-run --no-deps`, and
+  the state.json change — behind `< Proceed > / < Cancel >` buttons
+  (Cancel forks nothing). Manage Secrets forks `setup_secrets` and
+  returns to the main menu afterwards. New `lib/tui_backend.sh` helpers:
+  `tui_cli_installed_json`, `tui_installed_entries`, `tui_manage_args`,
+  `tui_cli_manage_plan`, `tui_manage_confirm_text`, plus
+  `TUI_YES_LABEL`/`TUI_NO_LABEL` relabeling on `tui_render_yesno`
+  (dialog `--yes-label/--no-label`, whiptail `--yes-button/--no-button`).
+  Covered by `test/unit/tui_manage_spec.bats` (mock-backend units + e2e
+  slices: list rendering, action argv, confirm content, cancel-no-fork,
+  secrets round-trip).
+
 - **TUI checkbox accumulator + Run → Review → Proceed** (issue #70, PRD
   §8.1/§8.2 Q43, AC-10/AC-11): Base / Recommended / Optional submenus are
   now pure check-lists grouped by `TAGS[0]` with dep chains collapsed to a

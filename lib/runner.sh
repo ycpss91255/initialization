@@ -88,6 +88,32 @@ _runner_progress() {
 # Per-trace monotonic counter backing span_id (`<phase>_<module>_NNN`).
 _RUNNER_SPAN_SEQ=0
 
+# Modules whose phase succeeded earlier in the CURRENT batch — backs the
+# ADR-0010 depends_on snapshot ("deps actually installed this session").
+# Reset by _runner_run_batch; filled by its loop after each success.
+declare -gA _RUNNER_SESSION_OK=()
+
+# _runner_dep_snapshot <module>
+#   Print <module>'s forward-dep snapshot as csv (ADR-0010, issue #93):
+#   the resolver's transitive dep closure minus the module itself, kept
+#   only where the dep actually completed install earlier in this session
+#   (topo order guarantees deps run before their dependents). --no-deps
+#   prints nothing — the snapshot reflects reality, not metadata intent.
+#   Degrades to empty when the resolver is not loaded (minimal engines).
+_runner_dep_snapshot() {
+    local _name="${1:?_runner_dep_snapshot needs <module>}"
+    [[ "${INIT_UBUNTU_NO_DEPS:-false}" == "true" ]] && return 0
+    declare -F resolver_collect_transitive >/dev/null 2>&1 || return 0
+
+    local _dep _csv=""
+    while IFS= read -r _dep; do
+        [[ -z "${_dep}" || "${_dep}" == "${_name}" ]] && continue
+        [[ -n "${_RUNNER_SESSION_OK[${_dep}]:-}" ]] || continue
+        _csv+="${_dep},"
+    done < <(resolver_collect_transitive "${_name}" | sort)
+    printf '%s' "${_csv%,}"
+}
+
 _runner_run_phase() {
     local _phase="${1:?_runner_run_phase needs <phase>}"   # install|remove|purge
     local _name="${2:?_runner_run_phase needs <module>}"
@@ -184,7 +210,11 @@ _runner_run_phase() {
                     if [[ " ${INIT_UBUNTU_REQUESTED_MODULES:-} " == *" ${_name} "* ]]; then
                         _manual="true"
                     fi
-                    state_record_install "${_name}" "${_manual}" "${VERSION_PROVIDED:-unknown}" || \
+                    # depends_on snapshot (ADR-0010, #93): resolved deps that
+                    # actually installed this session; [] under --no-deps.
+                    state_record_install "${_name}" "${_manual}" \
+                        "${VERSION_PROVIDED:-unknown}" \
+                        "$(_runner_dep_snapshot "${_name}")" || \
                         log_warn "[${_name}] state_record_install failed (continuing)"
                     ;;
                 upgrade)
@@ -286,6 +316,9 @@ _runner_run_batch() {
         "arch=$(uname -m)" \
         "gpu=$(_runner_snapshot_gpu)"
 
+    # Fresh per-session success set (ADR-0010 depends_on snapshot, #93).
+    _RUNNER_SESSION_OK=()
+
     local _name _rc _failures=0 _ok=0
     local _idx=0 _total="${#_modules[@]}"
     for _name in "${_modules[@]}"; do
@@ -293,6 +326,7 @@ _runner_run_batch() {
         _runner_progress "[${_idx}/${_total}] ${_name}: $(_runner_phase_gerund "${_phase}")..."
         if _runner_run_phase "${_phase}" "${_name}"; then
             _ok=$(( _ok + 1 ))
+            _RUNNER_SESSION_OK["${_name}"]=1
         else
             _rc=$?
             _failures=$(( _failures + 1 ))

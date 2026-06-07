@@ -22,6 +22,91 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Runner records the ADR-0010 depends_on snapshot** (issue #93, PRD
+  §10.1, follow-up to #43): `runner_install` now passes the resolved
+  forward-dep snapshot into `state_record_install`'s 4th parameter
+  instead of always recording `[]`. The snapshot is the resolver's
+  transitive dep closure for the module, filtered to deps that actually
+  completed install earlier in the same session (topo order guarantees
+  deps run first), so deps that failed mid-batch are excluded and
+  `--no-deps` installs record `[]` — the state reflects what really
+  happened, not metadata intent. The per-session success set resets on
+  every runner batch. `upgrade` topo-sort (PRD §7.6) and
+  `--with-orphans` consume this field later.
+
+- **AC-10 two-layer TUI test harness** (issue #73, PRD §11.1 AC-10):
+  layer 1 — `test/unit/tui_ac10_spec.bats` runs the scripted-widget e2e
+  (now extracted to the reusable `test/helper/tui_harness.bash`: ADR-0019
+  fixtures, sealed-PATH symlink farm, recording mock `setup_ubuntu`,
+  backend-named mock widget) on BOTH backends and asserts the Q43 model —
+  checked pages accumulate → `< Run >` → one exact
+  `install <modules...> -y` CLI command string, byte-identical on dialog
+  and whiptail — plus the argv-level backend differences (dialog
+  `--cancel-label` vs whiptail `--cancel-button`; widget argv otherwise
+  identical across backends) and a whiptail Exit fs-snapshot. Layer 2 —
+  `test/integration/tui/tui_smoke_spec.bats` drives the REAL dialog and
+  whiptail binaries on an expect pseudo-tty (new `expect` in
+  Dockerfile.test-tools) through the literal AC-10 flow: open main menu →
+  enter Optional → check one item → OK → Exit; asserts every screen
+  renders, the checkbox toggles to `[*]`, `< Exit >` exits 0 with zero
+  file writes, and the only CLI forks are `list/detect --json`. The
+  expect proc library (`test/integration/tui/harness/tui_expect_lib.tcl`)
+  is reusable for the upcoming #71/#72 screens. Runs under
+  `make test-integration` (ADR-0004: Docker only).
+- **TUI Quick Setup multi-step wizard + manual-flag semantics** (issue
+  #71, PRD §8.2.1, ADR-0010): main-menu item 1 is now the real four-step
+  wizard. Step 1/4 confirms the detected platform with an optional
+  override that stays in wizard memory during prepare; Step 2/4 offers
+  recommended modules with the §15.3 filter pipeline (SUPPORTED_PLATFORMS
+  vs the effective form factor first, then the Q36 `[modules.<n>] enabled`
+  tri-state — `false` force-excludes, `true` force-includes checked — then
+  the engine's `is_recommended` verdict preselects); Step 3/4 offers the
+  CLI-essentials suite as whole-suite / pick-individually / skip; Step 4/4
+  is the AI-agent-CLI multi-select (recommended ones preselected). The
+  wizard then reuses the #70 Review & Install screen (refactored into a
+  shared `_tui_screen_review` decision screen: rc 0 = Proceed) and forks
+  the single CLI pipeline via `_tui_exec_install`. The platform override
+  is written only on the Proceed leg — via a forked
+  `setup_ubuntu config set platform.override <v>` followed by
+  `install --profile=<v> <picked...> -y` — so Cancel/SIGINT anywhere
+  before Proceed is a pure cancel (zero config/state writes, fs-snapshot
+  asserted); after Proceed the CLI pipeline owns the terminal and a
+  partial install's exit 6 propagates as the TUI exit code (§8.2.1 stage
+  table, ADR-0015). ADR-0010 manual-flag matrix is guaranteed
+  structurally: the forked argv names only user-picked modules (e.g.
+  neovim/lazygit/eza → `manual=true`), engine-pulled deps
+  (fzf/ripgrep/fdfind/fnm) never appear on it and stay `manual=false` —
+  bats asserts the exact command string. New `lib/tui_backend.sh` helpers:
+  `tui_platform_choices` (shared §7.5 form-factor vocabulary, also reused
+  by System Info), `tui_effective_form_factor`,
+  `tui_qs_recommended_entries`, `tui_qs_tag_entries` (driven by the
+  additive ADR-0019 item fields `recommended` / `enabled`, absent = null
+  = nothing forced). Covered by `test/unit/tui_quick_setup_spec.bats`
+  (helper units + scripted mock-backend e2e: happy path, deferred
+  override write ordering, override narrowing Step 2, pure-cancel
+  fs snapshots, nothing-selected, exit-6 propagation).
+- **TUI Manage Installed / Manage Secrets + destructive confirm dialogs**
+  (issue #72, PRD §8.3/§8.4): the main menu's Manage Installed entry now
+  lists installed modules (version + installed_at, data source: a forked
+  `setup_ubuntu list --installed --json`) with a flat ↔ group-by-`TAGS[0]`
+  view toggle. Per-module actions fork the matching CLI subcommand (G4 —
+  the TUI has no pipeline of its own): Update → `upgrade <m> -y`,
+  Remove → `remove --no-deps <m> -y`, Purge → `purge --no-deps <m> -y`
+  (`--no-deps` so tearing down a module never cascades into shared
+  dependencies). Remove / Purge go through a §8.4 confirm dialog that
+  enumerates the concrete actions — the exact command to be forked, the
+  module plan derived from a forked `<action> --dry-run --no-deps`, and
+  the state.json change — behind `< Proceed > / < Cancel >` buttons
+  (Cancel forks nothing). Manage Secrets forks `setup_secrets` and
+  returns to the main menu afterwards. New `lib/tui_backend.sh` helpers:
+  `tui_cli_installed_json`, `tui_installed_entries`, `tui_manage_args`,
+  `tui_cli_manage_plan`, `tui_manage_confirm_text`, plus
+  `TUI_YES_LABEL`/`TUI_NO_LABEL` relabeling on `tui_render_yesno`
+  (dialog `--yes-label/--no-label`, whiptail `--yes-button/--no-button`).
+  Covered by `test/unit/tui_manage_spec.bats` (mock-backend units + e2e
+  slices: list rendering, action argv, confirm content, cancel-no-fork,
+  secrets round-trip).
+
 - **TUI checkbox accumulator + Run → Review → Proceed** (issue #70, PRD
   §8.1/§8.2 Q43, AC-10/AC-11): Base / Recommended / Optional submenus are
   now pure check-lists grouped by `TAGS[0]` with dep chains collapsed to a
@@ -281,6 +366,38 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`fnm.module.sh` v2 module** (issue #56, PRD §6.3.1 Batch B, Q3/Q4):
+  Fast Node Manager split out of `module/setup_neovim.sh` so the
+  dependency is reusable (neovim and gemini both need Node.js). Custom
+  archetype matching the legacy logic: the upstream install script
+  (`https://fnm.vercel.app/install --skip-shell --install-dir`) performs
+  a pure user-home install into `~/.local/share/fnm`
+  (`SUPPORTS_USER_HOME=true`, `INSTALL_TARGET_DEFAULT=user-home`, no
+  sudo), with `Schniz/fnm` release queries powering `is_outdated` and
+  the Sidecar version. Shell integration is idempotent and
+  marker-guarded: a fish `conf.d/fnm.fish` drop (user-owned files are
+  never clobbered) and a fenced block appended to an existing
+  `~/.bashrc` (never created); purge strips exactly what install added.
+  Install also provisions the legacy default Node.js 22 (fail-soft) so
+  dependents get a working `node`/`npm` out of the box. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent
+  (AC-5); `--dry-run` performs no filesystem writes (AC-12); the
+  Sidecar is written on install/upgrade and removed on remove/purge per
+  ADR-0001 while `state.json` is never touched by the module. Tagged
+  `cli-essentials`, `CATEGORY=optional`, `DEPENDS_ON=()`. Ships
+  `test/unit/module/fnm_spec.bats` (94 tests, Q29 scope) with mocked
+  fetch + GitHub queries (Q46: zero network in gates).
+- **New `ripgrep` module on the apt archetype** (issue #55, PRD §6.3.1
+  Batch B, Q41): `module/ripgrep.module.sh` installs the `ripgrep`
+  package (binary: `rg`, fast grep alternative) — referenced by the
+  neovim dep chain (telescope live-grep) but previously missing from
+  the catalog. All 10 lifecycle phases run standalone (AC-25); install
+  is idempotent (AC-5); `--dry-run` performs no filesystem writes
+  (AC-12); the version Sidecar (dpkg-reported package version) is
+  written on install/upgrade and removed on remove/purge per ADR-0001
+  while `state.json` is never touched by the module. Tagged
+  `cli-essentials`, `CATEGORY=optional`, `DEPENDS_ON=()`. Ships
+  `test/unit/module/ripgrep_spec.bats` (63 tests, Q29 scope).
 - **Install output UX** (issue #66, PRD §7.7, AC-35): the install pipeline
   now renders human-readable output derived from JSONL events (events are
   the single source of truth).

@@ -33,6 +33,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   while `state.json` is never touched by the module. Tagged
   `cli-essentials`, `CATEGORY=optional`, depends on `apt-essentials`.
 
+- **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
+  `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory
+  at session end — keeps the newest 100 `.jsonl` files and none older
+  than 30 days; when either limit is exceeded it deletes from the oldest
+  (logrotate-like, pure bash/find, no external dependency; both limits
+  env-overridable via `INIT_UBUNTU_LOG_RETENTION_{DAYS,FILES}`). Wired
+  into `lib/runner.sh` right after the `session_end` event so the active
+  log file (newest mtime) is never a victim; pruning emits one
+  engine-level `log_pruned` OTel event (ADR-0006 schema) carrying
+  `deleted_count` + retention limits. Boundaries are keep-side inclusive:
+  exactly 100 files / exactly 30 days old are kept.
 - **State robustness** (issue #41, PRD §10.1): reading a corrupt
   `state.json` now quarantines it (`mv` → `state.json.corrupt.<ts>`) and
   fails fast (exit 1) with recovery guidance — re-run install to rebuild

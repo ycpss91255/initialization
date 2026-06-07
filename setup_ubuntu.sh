@@ -40,6 +40,8 @@ _logger_ensure_trace_id
 
 # shellcheck source=lib/general.sh
 source "${LIB_DIR}/general.sh"
+# shellcheck source=lib/preflight.sh
+source "${LIB_DIR}/preflight.sh"
 # shellcheck source=lib/i18n.sh
 source "${LIB_DIR}/i18n.sh"
 # shellcheck source=lib/detect.sh
@@ -62,6 +64,11 @@ source "${LIB_DIR}/resolver.sh"
 source "${LIB_DIR}/runner.sh"
 # shellcheck source=lib/dispatcher.sh
 source "${LIB_DIR}/dispatcher.sh"
+
+# ── Self-deps preflight (PRD §3.4, AC-34) ───────────────────────────────────
+# Must run before anything that shells out to jq (state / config / detect /
+# platform). help / version paths are exempt inside preflight_self_deps.
+preflight_self_deps "$@" || exit $?
 
 # ── Compute & export form_factor for module sub-shells ──────────────────────
 # Modules' is_recommended() and platform-aware install() read this. We

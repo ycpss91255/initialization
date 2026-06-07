@@ -114,6 +114,23 @@ _load_sync() {
     grep -q "setup_ubuntu import" "${SYNC_STUB_LOG}"
 }
 
+@test "sync_push without --apply leaves the remote import a dry-run (ADR-0013)" {
+    _load_sync
+    state_record_install docker true
+    run sync_push user@host
+    assert_success
+    run grep -q -- "--apply" "${SYNC_STUB_LOG}"
+    assert_failure
+}
+
+@test "sync_push --apply forwards --apply to the remote import" {
+    _load_sync
+    state_record_install docker true
+    run sync_push user@host --apply
+    assert_success
+    grep -q "setup_ubuntu import /tmp/init_ubuntu_sync.json --apply" "${SYNC_STUB_LOG}"
+}
+
 @test "sync_push --modules=<csv> succeeds (filter forwarded to state_io_export)" {
     _load_sync
     state_record_install docker true

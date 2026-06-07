@@ -39,8 +39,8 @@ Subcommands:
   list                   List registered modules (--installed for state.json view)
   show    <module>       Print a module's metadata
   detect                 Print host environment (use --json for machine output)
-  export  <file>         Export installed-state payload (use --modules=<csv>)
-  import  <file>         Import payload and install the listed modules
+  export  <file>         Export state.json synced sections (use --modules=<csv>)
+  import  <file>         Diff payload vs local state (dry-run default; --apply commits)
   upgrade [<module>...]  Run upgrade() for given modules (or all installed)
   verify  [<module>...]  Run verify() for given modules (or all installed)
   search  <keyword>      Search modules by name / category / tag
@@ -339,13 +339,21 @@ _dispatcher_export() {
     return "${_rc}"
 }
 
+# import — ADR-0013 conflict pipeline, same rules as `sync --pull`:
+# dry-run by default (print the plan, write nothing), `--apply` commits.
+# Union of modules, remote-wins on version/depends_on, `manual` sticky to
+# true. The payload's `local` sections are never applied (ADR-0018); the
+# receiver rebuilds `local` via its own install pipeline.
 _dispatcher_import() {
     local _in=""
+    local _apply="false"
+    local _dry="false"
     local _arg
     for _arg in "$@"; do
         case "${_arg}" in
             -y|--yes) export INIT_UBUNTU_YES=true ;;
-            --dry-run) export INIT_UBUNTU_DRY_RUN=true ;;
+            --apply) _apply="true" ;;
+            --dry-run) _dry="true" ;;
             -*) printf "[dispatcher] ERROR: unknown flag %s\n" "${_arg}" >&2; return 2 ;;
             *)
                 if [[ -z "${_in}" ]]; then
@@ -361,27 +369,106 @@ _dispatcher_import() {
         printf "[dispatcher] ERROR: import needs <in-file>\n" >&2
         return 2
     fi
+    # Dry-run is the default; an explicit --dry-run (flag or global env)
+    # always wins over --apply.
+    [[ "${_dry}" == "true" || "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && _apply="false"
 
-    local _modules
-    _modules="$(state_io_payload_modules "${_in}")"
-    local _rc=$?
+    if ! declare -F state_io_import_plan >/dev/null 2>&1; then
+        printf "[dispatcher] ERROR: state_io lib not loaded\n" >&2
+        return 1
+    fi
+
+    local _plan _rc
+    _plan="$(state_io_import_plan "${_in}")"
+    _rc=$?
     if [[ "${_rc}" -ne 0 ]]; then
         return "${_rc}"
     fi
-    if [[ -z "${_modules}" ]]; then
-        printf "[dispatcher] payload has no modules; nothing to do.\n"
+
+    local _source
+    _source="$(jq -r 'if .source_host then ((.source_user // "?") + "@" + .source_host) else "local file" end' \
+        "${_in}" 2>/dev/null || printf 'local file')"
+
+    printf "IMPORT DIFF (source: %s)\n" "${_source}"
+    jq -r '.[]
+        | if .action == "install" then
+            "  + \(.name)\tinstall\t\(.remote_version)\tmanual=\(.synced.manual // false)"
+          elif .action == "upgrade" then
+            "  ~ \(.name)\tupgrade\t\(.local_version) -> \(.remote_version)"
+          elif .action == "flag-manual" then
+            "  * \(.name)\tmanual\tflag manual=true (sticky)"
+          elif .action == "keep" then
+            "  = \(.name)\tkeep\t\(.local_version)\t(local only)"
+          elif .action == "noop" then
+            "  = \(.name)\tup-to-date\t\(.local_version)"
+          else
+            "  ! \(.name)\tskip\t\(.reason)"
+          end' <<< "${_plan}"
+
+    if [[ "${_apply}" != "true" ]]; then
+        printf "\n[dispatcher] dry-run (default): nothing was changed. Re-run with --apply to commit.\n"
         return 0
     fi
 
-    # Hand the names to the install lifecycle path so deps are resolved
-    # and the user's per-flag choices (dry-run, yes) are honored.
-    local -a _names=()
-    local _line
-    while IFS= read -r _line; do
-        [[ -n "${_line}" ]] && _names+=("${_line}")
-    done <<< "${_modules}"
+    # Modules that need a real lifecycle run on this machine.
+    local -a _installs=() _upgrades=()
+    local _n
+    while IFS= read -r _n; do
+        [[ -n "${_n}" ]] && _installs+=("${_n}")
+    done < <(jq -r '.[] | select(.action == "install") | .name' <<< "${_plan}")
+    while IFS= read -r _n; do
+        [[ -n "${_n}" ]] && _upgrades+=("${_n}")
+    done < <(jq -r '.[] | select(.action == "upgrade") | .name' <<< "${_plan}")
 
-    _dispatcher_lifecycle install "${_names[@]}"
+    # Refuse root only when we'll actually mutate the system (PRD §10);
+    # a flag-manual-only apply is a pure state.json write and stays
+    # root-safe for CI / bats.
+    if [[ "$(( ${#_installs[@]} + ${#_upgrades[@]} ))" -gt 0 && "${EUID:-0}" -eq 0 ]]; then
+        printf "[dispatcher] ERROR: do not run import --apply as root. Re-run as a regular user; sudo will be requested per-module.\n" >&2
+        return 4
+    fi
+
+    # ADR-0013 --apply: each affected module runs through the normal
+    # install / upgrade lifecycle, then the merged synced sections land in
+    # state.json (remote-wins). Partial failure → exit 6 (PRD §7.4).
+    local _lifecycle_rc=0
+    if [[ "${#_installs[@]}" -gt 0 ]]; then
+        _dispatcher_lifecycle install "${_installs[@]}" || _lifecycle_rc=$?
+    fi
+    if [[ "${#_upgrades[@]}" -gt 0 ]] && declare -F runner_upgrade >/dev/null 2>&1; then
+        runner_upgrade "${_upgrades[@]}" || _lifecycle_rc=$?
+    fi
+
+    # Never let state.json claim an install that did not land: any
+    # install-entry module still missing from state is excluded from the
+    # state merge.
+    local _skip_csv=""
+    for _n in "${_installs[@]}"; do
+        if ! state_is_recorded "${_n}"; then
+            _skip_csv="${_skip_csv:+${_skip_csv},}${_n}"
+        fi
+    done
+
+    # Hand the pre-lifecycle plan to the apply phase: the install runs
+    # above already changed local state, so recomputing the plan here
+    # would shift the actions (install→upgrade/noop) and lose remote-wins.
+    local _plan_file
+    _plan_file="$(mktemp /tmp/init_ubuntu_import_plan.XXXXXX.json)"
+    printf '%s\n' "${_plan}" > "${_plan_file}"
+
+    local -a _apply_args=("${_in}" "--plan=${_plan_file}")
+    [[ -n "${_skip_csv}" ]] && _apply_args+=("--skip=${_skip_csv}")
+    state_io_import_apply "${_apply_args[@]}"
+    local _apply_rc=$?
+    rm -f "${_plan_file}"
+    [[ "${_apply_rc}" -ne 0 ]] && return 1
+
+    if [[ "${_lifecycle_rc}" -ne 0 ]]; then
+        printf "[dispatcher] import applied with partial failures\n" >&2
+        return 6
+    fi
+    printf "[dispatcher] import applied.\n"
+    return 0
 }
 
 # ── detect ───────────────────────────────────────────────────────────────────
@@ -686,11 +773,13 @@ _dispatcher_config() {
 _dispatcher_sync() {
     local _target=""
     local _pull="false"
+    local _apply="false"
     local -a _passthrough=()
     local _arg
     for _arg in "$@"; do
         case "${_arg}" in
             --pull) _pull="true" ;;
+            --apply) _apply="true" ;;
             --modules=*|--include-config|--dry-run) _passthrough+=("${_arg}") ;;
             -*) printf "[dispatcher] ERROR: unknown sync flag %s\n" "${_arg}" >&2; return 2 ;;
             *)
@@ -710,16 +799,24 @@ _dispatcher_sync() {
 
     if [[ "${_pull}" == "true" ]]; then
         # sync_pull prints a temp file path on stdout (the downloaded
-        # payload) which we feed into the local import pipeline.
+        # payload) which we feed into the local import pipeline —
+        # ADR-0013: dry-run by default, --apply commits.
         local _payload
         _payload="$(sync_pull "${_target}" "${_passthrough[@]}")"
         local _rc=$?
         if [[ "${_rc}" -ne 0 ]]; then return "${_rc}"; fi
         if [[ -n "${_payload}" && -f "${_payload}" ]]; then
-            _dispatcher_import "${_payload}"
+            local -a _import_args=("${_payload}")
+            [[ "${_apply}" == "true" ]] && _import_args+=("--apply")
+            _dispatcher_import "${_import_args[@]}"
+            _rc=$?
             rm -f "${_payload}"
+            return "${_rc}"
         fi
     else
+        # Push defaults to dry-run on the remote side too (ADR-0013):
+        # without --apply the remote prints its diff back over ssh.
+        [[ "${_apply}" == "true" ]] && _passthrough+=("--apply")
         sync_push "${_target}" "${_passthrough[@]}"
     fi
 }

@@ -21,6 +21,8 @@
 #   ./ci.sh --ci-integration      # Inside container: bats integration only
 #   ./ci.sh --lint-only           # Host: route to --ci-lint via compose
 #   ./ci.sh --unit-only           # Host: route to --ci-unit via compose
+#   ./ci.sh --unit-only --module docker   # Host: only docker's unit spec
+#   ./ci.sh --unit-only --module core     # Host: non-module unit specs only
 #   ./ci.sh --integration-only    # Host: route to --ci-integration via compose
 #   ./ci.sh --coverage            # Host: full + kcov via compose
 
@@ -65,7 +67,7 @@ _install_deps_for_coverage() {
     apt-get install -y --no-install-recommends \
         bats bats-support bats-assert \
         shellcheck git ca-certificates \
-        parallel make jq \
+        parallel make jq curl \
         || _die "apt-get install failed for bats/shellcheck deps."
 
     # bats-mock not in debian bookworm; pin to upstream v1.2.5 for reproducibility.
@@ -94,6 +96,13 @@ Container-side options (called by compose entrypoint):
   --ci-lint             Lint only
   --ci-unit             Bats unit only
   --ci-integration      Bats integration only
+
+Unit-scope filter (combine with --unit-only / --ci-unit; issue #31):
+  --module <name>       Only run test/unit/module/<name>_spec.bats
+                        (missing spec = skip, exits 0 — per-module CI
+                        matrix includes modules without specs yet)
+  --module core         Only run the non-module unit specs (engine/lib/
+                        hook/script/template specs)
 
   -h, --help            Show this help
 EOF
@@ -215,14 +224,51 @@ _set_bats_args_arr() {
     fi
 }
 
+# Scope: honors MODULE_FILTER (set via --module; issue #31, PRD M10):
+#   ""      — full unit tree (default; unchanged behaviour)
+#   core    — every unit spec EXCEPT test/unit/module/ (engine/lib/hook/
+#             script/template specs); the per-module CI matrix runs these
+#             in a single `test-unit (core)` job
+#   <name>  — only test/unit/module/<name>_spec.bats; a missing spec is a
+#             skip (exit 0) so matrix jobs for not-yet-specced modules
+#             stay green instead of failing the shard
 _run_unit() {
     if [[ ! -d "${REPO_ROOT}/test/unit" ]]; then
         _info "test/unit/ does not exist yet — skipping (Phase 1 bootstrap)"
         return 0
     fi
-    _info "Running Bats unit tests"
     _set_bats_args_arr
-    bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/test/unit/"
+    case "${MODULE_FILTER:-}" in
+        "")
+            _info "Running Bats unit tests"
+            bats "${BATS_ARGS_ARR[@]}" -r "${REPO_ROOT}/test/unit/"
+            ;;
+        core)
+            _info "Running Bats unit tests (core: non-module specs)"
+            local -a _specs=()
+            local _f
+            while IFS= read -r -d '' _f; do
+                _specs+=("${_f}")
+            done < <(find "${REPO_ROOT}/test/unit" -type f -name '*.bats' \
+                         ! -path "${REPO_ROOT}/test/unit/module/*" -print0 \
+                     | sort -z)
+            if [[ "${#_specs[@]}" -eq 0 ]]; then
+                _info "  no core unit specs found — skipping"
+                return 0
+            fi
+            bats "${BATS_ARGS_ARR[@]}" "${_specs[@]}"
+            ;;
+        *)
+            local _spec="${REPO_ROOT}/test/unit/module/${MODULE_FILTER}_spec.bats"
+            if [[ ! -f "${_spec}" ]]; then
+                _info "No unit spec for module '${MODULE_FILTER}'" \
+                      "(test/unit/module/${MODULE_FILTER}_spec.bats missing) — skipping"
+                return 0
+            fi
+            _info "Running Bats unit tests (module: ${MODULE_FILTER})"
+            bats "${BATS_ARGS_ARR[@]}" "${_spec}"
+            ;;
+    esac
 }
 
 _run_integration() {
@@ -299,6 +345,7 @@ _run_in_container() {
 
 main() {
     local mode="compose"
+    MODULE_FILTER=""
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -311,9 +358,19 @@ main() {
             --unit-only) mode="unit"; shift ;;
             --integration-only) mode="integration"; shift ;;
             --coverage) mode="coverage"; shift ;;
+            --module)
+                [[ $# -ge 2 ]] || _die "--module requires a value (module name or 'core')"
+                MODULE_FILTER="$2"; shift 2 ;;
             *) _die "Unknown option: $1" ;;
         esac
     done
+
+    # Module names are kebab-case (PRD Q11); 'core' is the reserved
+    # non-module bucket. Validate before interpolating into the compose
+    # `-c` command line.
+    if [[ -n "${MODULE_FILTER}" && ! "${MODULE_FILTER}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+        _die "Invalid --module value: ${MODULE_FILTER} (expected [A-Za-z0-9_-]+)"
+    fi
 
     case "${mode}" in
         # ── Inside-container modes ──
@@ -349,7 +406,8 @@ main() {
         # service = ci (alpine, fast) for everything except --coverage,
         # which uses the kcov/kcov service.
         lint)        _run_in_container ci       --ci-lint        0 ;;
-        unit)        _run_in_container ci       --ci-unit        0 ;;
+        unit)        _run_in_container ci \
+                         "--ci-unit${MODULE_FILTER:+ --module ${MODULE_FILTER}}" 0 ;;
         integration) _run_in_container ci       --ci-integration 0 ;;
         coverage)    _run_in_container coverage --ci             1 ;;
         compose)     _run_in_container ci       --ci             0 ;;

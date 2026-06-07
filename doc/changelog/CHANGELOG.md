@@ -20,7 +20,153 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Fixed
+
+- **github-release archetype download URL 404** : `lib/module_helper.sh`
+  built `releases/latests/download/` (one-char typo) so every real
+  (non-mocked) install of an archetype-B module would 404. Fixed to
+  `releases/latest/download/` + regression spec. Found independently by
+  three Batch B module agents.
+
 ### Added
+
+- **fdfind module migrated to the v2 contract** (issue #54, PRD §6.3.1
+  Batch B): `module/submodule/fdfind.sh` (v1 GitHub tarball install) is
+  replaced by `module/fdfind.module.sh` on the apt archetype — Ubuntu
+  ships fd as the `fd-find` package whose binary is `fdfind`; the
+  POST_INSTALL_MESSAGE explains the `alias fd=fdfind` shortcut. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  (dpkg-reported package version) is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. Tagged `cli-essentials`, `CATEGORY=optional`,
+  `DEPENDS_ON=()` (also a neovim dependency for telescope file finding).
+- **Self-deps preflight in the entrypoint** (issue #40, PRD §3.4 /
+  AC-34): new `lib/preflight.sh` checks the tool's own dependencies
+  (`jq` / `curl` / `git`) before dispatching. Missing + sudo available:
+  prints an apt-style plan and asks once whether to `apt install`
+  (automatic with `-y` / `INIT_UBUNTU_YES=true`); missing + no sudo:
+  fails fast with exit 4 and explicit install guidance. `help` /
+  `version` paths are exempt, and the check runs at most once per run
+  (`INIT_UBUNTU_PREFLIGHT_DONE` guard). Resolves the chicken-and-egg
+  where state/config/detect need `jq` but `jq` ships inside the
+  `apt-essentials` module. Test rig gains `curl` (test-tools image +
+  kcov coverage deps) so e2e specs driving the real entrypoint pass the
+  preflight; the real apt-install path is reserved for the AC-34
+  integration check in a clean CI container (wave 6).
+- **`lazygit.module.sh` v2 module** (issue #48, PRD §6.3.1 Batch B):
+  migrates `module/submodule/lazygit.sh` to the v2 contract on the
+  github-release archetype. Versioned upstream assets
+  (`lazygit_<ver>_Linux_x86_64.tar.gz`) are resolved at run time before
+  super-calling the archetype fetch. All 10 lifecycle phases are
+  runnable standalone (AC-25); the version Sidecar (shared
+  `module_sidecar_*` helpers) is written on install/upgrade and deleted
+  on remove/purge (ADR-0001), with `doctor` flagging
+  Sidecar/install-state drift. Ships
+  `test/unit/module/lazygit_spec.bats` (71 tests, Q29 scope) with
+  mocked GitHub queries (Q46: zero network in gates).
+- **Import/export with the ADR-0013 conflict pipeline** (issue #43,
+  AC-14): `export <file> [--modules=<csv>]` ships only the
+  machine-portable `synced` section of each installed module (ADR-0018);
+  the machine-specific `local` section never leaves the host.
+  `import <file>` runs the same conflict pipeline as `sync --pull`:
+  **dry-run by default** (prints an `IMPORT DIFF` plan, writes nothing),
+  `--apply` commits. Merge rules: union of modules (local-only entries
+  are never deleted), remote-wins on `version_provided` / `depends_on`,
+  `manual` sticky-to-true, and remote-only modules missing from the
+  local catalog are skipped with a warning. The receiver rebuilds
+  `local` sections via its own install pipeline; payload `local` data is
+  never applied. New state helpers `state_get_synced` /
+  `state_set_synced`, plus `state_io_import_plan` /
+  `state_io_import_apply` (payload schema 0.2.0). `sync --apply` is
+  forwarded to the importing side (push: remote `import --apply`; pull:
+  local apply), so sync also defaults to dry-run per ADR-0013.
+- **state.json synced/local split** (issue #43, ADR-0018, PRD §10.1):
+  `installed.<m>` is now split into `synced` (manual, depends_on,
+  version_provided, installed_at, installed_by — travels over
+  sync/export) and `local` (machine-specific facts — never leaves the
+  host). `state_record_install` gains an optional 4th `depends_on` csv
+  arg and preserves the `local` sub-object across re-records;
+  `state_record_upgrade` updates `synced`; `state_record_verify` stamps
+  `local.last_verified_at`; `state_get_field` reads synced-then-local.
+- **batcat module migrated to the v2 contract** (issue #53, PRD §6.3.1
+  Batch B): `module/submodule/batcat.sh` (GitHub-release tarball) is
+  replaced by `module/batcat.module.sh` on the apt archetype — installs
+  the Ubuntu `bat` package (binary ships as `batcat`) and appends guarded
+  `alias cat='batcat'` / `alias bat='batcat'` lines to existing
+  `~/.bashrc` / `~/.zshrc` (alias target asserted against the real binary
+  per the issue #1 copy-paste bug class; `LEGACY_DOTFILE=true` per spec
+  §6.1). All 10 lifecycle phases run standalone (AC-25); install is
+  idempotent (AC-5); `--dry-run` performs no filesystem writes (AC-12);
+  the version Sidecar is written on install/upgrade and removed on
+  remove/purge per ADR-0001 while `state.json` is never touched by the
+  module. Tagged `cli-essentials`, `CATEGORY=optional`, `DEPENDS_ON=()`.
+- **`setup_secrets.sh` skeleton: storage backend abstraction + ssh-key
+  subcommands** (issue #44, PRD §14, AC-20): new standalone sensitive-data
+  tool (not a module; shares `lib/logger.sh` / `lib/i18n.sh` /
+  `lib/config.sh` only — no engine pipeline coupling, so the TUI can fork
+  it later). New `lib/secrets.sh` implements the generic backend API
+  (`secrets_store/retrieve/exists/list/remove`, stdin/stdout only — secret
+  material never travels through argv) over three backends with PRD §14.3
+  priority: `pass` → `gnome-keyring` (secret-tool + DBus) → encrypted file
+  (`openssl enc` AES-256-CBC + PBKDF2, `~/.config/init_ubuntu/secrets/
+  <name>.enc`, 0600/0700 perms, passphrase via `-pass env:` — never
+  plaintext on disk). Autoselect honors `[secrets] backend` in config.ini
+  and the `INIT_UBUNTU_SECRETS_BACKEND` env override. Subcommands shipped:
+  `ssh-key generate` (passphrase prompting delegated to ssh-keygen's own
+  tty — nothing sensitive in argv or shell history, AC-20), `ssh-key
+  load` (ssh-add), `ssh-key copy <user@host>` (ssh-copy-id, remote
+  failure → exit 7). `gpg` / `token` / `list` / `remove` are reserved
+  stubs for issue #68 and mount directly on the backend API. Test-tools
+  image gains `openssl` so the encrypted-file round-trip is tested for
+  real in the container.
+- **eza module migrated to the v2 contract** (issue #51, PRD §6.3.1
+  Batch B): `module/submodule/eza.sh` → `module/eza.module.sh`
+  (github-release archetype, `CATEGORY=optional`,
+  `TAGS=("cli-essentials")`). Keeps the legacy behavior — tarball to
+  `/opt/eza`, `/usr/local/bin/eza` symlink, `alias ls='eza'` dropped
+  into `~/.bashrc` / `~/.zshrc` (removed on purge, kept on remove) —
+  and adds Sidecar bookkeeping plus `is_outdated` / `doctor`. New
+  shared Sidecar helpers in `lib/module_helper.sh`
+  (`module_sidecar_write/remove/get_version/path`, ADR-0001) are
+  available to all modules.
+- **zoxide module** (issue #52, PRD §6.3.1 Batch B): migrated
+  `module/submodule/zoxide.sh` to the v2 contract as
+  `module/zoxide.module.sh` (smarter `cd`; aliases `cd` to `z`).
+  Archetype B (github-release) with super-call overrides — the release
+  asset name embeds the version, so install/upgrade resolve the latest
+  tag first, then chain to the archetype default; both wire
+  `zoxide init` + the `cd`→`z` alias into existing bash/zsh rc files
+  (idempotent) and write the version Sidecar; remove/purge delete it
+  (ADR-0001). All 10 lifecycle phases run standalone (AC-25); dry-run
+  performs no filesystem writes (AC-12). New shared `module_sidecar_*`
+  helpers in `lib/module_helper.sh` (path / write / remove /
+  get_version, dry-run-safe) give Standalone and Engine mode one
+  Sidecar code path — closes the cookbook's
+  `module_sidecar_get_version` follow-up. Spec:
+  `test/unit/module/zoxide_spec.bats` (49 tests).
+- **fzf module migrated to the v2 contract** (issue #50, PRD §6.3.1 Batch
+  B): `module/submodule/fzf.sh` (git-clone + `~/.fzf/install`) is replaced
+  by `module/fzf.module.sh` on the github-release archetype — downloads
+  the prebuilt single-binary tarball for the host arch (amd64 / arm64 /
+  armv7) into `/opt/fzf` and symlinks `/usr/local/bin/fzf`. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  is written on install/upgrade and removed on remove/purge per ADR-0001
+  while `state.json` is never touched by the module. Tagged
+  `cli-essentials`, `CATEGORY=optional`, depends on `apt-essentials`.
+- **lazydocker module migrated to the v2 contract** (issue #49, PRD
+  §6.3.1 Batch B): `module/lazydocker.module.sh` (docker TUI,
+  github-release archetype with a version-aware fetch override —
+  upstream asset names embed the release version). Metadata per PRD
+  §9.1 (`CATEGORY=optional`, `TAGS=(cli-essentials)`,
+  `DEPENDS_ON=(docker)`, i18n `DESCRIPTION`). All 10 lifecycle phases
+  run standalone (AC-25); install is idempotent (AC-5); `--dry-run`
+  writes nothing (AC-12). New `module_sidecar_*` helpers in
+  `lib/module_helper.sh` implement the ADR-0001 Sidecar (written on
+  install/upgrade, dropped on remove/purge, never touching
+  `state.json` in standalone mode); `is_outdated` compares the Sidecar
+  version against the latest GitHub release.
 
 - **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
   `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory
@@ -45,6 +191,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Unit tests run as a per-module CI matrix** (issue #31, PRD M10): a
+  `discover` job builds the matrix dynamically from `module/*.module.sh`
+  (`fail-fast: false`, `timeout-minutes: 5` per shard) and non-module
+  specs (engine/lib/hook/script/template) run in a single
+  `test-unit (core)` job. `make test-unit MODULE=<name>` (and
+  `MODULE=core`) narrows the bats run via the new `ci.sh --module` flag;
+  a module without a spec yet is a green skip. Runtime-generated
+  `dorny/paths-filter` filters (`script/ci/generate_module_filters.sh` +
+  `script/ci/select_unit_matrix.sh`) make PRs run only the shards for
+  changed modules — `lib/`/`script/`/`Makefile`/workflow changes (or any
+  code change outside the known filters) fan out to the full matrix, and
+  pushes to main / tags always run the full matrix. `ci-passed` name and
+  aggregation semantics unchanged (skipped shards still count as pass);
+  every shard reuses the `build-image` test-tools artifact (#26).
 - **Module tools directory relocated to top-level `tool/`** (issue #46,
   PRD §6.5): holding area for one-off scripts — not in the module
   catalog, not in the TUI, not in the install pipeline; per-file

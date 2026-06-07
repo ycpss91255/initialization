@@ -32,8 +32,11 @@ endif
 test: $(TEST_TOOLS_DEP) ## Run ShellCheck + Bats (unit + integration; no kcov — fast dev loop)
 	./script/ci/ci.sh
 
-test-unit: $(TEST_TOOLS_DEP) ## Run unit bats only (fastest feedback loop)
-	./script/ci/ci.sh --unit-only
+# MODULE=<name> narrows to test/unit/module/<name>_spec.bats;
+# MODULE=core runs the non-module specs only (per-module CI matrix,
+# issue #31). Unset = full unit tree (unchanged).
+test-unit: $(TEST_TOOLS_DEP) ## Run unit bats only (optional MODULE=<name>|core)
+	./script/ci/ci.sh --unit-only $(if $(MODULE),--module $(MODULE))
 
 test-integration: $(TEST_TOOLS_DEP) ## Run integration bats only (slower; container-based)
 	./script/ci/ci.sh --integration-only

@@ -274,6 +274,27 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`fnm.module.sh` v2 module** (issue #56, PRD §6.3.1 Batch B, Q3/Q4):
+  Fast Node Manager split out of `module/setup_neovim.sh` so the
+  dependency is reusable (neovim and gemini both need Node.js). Custom
+  archetype matching the legacy logic: the upstream install script
+  (`https://fnm.vercel.app/install --skip-shell --install-dir`) performs
+  a pure user-home install into `~/.local/share/fnm`
+  (`SUPPORTS_USER_HOME=true`, `INSTALL_TARGET_DEFAULT=user-home`, no
+  sudo), with `Schniz/fnm` release queries powering `is_outdated` and
+  the Sidecar version. Shell integration is idempotent and
+  marker-guarded: a fish `conf.d/fnm.fish` drop (user-owned files are
+  never clobbered) and a fenced block appended to an existing
+  `~/.bashrc` (never created); purge strips exactly what install added.
+  Install also provisions the legacy default Node.js 22 (fail-soft) so
+  dependents get a working `node`/`npm` out of the box. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent
+  (AC-5); `--dry-run` performs no filesystem writes (AC-12); the
+  Sidecar is written on install/upgrade and removed on remove/purge per
+  ADR-0001 while `state.json` is never touched by the module. Tagged
+  `cli-essentials`, `CATEGORY=optional`, `DEPENDS_ON=()`. Ships
+  `test/unit/module/fnm_spec.bats` (94 tests, Q29 scope) with mocked
+  fetch + GitHub queries (Q46: zero network in gates).
 - **New `ripgrep` module on the apt archetype** (issue #55, PRD §6.3.1
   Batch B, Q41): `module/ripgrep.module.sh` installs the `ripgrep`
   package (binary: `rg`, fast grep alternative) — referenced by the

@@ -96,3 +96,16 @@ _load_engine() {
     assert_output --partial "Will install: main + 2 deps (depa, depb)"
     assert_output --partial "Proceed? [Y/n]"
 }
+
+@test "install -y skips the plan prompt" {
+    _load_engine
+    run dispatcher_dispatch install main -y
+    refute_output --partial "Proceed?"
+}
+
+@test "install --dry-run never prompts" {
+    _load_engine
+    run dispatcher_dispatch install main --dry-run
+    assert_success
+    refute_output --partial "Proceed?"
+}

@@ -22,6 +22,30 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Import/export with the ADR-0013 conflict pipeline** (issue #43,
+  AC-14): `export <file> [--modules=<csv>]` ships only the
+  machine-portable `synced` section of each installed module (ADR-0018);
+  the machine-specific `local` section never leaves the host.
+  `import <file>` runs the same conflict pipeline as `sync --pull`:
+  **dry-run by default** (prints an `IMPORT DIFF` plan, writes nothing),
+  `--apply` commits. Merge rules: union of modules (local-only entries
+  are never deleted), remote-wins on `version_provided` / `depends_on`,
+  `manual` sticky-to-true, and remote-only modules missing from the
+  local catalog are skipped with a warning. The receiver rebuilds
+  `local` sections via its own install pipeline; payload `local` data is
+  never applied. New state helpers `state_get_synced` /
+  `state_set_synced`, plus `state_io_import_plan` /
+  `state_io_import_apply` (payload schema 0.2.0). `sync --apply` is
+  forwarded to the importing side (push: remote `import --apply`; pull:
+  local apply), so sync also defaults to dry-run per ADR-0013.
+- **state.json synced/local split** (issue #43, ADR-0018, PRD §10.1):
+  `installed.<m>` is now split into `synced` (manual, depends_on,
+  version_provided, installed_at, installed_by — travels over
+  sync/export) and `local` (machine-specific facts — never leaves the
+  host). `state_record_install` gains an optional 4th `depends_on` csv
+  arg and preserves the `local` sub-object across re-records;
+  `state_record_upgrade` updates `synced`; `state_record_verify` stamps
+  `local.last_verified_at`; `state_get_field` reads synced-then-local.
 - **State robustness** (issue #41, PRD §10.1): reading a corrupt
   `state.json` now quarantines it (`mv` → `state.json.corrupt.<ts>`) and
   fails fast (exit 1) with recovery guidance — re-run install to rebuild

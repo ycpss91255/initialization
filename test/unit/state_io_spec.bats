@@ -1,5 +1,8 @@
 #!/usr/bin/env bats
 # test/unit/state_io_spec.bats — lib/state_io.sh
+#
+# Covers the ADR-0018 synced-only payload and the ADR-0013 conflict
+# pipeline (dry-run plan, union, remote-wins, sticky manual).
 
 load "${BATS_TEST_DIRNAME}/../helper/common"
 
@@ -18,6 +21,12 @@ _load_state_io() {
     source "${LIB_DIR}/state.sh"
     # shellcheck source=../../lib/state_io.sh
     source "${LIB_DIR}/state_io.sh"
+}
+
+# Fake catalog membership for the conflict pipeline: space-separated names
+# in $FAKE_CATALOG count as locally-defined modules.
+registry_has() {
+    [[ " ${FAKE_CATALOG:-} " == *" $1 "* ]]
 }
 
 # ── export ──────────────────────────────────────────────────────────────────
@@ -41,7 +50,7 @@ _load_state_io() {
 
     run jq -r '.version' "${_out}"
     assert_success
-    assert_output --partial "0.1.0"
+    assert_output --regexp '^0\.'
 
     run jq -r '.source_host' "${_out}"
     assert_success
@@ -60,18 +69,46 @@ _load_state_io() {
     assert_output "false"
 }
 
-@test "state_io_export includes module entry with name+manual" {
+@test "state_io_export carries each module's synced section (ADR-0018)" {
     _load_state_io
-    state_record_install docker true apt-managed
+    state_record_install docker true apt-managed "apt-essentials"
     local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
     state_io_export "${_out}"
 
     run jq -r '.modules[0].name' "${_out}"
     assert_success
     assert_output "docker"
-    run jq -r '.modules[0].manual' "${_out}"
+    run jq -r '.modules[0].synced.manual' "${_out}"
     assert_success
     assert_output "true"
+    run jq -r '.modules[0].synced.version_provided' "${_out}"
+    assert_success
+    assert_output "apt-managed"
+    run jq -cr '.modules[0].synced.depends_on' "${_out}"
+    assert_success
+    assert_output '["apt-essentials"]'
+}
+
+@test "state_io_export payload never carries local sections (AC, issue #43)" {
+    _load_state_io
+    state_record_install docker true apt-managed
+    state_record_install neovim true v0.10.2
+    # Seed machine-specific local fields that must NOT ship.
+    local _p; _p="$(state_get_path)"
+    jq '.installed.docker.local = {"install_target_resolved":"sudo"}
+        | .installed.neovim.local = {"install_target_resolved":"user-home",
+                                     "user_home_root":"/home/u/.local/lib/neovim"}' \
+        "${_p}" > "${_p}.tmp" && mv "${_p}.tmp" "${_p}"
+
+    local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    state_io_export "${_out}"
+
+    run jq -r '[.modules[] | has("local")] | any' "${_out}"
+    assert_success
+    assert_output "false"
+    run jq -r '[.modules[].synced | has("install_target_resolved"), has("user_home_root")] | any' "${_out}"
+    assert_success
+    assert_output "false"
 }
 
 @test "state_io_export --modules filters to the specified subset" {
@@ -123,20 +160,20 @@ _load_state_io() {
     [[ ! -f "${_p}" ]]
 }
 
-# ── import / payload_modules ───────────────────────────────────────────────
+# ── payload read ────────────────────────────────────────────────────────────
 
 @test "state_io_payload_modules prints module names in payload order" {
     _load_state_io
     local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
     cat > "${_payload}" <<'EOF'
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "source_host": "test",
   "source_user": "tester",
   "exported_at": "2026-05-14T10:00:00+00:00",
   "modules": [
-    {"name": "docker", "manual": true},
-    {"name": "fzf", "manual": false}
+    {"name": "docker", "synced": {"manual": true}},
+    {"name": "fzf", "synced": {"manual": false}}
   ],
   "include_config": false
 }
@@ -145,17 +182,6 @@ EOF
     assert_success
     [[ "${lines[0]}" == "docker" ]]
     [[ "${lines[1]}" == "fzf" ]]
-}
-
-@test "state_io_import is an alias for state_io_payload_modules" {
-    _load_state_io
-    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
-    cat > "${_payload}" <<'EOF'
-{"version":"0.1.0","modules":[{"name":"docker","manual":true}]}
-EOF
-    run state_io_import "${_payload}"
-    assert_success
-    assert_output "docker"
 }
 
 @test "state_io_payload_modules rejects payload missing 'version'" {
@@ -182,17 +208,233 @@ EOF
     assert_failure 2
 }
 
-# ── round trip ─────────────────────────────────────────────────────────────
+# ── import plan (ADR-0013 conflict pipeline) ────────────────────────────────
 
-@test "export -> payload_modules round trip preserves module names" {
+# Builds a payload at $1 with the given module entries (jq array body in $2).
+_write_payload() {
+    local _file="$1" _modules="$2"
+    jq -n --argjson modules "${_modules}" '{
+        version: "0.2.0",
+        source_host: "machine-a",
+        source_user: "tester",
+        exported_at: "2026-06-07T10:00:00+00:00",
+        modules: $modules,
+        include_config: false
+    }' > "${_file}"
+}
+
+@test "import plan: union — local-only kept, remote-only (known) installed" {
     _load_state_io
-    state_record_install docker true
-    state_record_install neovim true
-    local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
-    state_io_export "${_out}"
+    export FAKE_CATALOG="docker"
+    state_record_install eza true v0.20.0
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" \
+        '[{"name":"docker","synced":{"manual":false,"depends_on":[],"version_provided":"v28.0.0"}}]'
 
-    run state_io_payload_modules "${_out}"
+    run state_io_import_plan "${_payload}"
     assert_success
-    [[ "${lines[0]}" == "docker" ]]
-    [[ "${lines[1]}" == "neovim" ]]
+    echo "${output}" | jq -e '
+        (map(select(.name == "docker")) | first | .action == "install") and
+        (map(select(.name == "eza"))    | first | .action == "keep")' > /dev/null
+}
+
+@test "import plan: remote-only module missing from catalog is skipped" {
+    _load_state_io
+    export FAKE_CATALOG=""
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" \
+        '[{"name":"obscure-tool","synced":{"manual":true,"version_provided":"v1"}}]'
+
+    run state_io_import_plan "${_payload}"
+    assert_success
+    echo "${output}" | jq -e '.[0].action == "skip"
+        and (.[0].reason | test("no local module definition"))' > /dev/null
+}
+
+@test "import plan: same version on both sides is a noop" {
+    _load_state_io
+    export FAKE_CATALOG="docker"
+    state_record_install docker true v28.0.0
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" \
+        '[{"name":"docker","synced":{"manual":true,"version_provided":"v28.0.0"}}]'
+
+    run state_io_import_plan "${_payload}"
+    assert_success
+    echo "${output}" | jq -e '.[0].action == "noop"' > /dev/null
+}
+
+@test "import plan: version diff resolves remote-wins (upgrade action)" {
+    _load_state_io
+    export FAKE_CATALOG="neovim"
+    state_record_install neovim true v0.10.2
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" \
+        '[{"name":"neovim","synced":{"manual":false,"depends_on":["fnm"],"version_provided":"v0.10.5"}}]'
+
+    run state_io_import_plan "${_payload}"
+    assert_success
+    echo "${output}" | jq -e '.[0].action == "upgrade"
+        and .[0].local_version == "v0.10.2"
+        and .[0].remote_version == "v0.10.5"
+        and .[0].synced.version_provided == "v0.10.5"
+        and .[0].synced.depends_on == ["fnm"]' > /dev/null
+}
+
+@test "import plan: manual sticky-to-true survives remote-wins (ADR-0013)" {
+    _load_state_io
+    export FAKE_CATALOG="neovim"
+    # Local manual=true, remote manual=false + version diff: remote wins on
+    # version/depends_on but manual must stay true (sticky, AC-42 pattern).
+    state_record_install neovim true v0.10.2
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" \
+        '[{"name":"neovim","synced":{"manual":false,"version_provided":"v0.10.5"}}]'
+
+    run state_io_import_plan "${_payload}"
+    assert_success
+    echo "${output}" | jq -e '.[0].action == "upgrade"
+        and .[0].synced.manual == true' > /dev/null
+}
+
+@test "import plan: remote manual=true flips local manual=false (same version)" {
+    _load_state_io
+    export FAKE_CATALOG="fzf"
+    state_record_install fzf false v0.55
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" \
+        '[{"name":"fzf","synced":{"manual":true,"version_provided":"v0.55"}}]'
+
+    run state_io_import_plan "${_payload}"
+    assert_success
+    echo "${output}" | jq -e '.[0].action == "flag-manual"
+        and .[0].synced.manual == true' > /dev/null
+}
+
+@test "import plan propagates payload validation failure (exit 2)" {
+    _load_state_io
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    echo '{"modules":[]}' > "${_payload}"
+    run state_io_import_plan "${_payload}"
+    assert_failure 2
+}
+
+# ── import apply ────────────────────────────────────────────────────────────
+
+@test "import apply: union + remote-wins land in state.json" {
+    _load_state_io
+    export FAKE_CATALOG="docker neovim"
+    state_record_install eza true v0.20.0
+    state_record_install neovim true v0.10.2
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" '[
+        {"name":"docker","synced":{"manual":true,"depends_on":[],"version_provided":"v28.0.0"}},
+        {"name":"neovim","synced":{"manual":false,"depends_on":["fnm"],"version_provided":"v0.10.5"}}
+    ]'
+
+    run state_io_import_apply "${_payload}"
+    assert_success
+
+    local _p; _p="$(state_get_path)"
+    # Union: local-only eza kept untouched.
+    [[ "$(jq -r '.installed.eza.synced.version_provided' "${_p}")" == "v0.20.0" ]]
+    # Remote-only docker recorded with remote synced.
+    [[ "$(jq -r '.installed.docker.synced.version_provided' "${_p}")" == "v28.0.0" ]]
+    # Remote-wins on version + depends_on; manual stays sticky-true.
+    [[ "$(jq -r '.installed.neovim.synced.version_provided' "${_p}")" == "v0.10.5" ]]
+    [[ "$(jq -cr '.installed.neovim.synced.depends_on' "${_p}")" == '["fnm"]' ]]
+    [[ "$(jq -r '.installed.neovim.synced.manual' "${_p}")" == "true" ]]
+}
+
+@test "import apply never applies payload local sections (AC, issue #43)" {
+    _load_state_io
+    export FAKE_CATALOG="docker"
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    # Hand-crafted hostile payload smuggling a local section.
+    cat > "${_payload}" <<'EOF'
+{"version":"0.2.0","modules":[
+  {"name":"docker",
+   "synced":{"manual":true,"version_provided":"v28.0.0"},
+   "local":{"install_target_resolved":"sudo","user_home_root":"/evil"}}
+]}
+EOF
+    run state_io_import_apply "${_payload}"
+    assert_success
+
+    local _p; _p="$(state_get_path)"
+    run jq -r '.installed.docker.local | length' "${_p}"
+    assert_success
+    assert_output "0"
+}
+
+@test "import apply --skip excludes named modules from state writes" {
+    _load_state_io
+    export FAKE_CATALOG="docker fzf"
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" '[
+        {"name":"docker","synced":{"manual":true,"version_provided":"v28.0.0"}},
+        {"name":"fzf","synced":{"manual":true,"version_provided":"v0.55"}}
+    ]'
+
+    run state_io_import_apply "${_payload}" --skip=docker
+    assert_success
+
+    local _p; _p="$(state_get_path)"
+    [[ "$(jq -r '.installed | has("docker")' "${_p}")" == "false" ]]
+    [[ "$(jq -r '.installed | has("fzf")' "${_p}")" == "true" ]]
+}
+
+@test "import apply: skipped catalog-unknown module is never written" {
+    _load_state_io
+    export FAKE_CATALOG=""
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/in.json"
+    _write_payload "${_payload}" \
+        '[{"name":"obscure-tool","synced":{"manual":true,"version_provided":"v1"}}]'
+
+    run state_io_import_apply "${_payload}"
+    assert_success
+
+    local _p; _p="$(state_get_path)"
+    [[ "$(jq -r '.installed | length' "${_p}")" == "0" ]]
+}
+
+# ── round trip (AC-14) ──────────────────────────────────────────────────────
+
+@test "round trip: A export -> B import apply gives consistent installed sets (AC-14)" {
+    _load_state_io
+    export FAKE_CATALOG="docker neovim fzf"
+
+    # Machine A state.
+    local _state_a="${INIT_UBUNTU_TEST_SCRATCH}/machine-a"
+    export INIT_UBUNTU_STATE_DIR="${_state_a}"
+    state_record_install docker true v28.0.0
+    state_record_install neovim true v0.10.5 "fzf"
+    state_record_install fzf false v0.55
+
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    state_io_export "${_payload}"
+    local _a_synced
+    _a_synced="$(jq -S '[.installed | to_entries[] | {name: .key, synced: .value.synced}] | sort_by(.name)' \
+        "${_state_a}/state.json")"
+
+    # Machine B: empty state, import with apply.
+    local _state_b="${INIT_UBUNTU_TEST_SCRATCH}/machine-b"
+    export INIT_UBUNTU_STATE_DIR="${_state_b}"
+    run state_io_import_apply "${_payload}"
+    assert_success
+
+    local _b_synced
+    _b_synced="$(jq -S '[.installed | to_entries[] | {name: .key, synced: .value.synced}] | sort_by(.name)' \
+        "${_state_b}/state.json")"
+    [[ "${_a_synced}" == "${_b_synced}" ]]
+
+    # B's local sections are rebuilt locally — never copied from A.
+    run jq -r '[.installed[].local | length] | add // 0' "${_state_b}/state.json"
+    assert_success
+    assert_output "0"
 }

@@ -37,6 +37,8 @@ _load_engine() {
     source "${LIB_DIR}/general.sh"
     # shellcheck source=../../lib/state.sh
     source "${LIB_DIR}/state.sh"
+    # shellcheck source=../../lib/state_io.sh
+    source "${LIB_DIR}/state_io.sh"
     # shellcheck source=../../lib/config.sh
     source "${LIB_DIR}/config.sh"
     # shellcheck source=../../lib/registry.sh
@@ -270,7 +272,93 @@ _load_engine() {
 @test "dispatcher_dispatch list --installed --json dumps state.json" {
     _load_engine
     state_record_install noop true
-    dispatcher_dispatch list --installed --json | jq -e '.installed.noop.manual == true' > /dev/null
+    dispatcher_dispatch list --installed --json | jq -e '.installed.noop.synced.manual == true' > /dev/null
+}
+
+# ── import / export conflict pipeline (issue #43, ADR-0013) ─────────────────
+
+# Writes a payload referencing the fixture module `noop` to $1.
+_write_noop_payload() {
+    cat > "$1" <<'EOF'
+{
+  "version": "0.2.0",
+  "source_host": "machine-a",
+  "source_user": "tester",
+  "exported_at": "2026-06-07T10:00:00+00:00",
+  "modules": [
+    {"name": "noop", "synced": {"manual": true, "depends_on": [],
+     "version_provided": "v9", "installed_at": "2026-06-07T09:00:00+00:00",
+     "installed_by": "init_ubuntu@v0.1.0"}}
+  ],
+  "include_config": false
+}
+EOF
+}
+
+@test "import default run is a dry-run: prints plan, writes nothing (AC-40 pattern)" {
+    _load_engine
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    _write_noop_payload "${_payload}"
+
+    run dispatcher_dispatch import "${_payload}"
+    assert_success
+    assert_output --partial "noop"
+    assert_output --partial "install"
+    assert_output --partial "--apply"
+
+    local _p; _p="$(state_get_path)"
+    run jq -r '.installed | length' "${_p}"
+    assert_success
+    assert_output "0"
+}
+
+@test "import --apply with same-version manual flip applies sticky manual (AC-42 pattern)" {
+    _load_engine
+    state_record_install noop false v9
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    _write_noop_payload "${_payload}"
+
+    run dispatcher_dispatch import "${_payload}" --apply
+    assert_success
+
+    local _p; _p="$(state_get_path)"
+    run jq -r '.installed.noop.synced.manual' "${_p}"
+    assert_success
+    assert_output "true"
+}
+
+@test "import dry-run marks payload-only module unknown to catalog as skip" {
+    _load_engine
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    cat > "${_payload}" <<'EOF'
+{"version":"0.2.0","modules":[{"name":"not-in-catalog","synced":{"manual":true,"version_provided":"v1"}}]}
+EOF
+    run dispatcher_dispatch import "${_payload}"
+    assert_success
+    assert_output --partial "skip"
+    assert_output --partial "no local module definition"
+}
+
+@test "import --apply as root refuses when install lifecycle is needed (exit 4)" {
+    [[ "${EUID:-$(id -u)}" -eq 0 ]] || skip "root-refusal path needs the container root user"
+    _load_engine
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    _write_noop_payload "${_payload}"
+
+    run dispatcher_dispatch import "${_payload}" --apply
+    assert_failure 4
+}
+
+@test "import rejects payload with bad version (exit 2)" {
+    _load_engine
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    echo '{"modules":[]}' > "${_payload}"
+    run dispatcher_dispatch import "${_payload}"
+    assert_failure 2
 }
 
 # ── Exit-code contract (PRD §7.4) ────────────────────────────────────────────

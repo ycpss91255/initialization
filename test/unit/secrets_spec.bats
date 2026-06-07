@@ -296,22 +296,92 @@ _set_agent_sock() {
     assert_output "cli-tok-9f2"
 }
 
-@test "setup_secrets.sh gpg subcommand is reserved for #68 (exit 2)" {
-    run "${REPO_ROOT}/setup_secrets.sh" gpg generate
+@test "token set rejects a value passed as argv (exit 2)" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    run bash -c "'${REPO_ROOT}/setup_secrets.sh' token set gh-token my-secret-value </dev/null"
     assert_failure 2
-    assert_output --partial "#68"
+    refute_output --partial "my-secret-value stored"
 }
 
-@test "setup_secrets.sh list subcommand is reserved for #68 (exit 2)" {
-    run "${REPO_ROOT}/setup_secrets.sh" list
-    assert_failure 2
-    assert_output --partial "#68"
+@test "token get for a missing name fails without leaking anything" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" token get no-such-token
+    assert_failure
+    assert_output ""
 }
 
-@test "setup_secrets.sh remove subcommand is reserved for #68 (exit 2)" {
-    run "${REPO_ROOT}/setup_secrets.sh" remove gh
+@test "token round-trips through a mocked pass backend via CLI" {
+    _set_backend pass
+    export SECRETS_FAKE_PASS_STORE="${INIT_UBUNTU_TEST_SCRATCH}/fake-pass-store"
+    _stub pass 'case "$1" in
+        insert) cat > "${SECRETS_FAKE_PASS_STORE:?}" ;;
+        show)   cat "${SECRETS_FAKE_PASS_STORE:?}" ;;
+    esac'
+    run bash -c "printf '%s' 'pass-tok-77' | '${REPO_ROOT}/setup_secrets.sh' token set gh-token"
+    assert_success
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" token get gh-token
+    assert_success
+    assert_output "pass-tok-77"
+    # the secret value must never ride argv into the pass binary
+    run ! grep -q 'pass-tok-77' "${SECRETS_STUB_LOG}"
+}
+
+@test "token round-trips through a mocked gnome-keyring backend via CLI" {
+    _set_backend gnome-keyring
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/fake-bus"
+    export SECRETS_FAKE_KEYRING="${INIT_UBUNTU_TEST_SCRATCH}/fake-keyring"
+    _stub secret-tool 'case "$1" in
+        store)  cat > "${SECRETS_FAKE_KEYRING:?}" ;;
+        lookup) cat "${SECRETS_FAKE_KEYRING:?}" ;;
+    esac'
+    run bash -c "printf '%s' 'gkr-tok-42' | '${REPO_ROOT}/setup_secrets.sh' token set gh-token"
+    assert_success
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" token get gh-token
+    assert_success
+    assert_output "gkr-tok-42"
+    run ! grep -q 'gkr-tok-42' "${SECRETS_STUB_LOG}"
+}
+
+# ── list / remove (issue #68) ───────────────────────────────────────────────
+
+@test "list prints stored names only — never values" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    printf '%s' 'value-A-canary' | "${REPO_ROOT}/setup_secrets.sh" token set alpha
+    printf '%s' 'value-B-canary' | "${REPO_ROOT}/setup_secrets.sh" token set beta
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" list
+    assert_success
+    assert_line "alpha"
+    assert_line "beta"
+    refute_output --partial 'value-A-canary'
+    refute_output --partial 'value-B-canary'
+}
+
+@test "remove deletes the named secret from the active backend" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    printf '%s' 'v1' | "${REPO_ROOT}/setup_secrets.sh" token set doomed
+    [[ -f "${INIT_UBUNTU_SECRETS_DIR}/doomed.enc" ]]
+    run "${REPO_ROOT}/setup_secrets.sh" remove doomed
+    assert_success
+    [[ ! -e "${INIT_UBUNTU_SECRETS_DIR}/doomed.enc" ]]
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" list
+    assert_success
+    refute_output --partial "doomed"
+}
+
+@test "remove without a name exits 2" {
+    run "${REPO_ROOT}/setup_secrets.sh" remove
     assert_failure 2
-    assert_output --partial "#68"
+}
+
+@test "remove of a missing name fails non-zero" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    run "${REPO_ROOT}/setup_secrets.sh" remove never-stored
+    assert_failure
 }
 
 # ── ssh-key generate: argv hygiene (AC-20) ──────────────────────────────────

@@ -261,6 +261,28 @@ _secrets_cmd_token() {
     esac
 }
 
+# ── list / remove actions (issue #68) ────────────────────────────────────────
+
+_secrets_cmd_list() {
+    if (( $# != 0 )); then
+        log_error "list takes no arguments"
+        exit 2
+    fi
+    # stdout carries stored names only, one per line — values are never
+    # printed (by design; see lib/secrets.sh). No log_info here so stdout
+    # stays machine-consumable.
+    secrets_list
+}
+
+_secrets_cmd_remove() {
+    if (( $# != 1 )); then
+        log_error "usage: setup_secrets remove <name>"
+        exit 2
+    fi
+    secrets_remove "$1"
+    log_info "secret '$1' removed"
+}
+
 # ── dispatch ─────────────────────────────────────────────────────────────────
 
 main() {
@@ -276,7 +298,13 @@ main() {
         token)
             _secrets_cmd_token "$@"
             ;;
-        gpg|list|remove)
+        list)
+            _secrets_cmd_list "$@"
+            ;;
+        remove)
+            _secrets_cmd_remove "$@"
+            ;;
+        gpg)
             log_error "'${_cmd}' is not implemented yet — planned for issue #68"
             exit 2
             ;;

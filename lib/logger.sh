@@ -299,7 +299,7 @@ function log_event() {
 # ── Session-end log retention (PRD §10.2, AC-33) ─────────────────────────────
 #
 # logrotate-like retention for the JSONL log directory, with no external
-# dependency (pure bash + find/sort/coreutils):
+# dependency (pure bash + stat/sort from coreutils):
 #
 #   - keep at most INIT_UBUNTU_LOG_RETENTION_FILES (default 100) `.jsonl`
 #   - keep none older than INIT_UBUNTU_LOG_RETENTION_DAYS (default 30) days

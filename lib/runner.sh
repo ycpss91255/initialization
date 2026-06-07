@@ -204,6 +204,10 @@ _runner_run_batch() {
         "skipped=0" \
         "failed=${_failures}"
 
+    # Session-end log retention (PRD §10.2, AC-33): prune the JSONL log dir
+    # after session_end so the active file (newest mtime) is never a victim.
+    logger_prune_logs
+
     if [[ "${_failures}" -gt 0 ]]; then
         log_error "[runner] ${_failures} module(s) failed during ${_phase}; ${_ok} succeeded."
         return 6

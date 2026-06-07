@@ -30,6 +30,7 @@ teardown() {
     assert_success
     assert_line 'modules=["alpha","beta"]'
     assert_line 'core=true'
+    assert_line 'full=true'
 }
 
 @test "push event ignores narrower filter matches" {
@@ -37,6 +38,7 @@ teardown() {
     assert_success
     assert_line 'modules=["alpha","beta"]'
     assert_line 'core=true'
+    assert_line 'full=true'
 }
 
 @test "shared filter match fans out to full matrix + core" {
@@ -44,6 +46,7 @@ teardown() {
     assert_success
     assert_line 'modules=["alpha","beta"]'
     assert_line 'core=true'
+    assert_line 'full=true'
 }
 
 @test "single module match runs only that shard, no core" {
@@ -51,6 +54,7 @@ teardown() {
     assert_success
     assert_line 'modules=["alpha"]'
     assert_line 'core=false'
+    assert_line 'full=false'
 }
 
 @test "module + core match runs that shard and core" {
@@ -58,6 +62,7 @@ teardown() {
     assert_success
     assert_line 'modules=["beta"]'
     assert_line 'core=true'
+    assert_line 'full=false'
 }
 
 @test "core-only match emits empty matrix + core" {
@@ -65,6 +70,7 @@ teardown() {
     assert_success
     assert_line 'modules=[]'
     assert_line 'core=true'
+    assert_line 'full=false'
 }
 
 @test "no relevant filter match falls back to full matrix + core" {
@@ -74,6 +80,7 @@ teardown() {
     assert_success
     assert_line 'modules=["alpha","beta"]'
     assert_line 'core=true'
+    assert_line 'full=true'
 }
 
 @test "unknown filter names alone also trigger the fallback" {
@@ -81,6 +88,18 @@ teardown() {
     assert_success
     assert_line 'modules=["alpha","beta"]'
     assert_line 'core=true'
+    assert_line 'full=true'
+}
+
+@test "PR whose matched filters cover every module + core reports full=true" {
+    # Rule 4 can coincidentally select the complete cartesian — the
+    # coverage gate must then enforce (full=true), not stay report-only.
+    run "${SCRIPT}" --event pull_request \
+        --changed '["module-alpha","module-beta","core"]'
+    assert_success
+    assert_line 'modules=["alpha","beta"]'
+    assert_line 'core=true'
+    assert_line 'full=true'
 }
 
 @test "module filter for a nonexistent module is dropped by intersection" {

@@ -4,8 +4,10 @@
 # Tests for `script/ci/ci.sh` per-shard kcov coverage + merge gate
 # (issue #28): each per-module CI matrix shard runs bats ONCE under kcov
 # (`--kcov`), and a final aggregation entry point (`--ci-merge-coverage`)
-# merges all shard outputs and asserts the AC-17 gate (>= 80%) on the
-# MERGED result.
+# merges all shard outputs and asserts the coverage gate on the MERGED
+# result. Gate default is the 66 ratchet baseline (AC-17's 80% flips in
+# via #124); COVERAGE_ENFORCE=0|false makes it report-only (CI narrow
+# PR matrices).
 #
 # Strategy: copy ci.sh into a fixture repo skeleton under
 # $BATS_TEST_TMPDIR so its self-resolved REPO_ROOT points at the fixture,
@@ -145,16 +147,16 @@ teardown() {
     assert_output --partial "coverage/shard-core"
 }
 
-@test "merge gate passes when merged coverage meets the 80% default (AC-17)" {
+@test "merge gate passes when merged coverage meets the 66 ratchet default" {
     mkdir -p "${FIXTURE_ROOT}/coverage/shard-core"
-    STUB_KCOV_PERCENT="80.00" run "${CI_SH}" --ci-merge-coverage
+    STUB_KCOV_PERCENT="66.00" run "${CI_SH}" --ci-merge-coverage
     assert_success
-    assert_output --partial "80.00%"
+    assert_output --partial "66.00%"
 }
 
-@test "merge gate fails when merged coverage is below the 80% default (AC-17)" {
+@test "merge gate fails when merged coverage is below the 66 ratchet default" {
     mkdir -p "${FIXTURE_ROOT}/coverage/shard-core"
-    STUB_KCOV_PERCENT="79.99" run "${CI_SH}" --ci-merge-coverage
+    STUB_KCOV_PERCENT="65.99" run "${CI_SH}" --ci-merge-coverage
     assert_failure
     assert_output --partial "coverage gate failed"
 }
@@ -163,6 +165,35 @@ teardown() {
     mkdir -p "${FIXTURE_ROOT}/coverage/shard-core"
     STUB_KCOV_PERCENT="42.50" COVERAGE_MIN=40 run "${CI_SH}" --ci-merge-coverage
     assert_success
+}
+
+@test "COVERAGE_ENFORCE=false turns a below-threshold gate into report-only" {
+    # Narrow-matrix PR runs (issue #28): the CI coverage job passes
+    # discover's `full=false` as COVERAGE_ENFORCE — the merge must print
+    # the percentage but never fail, since unrun shards' files still
+    # count in the merged denominator.
+    mkdir -p "${FIXTURE_ROOT}/coverage/shard-alpha"
+    STUB_KCOV_PERCENT="12.34" COVERAGE_ENFORCE=false \
+        run "${CI_SH}" --ci-merge-coverage
+    assert_success
+    assert_output --partial "12.34%"
+    assert_output --partial "report-only"
+}
+
+@test "COVERAGE_ENFORCE=0 is also report-only" {
+    mkdir -p "${FIXTURE_ROOT}/coverage/shard-alpha"
+    STUB_KCOV_PERCENT="12.34" COVERAGE_ENFORCE=0 \
+        run "${CI_SH}" --ci-merge-coverage
+    assert_success
+    assert_output --partial "report-only"
+}
+
+@test "COVERAGE_ENFORCE=true still enforces the gate" {
+    mkdir -p "${FIXTURE_ROOT}/coverage/shard-core"
+    STUB_KCOV_PERCENT="12.34" COVERAGE_ENFORCE=true \
+        run "${CI_SH}" --ci-merge-coverage
+    assert_failure
+    assert_output --partial "coverage gate failed"
 }
 
 @test "--ci-merge-coverage with no shard dirs is a green skip (all shards spec-less)" {
@@ -197,10 +228,13 @@ printf '%s\n' "$*" >> "${STUB_CALL_LOG}/docker.calls"
 EOF
     chmod +x "${FIXTURE_ROOT}/bin/docker"
 
-    run "${CI_SH}" --merge-coverage
+    COVERAGE_ENFORCE=false run "${CI_SH}" --merge-coverage
     assert_success
 
     run cat "${STUB_CALL_LOG}/docker.calls"
     assert_success
     assert_output --partial " coverage -c ./script/ci/ci.sh --ci-merge-coverage"
+    # The enforce flag must cross the container boundary (CI sets it on
+    # the host-side make invocation).
+    assert_output --partial "COVERAGE_ENFORCE=false"
 }

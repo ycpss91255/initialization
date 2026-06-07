@@ -433,28 +433,24 @@ EOF
 
 @test "global flag --verbose sets LOG_LEVEL=DEBUG" {
     _load_engine
-    export LOG_LEVEL=INFO
     dispatcher_dispatch version --verbose >/dev/null
     [ "${LOG_LEVEL}" = "DEBUG" ]
 }
 
 @test "global flag -v sets LOG_LEVEL=DEBUG" {
     _load_engine
-    export LOG_LEVEL=INFO
     dispatcher_dispatch version -v >/dev/null
     [ "${LOG_LEVEL}" = "DEBUG" ]
 }
 
 @test "global flag --quiet sets LOG_LEVEL=WARN" {
     _load_engine
-    export LOG_LEVEL=INFO
     dispatcher_dispatch version --quiet >/dev/null
     [ "${LOG_LEVEL}" = "WARN" ]
 }
 
 @test "global flags are accepted before the subcommand" {
     _load_engine
-    export LOG_LEVEL=INFO
     dispatcher_dispatch --verbose list >/dev/null
     [ "${LOG_LEVEL}" = "DEBUG" ]
 }

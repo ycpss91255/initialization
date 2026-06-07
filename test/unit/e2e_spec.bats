@@ -379,16 +379,12 @@ EOF
 }
 
 @test "setup_ubuntu --color=always forces ANSI escapes even when piped" {
-    export LOG_LEVEL=INFO
-    unset LOG_COLOR
     run bash -c "bash '${REPO_ROOT}/setup_ubuntu.sh' --color=always verify docker --dry-run | cat"
     assert_success
     [[ "${output}" == *$'\033'* ]]
 }
 
 @test "setup_ubuntu --color=never keeps output free of ANSI escapes" {
-    export LOG_LEVEL=INFO
-    unset LOG_COLOR
     run bash -c "bash '${REPO_ROOT}/setup_ubuntu.sh' --color=never verify docker --dry-run | cat"
     assert_success
     [[ "${output}" != *$'\033'* ]]

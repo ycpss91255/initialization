@@ -13,6 +13,7 @@ setup() {
     # Start each test from a clean color-related env.
     unset NO_COLOR INIT_UBUNTU_COLOR_MODE COLOR_ENABLED LOG_COLOR
     export TERM="xterm-256color"
+    export LOG_LEVEL=INFO
 }
 
 teardown() {
@@ -106,9 +107,11 @@ source_color() {
 @test "color_enabled reflects the color_init decision" {
     source_color
     color_init always
-    color_enabled
+    run color_enabled
+    assert_success
     color_init never
-    ! color_enabled
+    run color_enabled
+    assert_failure
 }
 
 # ── colorize helper ──────────────────────────────────────────────────────────
@@ -137,7 +140,6 @@ source_color() {
     source_logger
     source_color
     color_init auto
-    export LOG_LEVEL=INFO
     run log_info "hello"
     assert_success
     [[ "${output}" != *$'\033'* ]]
@@ -147,7 +149,6 @@ source_color() {
     source_logger
     source_color
     color_init always
-    export LOG_LEVEL=INFO
     run log_info "hello"
     assert_success
     [[ "${output}" == *$'\033'* ]]

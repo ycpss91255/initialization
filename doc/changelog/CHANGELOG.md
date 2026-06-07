@@ -22,6 +22,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Self-deps preflight in the entrypoint** (issue #40, PRD §3.4 /
+  AC-34): new `lib/preflight.sh` checks the tool's own dependencies
+  (`jq` / `curl` / `git`) before dispatching. Missing + sudo available:
+  prints an apt-style plan and asks once whether to `apt install`
+  (automatic with `-y` / `INIT_UBUNTU_YES=true`); missing + no sudo:
+  fails fast with exit 4 and explicit install guidance. `help` /
+  `version` paths are exempt, and the check runs at most once per run
+  (`INIT_UBUNTU_PREFLIGHT_DONE` guard). Resolves the chicken-and-egg
+  where state/config/detect need `jq` but `jq` ships inside the
+  `apt-essentials` module. Test rig gains `curl` (test-tools image +
+  kcov coverage deps) so e2e specs driving the real entrypoint pass the
+  preflight; the real apt-install path is reserved for the AC-34
+  integration check in a clean CI container (wave 6).
 - **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
   `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory
   at session end — keeps the newest 100 `.jsonl` files and none older
@@ -97,20 +110,6 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `${XDG_CONFIG_HOME}/init_ubuntu/module/` (was `.../modules/`).
 
 ### Added
-
-- **Self-deps preflight in the entrypoint** (issue #40, PRD §3.4 /
-  AC-34): new `lib/preflight.sh` checks the tool's own dependencies
-  (`jq` / `curl` / `git`) before dispatching. Missing + sudo available:
-  prints an apt-style plan and asks once whether to `apt install`
-  (automatic with `-y` / `INIT_UBUNTU_YES=true`); missing + no sudo:
-  fails fast with exit 4 and explicit install guidance. `help` /
-  `version` paths are exempt, and the check runs at most once per run
-  (`INIT_UBUNTU_PREFLIGHT_DONE` guard). Resolves the chicken-and-egg
-  where state/config/detect need `jq` but `jq` ships inside the
-  `apt-essentials` module. Test rig gains `curl` (test-tools image +
-  kcov coverage deps) so e2e specs driving the real entrypoint pass the
-  preflight; the real apt-install path is reserved for the AC-34
-  integration check in a clean CI container (wave 6).
 
 #### M1 — PRD + architecture + module contract (commit 50a41eb)
 

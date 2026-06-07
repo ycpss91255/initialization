@@ -73,7 +73,7 @@ install() {
     module_skip_if_installed && return 0
     _lazygit_resolve_asset_pattern || return $?
     _module_github_release_fetch_and_install || return $?
-    _lazygit_sidecar_write
+    module_sidecar_write "${NAME}" "${_LAZYGIT_TARGET_VERSION:-unknown}"
 }
 
 upgrade() {
@@ -81,7 +81,7 @@ upgrade() {
         && return 0
     _lazygit_resolve_asset_pattern || return $?
     _module_github_release_fetch_and_install || return $?
-    _lazygit_sidecar_write
+    module_sidecar_write "${NAME}" "${_LAZYGIT_TARGET_VERSION:-unknown}"
 }
 
 remove() {
@@ -89,7 +89,7 @@ remove() {
         "rm ${INSTALL_DIR} + ${BIN_LINK} + Sidecar" \
         && return 0
     module_default_github_release_remove || return $?
-    _lazygit_sidecar_remove
+    module_sidecar_remove "${NAME}"
 }
 
 purge() {
@@ -97,7 +97,7 @@ purge() {
         "rm ${INSTALL_DIR} + ${BIN_LINK} + Sidecar + CONFIG_PATHS" \
         && return 0
     module_default_github_release_purge || return $?
-    _lazygit_sidecar_remove
+    module_sidecar_remove "${NAME}"
 }
 
 detect() {
@@ -131,7 +131,7 @@ doctor() {
         _ok=1
     fi
     local _sidecar
-    _sidecar="$(_lazygit_sidecar_path)"
+    _sidecar="$(module_sidecar_path "${NAME}")"
     if is_installed; then
         if [[ ! -f "${_sidecar}" ]]; then
             log_warn "[${NAME}] doctor: installed but Sidecar missing (ADR-0001 drift; re-run install/upgrade to heal)"
@@ -163,31 +163,10 @@ _lazygit_resolve_asset_pattern() {
     _LAZYGIT_TARGET_VERSION="${_ver}"
 }
 
-_lazygit_sidecar_path() {
-    local _state="${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu}"
-    printf '%s/versions/%s' "${_state}" "${NAME}"
-}
-
-_lazygit_sidecar_write() {
-    local _ver="${_LAZYGIT_TARGET_VERSION:-}"
-    [[ -n "${_ver}" ]] || _ver="$(_lazygit_installed_version)" || _ver=""
-    local _file
-    _file="$(_lazygit_sidecar_path)"
-    mkdir -p "${_file%/*}"
-    printf '%s\n' "${_ver:-unknown}" > "${_file}"
-}
-
-_lazygit_sidecar_remove() {
-    rm -f "$(_lazygit_sidecar_path)"
-}
-
-# Installed version: Sidecar first (fast, offline), fall back to parsing
-# `lazygit --version` (e.g. pre-Sidecar installs).
+# Installed version: Sidecar first (fast, offline, module_sidecar_* shared
+# helpers), fall back to parsing `lazygit --version` (pre-Sidecar installs).
 _lazygit_installed_version() {
-    local _file
-    _file="$(_lazygit_sidecar_path)"
-    if [[ -f "${_file}" ]]; then
-        head -n1 "${_file}"
+    if module_sidecar_get_version "${NAME}" 2>/dev/null; then
         return 0
     fi
     local _bin="${BIN_LINK:-/usr/local/bin/${BIN_NAME}}"

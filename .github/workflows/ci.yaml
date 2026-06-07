@@ -43,6 +43,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      # JSON array of matched per-module filter names (e.g.
+      # ["shared","module-docker","core"]); consumed by `discover` to
+      # narrow the test-unit matrix on PRs (issue #31).
+      changed: ${{ steps.module-filter.outputs.changes }}
     steps:
       - uses: actions/checkout@v4
       - id: filter
@@ -71,6 +75,46 @@ jobs:
               - '!.codecov.yaml'
               - '!.claude/**'
               - '!.github/ISSUE_TEMPLATE/**'
+      # Per-module filters (issue #31): generated at runtime from
+      # module/*.module.sh so adding a module never requires a workflow
+      # edit. Separate paths-filter step because these are positive
+      # filters and need the default `some` quantifier (the `code`
+      # filter above is all-negated and needs `every`).
+      - name: generate per-module path filters
+        run: |
+          ./script/ci/generate_module_filters.sh \
+            > /tmp/module-filters.generated.yaml
+          echo '── generated filters ──'
+          cat /tmp/module-filters.generated.yaml
+      - id: module-filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: /tmp/module-filters.generated.yaml
+
+  # ── Discover unit-test matrix (issue #31, PRD M10) ─────────────────────────
+  # Lists module/*.module.sh and intersects with the matched path filters:
+  # PRs only run the jobs for changed modules (+ `core` for non-module
+  # specs); push to main / tags runs the full matrix. A code change that
+  # matches no known filter falls back to the full matrix (never silently
+  # skip unit tests).
+  discover:
+    name: discover-modules
+    needs: changes
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.select.outputs.modules }}
+      core: ${{ steps.select.outputs.core }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHANGED_FILTERS: ${{ needs.changes.outputs.changed }}
+        run: |
+          ./script/ci/select_unit_matrix.sh \
+            --event "${EVENT_NAME}" \
+            --changed "${CHANGED_FILTERS:-[]}" \
+            | tee -a "$GITHUB_OUTPUT"
 
   # ── Build test-tools image once (issue #26) ────────────────────────────────
   # Always runs (no path filter) because lint runs on every PR, including
@@ -116,11 +160,15 @@ jobs:
       - name: run lint (shellcheck + hadolint + fish syntax)
         run: make lint TEST_TOOLS_PREBUILT=1
 
-  # ── Unit tests (skipped on doc-only changes) ───────────────────────────────
-  test-unit:
-    name: test-unit
-    needs: [changes, build-image]
-    if: needs.changes.outputs.code == 'true'
+  # ── Unit tests: core (non-module specs; issue #31) ─────────────────────────
+  # Engine / lib / hook / script / template specs in one job. Skipped on
+  # doc-only changes and on PRs that only touch modules.
+  test-unit-core:
+    name: test-unit (core)
+    needs: [changes, discover, build-image]
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      needs.discover.outputs.core == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,8 +179,40 @@ jobs:
           path: /tmp
       - name: load test-tools image
         run: docker load -i /tmp/test-tools.tar
-      - name: run unit bats specs
-        run: make test-unit TEST_TOOLS_PREBUILT=1
+      - name: run core unit bats specs
+        run: make test-unit MODULE=core TEST_TOOLS_PREBUILT=1
+
+  # ── Unit tests: per-module matrix (issue #31, PRD M10) ─────────────────────
+  # One shard per module from the discover job. PRs get only the shards
+  # for changed modules; push to main / tags gets the full matrix. A
+  # module without a spec yet is a green skip inside ci.sh. Empty matrix
+  # (e.g. core-only PR) skips the whole job — ci-passed counts skipped
+  # as pass.
+  test-unit-module:
+    name: test-unit (${{ matrix.module }})
+    needs: [changes, discover, build-image]
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      needs.discover.outputs.modules != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJson(needs.discover.outputs.modules) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: download test-tools image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: test-tools-image
+          path: /tmp
+      - name: load test-tools image
+        run: docker load -i /tmp/test-tools.tar
+      - name: run module unit bats spec
+        env:
+          MODULE: ${{ matrix.module }}
+        run: make test-unit MODULE="${MODULE}" TEST_TOOLS_PREBUILT=1
 
   # ── Integration tests (skipped on doc-only changes) ────────────────────────
   test-integration:
@@ -181,7 +261,15 @@ jobs:
   # either approach (#3 will decide).
   ci-passed:
     name: ci-passed
-    needs: [changes, build-image, lint, test-unit, test-integration, coverage]
+    needs:
+      - changes
+      - discover
+      - build-image
+      - lint
+      - test-unit-core
+      - test-unit-module
+      - test-integration
+      - coverage
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -189,20 +277,32 @@ jobs:
         run: |
           set -euo pipefail
           echo "changes.code=${{ needs.changes.outputs.code }}"
+          echo "discover.modules=${{ needs.discover.outputs.modules }}"
+          echo "discover.core=${{ needs.discover.outputs.core }}"
+          echo "changes=${{ needs.changes.result }}"
+          echo "discover=${{ needs.discover.result }}"
           echo "build-image=${{ needs.build-image.result }}"
           echo "lint=${{ needs.lint.result }}"
-          echo "test-unit=${{ needs.test-unit.result }}"
+          echo "test-unit-core=${{ needs.test-unit-core.result }}"
+          echo "test-unit-module=${{ needs.test-unit-module.result }}"
           echo "test-integration=${{ needs.test-integration.result }}"
           echo "coverage=${{ needs.coverage.result }}"
-          # build-image + lint must succeed; the heavy three must
-          # succeed-or-skipped (doc-only PRs skip them).
+          # changes + discover + build-image + lint must succeed; the
+          # heavy jobs must succeed-or-skipped (doc-only PRs skip all of
+          # them; module-scoped PRs skip the shards for unchanged
+          # modules / core). test-unit-module is the MATRIX AGGREGATE:
+          # any failed shard makes it `failure`, all-shards-skipped (or
+          # empty matrix) makes it `skipped`.
           for r in \
+              "${{ needs.changes.result }}" \
+              "${{ needs.discover.result }}" \
               "${{ needs.build-image.result }}" \
               "${{ needs.lint.result }}"; do
             case "$r" in success) ;; *) echo "mandatory job=$r"; exit 1 ;; esac
           done
           for r in \
-              "${{ needs.test-unit.result }}" \
+              "${{ needs.test-unit-core.result }}" \
+              "${{ needs.test-unit-module.result }}" \
               "${{ needs.test-integration.result }}" \
               "${{ needs.coverage.result }}"; do
             case "$r" in success|skipped) ;; *) echo "heavy job=$r"; exit 1 ;; esac

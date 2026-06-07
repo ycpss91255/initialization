@@ -27,11 +27,61 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   github-release archetype. Versioned upstream assets
   (`lazygit_<ver>_Linux_x86_64.tar.gz`) are resolved at run time before
   super-calling the archetype fetch. All 10 lifecycle phases are
-  runnable standalone (AC-25); Sidecar is written on install/upgrade
-  and deleted on remove/purge (ADR-0001), with `doctor` flagging
+  runnable standalone (AC-25); the version Sidecar (shared
+  `module_sidecar_*` helpers) is written on install/upgrade and deleted
+  on remove/purge (ADR-0001), with `doctor` flagging
   Sidecar/install-state drift. Ships
-  `test/unit/module/lazygit_spec.bats` (~60 tests, Q29 scope) with
+  `test/unit/module/lazygit_spec.bats` (71 tests, Q29 scope) with
   mocked GitHub queries (Q46: zero network in gates).
+- **zoxide module** (issue #52, PRD §6.3.1 Batch B): migrated
+  `module/submodule/zoxide.sh` to the v2 contract as
+  `module/zoxide.module.sh` (smarter `cd`; aliases `cd` to `z`).
+  Archetype B (github-release) with super-call overrides — the release
+  asset name embeds the version, so install/upgrade resolve the latest
+  tag first, then chain to the archetype default; both wire
+  `zoxide init` + the `cd`→`z` alias into existing bash/zsh rc files
+  (idempotent) and write the version Sidecar; remove/purge delete it
+  (ADR-0001). All 10 lifecycle phases run standalone (AC-25); dry-run
+  performs no filesystem writes (AC-12). New shared `module_sidecar_*`
+  helpers in `lib/module_helper.sh` (path / write / remove /
+  get_version, dry-run-safe) give Standalone and Engine mode one
+  Sidecar code path — closes the cookbook's
+  `module_sidecar_get_version` follow-up. Spec:
+  `test/unit/module/zoxide_spec.bats` (49 tests).
+- **fzf module migrated to the v2 contract** (issue #50, PRD §6.3.1 Batch
+  B): `module/submodule/fzf.sh` (git-clone + `~/.fzf/install`) is replaced
+  by `module/fzf.module.sh` on the github-release archetype — downloads
+  the prebuilt single-binary tarball for the host arch (amd64 / arm64 /
+  armv7) into `/opt/fzf` and symlinks `/usr/local/bin/fzf`. All 10
+  lifecycle phases run standalone (AC-25); install is idempotent (AC-5);
+  `--dry-run` performs no filesystem writes (AC-12); the version Sidecar
+  is written on install/upgrade and removed on remove/purge per ADR-0001
+  while `state.json` is never touched by the module. Tagged
+  `cli-essentials`, `CATEGORY=optional`, depends on `apt-essentials`.
+- **lazydocker module migrated to the v2 contract** (issue #49, PRD
+  §6.3.1 Batch B): `module/lazydocker.module.sh` (docker TUI,
+  github-release archetype with a version-aware fetch override —
+  upstream asset names embed the release version). Metadata per PRD
+  §9.1 (`CATEGORY=optional`, `TAGS=(cli-essentials)`,
+  `DEPENDS_ON=(docker)`, i18n `DESCRIPTION`). All 10 lifecycle phases
+  run standalone (AC-25); install is idempotent (AC-5); `--dry-run`
+  writes nothing (AC-12). New `module_sidecar_*` helpers in
+  `lib/module_helper.sh` implement the ADR-0001 Sidecar (written on
+  install/upgrade, dropped on remove/purge, never touching
+  `state.json` in standalone mode); `is_outdated` compares the Sidecar
+  version against the latest GitHub release.
+
+- **Session-end log retention** (issue #42, PRD §10.2, AC-33): new
+  `logger_prune_logs` in `lib/logger.sh` prunes the JSONL log directory
+  at session end — keeps the newest 100 `.jsonl` files and none older
+  than 30 days; when either limit is exceeded it deletes from the oldest
+  (logrotate-like, pure bash/find, no external dependency; both limits
+  env-overridable via `INIT_UBUNTU_LOG_RETENTION_{DAYS,FILES}`). Wired
+  into `lib/runner.sh` right after the `session_end` event so the active
+  log file (newest mtime) is never a victim; pruning emits one
+  engine-level `log_pruned` OTel event (ADR-0006 schema) carrying
+  `deleted_count` + retention limits. Boundaries are keep-side inclusive:
+  exactly 100 files / exactly 30 days old are kept.
 - **State robustness** (issue #41, PRD §10.1): reading a corrupt
   `state.json` now quarantines it (`mv` → `state.json.corrupt.<ts>`) and
   fails fast (exit 1) with recovery guidance — re-run install to rebuild
@@ -44,6 +94,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Unit tests run as a per-module CI matrix** (issue #31, PRD M10): a
+  `discover` job builds the matrix dynamically from `module/*.module.sh`
+  (`fail-fast: false`, `timeout-minutes: 5` per shard) and non-module
+  specs (engine/lib/hook/script/template) run in a single
+  `test-unit (core)` job. `make test-unit MODULE=<name>` (and
+  `MODULE=core`) narrows the bats run via the new `ci.sh --module` flag;
+  a module without a spec yet is a green skip. Runtime-generated
+  `dorny/paths-filter` filters (`script/ci/generate_module_filters.sh` +
+  `script/ci/select_unit_matrix.sh`) make PRs run only the shards for
+  changed modules — `lib/`/`script/`/`Makefile`/workflow changes (or any
+  code change outside the known filters) fan out to the full matrix, and
+  pushes to main / tags always run the full matrix. `ci-passed` name and
+  aggregation semantics unchanged (skipped shards still count as pass);
+  every shard reuses the `build-image` test-tools artifact (#26).
 - **Module tools directory relocated to top-level `tool/`** (issue #46,
   PRD §6.5): holding area for one-off scripts — not in the module
   catalog, not in the TUI, not in the install pipeline; per-file

@@ -40,6 +40,46 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   localized templates; `doctor` validates the statusline launcher.
   80-test bats spec.
 
+- **qmk-firmware module** (issue #63, PRD §6.3.3 Batch C, M7): new
+  `module/qmk-firmware.module.sh` migrates `module/setup_qmk_firmware.sh`
+  to the v2 contract on the custom archetype — apt prereqs (git, python3,
+  pipx, build-essential; the package is ensured in `install()` per Q39
+  while `DEPENDS_ON` carries only the `apt-essentials` module), pipx-managed
+  `qmk` CLI, `qmk setup -y` toolchain + `~/qmk_firmware` checkout, and a
+  personal keymap overlay from `module/config/qmk_firmware/keyboards`.
+  Tagged `hardware`; host-only platforms (no wsl/container, US-5); opt-in
+  only (`is_recommended` always declines — enable via
+  `[modules.qmk-firmware]`). All 10 lifecycle phases runnable standalone
+  (AC-25), idempotent install (AC-5), dry-run writes nothing (AC-12),
+  Sidecar per ADR-0001 with PyPI-backed `is_outdated`. 74-test bats spec
+  `test/unit/module/qmk-firmware_spec.bats` (Q29 coverage ladder).
+
+- **claude-code module** (issue #57, PRD §6.3.2, Batch C): new
+  `module/claude-code.module.sh` installs the Anthropic Claude Code CLI
+  via the official native installer (`https://claude.ai/install.sh`,
+  user-home install, no sudo) on the custom archetype (D). The tool
+  ships its own auto-updater, so `is_outdated` always returns 1
+  (delegated) and `upgrade` runs `claude update`; `remove` keeps user
+  config (`~/.claude*`), `purge` clears it. Sidecar written on
+  install/upgrade and dropped on remove/purge (ADR-0001); all 10
+  lifecycle phases runnable standalone (AC-25). 74-test bats spec at
+  `test/unit/module/claude-code_spec.bats`.
+
+- **ranger module** (issue #61, PRD §6.3.3 Batch C): new
+  `module/ranger.module.sh` on the apt + config-drop hybrid archetype
+  (super-call pattern) — apt installs the `ranger` package, then the
+  config-drop defaults place the repo-managed
+  `module/config/ranger/rifle.conf` (ranger's file-opener rules) at
+  `~/.config/ranger/rifle.conf` with the managed marker. `is_installed`
+  requires both the package and the marked config, so a deleted
+  rifle.conf re-triggers the drop while a user-edited (still-marked)
+  file is never clobbered; `remove` keeps the config, `purge` deletes
+  `~/.config/ranger`. All 10 lifecycle phases run standalone (AC-25);
+  install is idempotent (AC-5); `--dry-run` performs no filesystem
+  writes (AC-12); the version Sidecar is written on install/upgrade and
+  removed on remove/purge per ADR-0001 while `state.json` is never
+  touched by the module. Tagged `filemgr`, `CATEGORY=optional`,
+  `DEPENDS_ON=()` (Q39).
 - **`lnav.module.sh` v2 module** (issue #62, PRD §6.3.3 Batch C):
   migrates the `module/config/lnav_pkg/` based install (config bundle
   loaded ad-hoc via `lnav -I <path>`) to the v2 contract on the custom

@@ -68,6 +68,8 @@ Common flags:
   -y / --yes             Assume yes to interactive prompts
   --dry-run              Print intended actions without executing
   --no-deps              Skip dep resolution (install only the named modules)
+  --verbose              Stream child command output live (default: captured to JSONL)
+  --quiet                Suppress progress lines; keep warn / error only
   --category=<c>         Filter list by category (base|recommended|optional|experimental)
   --tag=<t>              Filter list by tag
   --installed            With list: show modules recorded in state.json (--json for raw)
@@ -198,6 +200,12 @@ _dispatcher_lifecycle() {
             -y|--yes)     export INIT_UBUNTU_YES=true ;;
             --dry-run)    export INIT_UBUNTU_DRY_RUN=true ;;
             --no-deps)    export INIT_UBUNTU_NO_DEPS=true ;;
+            --verbose)    export INIT_UBUNTU_VERBOSE=true ;;
+            --quiet)
+                # PRD §7.7.1: no progress lines; only warn/error remain.
+                export INIT_UBUNTU_QUIET=true
+                export LOG_LEVEL=WARN
+                ;;
             --with-orphans|--base|--recommended|--all-base|--category=*|--install-target=*|--force|--profile=*)
                 printf "[dispatcher] WARN: %s is stubbed; ignoring\n" "${_arg}" >&2
                 ;;
@@ -230,6 +238,43 @@ _dispatcher_lifecycle() {
         while IFS= read -r _line; do
             [[ -n "${_line}" ]] && _order+=("${_line}")
         done <<< "${_resolved}"
+    fi
+
+    # Plan + confirm (PRD §7.2, 2026-06-06): without -y, print the resolved
+    # plan after dep resolution and ask `Proceed? [Y/n]` (install defaults
+    # to yes). Non-tty stdin has nobody to answer, so the default applies.
+    # --dry-run executes nothing, so it never prompts.
+    if [[ "${_phase}" == "install" \
+          && "${INIT_UBUNTU_DRY_RUN}" != "true" \
+          && "${INIT_UBUNTU_YES}" != "true" ]]; then
+        local -a _plan_deps=()
+        local _n
+        for _n in "${_order[@]}"; do
+            [[ " ${_modules[*]} " == *" ${_n} "* ]] && continue
+            _plan_deps+=("${_n}")
+        done
+        local _plan="Will install: ${_modules[*]}"
+        if [[ "${#_plan_deps[@]}" -gt 0 ]]; then
+            local _dep_word="deps"
+            [[ "${#_plan_deps[@]}" -eq 1 ]] && _dep_word="dep"
+            local _dep_csv
+            printf -v _dep_csv '%s, ' "${_plan_deps[@]}"
+            _plan+=" + ${#_plan_deps[@]} ${_dep_word} (${_dep_csv%, })"
+        fi
+        printf '%s\n' "${_plan}"
+        printf 'Proceed? [Y/n] '
+        local _ans=""
+        if [[ -t 0 ]]; then
+            read -r _ans || _ans=""
+        else
+            printf '\n'
+        fi
+        case "${_ans}" in
+            [nN]*)
+                printf 'Aborted.\n'
+                return 1
+                ;;
+        esac
     fi
 
     # Refuse root only when we'll actually mutate the system (PRD §10).
@@ -545,6 +590,11 @@ _dispatcher_upgrade() {
         case "${_arg}" in
             -y|--yes) export INIT_UBUNTU_YES=true ;;
             --dry-run) export INIT_UBUNTU_DRY_RUN=true ;;
+            --verbose) export INIT_UBUNTU_VERBOSE=true ;;
+            --quiet)
+                export INIT_UBUNTU_QUIET=true
+                export LOG_LEVEL=WARN
+                ;;
             -*) printf "[dispatcher] ERROR: unknown flag %s\n" "${_arg}" >&2; return 2 ;;
             *) _modules+=("${_arg}") ;;
         esac
@@ -571,6 +621,27 @@ _dispatcher_upgrade() {
             printf "  - %s\n" "${_n}"
         done
         return 0
+    fi
+
+    # Plan + confirm (PRD §7.6): upgrade keeps the conservative [y/N]
+    # default (unlike install's [Y/n]). Non-tty stdin has nobody to
+    # answer, so the default (no) applies and the run aborts.
+    if [[ "${INIT_UBUNTU_YES}" != "true" ]]; then
+        printf 'Will upgrade %s module(s): %s\n' "${#_modules[@]}" "${_modules[*]}"
+        printf 'Proceed? [y/N] '
+        local _ans=""
+        if [[ -t 0 ]]; then
+            read -r _ans || _ans=""
+        else
+            printf '\n'
+        fi
+        case "${_ans}" in
+            [yY]*) ;;
+            *)
+                printf 'Aborted.\n'
+                return 1
+                ;;
+        esac
     fi
 
     # Real run: refuse root (PRD §10). Check is HERE so dry-run + empty

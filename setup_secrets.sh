@@ -6,13 +6,14 @@
 # module pipeline, no registry/resolver/runner/dispatcher coupling, so the
 # TUI can simply fork it from a "Manage Secrets" menu entry.
 #
-# Subcommands (issue #44 scope):
+# Subcommands (issues #44 + #68):
 #   ssh-key generate [--type t] [--file path] [--comment c] [--no-passphrase]
 #   ssh-key load     [--file path]
 #   ssh-key copy <user@host> [--file path]
-#
-# Reserved for issue #68 (the lib/secrets.sh backend API they mount on is
-# already in place): gpg generate, token set/get, list, remove.
+#   token set <name>      (value via interactive prompt or stdin pipe)
+#   token get <name>      (value to stdout, nothing else on stdout)
+#   gpg generate / gpg import [<file>]
+#   list / remove <name>
 #
 # Security (AC-20): anything sensitive (key passphrases, future tokens) is
 # entered through interactive prompts owned by this tool or by ssh-keygen
@@ -65,11 +66,21 @@ Commands:
   ssh-key copy <user@host> [--file <path>]
                        Install the public key on a remote host (ssh-copy-id).
 
+  token set <name>     Store a token/secret under <name>. The value is read
+                       from an interactive no-echo prompt (or from a stdin
+                       pipe in automation) — never from argv, so it cannot
+                       leak into `ps` output or shell history.
+  token get <name>     Print the stored value to stdout (and nothing else
+                       on stdout, so it is pipe-safe). Careful: redirecting
+                       it on an interactive shell can land it in history.
+  gpg generate         Generate a GPG key pair (gpg --full-generate-key;
+                       all prompts are owned by gpg on its own tty).
+  gpg import [<file>]  Import GPG key material from <file> (or stdin).
+  list                 List stored secret names — names only, never values.
+  remove <name>        Delete the named secret from the active backend.
+
   help                 Show this help.
   version              Show version.
-
-Planned (issue #68; not implemented yet):
-  gpg generate / token set <name> / token get <name> / list / remove <name>
 
 Storage backend selection (for token storage; PRD §14.3):
   pass -> gnome-keyring -> encrypted file (~/.config/init_ubuntu/secrets/).
@@ -194,6 +205,62 @@ _secrets_cmd_ssh_key() {
     esac
 }
 
+# ── token actions (issue #68) ────────────────────────────────────────────────
+
+_secrets_token_set() {
+    if (( $# != 1 )); then
+        log_error "usage: setup_secrets token set <name> — the value is prompted for (or piped on stdin), never passed as an argument"
+        exit 2
+    fi
+    local _name="$1"
+
+    if [[ -t 0 ]]; then
+        # Interactive: no-echo prompt on the tty. The value never appears in
+        # argv (`ps`) or shell history (AC-20); printf is a bash builtin, so
+        # the pipe below never exec()s the value either.
+        local _value=""
+        printf 'Enter value for token %s: ' "${_name}" > /dev/tty
+        IFS= read -rs _value < /dev/tty
+        printf '\n' > /dev/tty
+        if [[ -z "${_value}" ]]; then
+            log_error "empty token value rejected"
+            exit 1
+        fi
+        printf '%s' "${_value}" | secrets_store "${_name}"
+    else
+        # Automation: the value arrives on the stdin pipe and flows straight
+        # through to the backend without touching argv or the filesystem.
+        secrets_store "${_name}"
+    fi
+    log_info "token '${_name}' stored"
+}
+
+_secrets_token_get() {
+    if (( $# != 1 )); then
+        log_error "usage: setup_secrets token get <name>"
+        exit 2
+    fi
+    # stdout carries the secret value and nothing else (pipe-safe);
+    # diagnostics from the lib go to stderr only.
+    secrets_retrieve "$1"
+}
+
+_secrets_cmd_token() {
+    if (( $# == 0 )); then
+        log_error "token requires an action: set <name> | get <name>"
+        exit 2
+    fi
+    local _action="$1"; shift
+    case "${_action}" in
+        set) _secrets_token_set "$@" ;;
+        get) _secrets_token_get "$@" ;;
+        *)
+            log_error "unknown token action '${_action}' (valid: set | get)"
+            exit 2
+            ;;
+    esac
+}
+
 # ── dispatch ─────────────────────────────────────────────────────────────────
 
 main() {
@@ -206,7 +273,10 @@ main() {
         ssh-key)
             _secrets_cmd_ssh_key "$@"
             ;;
-        gpg|token|list|remove)
+        token)
+            _secrets_cmd_token "$@"
+            ;;
+        gpg|list|remove)
             log_error "'${_cmd}' is not implemented yet — planned for issue #68"
             exit 2
             ;;

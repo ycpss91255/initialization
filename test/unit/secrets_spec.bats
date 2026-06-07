@@ -284,10 +284,16 @@ _set_agent_sock() {
     assert_failure 2
 }
 
-@test "setup_secrets.sh token subcommand is reserved for #68 (exit 2)" {
-    run "${REPO_ROOT}/setup_secrets.sh" token set gh
-    assert_failure 2
-    assert_output --partial "#68"
+# ── token set / token get (issue #68) ───────────────────────────────────────
+
+@test "token set/get round-trip via CLI on encrypted-file backend" {
+    _set_backend encrypted-file
+    _write_passphrase "pp"
+    run bash -c "printf '%s' 'cli-tok-9f2' | '${REPO_ROOT}/setup_secrets.sh' token set gh-token"
+    assert_success
+    run --separate-stderr "${REPO_ROOT}/setup_secrets.sh" token get gh-token
+    assert_success
+    assert_output "cli-tok-9f2"
 }
 
 @test "setup_secrets.sh gpg subcommand is reserved for #68 (exit 2)" {

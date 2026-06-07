@@ -90,14 +90,14 @@ install() {
     module_dryrun_guard install "append cat/bat aliases to shell rc files + write sidecar" \
         && return 0
     _batcat_add_aliases
-    _batcat_sidecar_write "$(_batcat_pkg_version)"
+    module_sidecar_write "${NAME}" "$(_batcat_pkg_version)"
 }
 
 # Override upgrade: archetype upgrades, then refresh the Sidecar version.
 upgrade() {
     module_default_apt_upgrade || return $?
     module_dryrun_guard upgrade "refresh sidecar version" && return 0
-    _batcat_sidecar_write "$(_batcat_pkg_version)"
+    module_sidecar_write "${NAME}" "$(_batcat_pkg_version)"
 }
 
 # Override remove: apt-remove keeps user config (alias lines stay — they
@@ -106,7 +106,7 @@ upgrade() {
 remove() {
     module_default_apt_remove || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    _batcat_sidecar_remove
+    module_sidecar_remove "${NAME}"
 }
 
 # Override purge: archetype purges pkg + CONFIG_PATHS, then strip the
@@ -115,7 +115,7 @@ purge() {
     module_default_apt_purge || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _batcat_remove_aliases
-    _batcat_sidecar_remove
+    module_sidecar_remove "${NAME}"
 }
 
 detect() {
@@ -140,7 +140,7 @@ doctor() {
         log_warn "[${NAME}] doctor: batcat --version failed"
         return 1
     fi
-    [[ -f "$(_batcat_sidecar_path)" ]] \
+    [[ -f "$(module_sidecar_path "${NAME}")" ]] \
         || log_warn "[${NAME}] doctor: sidecar missing (installed outside init_ubuntu?)"
     return 0
 }
@@ -153,26 +153,6 @@ _batcat_pkg_version() {
     local _ver
     _ver="$(dpkg-query -W -f='${Version}' bat 2>/dev/null || true)"
     printf '%s' "${_ver:-apt-managed}"
-}
-
-# Sidecar path per ADR-0001: ${XDG_STATE_HOME}/init_ubuntu/versions/<name>.
-# Honors INIT_UBUNTU_STATE_DIR (engine/test override), like lib/state.sh.
-_batcat_sidecar_path() {
-    local _dir="${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu}"
-    printf '%s/versions/%s' "${_dir}" "${NAME}"
-}
-
-_batcat_sidecar_write() {
-    local _ver="${1:-unknown}"
-    local _path; _path="$(_batcat_sidecar_path)"
-    mkdir -p "${_path%/*}"
-    printf '%s\n' "${_ver}" > "${_path}"
-    log_info "[${NAME}] sidecar: ${_path} = ${_ver}"
-}
-
-_batcat_sidecar_remove() {
-    rm -f "$(_batcat_sidecar_path)"
-    return 0
 }
 
 # Append the guarded alias lines to every EXISTING shell rc file; never

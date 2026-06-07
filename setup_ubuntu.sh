@@ -32,6 +32,12 @@ export LOG_COLOR="${LOG_COLOR:-true}"
 # ── Source engine ────────────────────────────────────────────────────────────
 # shellcheck source=lib/logger.sh
 source "${LIB_DIR}/logger.sh"
+
+# Session-level trace id (W3C Trace Context, ADR-0006): generated once per
+# setup_ubuntu invocation and exported so every sub-shell (runner module
+# sub-shells included) tags its JSONL events with the same trace_id.
+_logger_ensure_trace_id
+
 # shellcheck source=lib/general.sh
 source "${LIB_DIR}/general.sh"
 # shellcheck source=lib/i18n.sh

@@ -1,0 +1,81 @@
+name: Bug report
+description: Report something that is broken or behaving unexpectedly
+title: "fix: "
+labels: ["bug"]
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Fill in every required section below.
+        GitHub interaction here is English-only.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: |
+        Describe the broken behavior. Include:
+        - What is broken, in one sentence.
+        - Where it happens (which module / script / command).
+        - What you actually observed (error text, wrong output).
+      placeholder: |
+        - The `claude-ls` function prints the wrong path when ...
+        - Observed: `<paste exact output / error>`
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: |
+        - What you expected to happen instead.
+        - Why that is the correct behavior (spec, ADR, docs) if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Minimal, precise steps. Include:
+        - The exact command(s) run.
+        - Any required setup or preconditions.
+        - How often it reproduces (always / intermittent).
+      placeholder: |
+        1. Run `make test-unit MODULE=foo`
+        2. ...
+        3. See error: ...
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Which target(s) does this affect?
+      multiple: true
+      options:
+        - x86_64
+        - rpi4
+        - rpi5
+        - jetson
+        - not platform-specific
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: |
+        Optional. Add any of:
+        - Relevant logs or stack traces.
+        - Root-cause notes or a suggested fix.
+        - Severity / blast radius.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for a duplicate.
+          required: false

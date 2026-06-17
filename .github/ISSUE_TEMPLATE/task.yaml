@@ -1,0 +1,59 @@
+name: Task
+description: A specific piece of engineering work (refactor, tests, CI, chore)
+labels: ["enhancement"]
+type: Task
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A maintainer / agent work item that is neither a user-facing bug nor a
+        new feature idea: refactors, test backfill, CI / infra changes, chores,
+        dependency bumps, or tracking issues. Title prefix is usually
+        `refactor:` / `test:` / `ci:` / `chore:` / `perf:`.
+        GitHub interaction here is English-only.
+  - type: textarea
+    id: work
+    attributes:
+      label: What needs to be done
+      description: |
+        Describe the work concretely. Include:
+        - The change to make, in actionable terms.
+        - Which files / areas / modules are touched.
+        - The intended approach (if decided).
+      placeholder: |
+        - Extract the WS_PATH reconciler out of `setup.sh` into ...
+        - Touches: `lib/general.sh`, `test/unit/...`
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: |
+        A checklist that defines "done". Each item should be verifiable.
+      placeholder: |
+        - [ ] Reconciler lives in its own function with a unit test
+        - [ ] Coverage stays >= 80%
+        - [ ] Changelog / docs synced
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: |
+        Optional:
+        - Background, links to ADRs / related issues / PRs.
+        - Why this work matters now.
+    validations:
+      required: false
+  - type: textarea
+    id: scope
+    attributes:
+      label: Out of scope / blocked by
+      description: |
+        Optional:
+        - What this task does NOT cover.
+        - Anything that must land first (issue / PR refs).
+    validations:
+      required: false

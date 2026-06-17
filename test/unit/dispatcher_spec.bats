@@ -761,3 +761,225 @@ EOF
     run dispatcher_dispatch status --bogus
     assert_failure 2
 }
+
+# ── lifecycle flag handling (--verbose / --quiet / unknown) ─────────────────
+
+@test "lifecycle --verbose flag is accepted and dry-run still lists order" {
+    _load_engine
+    run dispatcher_dispatch install noop --verbose --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+    assert_output --partial "noop"
+}
+
+@test "lifecycle --quiet flag sets LOG_LEVEL=WARN and dry-run succeeds" {
+    _load_engine
+    dispatcher_dispatch install noop --quiet --dry-run >/dev/null
+    [ "${LOG_LEVEL}" = "WARN" ]
+}
+
+@test "lifecycle with unknown -flag returns exit 2" {
+    _load_engine
+    run dispatcher_dispatch install noop --no-such-flag
+    assert_failure 2
+    assert_output --partial "unknown flag"
+}
+
+@test "lifecycle --no-deps installs only the named module (skips resolver)" {
+    _load_engine
+    run dispatcher_dispatch install noop --no-deps --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+    assert_output --partial "noop"
+}
+
+# ── upgrade flag handling + state-driven defaults ───────────────────────────
+
+@test "upgrade --verbose flag is accepted and dry-run lists order" {
+    _load_engine
+    run dispatcher_dispatch upgrade noop --verbose --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+    assert_output --partial "noop"
+}
+
+@test "upgrade --quiet flag sets LOG_LEVEL=WARN" {
+    _load_engine
+    dispatcher_dispatch upgrade noop --quiet --dry-run >/dev/null
+    [ "${LOG_LEVEL}" = "WARN" ]
+}
+
+@test "upgrade with no args defaults to modules recorded in state (dry-run)" {
+    _load_engine
+    state_record_install noop true v1
+    run dispatcher_dispatch upgrade --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+    assert_output --partial "noop"
+}
+
+@test "upgrade -y as root is refused with exit 4 (PRD §10)" {
+    [[ "${EUID:-$(id -u)}" -eq 0 ]] || skip "root-refusal path needs the container root user"
+    _load_engine
+    state_record_install noop true v1
+    run dispatcher_dispatch upgrade noop -y
+    assert_failure 4
+    assert_output --partial "do not run upgrade as root"
+}
+
+# ── verify state-driven defaults + real runner_verify call ──────────────────
+
+@test "verify with no args defaults to modules recorded in state (dry-run)" {
+    _load_engine
+    state_record_install noop true v1
+    run dispatcher_dispatch verify --dry-run
+    assert_success
+    assert_output --partial "DRY-RUN"
+    assert_output --partial "noop"
+}
+
+@test "verify <module> (non-dry-run) invokes runner_verify and reports a result" {
+    _load_engine
+    state_record_install noop true v1
+    run dispatcher_dispatch verify noop
+    # runner_verify runs verify() in a subshell; the noop fixture defines no
+    # verify(), so the runner reports a failure (exit 6) — what matters for
+    # coverage is that the real runner path (not the dry-run branch) executes.
+    assert_failure 6
+}
+
+# ── import plan formatting branches (jq actions) ────────────────────────────
+
+# Writes a payload with noop at a caller-chosen version + manual flag.
+_write_noop_payload_ver() {
+    local _file="$1" _ver="$2" _manual="${3:-true}"
+    cat > "${_file}" <<EOF
+{
+  "version": "0.2.0",
+  "modules": [
+    {"name": "noop", "synced": {"manual": ${_manual}, "depends_on": [],
+     "version_provided": "${_ver}"}}
+  ]
+}
+EOF
+}
+
+@test "import dry-run formats an upgrade action when versions differ" {
+    _load_engine
+    state_record_install noop true v1
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    _write_noop_payload_ver "${_payload}" v9
+    run dispatcher_dispatch import "${_payload}"
+    assert_success
+    assert_output --partial "noop"
+    assert_output --partial "upgrade"
+    assert_output --partial "v1 -> v9"
+}
+
+@test "import dry-run formats a noop action when versions match and manual unchanged" {
+    _load_engine
+    state_record_install noop true v9
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    _write_noop_payload_ver "${_payload}" v9 true
+    run dispatcher_dispatch import "${_payload}"
+    assert_success
+    assert_output --partial "noop"
+    assert_output --partial "up-to-date"
+}
+
+@test "import dry-run formats a flag-manual action when manual flips sticky" {
+    _load_engine
+    state_record_install noop false v9
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    _write_noop_payload_ver "${_payload}" v9 true
+    run dispatcher_dispatch import "${_payload}"
+    assert_success
+    assert_output --partial "noop"
+    assert_output --partial "manual"
+}
+
+@test "import dry-run formats a keep action for a local-only module" {
+    _load_engine
+    state_record_install noop true v9
+    state_record_install other true v2
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    _write_noop_payload_ver "${_payload}" v9 true
+    run dispatcher_dispatch import "${_payload}"
+    assert_success
+    assert_output --partial "other"
+    assert_output --partial "local only"
+}
+
+@test "import --apply with an upgrade action as root is refused (exit 4)" {
+    [[ "${EUID:-$(id -u)}" -eq 0 ]] || skip "root-refusal path needs the container root user"
+    _load_engine
+    state_record_install noop true v1
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    _write_noop_payload_ver "${_payload}" v9
+    run dispatcher_dispatch import "${_payload}" --apply
+    assert_failure 4
+    assert_output --partial "do not run import --apply as root"
+}
+
+@test "import -y flag is accepted and dry-run still prints the diff" {
+    _load_engine
+    state_init
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    _write_noop_payload_ver "${_payload}" v9
+    run dispatcher_dispatch import "${_payload}" -y
+    assert_success
+    assert_output --partial "IMPORT DIFF"
+}
+
+@test "import --dry-run explicitly wins over --apply" {
+    _load_engine
+    state_record_install noop true v1
+    local _payload="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
+    _write_noop_payload_ver "${_payload}" v9
+    run dispatcher_dispatch import "${_payload}" --apply --dry-run
+    assert_success
+    assert_output --partial "nothing was changed"
+}
+
+# ── doctor: registered module file present (is_installed subshell) ──────────
+
+@test "doctor reports OK when a registered module's is_installed succeeds" {
+    cat > "${FAKE_MODULE_DIR}/present.module.sh" <<'EOF'
+NAME="present"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+is_installed() { return 0; }
+EOF
+    _load_engine
+    state_record_install present true v1
+    run dispatcher_dispatch doctor
+    assert_success
+    assert_output --partial "present"
+    assert_output --partial "OK"
+    assert_output --partial "consistent"
+}
+
+@test "doctor reports DRIFTED when a registered module's is_installed fails" {
+    cat > "${FAKE_MODULE_DIR}/absent.module.sh" <<'EOF'
+NAME="absent"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+is_installed() { return 1; }
+EOF
+    _load_engine
+    state_record_install absent true v1
+    run dispatcher_dispatch doctor
+    assert_failure 1
+    assert_output --partial "absent"
+    assert_output --partial "DRIFTED"
+}

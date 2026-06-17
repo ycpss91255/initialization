@@ -9,7 +9,7 @@ The whole flow:
 
 ```
 pick archetype → copy template → fill metadata → lifecycle functions
-              → bats spec → make test-unit / lint → PR
+              → bats spec → just -f justfile.ci test-unit / lint → PR
 ```
 
 ---
@@ -122,12 +122,12 @@ installs").
 ## 5. Test and lint (Docker only)
 
 ```bash
-make test-unit MODULE=mytool   # your spec only
-make test-unit                 # full unit suite
-make lint                      # ShellCheck + fish + hadolint
+just -f justfile.ci test-unit mytool   # your spec only
+just -f justfile.ci test-unit          # full unit suite
+just -f justfile.ci lint               # ShellCheck + fish + hadolint
 ```
 
-Tests run inside Docker **only** (ADR-0004); the Make targets handle
+Tests run inside Docker **only** (ADR-0004); the just recipes handle
 the container for you. Regenerate the module index after adding the
 module:
 
@@ -145,7 +145,7 @@ One module per PR. Checklist:
 - [ ] `test/unit/module/mytool_spec.bats` (spec §7 table covered)
 - [ ] `doc/module/INDEX.md` regenerated
 - [ ] CHANGELOG entry under `[Unreleased]` (`doc/changelog/CHANGELOG.md`)
-- [ ] `make test-unit MODULE=mytool` + `make lint` green
+- [ ] `just -f justfile.ci test-unit mytool` + `just -f justfile.ci lint` green
 - [ ] Conventional commit, e.g. `feat(module): mytool — <summary>`
 
 `setup_ubuntu doctor --validate-modules` runs the same metadata lint CI

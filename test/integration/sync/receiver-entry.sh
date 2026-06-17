@@ -9,7 +9,7 @@
 #   1. Generates sshd host keys + a throwaway client keypair, sharing the
 #      client key and the host public key with the sender ci container
 #      through the bind-mounted repo at /source/.tmp/sync-e2e/ (nothing is
-#      ever committed — .tmp/ is gitignored and `make clean` removes it).
+#      ever committed — .tmp/ is gitignored and `just -f justfile.ci clean` removes it).
 #   2. Creates a non-root `syncuser` (key-only auth; password stays locked
 #      so PasswordAuthentication can never succeed — PRD §16.4).
 #   3. Drops a no-op `e2e-probe` fixture module into syncuser's user-local

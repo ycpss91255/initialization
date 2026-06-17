@@ -22,7 +22,7 @@ to `~/.claude/rules/` via `install.sh`).
 
 ## Hard rules
 
-1. **Tests run inside Docker only.** Use `make test-unit` / `make test-integration` / `make coverage`. See `doc/adr/0004-tests-must-run-in-docker-only.md`. Enforced by `.claude/hook/test-must-use-docker.sh` (PreToolUse).
+1. **Tests run inside Docker only.** Use `just -f justfile.ci test-unit` / `just -f justfile.ci test-integration` / `just -f justfile.ci coverage` (the CI gate; `just` replaced `make` per `doc/adr/0022-just-replaces-make-as-task-runner.md`). See `doc/adr/0004-tests-must-run-in-docker-only.md`. Enforced by `.claude/hook/test-must-use-docker.sh` (PreToolUse).
 2. **No host package installs.** Module Action Phases (install / upgrade / remove / purge) must not run on the host.
 3. **Bash + Docker scope.** Language migration triggers documented in `doc/adr/0003-language-choice-and-migration-triggers.md`.
 

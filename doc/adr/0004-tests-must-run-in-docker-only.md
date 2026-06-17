@@ -1,8 +1,9 @@
 # Tests MUST run in Docker, never on the host (hard rule)
 
 All `bats` / module-lifecycle invocations execute inside the
-`test-tools:local` container via `make test-unit` / `make test-integration` /
-`make coverage`. **Running `bats` directly on the host, or invoking
+`test-tools:local` container via `just -f justfile.ci test-unit` /
+`just -f justfile.ci test-integration` / `just -f justfile.ci coverage`
+(`just` replaced `make` per ADR-0022). **Running `bats` directly on the host, or invoking
 `bash module/<x>.module.sh install` on the host, is prohibited — no
 exceptions, no temporary debug shortcuts, no "just this once."**
 
@@ -15,8 +16,9 @@ working machine. Docker provides the only safe isolation boundary.
 
 ## Considered Options
 
-- **Soft convention** (current state pre-ADR): rule mentioned in Makefile
-  comment + PRD G5 but not enforced. Rejected because a single slip during
+- **Soft convention** (current state pre-ADR): rule mentioned in the task
+  runner's comment (then `Makefile`, now `justfile.ci`) + PRD G5 but not
+  enforced. Rejected because a single slip during
   rapid iteration can clobber the dev host irreversibly.
 - **Run on host with `--dry-run` guards in tests**: rejected because (a)
   dry-run flag depends on every module honoring it correctly, (b) tests
@@ -25,7 +27,7 @@ working machine. Docker provides the only safe isolation boundary.
 
 ## Enforcement
 
-1. `Makefile` test targets exclusively call `script/ci/ci.sh` which routes
+1. `justfile.ci` test recipes exclusively call `script/ci/ci.sh` which routes
    through `docker compose run --rm ci ...`.
 2. `.claude/hook/test-must-use-docker.sh` — a Claude PreToolUse Bash hook
    that blocks the following patterns on the host:
@@ -49,7 +51,7 @@ consistency with the test workflow.
 
 - A small overhead per test invocation (Docker compose run startup ≈ 1s).
 - Developers cannot iterate via direct host `bats` even for one-off debug.
-  Acceptable: `make test-unit` is the only entry point.
+  Acceptable: `just -f justfile.ci test-unit` is the only entry point.
 - The hook script must stay current with new dangerous patterns (e.g. if
   a new tool like `pip install` becomes a host-mutating risk, extend the
   hook).

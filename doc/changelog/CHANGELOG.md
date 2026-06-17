@@ -38,6 +38,26 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **`make` → `just` as the single task runner** (issue #157, ADR-0022):
+  hard cut, no `Makefile` alias kept. The retired `Makefile` is replaced by
+  two files mirroring `ycpss91255-docker/base` v0.41.0 (ADR-00000005):
+  `justfile.ci` — the CI / test gate, a 1:1 port of the old targets
+  (`just -f justfile.ci test` / `test-unit [<module>]` / `test-integration`
+  / `lint` / `coverage` / `coverage-unit [<module>]` / `coverage-merge` /
+  `build-test-tools` / `clean`; `help` → `default`); and a net-new
+  auto-discovered `justfile` wrapping the host entry scripts
+  (`just install` / `remove` / `purge` / `upgrade` / `verify` / `list` /
+  `show` / `detect` / `doctor` / `config` / `version` / `tui` / `secrets` /
+  `nvidia-driver` / `claude`). `MODULE=<name>` becomes a positional recipe
+  param (`just -f justfile.ci test-unit core`); the `TEST_TOOLS_PREBUILT=1`
+  toggle (just has no conditional deps) is reproduced via a hidden
+  always-run `_ensure-image` dep with a conditional body. `just` is
+  provisioned in CI (`extractions/setup-just`) and the test-tools image
+  (`apk add just`); dev hosts install it manually. `ci.sh`'s CLI is
+  unchanged. All references updated atomically (CI workflow, the docker
+  hook whitelist, `generate_module_filters.sh` + spec, docs, ADR-0004,
+  `AGENTS.md` / `CONTEXT.md`, templates, `compose.yaml`, script comments).
+
 - **`remind_pr_wait_ci.sh` → `remind_ci_auto_merge.sh`** (issue #154): the
   PR-CI reminder hook is renamed and broadened. It now triggers on both
   `gh pr create` and `git push`, and injects the matching instruction —

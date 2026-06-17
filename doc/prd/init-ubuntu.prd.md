@@ -106,7 +106,7 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 | US-8 | 無 sudo 使用者 | 工具自動偵測並 fallback 到 user-home 安裝 | 在受限環境下也能用 |
 | US-9 | 多平台使用者(RPi / Jetson) | 工具偵測 form factor 並只推薦該平台合理的 module | 一套工具走多個平台 |
 | US-10 | 開發者 | 寫一個新的 `module/myrust.module.sh` 就能加入工具 | 不必改 engine 程式碼 |
-| US-11 | CI 使用者 | 在 Docker 內 `make test` 跑完所有測試 | 在 GitHub Actions 持續驗證 |
+| US-11 | CI 使用者 | 在 Docker 內 `just -f justfile.ci test` 跑完所有測試 | 在 GitHub Actions 持續驗證 |
 | US-12 | 安全意識使用者 | 用 `setup_secrets ssh-key generate` 互動產 key 並安全儲存 token | 不會忘記安全性的細節 |
 
 ---
@@ -1020,7 +1020,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | Milestone | Plan |
 |---|---|
 | M0 - Discovery | `doc/prd/` + `doc/architecture.md` + `doc/module-spec.md` + `CONTEXT.md` + `doc/adr/` |
-| M1 - Test harness | 借用 base 的 `Dockerfile.test-tools` + `Makefile` + `script/ci/ci.sh`(bats + bats-assert + bats-mock) |
+| M1 - Test harness | 借用 base 的 `Dockerfile.test-tools` + `justfile.ci`(原借自 `Makefile.ci`,`make`→`just` 遷移見 ADR-0022)+ `script/ci/ci.sh`(bats + bats-assert + bats-mock) |
 | M2 - Engine core | `lib/dispatcher.sh` + `lib/registry.sh` + `lib/runner.sh` + `lib/resolver.sh` + `lib/module_helper.sh` + 10 v2 modules |
 | M3 - Detect engine | `lib/detect.sh` + `lib/platform.sh` + `setup_ubuntu detect` |
 | M4 - State + log | `lib/state.sh` + `lib/state_io.sh` + `lib/logger.sh`(JSONL + 30 天/100 檔保留,AC-33)+ flock concurrency |
@@ -1029,7 +1029,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | M7 - Module migration | Batch A(10 個 v2 module + helpers + template)/ Batch B(cli-essentials 9 個,含新建 ripgrep,Q41)/ Batch C(agent + 其他 optional 12 個,Q42 / Q50 / Q51) |
 | M8 - i18n + color | `lib/i18n.sh`(`i18n_detect_lang` / `i18n_sanitize_lang`,對標 base)+ `lib/color.sh`;module 用 `declare -A` + `module_i18n_get` |
 | M9 - Sync + Secrets | `lib/sync.sh`(SSH push/pull)+ `setup_secrets.sh`(SSH key / GPG / token) |
-| M10 - Unit tests 80% | 239 + N modules × ~50 tests ≈ 600+ unit tests。CI 切「per-module job」(每 module 一個 job,matrix 從 `ls module/*.module.sh` discover step 動態生;`fail-fast: false`;`timeout-minutes: 5`;`make test-unit MODULE=<name>` 入口);path-filter(dorny/paths-filter)讓 PR 只跑改動的 module job,main push 跑完整 cartesian |
+| M10 - Unit tests 80% | 239 + N modules × ~50 tests ≈ 600+ unit tests。CI 切「per-module job」(每 module 一個 job,matrix 從 `ls module/*.module.sh` discover step 動態生;`fail-fast: false`;`timeout-minutes: 5`;`just -f justfile.ci test-unit <name>` 入口);path-filter(dorny/paths-filter)讓 PR 只跑改動的 module job,main push 跑完整 cartesian |
 | M11 - Integration tests | `ubuntu:22.04` + `ubuntu:24.04` + `ubuntu:26.04` 矩陣 |
 | M12 - Coverage + CI | kcov + GitHub Actions |
 | M13 - Code review | code-reviewer x 2 + security-reviewer 並行 |

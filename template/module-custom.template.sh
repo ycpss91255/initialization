@@ -13,7 +13,7 @@
 #   4. Implement detect() and is_recommended() — these are always module-specific.
 #   5. Optionally implement is_outdated() / doctor() for richer engine support.
 #   6. cp template/test.template.bats test/unit/module/<your-name>_spec.bats
-#   7. Run: make test-unit   (Docker-only; see ADR-0004)
+#   7. Run: just -f justfile.ci test-unit   (Docker-only; see ADR-0004)
 #
 # Standalone usage:
 #   bash module/<x>.module.sh install [--dry-run]

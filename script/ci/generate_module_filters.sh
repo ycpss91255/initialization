@@ -5,8 +5,9 @@
 # .github/workflows/ci.yaml (issue #31, PRD M10). Three filter kinds:
 #
 #   shared      — anything that affects HOW tests run (lib/, script/,
-#                 test/helper/, dockerfile/, compose.yaml, Makefile,
-#                 workflows). A match fans out to ALL module jobs + core.
+#                 test/helper/, dockerfile/, compose.yaml, justfile,
+#                 justfile.ci, workflows). A match fans out to ALL module
+#                 jobs + core.
 #   core        — non-module unit specs (engine/lib/hook/script/template
 #                 specs) and the trees they exercise. A match runs the
 #                 single `test-unit (core)` job.
@@ -40,7 +41,8 @@ shared:
   - 'test/helper/**'
   - 'dockerfile/**'
   - 'compose.yaml'
-  - 'Makefile'
+  - 'justfile'
+  - 'justfile.ci'
   - '.github/workflows/**'
 core:
   - 'test/unit/*.bats'

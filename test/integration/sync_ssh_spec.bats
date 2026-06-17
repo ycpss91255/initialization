@@ -9,9 +9,9 @@
 # Real ssh + scp, StrictHostKeyChecking=yes against the receiver's pinned
 # host key, key-only auth — exactly the §16.4 posture sync enforces.
 #
-# Gated on SYNC_E2E=1: `make test-integration` (script/ci/ci.sh
+# Gated on SYNC_E2E=1: `just -f justfile.ci test-integration` (script/ci/ci.sh
 # --integration-only) starts the receiver and sets it; every other workflow
-# that sweeps test/integration/ (full `make test`, `make coverage`) skips
+# that sweeps test/integration/ (full `just -f justfile.ci test`, `coverage`) skips
 # this file instead of failing on a receiver that was never started.
 
 load "${BATS_TEST_DIRNAME}/../helper/common"
@@ -20,7 +20,7 @@ TARGET="syncuser@sync-receiver"
 
 _require_e2e() {
     [[ "${SYNC_E2E:-0}" == "1" ]] \
-        || skip "SYNC_E2E != 1 — run via 'make test-integration'"
+        || skip "SYNC_E2E != 1 — run via 'just -f justfile.ci test-integration'"
 }
 
 _remote() {

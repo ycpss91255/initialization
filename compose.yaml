@@ -4,9 +4,9 @@
 # Customizations vs upstream:
 #   - Image comes from $TEST_TOOLS_IMAGE — the content-keyed tag
 #     test-tools:<sha256(Dockerfile.test-tools) first 12> resolved by
-#     script/ci/resolve_test_tools_tag.sh and exported by the Makefile /
+#     script/ci/resolve_test_tools_tag.sh and exported by justfile.ci /
 #     ci.sh (issue #113: parallel worktrees clobbered a single shared
-#     tag). Fallback `test-tools:local` is the alias `make
+#     tag). Fallback `test-tools:local` is the alias `just -f justfile.ci
 #     build-test-tools` re-points on every build, so plain
 #     `docker compose run` keeps working in single-worktree setups. We
 #     don't publish this repo's image to ghcr (PRD §2 Non-Goals)
@@ -18,7 +18,7 @@
 
 services:
   # Fast CI: ShellCheck + fish syntax + Hadolint + Bats (+ Kcov if $COVERAGE=1).
-  # Image is built locally by `make build-test-tools` under the
+  # Image is built locally by `just -f justfile.ci build-test-tools` under the
   # content-keyed tag (issue #113), so it's reproducible without
   # depending on an upstream registry and parallel worktrees with
   # different Dockerfile contents don't clobber each other.
@@ -51,7 +51,7 @@ services:
   # debian image because kcov is not in any alpine repo (main / community
   # / edge / testing) as of 2026-05. ci.sh `_install_deps_for_coverage`
   # apt-installs bats + shellcheck + bats-mock inside this container on
-  # demand (slower path, kept for the slow `make coverage` workflow only;
+  # demand (slower path, kept for the slow `just -f justfile.ci coverage` workflow only;
   # fast lint/bats stays on the content-keyed test-tools image).
   coverage:
     image: kcov/kcov
@@ -74,7 +74,7 @@ services:
   # Sync E2E receiver (AC-15, issue #67): the "other machine" of
   # `setup_ubuntu sync user@host`. An sshd container on the same compose
   # network as `ci`, reachable as host `sync-receiver`. Profile-gated so
-  # plain `up` / `run ci` never starts it — only `make test-integration`
+  # plain `up` / `run ci` never starts it — only `just -f justfile.ci test-integration`
   # (script/ci/ci.sh --integration-only) brings it up, runs the suite with
   # SYNC_E2E=1, and tears it down. test/integration/sync/receiver-entry.sh
   # provisions host keys, the key-only `syncuser`, the e2e-probe fixture

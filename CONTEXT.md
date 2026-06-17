@@ -139,7 +139,9 @@ avoid name collision with the Engine-level `setup_ubuntu update` (registry resca
   verb (apt-aligned); standalone CLI `info` Phase is an alias for the same
   output (helper-provided, no Lifecycle function needed).
 - "run a test locally" — resolved: there is no "local" test execution. All
-  test invocations must be `make test-unit` / `make test-integration` /
-  `make coverage`, which route through `docker compose run --rm ci ...`.
+  test invocations must be `just -f justfile.ci test-unit` /
+  `just -f justfile.ci test-integration` / `just -f justfile.ci coverage`
+  (the CI gate; `just` replaced `make` per ADR-0022), which route through
+  `docker compose run --rm ci ...`.
   Running `bats` or `bash module/<x>.module.sh <action-phase>` on the host
   is prohibited by ADR-0004 and blocked by the PreToolUse Bash hook.

@@ -19,7 +19,7 @@
 # Selection rules:
 #   1. push event (main / tags)        → full matrix + core
 #   2. 'shared' filter matched         → full matrix + core (lib/, script/,
-#                                        Makefile, … affect every job)
+#                                        justfile.ci, … affect every job)
 #   3. no relevant filter matched      → full matrix + core (conservative
 #                                        fallback: a code change outside the
 #                                        known filters must not silently

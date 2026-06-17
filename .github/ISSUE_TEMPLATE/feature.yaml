@@ -1,0 +1,64 @@
+name: Feature request
+description: Propose a new capability or idea
+title: "feat: "
+labels: ["enhancement"]
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Propose a new capability. Fill in every required section below.
+        GitHub interaction here is English-only.
+  - type: textarea
+    id: what
+    attributes:
+      label: What to build
+      description: |
+        Describe the capability concretely. Include:
+        - What it does, from the user's point of view.
+        - The interface or behavior (new flag, module, command).
+        - Rough scope / where it lives.
+      placeholder: |
+        - Add a `--all` flag to `claude-ls` that ...
+        - Lives in `module/config/fish/functions/claude-ls.fish`.
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: |
+        Optional but recommended:
+        - The problem this solves or the pain it removes.
+        - Why now / who benefits.
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: |
+        A checklist that defines "done". Each item should be verifiable.
+      placeholder: |
+        - [ ] `claude-ls --all` lists every project
+        - [ ] Unit test covers the new flag
+        - [ ] Docs / changelog updated
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: |
+        Optional:
+        - What this explicitly does NOT cover.
+        - Follow-ups deferred to a later issue.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for a duplicate.
+          required: false

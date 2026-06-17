@@ -36,6 +36,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **GitHub issue/PR templates + agent template-enforcement hook**: four
+  YAML issue forms under `.github/ISSUE_TEMPLATE/` (`bug` / `feature` /
+  `task` / `docs`), each setting `type:` (org Issue Type — auto-applies in
+  org repos, harmlessly ignored on this personal repo) and stock `labels:`,
+  plus `config.yaml` disabling blank issues and a markdown
+  `PULL_REQUEST_TEMPLATE.md` (`Summary` / `Changes` / `Decision` / `Tests`).
+  New PreToolUse hook `enforce_gh_issue_template.sh` re-imposes the template
+  on the agent path (`gh issue create --body-file` bypasses GitHub's forms):
+  it picks the form from the conventional-commit title prefix
+  (`fix`→bug, `feat`→feature, `docs`→docs, `refactor/test/ci/chore/perf/build/style`→task)
+  and denies when a required section is missing or empty. Required sections
+  are parsed from the form files themselves — single source of truth, no
+  second list to drift. Templates are repo-agnostic and intended to be
+  adoptable by `ycpss91255-docker/base`. Covered by
+  `test/unit/hook/enforce_gh_issue_template_spec.bats` (13 tests).
 - **lib/general.sh + lib mid-band unit-spec coverage boost** (issue #122,
   AC-17 gap 1/2, from the #112 honest-coverage investigation): +177
   behavior-level bats tests across nine `test/unit/*_spec.bats` files —

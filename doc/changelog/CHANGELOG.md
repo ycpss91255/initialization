@@ -20,6 +20,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Changed
+
+- **Skill layout canonicalized under `.agents/skills/`** (issue #150,
+  supersedes the 2026-05-21 migration): the repo-owned skills `semver-bump`
+  and `wait-pr-ci` move from real directories in `.claude/skills/` to
+  `.agents/skills/<name>/`, with `.claude/skills/<name>` now a symlink into
+  the canonical store — matching how third-party (`skills` CLI) skills are
+  laid out. Both the canonical dir and the symlink are git-tracked;
+  third-party skills + their symlinks stay machine-local. `.gitignore` moves
+  to the `.agents/*` + layer-by-layer negation form (git cannot re-include a
+  path once a parent dir is ignored). Path references such as
+  `.claude/skills/semver-bump/SKILL.md` still resolve transparently through
+  the symlink, so no hook/script/doc references changed.
+
 ### Added
 
 - **lib/general.sh + lib mid-band unit-spec coverage boost** (issue #122,

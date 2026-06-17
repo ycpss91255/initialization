@@ -6,7 +6,7 @@
 #   1. cp template/test.template.bats test/unit/module/<your-name>_spec.bats
 #   2. Replace every <MODULE-NAME> below with your module name (no quotes).
 #   3. Search for <TODO> markers and fill them in.
-#   4. Run: make test-unit
+#   4. Run: just -f justfile.ci test-unit
 #
 # What this template covers (the doc/module-spec.md §7 minimum):
 #   - Metadata sanity (NAME / CATEGORY match)

@@ -1,9 +1,9 @@
 tmp
 
-# kcov coverage output from `make coverage` (local + CI artefact).
+# kcov coverage output from `just -f justfile.ci coverage` (local + CI artefact).
 /coverage/
 
-# Test runtime scratch (`make clean` removes it). Holds throwaway sync-E2E
+# Test runtime scratch (`just -f justfile.ci clean` removes it). Holds throwaway sync-E2E
 # ssh keys (test/integration/sync/receiver-entry.sh) — never commit.
 /.tmp/
 

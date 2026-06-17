@@ -272,7 +272,7 @@ _bats_unit() {
         return
     fi
     command -v kcov >/dev/null 2>&1 \
-        || _die "kcov not found in container — per-shard coverage runs in the kcov image (make coverage-unit)"
+        || _die "kcov not found in container — per-shard coverage runs in the kcov image (just -f justfile.ci coverage-unit)"
     local _shard="${MODULE_FILTER:-all}"
     local _out="${REPO_ROOT}/coverage/shard-${_shard}"
     # kcov only creates ONE directory level; coverage/ itself does not
@@ -356,7 +356,7 @@ _run_coverage() {
         return 0
     fi
     if ! command -v kcov >/dev/null 2>&1; then
-        _die "kcov not found in container — rebuild test-tools:local (make build-test-tools)"
+        _die "kcov not found in container — rebuild test-tools:local (just -f justfile.ci build-test-tools)"
     fi
     _info "Running tests with kcov coverage"
     local -a _targets=()
@@ -442,7 +442,7 @@ _run_coverage_merge() {
         return 0
     fi
     command -v kcov >/dev/null 2>&1 \
-        || _die "kcov not found in container — merge runs in the kcov image (make coverage-merge)"
+        || _die "kcov not found in container — merge runs in the kcov image (just -f justfile.ci coverage-merge)"
     _info "Merging ${#_shards[@]} coverage shard(s) into coverage/merged"
     kcov --merge "${REPO_ROOT}/coverage/merged" "${_shards[@]}"
     # chown BEFORE the gate assert: a failed gate is an expected outcome
@@ -469,9 +469,9 @@ _fix_permissions() {
 # The ci service image tag is content-keyed (issue #113): resolved from
 # sha256(Dockerfile.test-tools) via resolve_test_tools_tag.sh and exported
 # as $TEST_TOOLS_IMAGE so compose's ${TEST_TOOLS_IMAGE:-test-tools:local}
-# substitution picks it up. A pre-set $TEST_TOOLS_IMAGE (Makefile export,
+# substitution picks it up. A pre-set $TEST_TOOLS_IMAGE (justfile.ci export,
 # CI prebuilt path, manual override) wins — resolution is consistent
-# across Makefile / ci.sh / compose.yaml by construction.
+# across justfile.ci / ci.sh / compose.yaml by construction.
 _run_in_container() {
     local _service="${1:-ci}"
     local _container_flag="${2:---ci}"
@@ -496,7 +496,7 @@ _run_in_container() {
 # The integration suite's dual-container sync spec needs the sshd receiver
 # on the same compose network BEFORE the ci container joins it. Profile-gated
 # (sync-e2e) so no other compose workflow ever starts it; the spec itself is
-# gated on SYNC_E2E=1 and skips everywhere else (full `make test`, coverage).
+# gated on SYNC_E2E=1 and skips everywhere else (full `just -f justfile.ci test`, coverage).
 
 _sync_receiver_up() {
     _info "Starting sync-receiver (compose profile sync-e2e) for the AC-15 sync E2E"

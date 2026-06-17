@@ -46,7 +46,7 @@ gh pr create --title "..." --body-file <(cat <<'EOF'
 ## Summary
 ...
 ## Test plan
-- [x] make test-unit (267 ok / 0 failed)
+- [x] just -f justfile.ci test-unit (267 ok / 0 failed)
 EOF
 )
 ```

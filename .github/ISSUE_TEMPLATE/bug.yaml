@@ -42,7 +42,7 @@ body:
         - Any required setup or preconditions.
         - How often it reproduces (always / intermittent).
       placeholder: |
-        1. Run `make test-unit MODULE=foo`
+        1. Run `just -f justfile.ci test-unit foo`
         2. ...
         3. See error: ...
     validations:

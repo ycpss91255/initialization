@@ -1,0 +1,121 @@
+# justfile.ci — init_ubuntu CI entry points
+#
+# Invoke with `just -f justfile.ci <recipe>` (the user-facing `justfile`
+# is the auto-discovered one). 1:1 port of the retired `Makefile`
+# (issue #157, ADR-0022): just is now the single task runner, aligning
+# with ycpss91255-docker/base v0.41.0 (ADR-00000005, retired Makefile.ci).
+#
+# Recipe map vs the old make targets:
+#   test / test-unit / test-integration / lint / coverage /
+#   coverage-unit / coverage-merge / build-test-tools / clean — unchanged
+#   names; `help` → `default` (via `just --list`).
+#
+# Make-variable → just translation:
+#   MODULE=<name>           → positional recipe param `module=""`
+#                             (`just -f justfile.ci test-unit core`)
+#   TEST_TOOLS_PREBUILT=1   → env var read inside `_ensure-image`
+#                             (just has no conditional dependencies, so the
+#                             Makefile `ifeq` is reproduced by an always-run
+#                             dep whose BODY is conditional)
+#
+# All test workflows run inside Docker (PRD G5: "全部在 Docker 內驗證";
+# ADR-0004). just stays a thin wrapper over ./script/ci/ci.sh — ci.sh's
+# CLI is unchanged.
+
+# ── Content-keyed image tag (issue #113) ─────────────────────────────────────
+# Parallel worktrees on one host clobbered the single `test-tools:local`
+# tag. The tag is now content-addressed —
+# test-tools:<sha256(Dockerfile.test-tools) first 12> — resolved by
+# script/ci/resolve_test_tools_tag.sh and exported so compose.yaml
+# (${TEST_TOOLS_IMAGE:-test-tools:local}) and ci.sh see the same value.
+# An explicit TEST_TOOLS_IMAGE=<ref> on the command line / env wins
+# (env_var_or_default mirrors the Makefile `ifeq origin undefined`).
+export TEST_TOOLS_IMAGE := env_var_or_default('TEST_TOOLS_IMAGE', `./script/ci/resolve_test_tools_tag.sh`)
+
+# ── Help ─────────────────────────────────────────────────────────────────────
+
+# Show available recipes (replaces the Makefile `help` target).
+default:
+    @just -f justfile.ci --list
+
+# ── Prebuilt image escape hatch (CI; issue #26) ──────────────────────────────
+# GitHub Actions builds the content-keyed test-tools image ONCE in the
+# `build-image` job and `docker load`s it in downstream jobs. Those jobs pass
+# TEST_TOOLS_PREBUILT=1 so recipes skip the redundant local rebuild. Local
+# dev keeps the default (build before run; cached layers make repeat builds
+# cheap).
+#
+# just has NO conditional dependencies, so the Makefile
+# `ifeq ($(TEST_TOOLS_PREBUILT),1)` toggle of `$(TEST_TOOLS_DEP)` is
+# reproduced here as an ALWAYS-run hidden dep whose BODY is conditional:
+# when TEST_TOOLS_PREBUILT=1 the build is skipped, otherwise it runs
+# `build-test-tools` exactly like the old prerequisite.
+_ensure-image:
+    @[ "${TEST_TOOLS_PREBUILT:-}" = "1" ] || just -f justfile.ci build-test-tools
+
+# ── Development ──────────────────────────────────────────────────────────────
+
+# Run ShellCheck + Bats (unit + integration; no kcov — fast dev loop).
+test: _ensure-image
+    ./script/ci/ci.sh
+
+# module=<name> narrows to test/unit/module/<name>_spec.bats;
+# module=core runs the non-module specs only (per-module CI matrix,
+# issue #31). Empty = full unit tree (unchanged).
+#
+# Run unit bats only (optional MODULE=<name>|core, e.g. `test-unit core`).
+test-unit module="": _ensure-image
+    ./script/ci/ci.sh --unit-only {{ if module != "" { "--module " + module } else { "" } }}
+
+# Run integration bats only (slower; container-based).
+test-integration: _ensure-image
+    ./script/ci/ci.sh --integration-only
+
+# Run ShellCheck + fish syntax + hadolint.
+lint: _ensure-image
+    ./script/ci/ci.sh --lint-only
+
+# Run ShellCheck + Bats + kcov coverage report.
+coverage: _ensure-image
+    ./script/ci/ci.sh --coverage
+
+# ── Per-shard coverage + merge (CI; issue #28) ───────────────────────────────
+# CI runs each test-unit matrix shard ONCE under kcov (no separate
+# test-unit + coverage double run): `coverage-unit <name>|core`
+# writes coverage/shard-<name>; the aggregation job downloads all shard
+# artifacts and runs `coverage-merge`, which kcov-merges them and asserts
+# the coverage gate (>= $COVERAGE_MIN, default 80 — the AC-17 gate,
+# ratcheted up from the 66 baseline in #124 after #122/#123/#153) on the
+# MERGED result.
+# CI enforces the gate only on full-matrix runs; narrow PR matrices run
+# it report-only ($COVERAGE_ENFORCE=false — see ci.sh / ci.yaml).
+# Local dev keeps `coverage` (full kcov run, unit + integration).
+
+# Run unit bats once under kcov (optional MODULE=<name>|core) → coverage/shard-*.
+coverage-unit module="": _ensure-image
+    ./script/ci/ci.sh --unit-only --kcov {{ if module != "" { "--module " + module } else { "" } }}
+
+# Merge coverage/*shard-* + assert coverage gate (>= $COVERAGE_MIN, default 80; AC-17) on merged result.
+coverage-merge: _ensure-image
+    ./script/ci/ci.sh --merge-coverage
+
+# ── Image build ──────────────────────────────────────────────────────────────
+
+# Builds the content-keyed tag (issue #113) and re-points the legacy
+# `test-tools:local` alias at it (muscle memory; plain `docker compose run`
+# without just keeps working in single-worktree setups).
+#
+# Build the content-keyed test-tools image (+ test-tools:local alias).
+build-test-tools:
+    @test -n "${TEST_TOOLS_IMAGE}" || { \
+        echo "ERROR: could not resolve test-tools image tag" \
+             "(script/ci/resolve_test_tools_tag.sh failed — see stderr above)" >&2; \
+        exit 1; }
+    docker build -t "${TEST_TOOLS_IMAGE}" -f dockerfile/Dockerfile.test-tools .
+    docker tag "${TEST_TOOLS_IMAGE}" test-tools:local
+
+# ── Cleanup ──────────────────────────────────────────────────────────────────
+
+# Remove coverage reports and tmp artifacts.
+clean:
+    rm -rf coverage/ .tmp/

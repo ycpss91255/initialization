@@ -6,8 +6,9 @@
 
 ## ⚠️ HARD RULE — Tests MUST run in Docker (no exceptions)
 
-**`bats` / module lifecycle 函式絕不直接在 host 跑。**只准透過 `make test-unit` /
-`make test-integration` / `make coverage`(內部都走 `docker compose run --rm ci ...`)。
+**`bats` / module lifecycle 函式絕不直接在 host 跑。**只准透過
+`just -f justfile.ci test-unit` / `just -f justfile.ci test-integration` /
+`just -f justfile.ci coverage`(內部都走 `docker compose run --rm ci ...`)。
 
 **禁止行為:**
 - ❌ `bats test/unit/...`(host bats)
@@ -15,8 +16,8 @@
 - ❌ `sudo apt-get install ...` 直接驗證 module 邏輯(host apt)
 
 **允許行為:**
-- ✅ `make test-unit` / `make test-integration` / `make coverage`
-- ✅ `make lint`
+- ✅ `just -f justfile.ci test-unit` / `just -f justfile.ci test-integration` / `just -f justfile.ci coverage`
+- ✅ `just -f justfile.ci lint`
 - ✅ `docker compose -f compose.yaml run --rm ci bash -c "..."`(明確 in-container 一次性 debug)
 
 **為什麼這是 hard rule:** Module Action Phase 真的會跑 `sudo apt-get` / `curl` /
@@ -32,26 +33,29 @@ Bash 呼叫。
 ## 1. 快速開始
 
 ```bash
+# CI / 測試 gate 都在 justfile.ci(`just -f justfile.ci <recipe>`);
+# 使用者面向的 host 指令在自動探索的 justfile(`just <verb>`)。
+
 # 一次跑全部(lint + bats + 整合測試,不含 kcov,~30s)
-make test
+just -f justfile.ci test
 
 # 只跑 lint(ShellCheck + fish 語法 + Hadolint)
-make lint
+just -f justfile.ci lint
 
 # 只跑 bats unit(最快,< 10s)
-make test-unit
+just -f justfile.ci test-unit
 
 # 只跑 bats integration
-make test-integration
+just -f justfile.ci test-integration
 
 # 完整跑含覆蓋率(kcov,慢 2-5×)
-make coverage
+just -f justfile.ci coverage
 
 # 清理 coverage / .tmp
-make clean
+just -f justfile.ci clean
 
-# 看所有 target
-make help
+# 看所有 recipe
+just -f justfile.ci --list
 ```
 
 第一次跑時會先 build `test-tools:local` image(約 1-2 分鐘),後續快取重用。
@@ -61,7 +65,9 @@ make help
 ## 2. 前置需求
 
 - **Docker**(必要):所有測試在 `test-tools:local` 容器內跑
-- **GNU make**(本地調度 `make` target)
+- **just**(本地調度 recipe;dev host 需手動安裝 — `apt install just` /
+  `cargo install just` / 見 <https://github.com/casey/just>。CI 用
+  `extractions/setup-just`,test-tools image 用 `apk add just`,見 ADR-0022)
 - **bash 4+**(`script/ci/ci.sh` 用了 bash 4 array 語法)
 
 **主機端不需要** bats / shellcheck / fish / kcov — 全部在容器內。
@@ -70,7 +76,7 @@ make help
 
 ## 3. 測試結構(規劃)
 
-> Phase 1(本階段)只建框架,test/ 內容會在 Phase 2+ 逐步加。所以 `make test` 現在跑會 skip bats(目錄不存在),但 lint 會跑。
+> Phase 1(本階段)只建框架,test/ 內容會在 Phase 2+ 逐步加。所以 `just -f justfile.ci test` 現在跑會 skip bats(目錄不存在),但 lint 會跑。
 
 ```
 test/
@@ -119,22 +125,22 @@ test/
 
 | Image | 用途 | 速度 |
 |---|---|---|
-| `test-tools:local`(alpine,本地 build) | `make test` / `make lint` / `make test-unit` / `make test-integration` | 快(image 內已預裝所有工具) |
-| `kcov/kcov`(debian,從 Docker Hub 拉) | `make coverage` / `make coverage-unit` / `make coverage-merge` | 慢(每次 `apt-install` bats + shellcheck) |
+| `test-tools:local`(alpine,本地 build) | `just -f justfile.ci test` / `lint` / `test-unit` / `test-integration` | 快(image 內已預裝所有工具) |
+| `kcov/kcov`(debian,從 Docker Hub 拉) | `just -f justfile.ci coverage` / `coverage-unit` / `coverage-merge` | 慢(每次 `apt-install` bats + shellcheck) |
 
-`make coverage` 走慢路徑是有意的:kcov 覆蓋率報告主要給 CI / release 前確認,日常開發循環用 `make test` 即可。
+`just -f justfile.ci coverage` 走慢路徑是有意的:kcov 覆蓋率報告主要給 CI / release 前確認,日常開發循環用 `just -f justfile.ci test` 即可。
 
 CI 端(issue #28)不再分開跑 test-unit 與 coverage 兩遍:每個
-per-module matrix shard 用 `make coverage-unit MODULE=<name>|core` 在
+per-module matrix shard 用 `just -f justfile.ci coverage-unit <name>|core` 在
 kcov 下跑一次 bats(輸出 `coverage/shard-<name>`,上傳 artifact),最後
-`coverage` 聚合 job 用 `make coverage-merge` 做 `kcov --merge` 並在
+`coverage` 聚合 job 用 `just -f justfile.ci coverage-merge` 做 `kcov --merge` 並在
 **聚合結果**上斷言 coverage gate(`COVERAGE_MIN` 可覆寫,預設 66 —
 ratchet 基線,2026-06-07 實測 66.70%;AC-17 的 80% 終值不變,待
 #122/#123 補強 lib/engine specs 後由 #124 翻到 80)。gate 只在
 **完整矩陣** run(push to main / shared fan-out)強制;窄矩陣 PR(只跑
 changed shards)因未跑 shard 的檔案仍計入分母而結構性偏低,改為
 report-only(`COVERAGE_ENFORCE=false`,由 discover job 的 `full` 輸出
-決定)。本地 `make coverage`(unit + integration 全量)行為不變。
+決定)。本地 `just -f justfile.ci coverage`(unit + integration 全量)行為不變。
 
 ---
 
@@ -143,7 +149,7 @@ report-only(`COVERAGE_ENFORCE=false`,由 discover job 的 `full` 輸出
 | 本 repo 檔案 | 來源(`ycpss91255-docker/base`) | sync 範圍 |
 |---|---|---|
 | `dockerfile/Dockerfile.test-tools` | `dockerfile/Dockerfile.test-tools` | 加 fish/fishtape/kcov/dialog/whiptail;移除 docker-cli/buildx |
-| `Makefile` | `Makefile.ci`(改名) | 移除 `test-behavioural` / `init` / `upgrade` / `upgrade-check`;加 `test-unit` / `test-integration` / `build-test-tools` |
+| `justfile.ci` | `justfile.ci`(base v0.41.0;init_ubuntu 用 plain 檔名) | 對標 recipe interface;移除 `test-behavioural` / `init` / `upgrade` / `upgrade-check`;加 `test-unit` / `test-integration` / `build-test-tools`。`make`→`just` 遷移見 ADR-0022(原 `Makefile` 借自 base v0.28.0 `Makefile.ci`,已退役) |
 | `script/ci/ci.sh` | `script/ci/ci.sh` | 用 inline `_die` 取代 base `_lib.sh`;改 lint 範圍;加 fish 語法檢查;移除 behavioural |
 | `.codecov.yaml` | `.codecov.yaml` | target 改為 `"80%"`(從 `"auto"`);擴充 ignore[] |
 | `compose.yaml` | `compose.yaml` | default image 改為 `test-tools:local`;移除 `ci-behavioural`;coverage 不另開 service |
@@ -168,7 +174,7 @@ report-only(`COVERAGE_ENFORCE=false`,由 discover job 的 `full` 輸出
 2. 對 5 個檔案逐一 `gh api` 取最新內容,跟本地 diff
 3. 把符合本 repo 需求的變更**手動 merge**(注意我們的客製化要保留)
 4. 更新本檔 §5.1 的「借用版本」與 SHA
-5. `make test` 驗證沒壞
+5. `just -f justfile.ci test` 驗證沒壞
 
 未來可考慮寫 `script/sync-from-base.sh` 半自動化(不排版本,屬願望性質)。
 
@@ -178,10 +184,10 @@ report-only(`COVERAGE_ENFORCE=false`,由 discover job 的 `full` 輸出
 
 | 階段 | 本地命令 | CI workflow(`.github/workflows/ci.yaml`)|
 |---|---|---|
-| Lint | `make lint` | `lint` job |
-| Unit | `make test-unit` | `test-unit (core)` + `test-unit (<module>)` matrix(#31/#28)|
-| Integration | `make test-integration` | `test-integration (ubuntu:{22,24,26}.04)` Docker image matrix(#29;runner 固定 `ubuntu-24.04`,矩陣維度是 image,PRD §11.1)|
-| Coverage | `make coverage` | `coverage` 聚合 job(kcov merge,#28)|
+| Lint | `just -f justfile.ci lint` | `lint` job |
+| Unit | `just -f justfile.ci test-unit` | `test-unit (core)` + `test-unit (<module>)` matrix(#31/#28)|
+| Integration | `just -f justfile.ci test-integration` | `test-integration (ubuntu:{22,24,26}.04)` Docker image matrix(#29;runner 固定 `ubuntu-24.04`,矩陣維度是 image,PRD §11.1)|
+| Coverage | `just -f justfile.ci coverage` | `coverage` 聚合 job(kcov merge,#28)|
 
 ---
 
@@ -199,10 +205,10 @@ report-only(`COVERAGE_ENFORCE=false`,由 discover job 的 `full` 輸出
 
 ## 8. 常見問題
 
-### Q: 第一次跑 `make test` 卡很久?
+### Q: 第一次跑 `just -f justfile.ci test` 卡很久?
 A: 在 build `test-tools:local`,需要下載 alpine + bats + fishtape 等(~150 MB)。後續 build cache 命中只需 1-2s。
 
-### Q: 為什麼 `make test` 顯示「test/unit/ does not exist yet — skipping」?
+### Q: 為什麼 `just -f justfile.ci test` 顯示「test/unit/ does not exist yet — skipping」?
 A: Phase 1 只建測試框架,實際 bats spec 從 Phase 2 才開始加。Lint 部分(shellcheck + fish syntax + hadolint)會跑。
 
 ### Q: 我的覆蓋率被低估?(明明測了卻顯示沒覆蓋)
@@ -221,11 +227,11 @@ docker compose -f compose.yaml run --rm ci -c 'bats /source/test/unit/specific_s
 
 ## 9. 故障排除
 
-### `make test` 報「Cannot connect to the Docker daemon」
+### `just -f justfile.ci test` 報「Cannot connect to the Docker daemon」
 - 確認 Docker 服務有在跑:`systemctl status docker`
 - 確認自己在 `docker` group:`groups | grep docker`(需要的話 `sudo usermod -aG docker $USER` 後 re-login)
 
-### `make build-test-tools` 失敗在下載 shellcheck / hadolint
+### `just -f justfile.ci build-test-tools` 失敗在下載 shellcheck / hadolint
 - 網路問題;若在 GFW 後,確認 DNS / proxy 可達 `github.com/releases/...`
 
 ### bats parallel 失敗(`parallel: command not found`)

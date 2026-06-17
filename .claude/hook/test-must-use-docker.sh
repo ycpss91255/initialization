@@ -50,7 +50,7 @@ _cmd="$(_extract_cmd "${_stdin_payload}")"
 # like "host bats" or "apt-get install".
 _first_tok="${_cmd%%[[:space:]]*}"
 case "${_first_tok}" in
-    git|gh|docker|make|grep|find|ls|cat|sed|awk|tr|sort|uniq|wc|head|tail|\
+    git|gh|docker|just|make|grep|find|ls|cat|sed|awk|tr|sort|uniq|wc|head|tail|\
     cd|pwd|true|false|echo|printf|test|chmod|chown|mkdir|rm|cp|mv|ln|touch|\
     stat|file|which|command|type|tee|date|env|export|unset|history|jq|\
     python3|python|node|npm|pnpm|yarn|cargo|rustc|go|hadolint|shellcheck|\
@@ -66,19 +66,19 @@ _block() {
     printf '[hook:test-must-use-docker] BLOCKED — %s\n' "${_reason}" >&2
     printf '[hook:test-must-use-docker] Command: %s\n' "${_cmd}" >&2
     printf '[hook:test-must-use-docker] See doc/adr/0004-tests-must-run-in-docker-only.md\n' >&2
-    printf '[hook:test-must-use-docker] Use: make test-unit / make test-integration / make coverage\n' >&2
+    printf '[hook:test-must-use-docker] Use: just -f justfile.ci test-unit / test-integration / coverage\n' >&2
     exit 2
 }
 
 # 1. Direct bats invocation on host.
 if [[ "${_cmd}" =~ (^|[[:space:];|&])bats([[:space:]]|$) ]]; then
-    _block "direct 'bats' on host — use 'make test-unit' instead"
+    _block "direct 'bats' on host — use 'just -f justfile.ci test-unit' instead"
 fi
 
 # 2. Module Action Phase on host (install / upgrade / remove / purge).
 #    Matches both 'bash module/foo.module.sh install' and direct './module/foo.module.sh install'.
 if [[ "${_cmd}" =~ (bash[[:space:]]+)?(\.?/)?module/[a-z0-9-]+\.module\.sh[[:space:]]+(install|upgrade|remove|purge) ]]; then
-    _block "module Action Phase on host — use 'make test-unit' or 'docker compose run --rm ci ...'"
+    _block "module Action Phase on host — use 'just -f justfile.ci test-unit' or 'docker compose run --rm ci ...'"
 fi
 
 # 3. Host apt install (only block 'install' — apt-get update / search are read-only).

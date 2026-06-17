@@ -18,7 +18,7 @@
 # sealed PATH farm carries exactly ONE backend per test, so whiptail really
 # is whiptail (detection prefers dialog whenever it can see one).
 #
-# ADR-0004: runs inside Docker only, via `make test-integration`.
+# ADR-0004: runs inside Docker only, via `just -f justfile.ci test-integration`.
 
 load "${BATS_TEST_DIRNAME}/../../helper/common"
 load "${BATS_TEST_DIRNAME}/../../helper/tui_harness"
@@ -26,7 +26,7 @@ load "${BATS_TEST_DIRNAME}/../../helper/tui_harness"
 setup() {
     setup_test_env
     if ! command -v expect >/dev/null 2>&1; then
-        fail "expect not found — rebuild the image: make build-test-tools"
+        fail "expect not found — rebuild the image: just -f justfile.ci build-test-tools"
     fi
 }
 

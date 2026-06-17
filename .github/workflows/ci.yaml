@@ -4,8 +4,8 @@
 # - All test workflows run inside Docker (ADR-0004 hard rule).
 # - Path-filtered: doc-only / meta-only PRs (doc/, *.md, .claude/, GH
 #   issue templates, …) skip test/coverage; lint still runs.
-# - Job names match Makefile targets so `required_status_checks` can
-#   pin them by name (see issue #3).
+# - Job names match justfile.ci recipe names so `required_status_checks`
+#   can pin them by name (see issue #3).
 # - test-tools image is built ONCE in `build-image` (BuildKit + GHA
 #   cache), exported as a tar artifact, and `docker load`-ed by the
 #   downstream jobs instead of each job cold-building it (issue #26).
@@ -64,7 +64,8 @@ jobs:
           # `code` = anything that could affect runtime behaviour:
           # everything not excluded below — lib/, module/, script/,
           # template/, test/, small-tools/, dockerfile/, compose.yaml,
-          # Makefile, .github/workflows/, … (all-singular dirs, ADR-0021).
+          # justfile / justfile.ci, .github/workflows/, … (all-singular
+          # dirs, ADR-0021).
           # Doc-only / meta-only = `code` false → heavy jobs skip;
           # ci-passed treats their `skipped` result as pass.
           filters: |
@@ -136,7 +137,7 @@ jobs:
       - name: set up docker buildx
         uses: docker/setup-buildx-action@v3
       # Content-keyed tag (issue #113): downstream jobs re-resolve the
-      # same tag from the same checkout via the Makefile, so the loaded
+      # same tag from the same checkout via justfile.ci, so the loaded
       # image matches without passing the tag between jobs.
       - name: resolve content-keyed image tag
         id: tag
@@ -171,14 +172,16 @@ jobs:
           path: /tmp
       - name: load test-tools image
         run: docker load -i /tmp/test-tools.tar
+      - name: set up just
+        uses: extractions/setup-just@v3
       - name: run lint (shellcheck + hadolint + fish syntax)
-        run: make lint TEST_TOOLS_PREBUILT=1
+        run: TEST_TOOLS_PREBUILT=1 just -f justfile.ci lint
 
   # ── Unit tests: core (non-module specs; issue #31 + #28) ───────────────────
   # Engine / lib / hook / script / template specs in one job. Skipped on
   # doc-only changes and on PRs that only touch modules.
   #
-  # Issue #28: bats runs ONCE, under kcov (`make coverage-unit`) — this
+  # Issue #28: bats runs ONCE, under kcov (`just -f justfile.ci coverage-unit`) — this
   # job is both the unit-test gate and the coverage producer for its
   # shard. It runs in the upstream kcov/kcov debian image (see
   # compose.yaml `coverage` service), NOT in test-tools:local — kcov is
@@ -194,8 +197,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: set up just
+        uses: extractions/setup-just@v3
       - name: run core unit bats specs once under kcov
-        run: make coverage-unit MODULE=core TEST_TOOLS_PREBUILT=1
+        run: TEST_TOOLS_PREBUILT=1 just -f justfile.ci coverage-unit core
       - name: upload coverage shard
         uses: actions/upload-artifact@v4
         with:
@@ -225,10 +230,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: set up just
+        uses: extractions/setup-just@v3
       - name: run module unit bats spec once under kcov
         env:
           MODULE: ${{ matrix.module }}
-        run: make coverage-unit MODULE="${MODULE}" TEST_TOOLS_PREBUILT=1
+        run: TEST_TOOLS_PREBUILT=1 just -f justfile.ci coverage-unit "${MODULE}"
       - name: upload coverage shard
         uses: actions/upload-artifact@v4
         with:
@@ -264,6 +271,8 @@ jobs:
           path: /tmp
       - name: load test-tools image
         run: docker load -i /tmp/test-tools.tar
+      - name: set up just
+        uses: extractions/setup-just@v3
       # The shard's matrix image must exist AND boot on the 24.04 runner
       # (PRD §11.1 transition concern: 26.04 container on a 24.04 host).
       # Asserting /etc/os-release pins each shard to its real image —
@@ -285,7 +294,7 @@ jobs:
           # inside this image. Exported now so landing those specs needs
           # no workflow change.
           INIT_UBUNTU_TEST_IMAGE: ubuntu:${{ matrix.ubuntu }}
-        run: make test-integration TEST_TOOLS_PREBUILT=1
+        run: TEST_TOOLS_PREBUILT=1 just -f justfile.ci test-integration
 
   # ── Coverage aggregation (issue #28; skipped on doc-only changes) ──────────
   # The unit shards above already ran bats under kcov — no second bats
@@ -315,6 +324,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: set up just
+        uses: extractions/setup-just@v3
       - name: download coverage shard artifacts
         uses: actions/download-artifact@v4
         with:
@@ -323,7 +334,7 @@ jobs:
       - name: merge shards + coverage gate (enforce on full matrix, else report-only)
         env:
           COVERAGE_ENFORCE: ${{ needs.discover.outputs.full }}
-        run: make coverage-merge TEST_TOOLS_PREBUILT=1
+        run: TEST_TOOLS_PREBUILT=1 just -f justfile.ci coverage-merge
       - name: upload merged coverage report
         if: always()
         uses: actions/upload-artifact@v4

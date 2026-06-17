@@ -244,7 +244,7 @@ EOF
     assert_success
     assert_output --partial " coverage -c ./script/ci/ci.sh --ci-merge-coverage"
     # The enforce flag must cross the container boundary (CI sets it on
-    # the host-side make invocation).
+    # the host-side just invocation).
     assert_output --partial "COVERAGE_ENFORCE=false"
 }
 

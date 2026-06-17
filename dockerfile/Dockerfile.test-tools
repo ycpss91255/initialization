@@ -60,7 +60,12 @@ RUN apk add --no-cache curl xz && \
 #   - git-subtree        (kept for forward compatibility)
 #   - ca-certificates    for `curl` over HTTPS in test fixtures
 #   - grep + coreutils   GNU variants override busybox so `grep -P` etc. work
-#   - make               integration tests exercise `make` recipes
+#   - make               kept for forward compat (build fixtures that
+#                        shell out to `make`); the repo's own task runner
+#                        is now `just`
+#   - just               [init_ubuntu addition] the task runner (ADR-0022);
+#                        keeps in-container `just -f justfile.ci …`
+#                        invocations working
 #   - fish               [init_ubuntu addition] required by `fish -n` syntax
 #                        checks against module/config/fish/*.fish and any
 #                        future fish-based modules
@@ -94,6 +99,7 @@ RUN apk add --no-cache \
         ca-certificates \
         grep coreutils \
         make \
+        just \
         fish \
         dialog ncurses-terminfo \
         newt \
@@ -136,6 +142,7 @@ RUN bash --version >/dev/null && \
     bats --version >/dev/null && \
     shellcheck --version >/dev/null && \
     hadolint --version >/dev/null && \
+    just --version >/dev/null && \
     fish --version >/dev/null && \
     fish -c 'functions -q fishtape; or exit 1' && \
     (dialog --version 2>&1 | head -1 >/dev/null || true) && \

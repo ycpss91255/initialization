@@ -206,7 +206,8 @@ initialization/
 │   └── PLATFORMS.md                    # [N9] 支援平台與差異
 ├── doc/prd/init-ubuntu.prd.md       # (was .claude/prds/ before)
 ├── .github/workflows/ci.yaml
-├── Makefile
+├── justfile                            # user-facing host recipes (ADR-0022)
+├── justfile.ci                         # CI / test gate (was Makefile)
 ├── compose.yaml
 ├── .codecov.yaml
 ├── .hadolint.yaml
@@ -877,7 +878,7 @@ CLI 旗標 `--color=auto|always|never`(預設 `auto`,套用上述判斷)。
 
 ### 13.2 與 base repo 的關係
 
-只**借用 4 個檔案**:`Dockerfile.test-tools` / `Makefile.ci` / `script/ci/ci.sh` / `.codecov.yaml`。i18n 設計**對標**但不直接 copy(因為 base 的 i18n 對應 Docker container repo 用途,我們是 host installer)。
+只**借用 4 個檔案**:`Dockerfile.test-tools` / `justfile.ci`(對標 base v0.41.0,原借自 `Makefile.ci`;`make`→`just` 遷移見 ADR-0022) / `script/ci/ci.sh` / `.codecov.yaml`。i18n 設計**對標**但不直接 copy(因為 base 的 i18n 對應 Docker container repo 用途,我們是 host installer)。
 
 ### 13.3 與既有 `general.sh` 整合
 

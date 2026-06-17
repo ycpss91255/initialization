@@ -12,15 +12,15 @@
 # Different Dockerfile contents map to different tags (no clobbering);
 # identical contents share one tag (and the docker build cache).
 #
-# Resolution contract (consumed by Makefile, ci.sh → compose.yaml):
+# Resolution contract (consumed by justfile.ci, ci.sh → compose.yaml):
 #   1. $TEST_TOOLS_IMAGE set and non-empty → echoed verbatim (explicit
 #      override; CI prebuilt path or manual pinning)
 #   2. otherwise → content-keyed tag of dockerfile/Dockerfile.test-tools
 #      ($1 overrides the Dockerfile path — used by the bats spec)
 #   3. Dockerfile missing → exit 1 with a clear error on stderr
 #
-# `test-tools:local` is kept as an ALIAS tag by `make build-test-tools`
-# (muscle memory; plain `docker compose run` without the Makefile still
+# `test-tools:local` is kept as an ALIAS tag by `just -f justfile.ci build-test-tools`
+# (muscle memory; plain `docker compose run` without just still
 # works — it just points at whatever this worktree built last).
 #
 # Spec: test/unit/script/resolve_test_tools_tag_spec.bats

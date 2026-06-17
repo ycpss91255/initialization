@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2030,SC2031  # bats `@test`/`run` run in a subshell; test bodies `export PASSWORD_STORE_DIR=...` inside that subshell to stage env for secrets_list/the pass backend (same rationale as i18n_spec.bats) — https://www.shellcheck.net/wiki/SC2030
 # test/unit/secrets_spec.bats — lib/secrets.sh + setup_secrets.sh (issue #44)
 #
 # Covers:

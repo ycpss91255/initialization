@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2030,SC2031  # bats `@test`/`run` run in a subshell; test bodies `export XDG_CURRENT_DESKTOP/XDG_SESSION_TYPE/WSL_DISTRO_NAME=...` inside that subshell to stage env for detect_get_field (same rationale as i18n_spec.bats) — https://www.shellcheck.net/wiki/SC2030
 # test/unit/detect_spec.bats — lib/detect.sh
 
 load "${BATS_TEST_DIRNAME}/../helper/common"

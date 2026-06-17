@@ -610,3 +610,196 @@ teardown() {
     assert_success
     assert_output --partial "system-id-match"
 }
+
+@test "check_in_mac exports IN_MAC=true when uname reports Darwin" {
+    run bash -c "
+        source '${LIB_DIR}/general.sh'
+        uname() { echo Darwin; }
+        unset IN_MAC
+        check_in_mac
+        echo \"mac=\${IN_MAC:-unset}\"
+    "
+    assert_success
+    assert_output --partial "mac=true"
+}
+
+# ── _general_epoch_ms fallback (no %N support) ───────────────────────────────
+
+@test "exec_cmd capture mode uses second-precision epoch fallback when date lacks %N" {
+    local _log="${INIT_UBUNTU_TEST_SCRATCH}/events.jsonl"
+    run bash -c "
+        export EXEC_CMD_NO_PRINT=true INIT_UBUNTU_CMD_CAPTURE=true
+        export INIT_UBUNTU_LOG_FILE='${_log}'
+        source '${LIB_DIR}/general.sh'
+        date() {
+            if [[ \"\$1\" == '+%s%3N' ]]; then printf 'not-a-number'; else printf '1700000000'; fi
+        }
+        exec_cmd 'echo fallback-clock'
+        cat '${_log}'
+    "
+    assert_success
+    assert_output --partial '"duration_ms":'
+    assert_output --partial "fallback-clock"
+}
+
+# ── library guard (run as executable, not sourced) ───────────────────────────
+
+@test "lib/general.sh prints a library warning when executed directly" {
+    run bash "${LIB_DIR}/general.sh"
+    assert_success
+    assert_output --partial "is a library, not a executable script"
+    assert_output --partial "test/test_logger.sh"
+}
+
+# ── create_temp_file failure branches ────────────────────────────────────────
+
+@test "create_temp_file fails fatally when mktemp cannot create the file" {
+    run bash -c "
+        source '${LIB_DIR}/general.sh'
+        mktemp() { return 1; }
+        create_temp_file _tmp_path 'specprefix' 'txt'
+    "
+    assert_failure
+    assert_output --partial "Failed to create temporary file"
+}
+
+@test "create_temp_file -d fails fatally when mktemp cannot create the folder" {
+    run bash -c "
+        source '${LIB_DIR}/general.sh'
+        mktemp() { return 1; }
+        create_temp_file -d -- _tmp_path 'specfolder'
+    "
+    assert_failure
+    assert_output --partial "Failed to create temporary folder"
+}
+
+# ── setup_apt_mirror additional branches ─────────────────────────────────────
+
+@test "setup_apt_mirror --dry-run on a directory previews .list files without writing" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/drydir"
+    mkdir -p "${_dir}"
+    printf 'deb http://origin.example.com/ubuntu noble main\n' > "${_dir}/a.list"
+    run bash -c "
+        export EXEC_CMD_NO_PRINT=true
+        source '${LIB_DIR}/general.sh'
+        setup_apt_mirror --dry-run --path '${_dir}' -- 'mirror.example.com' 'origin.example.com'
+    "
+    assert_success
+    assert_output --partial "Dry run"
+    run cat "${_dir}/a.list"
+    assert_output --partial "origin.example.com"
+    [[ ! -e "${_dir}/a.list.bak" ]]
+}
+
+@test "setup_apt_mirror directory mode processes a non-.list/.sources file as skipped" {
+    local _dir="${INIT_UBUNTU_TEST_SCRATCH}/skipdir"
+    mkdir -p "${_dir}"
+    printf 'origin.example.com\n' > "${_dir}/config.cfg"
+    run bash -c "
+        export EXEC_CMD_NO_PRINT=true LOG_LEVEL=DEBUG
+        source '${LIB_DIR}/general.sh'
+        setup_apt_mirror --path '${_dir}' -- 'mirror.example.com' 'origin.example.com'
+    "
+    assert_success
+    assert_output --partial "Skip non-APT source file"
+    run cat "${_dir}/config.cfg"
+    assert_output "origin.example.com"
+}
+
+@test "setup_apt_mirror file mode rewrites a single .sources file" {
+    local _src="${INIT_UBUNTU_TEST_SCRATCH}/test.sources"
+    printf 'URIs: http://origin.example.com/ubuntu\n' > "${_src}"
+    run bash -c "
+        export EXEC_CMD_NO_PRINT=true
+        source '${LIB_DIR}/general.sh'
+        setup_apt_mirror --path '${_src}' -- 'mirror.example.com' 'origin.example.com'
+    "
+    assert_success
+    run cat "${_src}"
+    assert_output --partial "mirror.example.com"
+    refute_output --partial "origin.example.com"
+}
+
+@test "setup_apt_mirror --dry-run on a single .list file previews without writing" {
+    local _list="${INIT_UBUNTU_TEST_SCRATCH}/drysingle.list"
+    printf 'deb http://origin.example.com/ubuntu noble main\n' > "${_list}"
+    run bash -c "
+        export EXEC_CMD_NO_PRINT=true
+        source '${LIB_DIR}/general.sh'
+        setup_apt_mirror --dry-run --path '${_list}' -- 'mirror.example.com' 'origin.example.com'
+    "
+    assert_success
+    assert_output --partial "Dry run"
+    [[ ! -e "${_list}.bak" ]]
+}
+
+# ── apt_pkg_manager additional branches ──────────────────────────────────────
+
+@test "apt_pkg_manager rejects --only-upgrade outside the install action" {
+    run bash -c "
+        source '${LIB_DIR}/general.sh'
+        apt_pkg_manager --remove --only-upgrade -- cowsay
+    "
+    assert_failure
+    assert_output --partial "only supports install action"
+}
+
+@test "apt_pkg_manager install --only-upgrade passes --only-upgrade to apt-get" {
+    run bash -c "
+        export EXEC_CMD_NO_PRINT=true
+        source '${LIB_DIR}/general.sh'
+        sudo() { echo \"\$*\"; }
+        apt_pkg_manager --install --no-update --only-upgrade -- cowsay
+    "
+    assert_success
+    assert_output --partial "apt-get install -y --only-upgrade"
+}
+
+@test "apt_pkg_manager install marks a package not found in apt-cache as failed" {
+    run bash -c "
+        export EXEC_CMD_NO_PRINT=true
+        source '${LIB_DIR}/general.sh'
+        sudo() { return 1; }
+        apt_pkg_manager --install --no-update -- nonexistent-pkg-xyz
+    "
+    assert_failure 1
+    assert_output --partial "Install failed"
+}
+
+# ── get_github_pkg_latest_version wget fallback path ─────────────────────────
+
+@test "get_github_pkg_latest_version falls back to wget+grep when curl/jq are unavailable" {
+    run bash -c "
+        source '${LIB_DIR}/general.sh'
+        check_pkg_status() { [[ \"\$3\" == 'curl' || \"\$3\" == 'jq' ]] && return 1; return 0; }
+        apt_pkg_manager() { return 1; }
+        wget() { printf '{\"tag_name\":\"v3.4.5\"}'; }
+        get_github_pkg_latest_version PKG_VERSION 'owner/repo'
+        echo \"ver=\${PKG_VERSION}\"
+    "
+    assert_success
+    assert_output --partial "ver=3.4.5"
+}
+
+@test "get_github_pkg_latest_version wget fallback fails fatally when wget errors" {
+    run bash -c "
+        source '${LIB_DIR}/general.sh'
+        check_pkg_status() { [[ \"\$3\" == 'curl' || \"\$3\" == 'jq' ]] && return 1; return 0; }
+        apt_pkg_manager() { return 1; }
+        wget() { return 4; }
+        get_github_pkg_latest_version PKG_VERSION 'owner/repo'
+    "
+    assert_failure
+    assert_output --partial "Failed to get GitHub API response"
+}
+
+@test "get_github_pkg_latest_version fails fatally when wget+grep fallback tools cannot install" {
+    run bash -c "
+        source '${LIB_DIR}/general.sh'
+        check_pkg_status() { return 1; }
+        apt_pkg_manager() { return 1; }
+        get_github_pkg_latest_version PKG_VERSION 'owner/repo'
+    "
+    assert_failure
+    assert_output --partial "Unable to install 'curl jq' or 'wget grep sed' tools"
+}

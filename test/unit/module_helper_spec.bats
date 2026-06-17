@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# shellcheck disable=SC2034,SC2317  # SC2034: test setups stage module metadata vars (NAME / APT_PKGS / ...) that the function-under-test reads after sourcing module_helper. SC2317: test mocks (is_installed/install) dispatched indirectly via the module's macro wrappers — https://www.shellcheck.net/wiki/SC2034 + https://www.shellcheck.net/wiki/SC2317
+# shellcheck disable=SC2034,SC2317,SC2030,SC2031  # SC2034: test setups stage module metadata vars (NAME / APT_PKGS / ...) that the function-under-test reads after sourcing module_helper. SC2317: test mocks (is_installed/install) dispatched indirectly via the module's macro wrappers. SC2030/SC2031: bats `@test`/`run` run in a subshell; test setups `export INIT_UBUNTU_DRY_RUN/INIT_UBUNTU_LOG_FILE=...` inside that subshell to stage env for the function-under-test (same rationale as i18n_spec.bats) — https://www.shellcheck.net/wiki/SC2034 + https://www.shellcheck.net/wiki/SC2317 + https://www.shellcheck.net/wiki/SC2030
 # test/unit/module_helper_spec.bats — direct unit tests on lib/module_helper.sh
 #
 # Tests the helper functions in isolation (no module file):

@@ -5,9 +5,9 @@
 # (issue #28): each per-module CI matrix shard runs bats ONCE under kcov
 # (`--kcov`), and a final aggregation entry point (`--ci-merge-coverage`)
 # merges all shard outputs and asserts the coverage gate on the MERGED
-# result. Gate default is the 66 ratchet baseline (AC-17's 80% flips in
-# via #124); COVERAGE_ENFORCE=0|false makes it report-only (CI narrow
-# PR matrices).
+# result. Gate default is 80 (the AC-17 gate, ratcheted up from the 66
+# baseline in #124); COVERAGE_ENFORCE=0|false makes it report-only (CI
+# narrow PR matrices).
 #
 # Strategy: copy ci.sh into a fixture repo skeleton under
 # $BATS_TEST_TMPDIR so its self-resolved REPO_ROOT points at the fixture,
@@ -156,16 +156,16 @@ teardown() {
     assert_output --partial "coverage/shard-core"
 }
 
-@test "merge gate passes when merged coverage meets the 66 ratchet default" {
+@test "merge gate passes when merged coverage meets the 80 default (AC-17)" {
     mkdir -p "${FIXTURE_ROOT}/coverage/shard-core"
-    STUB_KCOV_PERCENT="66.00" run "${CI_SH}" --ci-merge-coverage
+    STUB_KCOV_PERCENT="80.00" run "${CI_SH}" --ci-merge-coverage
     assert_success
-    assert_output --partial "66.00%"
+    assert_output --partial "80.00%"
 }
 
-@test "merge gate fails when merged coverage is below the 66 ratchet default" {
+@test "merge gate fails when merged coverage is below the 80 default (AC-17)" {
     mkdir -p "${FIXTURE_ROOT}/coverage/shard-core"
-    STUB_KCOV_PERCENT="65.99" run "${CI_SH}" --ci-merge-coverage
+    STUB_KCOV_PERCENT="79.99" run "${CI_SH}" --ci-merge-coverage
     assert_failure
     assert_output --partial "coverage gate failed"
 }

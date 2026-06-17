@@ -45,10 +45,12 @@ skills-lock.json
 .agents/*
 !.agents/skills
 .agents/skills/*
+!.agents/skills/auto-merge-on-green
 !.agents/skills/semver-bump
 !.agents/skills/wait-pr-ci
 
 .claude/skills/*
+!.claude/skills/auto-merge-on-green
 !.claude/skills/semver-bump
 !.claude/skills/wait-pr-ci
 

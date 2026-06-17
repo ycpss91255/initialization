@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# shellcheck disable=SC2034,SC2317  # SC2034: test setups stage module metadata vars (NAME / APT_PKGS / ...) that the function-under-test reads after sourcing module_helper. SC2317: test mocks (is_installed/install) dispatched indirectly via the module's macro wrappers — https://www.shellcheck.net/wiki/SC2034 + https://www.shellcheck.net/wiki/SC2317
+# shellcheck disable=SC2034,SC2317,SC2030,SC2031  # SC2034: test setups stage module metadata vars (NAME / APT_PKGS / ...) that the function-under-test reads after sourcing module_helper. SC2317: test mocks (is_installed/install) dispatched indirectly via the module's macro wrappers. SC2030/SC2031: bats `@test`/`run` run in a subshell; test setups `export INIT_UBUNTU_DRY_RUN/INIT_UBUNTU_LOG_FILE=...` inside that subshell to stage env for the function-under-test (same rationale as i18n_spec.bats) — https://www.shellcheck.net/wiki/SC2034 + https://www.shellcheck.net/wiki/SC2317 + https://www.shellcheck.net/wiki/SC2030
 # test/unit/module_helper_spec.bats — direct unit tests on lib/module_helper.sh
 #
 # Tests the helper functions in isolation (no module file):
@@ -235,6 +235,290 @@ EOF
     assert_success
     assert_output --partial "outdated:"
     assert_output --partial "yes"
+}
+
+@test "module_standalone_status reports not installed" {
+    NAME="testmod"
+    is_installed() { return 1; }
+    run module_standalone_status
+    assert_success
+    assert_output --partial "installed:   no"
+}
+
+# ── Sidecar version file (ADR-0001 / module-spec §4.7.4) ────────────────────
+
+@test "module_sidecar_write + get_version round-trips under INIT_UBUNTU_STATE_DIR" {
+    module_sidecar_write testmod v1.2.3
+    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+    run module_sidecar_get_version testmod
+    assert_success
+    assert_output "v1.2.3"
+}
+
+@test "module_sidecar_get_version returns 1 when no record exists" {
+    run module_sidecar_get_version never-written
+    assert_failure
+}
+
+@test "module_sidecar_remove drops the version record" {
+    module_sidecar_write testmod v1
+    module_sidecar_remove testmod
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+    run module_sidecar_get_version testmod
+    assert_failure
+}
+
+@test "module_sidecar_write is a no-op under dry-run (AC-12)" {
+    INIT_UBUNTU_DRY_RUN=true module_sidecar_write testmod v1
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+}
+
+@test "module_sidecar_remove is a no-op under dry-run (AC-12)" {
+    module_sidecar_write testmod v1
+    INIT_UBUNTU_DRY_RUN=true module_sidecar_remove testmod
+    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+}
+
+# ── Standalone CLI entry: module_standalone_main ────────────────────────────
+
+@test "module_standalone_main --help prints usage, exit 0" {
+    run module_standalone_main --help
+    assert_success
+    assert_output --partial "Usage: bash module/"
+    assert_output --partial "install"
+}
+
+@test "module_standalone_main --version prints '<name> <version>'" {
+    NAME="testmod"
+    VERSION_PROVIDED="v1.0"
+    run module_standalone_main --version
+    assert_success
+    assert_output "testmod v1.0"
+}
+
+@test "module_standalone_main with unknown argument returns 2" {
+    run module_standalone_main --bogus
+    assert_failure 2
+    assert_output --partial "Unknown argument"
+}
+
+@test "module_standalone_main without a phase returns 2 with usage" {
+    run module_standalone_main
+    assert_failure 2
+    assert_output --partial "Usage: bash module/"
+}
+
+@test "module_standalone_main info routes to module_standalone_info" {
+    NAME="testmod"
+    declare -A DESCRIPTION=([en]="my module")
+    run module_standalone_main info
+    assert_success
+    assert_output --partial "name:"
+    assert_output --partial "testmod"
+}
+
+@test "module_standalone_main is-installed maps to is_installed() exit code" {
+    is_installed() { return 0; }
+    run module_standalone_main is-installed
+    assert_success
+    is_installed() { return 1; }
+    run module_standalone_main is-installed
+    assert_failure
+}
+
+@test "module_standalone_main is-outdated without implementation returns 2" {
+    run module_standalone_main is-outdated
+    assert_failure 2
+    assert_output --partial "not implemented"
+}
+
+@test "module_standalone_main install runs the module's install()" {
+    install() { echo "install-ran"; }
+    run module_standalone_main install
+    assert_success
+    assert_output --partial "install-ran"
+}
+
+@test "module_standalone_main --dry-run exports INIT_UBUNTU_DRY_RUN for the phase" {
+    install() { printf '%s\n' "${INIT_UBUNTU_DRY_RUN:-unset}"; }
+    run module_standalone_main install --dry-run
+    assert_success
+    assert_output "true"
+}
+
+@test "module_standalone_main --lang=<code> drives i18n output of info" {
+    NAME="testmod"
+    declare -A DESCRIPTION=([en]="hello" [zh-TW]="你好")
+    run module_standalone_main --lang=zh-TW info
+    assert_success
+    assert_output --partial "你好"
+}
+
+# ── module_default_verify ───────────────────────────────────────────────────
+
+@test "module_default_verify fails when is_installed fails" {
+    is_installed() { return 1; }
+    run module_default_verify
+    assert_failure
+    assert_output --partial "verify failed"
+}
+
+@test "module_default_verify runs TEST_VERIFY_CMD when declared" {
+    is_installed() { return 0; }
+    TEST_VERIFY_CMD="echo verify-cmd-ran"
+    run module_default_verify
+    assert_success
+    assert_output --partial "verify-cmd-ran"
+}
+
+@test "module_default_verify propagates TEST_VERIFY_CMD failure" {
+    is_installed() { return 0; }
+    TEST_VERIFY_CMD="false"
+    run module_default_verify
+    assert_failure
+}
+
+@test "module_default_verify dry-run skips checks" {
+    is_installed() { return 1; }
+    INIT_UBUNTU_DRY_RUN=true run module_default_verify
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+# ── APT archetype: upgrade fallback + is_outdated ───────────────────────────
+
+@test "module_default_apt_upgrade falls back to install when not installed" {
+    APT_PKGS=(curl)
+    is_installed() { return 1; }
+    install() { echo "install-called"; }
+    run module_default_apt_upgrade
+    assert_success
+    assert_output --partial "running install instead"
+    assert_output --partial "install-called"
+}
+
+@test "module_default_apt_is_outdated detects an upgradable package" {
+    STUB_DIR="${INIT_UBUNTU_TEST_SCRATCH}/stubs"
+    mkdir -p "${STUB_DIR}"
+    cat > "${STUB_DIR}/apt" <<'EOF'
+#!/usr/bin/env bash
+printf 'Listing... Done\ncurl/jammy-updates 8.0 amd64 [upgradable from: 7.0]\n'
+EOF
+    chmod +x "${STUB_DIR}/apt"
+    APT_PKGS=(curl)
+    PATH="${STUB_DIR}:${PATH}" run module_default_apt_is_outdated
+    assert_success
+}
+
+@test "module_default_apt_is_outdated returns 1 when package not upgradable" {
+    STUB_DIR="${INIT_UBUNTU_TEST_SCRATCH}/stubs"
+    mkdir -p "${STUB_DIR}"
+    cat > "${STUB_DIR}/apt" <<'EOF'
+#!/usr/bin/env bash
+printf 'Listing... Done\nother-pkg/jammy 1.0 amd64 [upgradable from: 0.9]\n'
+EOF
+    chmod +x "${STUB_DIR}/apt"
+    APT_PKGS=(curl)
+    PATH="${STUB_DIR}:${PATH}" run module_default_apt_is_outdated
+    assert_failure
+}
+
+@test "module_default_apt_is_outdated returns 1 on empty APT_PKGS" {
+    APT_PKGS=()
+    run module_default_apt_is_outdated
+    assert_failure
+}
+
+# ── GitHub-release archetype: is_installed ──────────────────────────────────
+
+@test "module_default_github_release_is_installed fails without BIN_NAME" {
+    BIN_NAME=""
+    run module_default_github_release_is_installed
+    assert_failure
+}
+
+@test "module_default_github_release_is_installed detects executable BIN_LINK" {
+    BIN_NAME="faketool"
+    BIN_LINK="${INIT_UBUNTU_TEST_SCRATCH}/faketool"
+    printf '#!/usr/bin/env bash\n' > "${BIN_LINK}"
+    chmod +x "${BIN_LINK}"
+    run module_default_github_release_is_installed
+    assert_success
+}
+
+@test "module_default_github_release_is_installed fails when neither link nor PATH hit" {
+    BIN_NAME="definitely-not-on-path-xyz"
+    BIN_LINK="${INIT_UBUNTU_TEST_SCRATCH}/missing-link"
+    run module_default_github_release_is_installed
+    assert_failure
+}
+
+# ── Config archetype: remove / upgrade ──────────────────────────────────────
+
+@test "module_default_config_remove deletes the dest file" {
+    CONFIG_DEST="${INIT_UBUNTU_TEST_SCRATCH}/myrc"
+    printf '# init_ubuntu managed\n' > "${CONFIG_DEST}"
+    run module_default_config_remove
+    assert_success
+    [[ ! -e "${CONFIG_DEST}" ]]
+}
+
+@test "module_default_config_remove dry-run leaves the file" {
+    CONFIG_DEST="${INIT_UBUNTU_TEST_SCRATCH}/myrc"
+    printf '# init_ubuntu managed\n' > "${CONFIG_DEST}"
+    INIT_UBUNTU_DRY_RUN=true run module_default_config_remove
+    assert_success
+    [[ -f "${CONFIG_DEST}" ]]
+}
+
+@test "module_default_config_upgrade re-drops config with the marker" {
+    CONFIG_DEST="${INIT_UBUNTU_TEST_SCRATCH}/myrc"
+    CONFIG_STUB="set background=light"
+    BACKUP_DIR="${INIT_UBUNTU_TEST_SCRATCH}/backup"
+    printf 'old content without marker\n' > "${CONFIG_DEST}"
+    run module_default_config_upgrade
+    assert_success
+    grep -q "init_ubuntu managed" "${CONFIG_DEST}"
+    grep -q "set background=light" "${CONFIG_DEST}"
+}
+
+# ── Engine-side aggregators: action_required events (AC-35) ─────────────────
+
+@test "module_emit_post_install is a no-op when POST_INSTALL_MESSAGE undeclared" {
+    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/events.jsonl"
+    run module_emit_post_install
+    assert_success
+    [[ ! -s "${INIT_UBUNTU_LOG_FILE}" ]]
+}
+
+@test "module_emit_post_install emits action_required JSONL (kind=post_install)" {
+    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/events.jsonl"
+    declare -A POST_INSTALL_MESSAGE=([en]="restart your shell")
+    run module_emit_post_install
+    assert_success
+    run jq -r 'select(.body == "action_required") | .attributes.kind' "${INIT_UBUNTU_LOG_FILE}"
+    assert_success
+    assert_output "post_install"
+    run jq -r 'select(.body == "action_required") | .attributes.message' "${INIT_UBUNTU_LOG_FILE}"
+    assert_output --partial "restart your shell"
+}
+
+@test "module_emit_reboot_required is a no-op when REBOOT_REQUIRED is not true" {
+    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/events.jsonl"
+    REBOOT_REQUIRED=false
+    run module_emit_reboot_required
+    assert_success
+    [[ ! -s "${INIT_UBUNTU_LOG_FILE}" ]]
+}
+
+@test "module_emit_reboot_required emits action_required JSONL (kind=reboot)" {
+    export INIT_UBUNTU_LOG_FILE="${INIT_UBUNTU_TEST_SCRATCH}/events.jsonl"
+    REBOOT_REQUIRED=true
+    run module_emit_reboot_required
+    assert_success
+    run jq -r 'select(.body == "action_required") | .attributes.kind' "${INIT_UBUNTU_LOG_FILE}"
+    assert_success
+    assert_output "reboot"
 }
 
 # ── github-release URL regression (one-char typo broke every real install) ──

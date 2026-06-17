@@ -22,6 +22,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **lib/general.sh + lib mid-band unit-spec coverage boost** (issue #122,
+  AC-17 gap 1/2, from the #112 honest-coverage investigation): +177
+  behavior-level bats tests across nine `test/unit/*_spec.bats` files —
+  `general` (13→57: exec_cmd incl. capture mode, sudo/platform helpers,
+  backup_file, temp-file helpers), `dispatcher` (49→83), `module_helper`
+  (25→59), `state_io` (24→37), `state` (37→46), `config` (14→24),
+  `secrets` (45→58), `sync` (17→23, rebased onto the post-#105 SSH e2e
+  suite), `detect` (14→28). lib/general.sh rises from 5.3% to 65%+ in
+  the core shard alone; no kcov excludes or threshold changes.
+  Test-only — no engine code touched.
 - **Batch-A module spec backfill** (issue #123, AC-17 gap 2/2): Q29-scope
   per-module specs for the 10 pre-runner Batch-A modules that previously
   had only incidental coverage (26-60%) — apt-essentials (72 tests),

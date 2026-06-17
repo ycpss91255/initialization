@@ -4,7 +4,7 @@ How the engineering skills should consume this repo's domain documentation when
 exploring the codebase.
 
 > **Repo convention**: Folder names are singular here (hard rule). ADR path is
-> `doc/adr/`, not `doc/adr/`. The seed templates in the upstream skill use
+> `doc/adr/`, not `docs/adr/`. The seed templates in the upstream skill use
 > plural names — translate accordingly when reading skill instructions.
 
 ## Before exploring, read these

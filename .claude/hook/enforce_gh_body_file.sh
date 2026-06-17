@@ -5,9 +5,9 @@
 # invocations that violate the body-file discipline rules from issue #64.
 # Renamed + upgraded from `remind_use_body_file.sh` (non-blocking remind).
 #
-# Companion: .claude/skills/gh-artifact-format/SKILL.md describes the
-# positive format guidance (issue title shape, 5 standard body sections,
-# close-comment tiers, cross-ref keywords).
+# Companion: .github/ISSUE_TEMPLATE/<kind>.yaml define the positive body
+# format (the structured sections per kind); enforce_gh_issue_template.sh
+# enforces those required sections on the agent --body-file path.
 #
 # Rules (deny on violation):
 #   1. `gh issue create` without `--body-file <path>`
@@ -175,7 +175,7 @@ main() {
       # Rule 9 (#91): `gh issue create` must carry --label <non-empty>.
       # PRs are exempt -- they inherit labels from the issue they close.
       if [[ "${subcmd}" == "issue create" ]] && ! has_label "${cmd}"; then
-        deny "gh issue create needs --label <name> (Rule 9 of #91). Map the title type prefix to a stock GitHub label per .claude/skills/gh-artifact-format/SKILL.md Section 6: feat/refactor/chore/track -> enhancement, fix -> bug, docs -> documentation. Example: gh issue create ... --body-file /tmp/x.md --label enhancement"
+        deny "gh issue create needs --label <name> (Rule 9 of #91). Map the title type prefix to a stock GitHub label (matches .github/ISSUE_TEMPLATE/<kind>.yaml): feat/refactor/chore/track -> enhancement, fix -> bug, docs -> documentation. Example: gh issue create ... --body-file /tmp/x.md --label enhancement"
         return 0
       fi
       return 0

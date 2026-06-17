@@ -1,0 +1,45 @@
+name: Documentation
+description: Report missing, wrong, or unclear documentation
+title: "docs: "
+labels: ["documentation"]
+type: Task
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report a documentation gap or error (README, ADR, CONTEXT, doc/).
+        GitHub interaction here is English-only.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing
+      description: |
+        Describe the documentation problem. Include:
+        - What is incorrect, outdated, unclear, or absent.
+        - What a reader currently gets wrong because of it.
+      placeholder: |
+        - `doc/module-spec.md` does not mention the purge phase ...
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where
+      description: |
+        Point to the exact location:
+        - File path and section heading, or
+        - URL / line range.
+      placeholder: |
+        - `doc/adr/0021-folder-naming-all-singular.md`, "Exceptions" section
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested change
+      description: |
+        Optional:
+        - The wording or structure you propose.
+        - Reference material that supports it.
+    validations:
+      required: false

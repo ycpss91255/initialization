@@ -110,8 +110,9 @@ Per-shard coverage (issue #28; combine with --unit-only / --ci-unit):
                         shard output: coverage/shard-<module|core|all>.
                         Routes to the kcov image (kcov is not available
                         in alpine test-tools). Gate threshold for
-                        --merge-coverage: $COVERAGE_MIN (default 66 —
-                        ratchet baseline; AC-17's 80% flips in via #124).
+                        --merge-coverage: $COVERAGE_MIN (default 80 —
+                        the AC-17 gate; ratcheted up from the 66 baseline
+                        in #124 once #122/#123 boosted coverage).
                         $COVERAGE_ENFORCE=0|false makes the gate
                         report-only (CI uses this on narrow PR matrices).
 
@@ -379,11 +380,12 @@ _run_coverage() {
 # (coverage/coverage-shard-<name>).
 #
 # Gate semantics:
-#   - Threshold: $COVERAGE_MIN, default 66 — ratchet baseline (the honest
-#     merged number measured 66.70% on 2026-06-07). It exists to prevent
-#     regression, NOT as the AC-17 target: #122 (lib specs) and #123
-#     (engine specs) boost the weak areas, then #124 flips this default
-#     to 80. AC-17's final value (80%) is unchanged.
+#   - Threshold: $COVERAGE_MIN, default 80 — the AC-17 gate. This was
+#     ratcheted up from the 66 baseline (honest merged number measured
+#     66.70% on 2026-06-07) in #124, after #122 (lib specs), #123 (engine
+#     specs), and #153 (general/dispatcher boost) lifted the merged number
+#     past 80 (measured 80.16% on 2026-06-17). The gate now prevents
+#     regression below AC-17's required floor.
 #   - Enforcement: $COVERAGE_ENFORCE=0|false → report-only (print the
 #     percentage, never fail). CI sets this on narrow-matrix PR runs
 #     (only changed shards ran) because they are structurally low — the
@@ -404,9 +406,10 @@ _merged_coverage_percent() {
 }
 
 _assert_coverage_gate() {
-    # Default 66 = ratchet baseline (66.70% measured 2026-06-07); #124
-    # flips it to 80 once #122/#123 land. See section comment above.
-    local _min="${COVERAGE_MIN:-66}"
+    # Default 80 = the AC-17 gate, ratcheted up from the 66 baseline in
+    # #124 (merged number reached 80.16% on 2026-06-17). See section
+    # comment above.
+    local _min="${COVERAGE_MIN:-80}"
     local _pct
     _pct="$(_merged_coverage_percent)"
     [[ -n "${_pct}" ]] \
@@ -419,9 +422,9 @@ _assert_coverage_gate() {
             return 0
             ;;
     esac
-    _info "Merged unit coverage: ${_pct}% (gate: >= ${_min}%, ratchet baseline; AC-17 target 80% via #124)"
+    _info "Merged unit coverage: ${_pct}% (gate: >= ${_min}%, AC-17)"
     awk -v p="${_pct}" -v t="${_min}" 'BEGIN { exit (p >= t) ? 0 : 1 }' \
-        || _die "coverage gate failed: ${_pct}% < ${_min}% (ratchet baseline; AC-17)"
+        || _die "coverage gate failed: ${_pct}% < ${_min}% (AC-17)"
 }
 
 _run_coverage_merge() {

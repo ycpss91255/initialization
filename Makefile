@@ -65,8 +65,9 @@ coverage: $(TEST_TOOLS_DEP) ## Run ShellCheck + Bats + kcov coverage report
 # test-unit + coverage double run): `coverage-unit MODULE=<name>|core`
 # writes coverage/shard-<name>; the aggregation job downloads all shard
 # artifacts and runs `coverage-merge`, which kcov-merges them and asserts
-# the coverage gate (>= $COVERAGE_MIN, default 66 — ratchet baseline;
-# AC-17's 80% flips in via #124 after #122/#123) on the MERGED result.
+# the coverage gate (>= $COVERAGE_MIN, default 80 — the AC-17 gate,
+# ratcheted up from the 66 baseline in #124 after #122/#123/#153) on the
+# MERGED result.
 # CI enforces the gate only on full-matrix runs; narrow PR matrices run
 # it report-only ($COVERAGE_ENFORCE=false — see ci.sh / ci.yaml).
 # Local dev keeps `make coverage` (full kcov run, unit + integration).
@@ -74,7 +75,7 @@ coverage: $(TEST_TOOLS_DEP) ## Run ShellCheck + Bats + kcov coverage report
 coverage-unit: $(TEST_TOOLS_DEP) ## Run unit bats once under kcov (optional MODULE=<name>|core) → coverage/shard-*
 	./script/ci/ci.sh --unit-only --kcov $(if $(MODULE),--module $(MODULE))
 
-coverage-merge: $(TEST_TOOLS_DEP) ## Merge coverage/*shard-* + assert ratchet gate (>= $$COVERAGE_MIN, default 66) on merged result
+coverage-merge: $(TEST_TOOLS_DEP) ## Merge coverage/*shard-* + assert coverage gate (>= $$COVERAGE_MIN, default 80; AC-17) on merged result
 	./script/ci/ci.sh --merge-coverage
 
 # ── Image build ──────────────────────────────────────────────────────────────

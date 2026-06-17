@@ -291,9 +291,9 @@ jobs:
   # The unit shards above already ran bats under kcov — no second bats
   # run here. This job downloads every per-shard kcov output, merges
   # them (`kcov --merge`), and asserts the coverage gate on the MERGED
-  # result — never per shard. Gate threshold is COVERAGE_MIN (default 66
-  # — ratchet baseline, honest 66.70% measured 2026-06-07; #124 flips it
-  # to AC-17's 80% once #122/#123 land). Enforcement only happens on
+  # result — never per shard. Gate threshold is COVERAGE_MIN (default 80
+  # — the AC-17 gate, ratcheted up from the 66 baseline in #124 after
+  # #122/#123/#153 lifted the merged number to 80.16%). Enforcement only happens on
   # full-matrix runs (discover.full): narrow PR matrices merge to a
   # structurally low number (unrun shards' source files still count in
   # the denominator), so those runs print the percentage report-only.

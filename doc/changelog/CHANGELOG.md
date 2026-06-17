@@ -22,6 +22,47 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`auto-merge-on-green` skill + CI-monitor hook** (issue #154): a new skill
+  (canonical under `.agents/skills/`, symlinked from `.claude/skills/`) plus
+  `.claude/script/auto-merge-on-green.sh` that arms GitHub-native auto-merge
+  (`gh pr merge --auto --squash --delete-branch`) on a PR and Monitor-watches
+  it land. The script keys off `gh pr view`'s `mergeStateStatus`
+  (repo-agnostic — no hardcoded check name): `MERGED` → done; `BEHIND` →
+  `gh pr update-branch` (keeps GitHub auto-merge unblocked under `strict`
+  branch protection, which does not auto-update stale branches); `DIRTY` /
+  required-check `FAILURE` → report and exit (auto-merge left armed so a
+  fix-push merges automatically); a non-progressing `BLOCKED` bails after a
+  grace window. The merge runs server-side, so it lands even if the session
+  ends. Covered by `test/unit/script/auto_merge_on_green_spec.bats` and
+  `test/unit/hook/remind_ci_auto_merge_spec.bats`.
+
+### Changed
+
+- **`remind_pr_wait_ci.sh` → `remind_ci_auto_merge.sh`** (issue #154): the
+  PR-CI reminder hook is renamed and broadened. It now triggers on both
+  `gh pr create` and `git push`, and injects the matching instruction —
+  `gh pr create` → run the `auto-merge-on-green` skill; `git push` (tag) →
+  monitor release CI; `git push` (branch) → auto-merge if a PR exists, else
+  monitor. The hook only detects + instructs (it cannot run a Monitor or
+  merge); the agent + skill do the work and GitHub performs the merge. No
+  per-PR human merge step; human oversight moves to feature/project
+  checkpoints. ADR-0007's exit-code-contract script list updated to the new
+  name.
+
+- **Skill layout canonicalized under `.agents/skills/`** (issue #150,
+  supersedes the 2026-05-21 migration): the repo-owned skills `semver-bump`
+  and `wait-pr-ci` move from real directories in `.claude/skills/` to
+  `.agents/skills/<name>/`, with `.claude/skills/<name>` now a symlink into
+  the canonical store — matching how third-party (`skills` CLI) skills are
+  laid out. Both the canonical dir and the symlink are git-tracked;
+  third-party skills + their symlinks stay machine-local. `.gitignore` moves
+  to the `.agents/*` + layer-by-layer negation form (git cannot re-include a
+  path once a parent dir is ignored). Path references such as
+  `.claude/skills/semver-bump/SKILL.md` still resolve transparently through
+  the symlink, so no hook/script/doc references changed.
+
+### Added
+
 - **GitHub issue/PR templates + agent template-enforcement hook**: four
   YAML issue forms under `.github/ISSUE_TEMPLATE/` (`bug` / `feature` /
   `task` / `docs`), each setting `type:` (org Issue Type — auto-applies in

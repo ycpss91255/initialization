@@ -33,13 +33,24 @@ module/config/fish/fish_variables*
 !.claude/projects/memory/**
 
 # Other agent CLIs' local state
-.agents/
 skills-lock.json
 
-# Generic agent skills are machine-local: installed via the `skills` CLI into
-# .agents/skills/ and symlinked from .claude/skills/ (2026-05-21 migration).
-# Project-specific skills (real directories) stay tracked via the negations.
+# Skill layout (refs #150, supersedes the 2026-05-21 migration): EVERY skill
+# lives canonically under .agents/skills/<name>/ and is symlinked from
+# .claude/skills/<name>. Third-party skills (installed via the `skills` CLI)
+# stay machine-local; repo-owned skills are tracked at BOTH ends — the
+# canonical dir under .agents/skills/ and the symlink under .claude/skills/.
+# git cannot re-include a path once a parent dir is ignored, so .agents is
+# ignored at the contents level (/*) with layer-by-layer negations.
+.agents/*
+!.agents/skills
+.agents/skills/*
+!.agents/skills/auto-merge-on-green
+!.agents/skills/semver-bump
+!.agents/skills/wait-pr-ci
+
 .claude/skills/*
+!.claude/skills/auto-merge-on-green
 !.claude/skills/semver-bump
 !.claude/skills/wait-pr-ci
 

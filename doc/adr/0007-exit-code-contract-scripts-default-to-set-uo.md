@@ -18,7 +18,7 @@
    `.claude/hook/*.sh` PreToolUse hooks (`enforce_gh_body_file.sh`,
    `enforce_gh_english.sh`, `check_changelog_drift.sh`,
    `remind_main_sync.sh`, `enforce_semver_tag_via_script.sh`,
-   `check_main_fresh_before_worktree.sh`, `remind_pr_wait_ci.sh`) and
+   `check_main_fresh_before_worktree.sh`, `remind_ci_auto_merge.sh`) and
    `.claude/script/release-tag.sh` fall in this group. They must reach
    `main()` `return` / `exit <code>` with a deliberate value — Claude
    Code reads the exit code (and `permissionDecision` JSON) to decide

@@ -33,6 +33,58 @@ if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     return 0 2>/dev/null
 fi
 
+# i18n_t (issue #185) lives in lib/i18n.sh. The entrypoint sources it before
+# dispatching, but make this lib self-sufficient (unit specs source preflight.sh
+# directly) by loading it on demand when the helper is not yet defined.
+if ! declare -F i18n_t >/dev/null 2>&1; then
+    # shellcheck source=lib/i18n.sh
+    source "${BASH_SOURCE[0]%/*}/i18n.sh"
+fi
+
+# File-local message catalog (issue #185, Phase 2). `en.<key>` MUST stay
+# byte-identical to the previous English literal (including leading spaces /
+# trailing spaces). Only human-facing prompts/status go through i18n_t.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
+declare -gA PREFLIGHT_I18N=(
+    [en.missing_deps]="[preflight] missing tool dependencies: {0}"
+    [zh-TW.missing_deps]="[preflight] 缺少工具相依套件：{0}"
+
+    [en.no_sudo_err]="[preflight] ERROR: sudo is not available; cannot install them automatically."
+    [zh-TW.no_sudo_err]="[preflight] 錯誤：無法使用 sudo，因此無法自動安裝這些套件。"
+
+    [en.no_sudo_ask]="[preflight] ask an administrator to run, then re-run this tool:"
+    [zh-TW.no_sudo_ask]="[preflight] 請管理員執行下列指令後，再重新執行本工具："
+
+    [en.no_sudo_cmd]="[preflight]   sudo apt-get install -y {0}"
+    [zh-TW.no_sudo_cmd]="[preflight]   sudo apt-get install -y {0}"
+
+    [en.apt_plan]="[preflight] the following packages will be installed via apt:"
+    [zh-TW.apt_plan]="[preflight] 將透過 apt 安裝下列套件："
+
+    [en.plan_item]="  - {0}"
+    [zh-TW.plan_item]="  - {0}"
+
+    [en.proceed]="Proceed? [Y/n] "
+    [zh-TW.proceed]="是否繼續？[Y/n] "
+
+    [en.no_answer]="[preflight] ERROR: no interactive answer; re-run with -y to auto-install"
+    [zh-TW.no_answer]="[preflight] 錯誤：沒有互動式回答；請加上 -y 重新執行以自動安裝"
+
+    [en.aborted]="[preflight] aborted by user; install manually or re-run with -y"
+    [zh-TW.aborted]="[preflight] 已由使用者中止；請手動安裝或加上 -y 重新執行"
+
+    [en.apt_failed]="[preflight] ERROR: apt install failed for: {0}"
+    [zh-TW.apt_failed]="[preflight] 錯誤：apt 安裝失敗：{0}"
+
+    [en.installed]="[preflight] installed: {0}"
+    [zh-TW.installed]="[preflight] 已安裝：{0}"
+)
+# kcov-exclude-end
+# PREFLIGHT_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
+# bareword argument — static analysis cannot follow that indirection, so make
+# the read explicit here to keep shellcheck honest (no disable directive).
+: "${PREFLIGHT_I18N[@]+x}"
+
 : "${INIT_UBUNTU_YES:=false}"
 
 # The tool's own dependencies (PRD §3.4).
@@ -109,12 +161,12 @@ preflight_self_deps() {
         return 0
     fi
 
-    printf "[preflight] missing tool dependencies: %s\n" "${_missing[*]}" >&2
+    printf '%s\n' "$(i18n_t PREFLIGHT_I18N missing_deps "${_missing[*]}")" >&2
 
     if ! _preflight_has_sudo; then
-        printf "[preflight] ERROR: sudo is not available; cannot install them automatically.\n" >&2
-        printf "[preflight] ask an administrator to run, then re-run this tool:\n" >&2
-        printf "[preflight]   sudo apt-get install -y %s\n" "${_missing[*]}" >&2
+        printf '%s\n' "$(i18n_t PREFLIGHT_I18N no_sudo_err)" >&2
+        printf '%s\n' "$(i18n_t PREFLIGHT_I18N no_sudo_ask)" >&2
+        printf '%s\n' "$(i18n_t PREFLIGHT_I18N no_sudo_cmd "${_missing[*]}")" >&2
         return 4
     fi
 
@@ -128,34 +180,34 @@ preflight_self_deps() {
     done
 
     if [[ "${_yes}" != "true" ]]; then
-        printf "[preflight] the following packages will be installed via apt:\n"
+        printf '%s\n' "$(i18n_t PREFLIGHT_I18N apt_plan)"
         local _dep
         for _dep in "${_missing[@]}"; do
-            printf "  - %s\n" "${_dep}"
+            printf '%s\n' "$(i18n_t PREFLIGHT_I18N plan_item "${_dep}")"
         done
         # printf the prompt ourselves: `read -p` only writes to a tty, and
         # the answer must be readable from plain stdin (pipes included).
-        printf "Proceed? [Y/n] "
+        printf '%s' "$(i18n_t PREFLIGHT_I18N proceed)"
         local _answer=""
         if ! read -r _answer; then
-            printf "\n[preflight] ERROR: no interactive answer; re-run with -y to auto-install\n" >&2
+            printf '\n%s\n' "$(i18n_t PREFLIGHT_I18N no_answer)" >&2
             return 1
         fi
         case "${_answer}" in
             ""|y|Y|yes|YES|Yes) ;;
             *)
-                printf "[preflight] aborted by user; install manually or re-run with -y\n" >&2
+                printf '%s\n' "$(i18n_t PREFLIGHT_I18N aborted)" >&2
                 return 1
                 ;;
         esac
     fi
 
     if ! _preflight_apt_install "${_missing[@]}"; then
-        printf "[preflight] ERROR: apt install failed for: %s\n" "${_missing[*]}" >&2
+        printf '%s\n' "$(i18n_t PREFLIGHT_I18N apt_failed "${_missing[*]}")" >&2
         return 1
     fi
 
     export INIT_UBUNTU_PREFLIGHT_DONE=true
-    printf "[preflight] installed: %s\n" "${_missing[*]}"
+    printf '%s\n' "$(i18n_t PREFLIGHT_I18N installed "${_missing[*]}")"
     return 0
 }

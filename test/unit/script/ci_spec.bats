@@ -55,8 +55,11 @@ setup() {
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${STUB_CALL_LOG}/kcov.calls"
 if [[ "${1:-}" == "--merge" ]]; then
-    mkdir -p "$2/kcov-merged"
-    cat > "$2/kcov-merged/coverage.json" <<JSON
+    shift
+    # skip any flags (e.g. --exclude-region=...) before the output dir arg
+    while [[ "${1:-}" == --* ]]; do shift; done
+    mkdir -p "$1/kcov-merged"
+    cat > "$1/kcov-merged/coverage.json" <<JSON
 {
   "files": [
     {"file": "/source/lib/x.sh", "percent_covered": "11.11", "covered_lines": "1", "total_lines": "9"}
@@ -151,7 +154,11 @@ teardown() {
 
     run cat "${STUB_CALL_LOG}/kcov.calls"
     assert_success
-    assert_output --partial "--merge ${FIXTURE_ROOT}/coverage/merged"
+    # `--merge` + the merged output dir (an --exclude-region flag sits between
+    # them so the i18n data tables stay out of the merged gate — see ci.sh).
+    assert_output --partial "--merge "
+    assert_output --partial "--exclude-region="
+    assert_output --partial "${FIXTURE_ROOT}/coverage/merged"
     assert_output --partial "coverage/coverage-shard-alpha"
     assert_output --partial "coverage/shard-core"
 }

@@ -35,8 +35,155 @@ export TUI_SECRETS
 : "${INIT_UBUNTU_VERSION:=0.1.0-draft}"
 
 # G4: the ONLY library the TUI sources is its own presentation helper.
+# (tui_backend.sh sources lib/i18n.sh itself, so i18n_t is available here too.)
 # shellcheck source=lib/tui_backend.sh
 source "${REPO_ROOT}/lib/tui_backend.sh"
+
+# Resolve the UI language once (env > config ui.lang > $LANG, sanitized). The
+# TUI never sources the engine, so config_get is absent here and resolution
+# lands on INIT_UBUNTU_LANG / $LANG — exactly the entrypoint contract (#185).
+i18n_resolve_init_ubuntu_lang
+
+# ── i18n table (#185): strings setup_ubuntu_tui.sh ITSELF authors ────────────
+# Screen titles, prompts, confirmations, status text the TUI frontend writes.
+# Module descriptions / detect output / plan bullets are CLI pass-through and
+# are NOT translated. `en.<key>` is byte-identical to the prior literal; zh-TW
+# uses full-width punctuation. {0}{1} are i18n_t positional args.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
+declare -gA TUI_I18N=(
+    # System Info screen (_tui_screen_system_info).
+    [en.title_system_info]="System Info"
+    [zh-TW.title_system_info]="系統資訊"
+    [en.sysinfo_detect_failed]="ERROR: 'setup_ubuntu detect' failed."
+    [zh-TW.sysinfo_detect_failed]="錯誤:'setup_ubuntu detect' 執行失敗。"
+    [en.sysinfo_override_line]="platform override:  {0} (this session)"
+    [zh-TW.sysinfo_override_line]="平台覆寫:  {0} (本工作階段)"
+    [en.title_platform_override]="Platform Override"
+    [zh-TW.title_platform_override]="平台覆寫"
+    [en.override_question]="Override the detected platform (form factor) for this session?"
+    [zh-TW.override_question]="是否在本工作階段覆寫偵測到的平台 (硬體型態)?"
+    [en.override_clear]="Clear override (use auto-detection)"
+    [zh-TW.override_clear]="清除覆寫 (改用自動偵測)"
+    [en.select_form_factor]="Select a form factor (PRD §7.5 --profile):"
+    [zh-TW.select_form_factor]="選擇硬體型態 (PRD §7.5 --profile):"
+
+    # Category checklist screen (_tui_screen_category).
+    [en.title_modules]="Modules"
+    [zh-TW.title_modules]="模組"
+    [en.no_modules_in_cat]="No modules in category '{0}'."
+    [zh-TW.no_modules_in_cat]="類別 '{0}' 中沒有模組。"
+    [en.cat_modules_title]="{0} Modules"
+    [zh-TW.cat_modules_title]="{0} 模組"
+    [en.check_modules_help]="Check modules to install. < OK > keeps this page, < Back > discards it."
+    [zh-TW.check_modules_help]="勾選要安裝的模組。< OK > 保留此頁,< Back > 捨棄此頁。"
+
+    # Review & Install screen (_tui_screen_review).
+    [en.title_review]="Review & Install"
+    [zh-TW.title_review]="檢閱並安裝"
+    [en.review_plan_failed]="ERROR: 'setup_ubuntu install --dry-run' failed — cannot build the plan."
+    [zh-TW.review_plan_failed]="錯誤:'setup_ubuntu install --dry-run' 執行失敗 — 無法產生安裝計畫。"
+    [en.review_will_install]="Will install {0} module(s):"
+    [zh-TW.review_will_install]="將安裝 {0} 個模組:"
+    [en.review_will_pull]="will pull {0} deps"
+    [zh-TW.review_will_pull]="將連帶安裝 {0} 個相依套件"
+    [en.review_proceed]="Install now (forks setup_ubuntu)"
+    [zh-TW.review_proceed]="立即安裝 (fork setup_ubuntu)"
+    [en.review_show_deps]="Show dependency details ({0})"
+    [zh-TW.review_show_deps]="顯示相依詳細資訊 ({0})"
+    [en.title_dep_details]="Dependency details"
+    [zh-TW.title_dep_details]="相依詳細資訊"
+    [en.nothing_selected]="nothing selected"
+    [zh-TW.nothing_selected]="未選擇任何項目"
+
+    # Quick Setup wizard (_tui_qs_* / _tui_screen_quick_setup).
+    [en.title_qs_platform]="Quick Setup — Platform Override"
+    [zh-TW.title_qs_platform]="快速安裝 — 平台覆寫"
+    [en.title_qs_step2]="Quick Setup — Step 2/4: Recommended modules"
+    [zh-TW.title_qs_step2]="快速安裝 — 步驟 2/4:推薦模組"
+    [en.qs_step2_help]="{0} / {1} will be installed — adjust and press OK."
+    [zh-TW.qs_step2_help]="將安裝 {0} / {1} 個 — 調整後按 OK。"
+    [en.title_qs_step3_suite]="Quick Setup — Step 3/4: CLI Essentials suite? ({0} tools)"
+    [zh-TW.title_qs_step3_suite]="快速安裝 — 步驟 3/4:CLI 必備套件? ({0} 項工具)"
+    [en.qs_step3_all]="Yes, install all"
+    [zh-TW.qs_step3_all]="是,全部安裝"
+    [en.qs_step3_pick]="Pick individually"
+    [zh-TW.qs_step3_pick]="逐項挑選"
+    [en.qs_step3_skip]="Skip"
+    [zh-TW.qs_step3_skip]="略過"
+    [en.title_qs_step3_pick]="Quick Setup — Step 3/4: CLI Essentials"
+    [zh-TW.title_qs_step3_pick]="快速安裝 — 步驟 3/4:CLI 必備套件"
+    [en.qs_step3_pick_help]="Check the tools to install."
+    [zh-TW.qs_step3_pick_help]="勾選要安裝的工具。"
+    [en.title_qs_step4]="Quick Setup — Step 4/4: AI agent CLI? (multi-select)"
+    [zh-TW.title_qs_step4]="快速安裝 — 步驟 4/4:AI agent CLI? (可多選)"
+    [en.qs_step4_help]="Check the agent CLIs to install."
+    [zh-TW.qs_step4_help]="勾選要安裝的 agent CLI。"
+    [en.title_qs_step1]="Quick Setup — Step 1/4: Confirm platform"
+    [zh-TW.title_qs_step1]="快速安裝 — 步驟 1/4:確認平台"
+    [en.qs_step1_detected]="Detected: {0}"
+    [zh-TW.qs_step1_detected]="偵測結果:{0}"
+    [en.qs_step1_form_factor]="Form factor: {0}"
+    [zh-TW.qs_step1_form_factor]="硬體型態:{0}"
+    [en.qs_step1_continue]="Yes, continue"
+    [zh-TW.qs_step1_continue]="是,繼續"
+    [en.qs_step1_override]="Override platform"
+    [zh-TW.qs_step1_override]="覆寫平台"
+    [en.title_quick_setup]="Quick Setup"
+    [zh-TW.title_quick_setup]="快速安裝"
+    [en.qs_persist_failed]="ERROR: failed to persist the platform override — nothing was installed."
+    [zh-TW.qs_persist_failed]="錯誤:無法儲存平台覆寫 — 未安裝任何項目。"
+
+    # Manage Installed (#72, §8.3 / §8.4).
+    [en.confirm_action_title]="Confirm {0}"
+    [zh-TW.confirm_action_title]="確認{0}"
+    [en.confirm_plan_failed]="ERROR: 'setup_ubuntu {0} --dry-run' failed — cannot enumerate the plan."
+    [zh-TW.confirm_plan_failed]="錯誤:'setup_ubuntu {0} --dry-run' 執行失敗 — 無法列出計畫。"
+    [en.btn_proceed]="Proceed"
+    [zh-TW.btn_proceed]="繼續"
+    [en.btn_cancel]="Cancel"
+    [zh-TW.btn_cancel]="取消"
+    [en.btn_back]="Back"
+    [zh-TW.btn_back]="返回"
+    [en.btn_exit]="Exit"
+    [zh-TW.btn_exit]="離開"
+    [en.manage_title]="Manage '{0}'"
+    [zh-TW.manage_title]="管理 '{0}'"
+    [en.manage_action_help]="Pick an action (forks the setup_ubuntu CLI — G4):"
+    [zh-TW.manage_action_help]="選擇動作 (fork setup_ubuntu CLI — G4):"
+    [en.manage_update]="Upgrade to the latest version"
+    [zh-TW.manage_update]="升級到最新版本"
+    [en.manage_remove]="Remove (config retained)"
+    [zh-TW.manage_remove]="移除 (保留設定)"
+    [en.manage_purge]="Remove + delete config (destructive)"
+    [zh-TW.manage_purge]="移除 + 刪除設定 (具破壞性)"
+    [en.title_manage_installed]="Manage Installed"
+    [zh-TW.title_manage_installed]="管理已安裝項目"
+    [en.manage_list_failed]="ERROR: 'setup_ubuntu list --installed --json' failed."
+    [zh-TW.manage_list_failed]="錯誤:'setup_ubuntu list --installed --json' 執行失敗。"
+    [en.manage_none_installed]="(no modules recorded as installed)"
+    [zh-TW.manage_none_installed]="(沒有已安裝的模組紀錄)"
+    [en.manage_toggle_group]="Switch view: group by tag"
+    [zh-TW.manage_toggle_group]="切換檢視:依標籤分組"
+    [en.manage_toggle_flat]="Switch view: flat list"
+    [zh-TW.manage_toggle_flat]="切換檢視:平面清單"
+    [en.manage_list_help]="Module / Version / Installed at — pick one to manage:"
+    [zh-TW.manage_list_help]="模組 / 版本 / 安裝時間 — 選一項進行管理:"
+
+    # Manage Secrets (_tui_screen_secrets).
+    [en.secrets_return]=$'\n[setup_secrets exited {0}] Press Enter to return to the menu...'
+    [zh-TW.secrets_return]=$'\n[setup_secrets 結束,代碼 {0}] 按 Enter 返回選單...'
+
+    # Main menu loop (_tui_main_loop).
+    [en.main_title]="init_ubuntu v{0}"
+    [zh-TW.main_title]="init_ubuntu v{0}"
+    [en.main_system]="System: {0}"
+    [zh-TW.main_system]="系統:{0}"
+)
+# kcov-exclude-end
+# TUI_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
+# bareword argument — static analysis cannot follow that indirection, so make
+# the read explicit here to keep shellcheck honest (no disable directive).
+: "${TUI_I18N[@]+x}"
 
 # ── In-memory session selections (Q43: never persisted by the TUI) ──────────
 # Platform override chosen on the System Info screen. Consumed as
@@ -84,18 +231,21 @@ EOF
 # System Info (§8.1 item 7): show forked `setup_ubuntu detect` output and
 # offer a platform override (kept in TUI memory only).
 _tui_screen_system_info() {
-    local _detect_text
+    local _detect_text _title_si
+    _title_si="$(i18n_t TUI_I18N title_system_info)"
     _detect_text="$("${TUI_CLI}" detect 2>/dev/null)" || {
-        tui_render_msgbox "System Info" "ERROR: 'setup_ubuntu detect' failed."
+        tui_render_msgbox "${_title_si}" "$(i18n_t TUI_I18N sysinfo_detect_failed)"
         return 0
     }
     if [[ -n "${TUI_PLATFORM_OVERRIDE}" ]]; then
-        _detect_text+=$'\n'"platform override:  ${TUI_PLATFORM_OVERRIDE} (this session)"
+        _detect_text+=$'\n'"$(i18n_t TUI_I18N sysinfo_override_line "${TUI_PLATFORM_OVERRIDE}")"
     fi
-    tui_render_msgbox "System Info" "${_detect_text}"
+    tui_render_msgbox "${_title_si}" "${_detect_text}"
 
-    if ! tui_render_yesno "Platform Override" \
-        "Override the detected platform (form factor) for this session?"; then
+    local _title_po
+    _title_po="$(i18n_t TUI_I18N title_platform_override)"
+    if ! tui_render_yesno "${_title_po}" \
+        "$(i18n_t TUI_I18N override_question)"; then
         return 0
     fi
 
@@ -104,11 +254,11 @@ _tui_screen_system_info() {
     while IFS=$'\t' read -r _tag _desc; do
         _choices+=("${_tag}" "${_desc}")
     done < <(tui_platform_choices)
-    _choices+=("detected" "Clear override (use auto-detection)")
+    _choices+=("detected" "$(i18n_t TUI_I18N override_clear)")
 
     local _choice
-    _choice="$(tui_render_menu "Platform Override" \
-        "Select a form factor (PRD §7.5 --profile):" \
+    _choice="$(tui_render_menu "${_title_po}" \
+        "$(i18n_t TUI_I18N select_form_factor)" \
         "${_choices[@]}")" || return 0
 
     if [[ "${_choice}" == "detected" ]]; then
@@ -134,14 +284,15 @@ _tui_screen_category() {
         "$(tui_selection_list | tr '\n' ' ')")
 
     if [[ "${#_rows[@]}" -eq 0 ]]; then
-        tui_render_msgbox "Modules" "No modules in category '${_cat}'."
+        tui_render_msgbox "$(i18n_t TUI_I18N title_modules)" \
+            "$(i18n_t TUI_I18N no_modules_in_cat "${_cat}")"
         return 0
     fi
 
     local _picked
-    if ! _picked="$(TUI_CANCEL_LABEL="Back" tui_render_checklist \
-        "${_cat^} Modules" \
-        "Check modules to install. < OK > keeps this page, < Back > discards it." \
+    if ! _picked="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_checklist \
+        "$(i18n_t TUI_I18N cat_modules_title "${_cat^}")" \
+        "$(i18n_t TUI_I18N check_modules_help)" \
         "${_rows[@]}")"; then
         return 0  # Back / ESC: discard this page's changes (Q43)
     fi
@@ -165,36 +316,38 @@ _tui_screen_category() {
 _tui_screen_review() {
     local -a _sel=("$@")
 
+    local _title_rv
+    _title_rv="$(i18n_t TUI_I18N title_review)"
     local _plan
     if ! _plan="$(tui_cli_install_plan "${_sel[@]}")"; then
-        tui_render_msgbox "Review & Install" \
-            "ERROR: 'setup_ubuntu install --dry-run' failed — cannot build the plan."
+        tui_render_msgbox "${_title_rv}" \
+            "$(i18n_t TUI_I18N review_plan_failed)"
         return 1
     fi
     local -a _deps=()
     mapfile -t _deps < <(tui_plan_deps "${_plan}" "${_sel[@]}")
 
     local _text
-    _text="Will install ${#_sel[@]} module(s):"$'\n'
+    _text="$(i18n_t TUI_I18N review_will_install "${#_sel[@]}")"$'\n'
     _text+="$(printf '  %s\n' "${_sel[@]}")"
     if [[ "${#_deps[@]}" -gt 0 ]]; then
-        _text+=$'\n'"will pull ${#_deps[@]} deps"
+        _text+=$'\n'"$(i18n_t TUI_I18N review_will_pull "${#_deps[@]}")"
     fi
 
-    local -a _entries=("proceed" "Install now (forks setup_ubuntu)")
+    local -a _entries=("proceed" "$(i18n_t TUI_I18N review_proceed)")
     if [[ "${#_deps[@]}" -gt 0 ]]; then
-        _entries+=("deps" "Show dependency details (${#_deps[@]})")
+        _entries+=("deps" "$(i18n_t TUI_I18N review_show_deps "${#_deps[@]}")")
     fi
 
     local _choice
     while :; do
-        if ! _choice="$(TUI_CANCEL_LABEL="Back" tui_render_menu \
-            "Review & Install" "${_text}" "${_entries[@]}")"; then
+        if ! _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
+            "${_title_rv}" "${_text}" "${_entries[@]}")"; then
             return 1  # Back / Cancel: the caller owns what survives
         fi
         case "${_choice}" in
             deps)
-                tui_render_msgbox "Dependency details" \
+                tui_render_msgbox "$(i18n_t TUI_I18N title_dep_details)" \
                     "$(printf '%s\n' "${_deps[@]}")"
                 ;;
             proceed)
@@ -208,7 +361,8 @@ _tui_screen_review() {
 # the selections and returns to the main menu.
 _tui_screen_run() {
     if [[ "$(tui_selection_count)" -eq 0 ]]; then
-        tui_render_msgbox "Review & Install" "nothing selected"
+        tui_render_msgbox "$(i18n_t TUI_I18N title_review)" \
+            "$(i18n_t TUI_I18N nothing_selected)"
         return 0
     fi
 
@@ -254,8 +408,8 @@ _tui_qs_platform_menu() {
     while IFS=$'\t' read -r _tag _desc; do
         _choices+=("${_tag}" "${_desc}")
     done < <(tui_platform_choices)
-    tui_render_menu "Quick Setup — Platform Override" \
-        "Select a form factor (PRD §7.5 --profile):" "${_choices[@]}"
+    tui_render_menu "$(i18n_t TUI_I18N title_qs_platform)" \
+        "$(i18n_t TUI_I18N select_form_factor)" "${_choices[@]}"
 }
 
 # Steps 2-4 below print the picked module names (one per line) on stdout;
@@ -272,8 +426,8 @@ _tui_qs_step2() {
     done < <(tui_qs_recommended_entries "$1" "$2")
     [[ "${#_rows[@]}" -eq 0 ]] && return 0
 
-    tui_render_checklist "Quick Setup — Step 2/4: Recommended modules" \
-        "${_on} / $(( ${#_rows[@]} / 3 )) will be installed — adjust and press OK." \
+    tui_render_checklist "$(i18n_t TUI_I18N title_qs_step2)" \
+        "$(i18n_t TUI_I18N qs_step2_help "${_on}" "$(( ${#_rows[@]} / 3 ))")" \
         "${_rows[@]}"
 }
 
@@ -293,15 +447,15 @@ _tui_qs_step3() {
 
     local _choice
     _choice="$(tui_render_menu \
-        "Quick Setup — Step 3/4: CLI Essentials suite? (${#_names[@]} tools)" \
+        "$(i18n_t TUI_I18N title_qs_step3_suite "${#_names[@]}")" \
         "${_joined}" \
-        "all"  "Yes, install all" \
-        "pick" "Pick individually" \
-        "skip" "Skip")" || return 1
+        "all"  "$(i18n_t TUI_I18N qs_step3_all)" \
+        "pick" "$(i18n_t TUI_I18N qs_step3_pick)" \
+        "skip" "$(i18n_t TUI_I18N qs_step3_skip)")" || return 1
     case "${_choice}" in
         all)  printf '%s\n' "${_names[@]}" ;;
-        pick) tui_render_checklist "Quick Setup — Step 3/4: CLI Essentials" \
-                  "Check the tools to install." "${_rows[@]}" || return 1 ;;
+        pick) tui_render_checklist "$(i18n_t TUI_I18N title_qs_step3_pick)" \
+                  "$(i18n_t TUI_I18N qs_step3_pick_help)" "${_rows[@]}" || return 1 ;;
         skip) : ;;
     esac
 }
@@ -315,8 +469,8 @@ _tui_qs_step4() {
     done < <(tui_qs_tag_entries "$1" agent "$2")
     [[ "${#_rows[@]}" -eq 0 ]] && return 0
 
-    tui_render_checklist "Quick Setup — Step 4/4: AI agent CLI? (multi-select)" \
-        "Check the agent CLIs to install." "${_rows[@]}"
+    tui_render_checklist "$(i18n_t TUI_I18N title_qs_step4)" \
+        "$(i18n_t TUI_I18N qs_step4_help)" "${_rows[@]}"
 }
 
 # §8.2.1 wizard driver: Step 1 platform confirm → Steps 2-4 accumulate →
@@ -331,10 +485,10 @@ _tui_screen_quick_setup() {
     while :; do
         _form="$(tui_effective_form_factor "${_detect_json}" "${_override}")"
         _choice="$(tui_render_menu \
-            "Quick Setup — Step 1/4: Confirm platform" \
-            "Detected: ${_summary}"$'\n'"Form factor: ${_form}" \
-            "continue" "Yes, continue" \
-            "override" "Override platform")" || return 0
+            "$(i18n_t TUI_I18N title_qs_step1)" \
+            "$(i18n_t TUI_I18N qs_step1_detected "${_summary}")"$'\n'"$(i18n_t TUI_I18N qs_step1_form_factor "${_form}")" \
+            "continue" "$(i18n_t TUI_I18N qs_step1_continue)" \
+            "override" "$(i18n_t TUI_I18N qs_step1_override)")" || return 0
         [[ "${_choice}" == "continue" ]] && break
         if _picked="$(_tui_qs_platform_menu)"; then
             _override="${_picked}"
@@ -357,7 +511,8 @@ _tui_screen_quick_setup() {
     done <<<"${_out}"
 
     if [[ "${#_sel[@]}" -eq 0 ]]; then
-        tui_render_msgbox "Quick Setup" "nothing selected"
+        tui_render_msgbox "$(i18n_t TUI_I18N title_quick_setup)" \
+            "$(i18n_t TUI_I18N nothing_selected)"
         return 0
     fi
 
@@ -375,8 +530,8 @@ _tui_screen_quick_setup() {
     # engine-pulled deps stay manual=false (they never appear on this argv).
     if [[ -n "${_override}" ]]; then
         if ! "${TUI_CLI}" config set platform.override "${_override}"; then
-            tui_render_msgbox "Quick Setup" \
-                "ERROR: failed to persist the platform override — nothing was installed."
+            tui_render_msgbox "$(i18n_t TUI_I18N title_quick_setup)" \
+                "$(i18n_t TUI_I18N qs_persist_failed)"
             return 0
         fi
         TUI_PLATFORM_OVERRIDE="${_override}"
@@ -391,16 +546,19 @@ _tui_screen_quick_setup() {
 # Proceed / Cancel. Cancel forks nothing and returns to the module list.
 _tui_screen_confirm_destructive() {
     local _action="$1" _module="$2"
+    local _confirm_title
+    _confirm_title="$(i18n_t TUI_I18N confirm_action_title "${_action^}")"
     local _plan
     if ! _plan="$(tui_cli_manage_plan "${_action}" "${_module}")"; then
-        tui_render_msgbox "Confirm ${_action^}" \
-            "ERROR: 'setup_ubuntu ${_action} --dry-run' failed — cannot enumerate the plan."
+        tui_render_msgbox "${_confirm_title}" \
+            "$(i18n_t TUI_I18N confirm_plan_failed "${_action}")"
         return 0
     fi
     local _text
     _text="$(tui_manage_confirm_text "${_action}" "${_module}" "${_plan}")"
-    if ! TUI_YES_LABEL="Proceed" TUI_NO_LABEL="Cancel" tui_render_yesno \
-        "Confirm ${_action^}" "${_text}"; then
+    if ! TUI_YES_LABEL="$(i18n_t TUI_I18N btn_proceed)" \
+         TUI_NO_LABEL="$(i18n_t TUI_I18N btn_cancel)" tui_render_yesno \
+        "${_confirm_title}" "${_text}"; then
         return 0  # Cancel / ESC: nothing was forked
     fi
     local -a _argv=()
@@ -413,12 +571,12 @@ _tui_screen_confirm_destructive() {
 # confirm dialog. < Back > returns to the module list.
 _tui_screen_manage_action() {
     local _module="$1" _action
-    _action="$(TUI_CANCEL_LABEL="Back" tui_render_menu \
-        "Manage '${_module}'" \
-        "Pick an action (forks the setup_ubuntu CLI — G4):" \
-        "update" "Upgrade to the latest version" \
-        "remove" "Remove (config retained)" \
-        "purge"  "Remove + delete config (destructive)")" || return 0
+    _action="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
+        "$(i18n_t TUI_I18N manage_title "${_module}")" \
+        "$(i18n_t TUI_I18N manage_action_help)" \
+        "update" "$(i18n_t TUI_I18N manage_update)" \
+        "remove" "$(i18n_t TUI_I18N manage_remove)" \
+        "purge"  "$(i18n_t TUI_I18N manage_purge)")" || return 0
     case "${_action}" in
         update)
             local -a _argv=()
@@ -440,8 +598,8 @@ _tui_screen_manage() {
     while :; do
         local _state_json
         if ! _state_json="$(tui_cli_installed_json)"; then
-            tui_render_msgbox "Manage Installed" \
-                "ERROR: 'setup_ubuntu list --installed --json' failed."
+            tui_render_msgbox "$(i18n_t TUI_I18N title_manage_installed)" \
+                "$(i18n_t TUI_I18N manage_list_failed)"
             return 0
         fi
 
@@ -454,19 +612,20 @@ _tui_screen_manage() {
         done < <(tui_installed_entries "${_state_json}" "${_list_json}" "${_mode}")
 
         if [[ "${#_rows[@]}" -eq 0 ]]; then
-            tui_render_msgbox "Manage Installed" \
-                "(no modules recorded as installed)"
+            tui_render_msgbox "$(i18n_t TUI_I18N title_manage_installed)" \
+                "$(i18n_t TUI_I18N manage_none_installed)"
             return 0
         fi
 
-        local _toggle="Switch view: group by tag"
-        [[ "${_mode}" == "grouped" ]] && _toggle="Switch view: flat list"
+        local _toggle
+        _toggle="$(i18n_t TUI_I18N manage_toggle_group)"
+        [[ "${_mode}" == "grouped" ]] && _toggle="$(i18n_t TUI_I18N manage_toggle_flat)"
         _rows+=("view" "<< ${_toggle} >>")
 
         local _choice
-        if ! _choice="$(TUI_CANCEL_LABEL="Back" tui_render_menu \
-            "Manage Installed" \
-            "Module / Version / Installed at — pick one to manage:" \
+        if ! _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
+            "$(i18n_t TUI_I18N title_manage_installed)" \
+            "$(i18n_t TUI_I18N manage_list_help)" \
             "${_rows[@]}")"; then
             return 0  # Back / ESC → main menu
         fi
@@ -492,7 +651,7 @@ _tui_screen_secrets() {
     clear 2>/dev/null || printf '\033c'
     "${TUI_SECRETS}"
     local _rc=$?
-    printf '\n[setup_secrets exited %d] Press Enter to return to the menu...' "${_rc}"
+    i18n_t TUI_I18N secrets_return "${_rc}"
     read -r REPLY || true
     return 0
 }
@@ -539,9 +698,9 @@ _tui_main_loop() {
 
         # < Exit > (relabeled Cancel) / ESC: drop the process and with it
         # every in-memory selection — zero side effects (Q43).
-        _choice="$(TUI_CANCEL_LABEL="Exit" tui_render_menu \
-            "init_ubuntu v${INIT_UBUNTU_VERSION}" \
-            "System: ${_summary}" "${_menu_args[@]}")" || return 0
+        _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_exit)" tui_render_menu \
+            "$(i18n_t TUI_I18N main_title "${INIT_UBUNTU_VERSION}")" \
+            "$(i18n_t TUI_I18N main_system "${_summary}")" "${_menu_args[@]}")" || return 0
         # #169: landing on a non-selectable section separator is a no-op —
         # re-loop without dispatching any action.
         [[ "${_choice}" == "${TUI_MENU_SEPARATOR:--}" ]] && continue

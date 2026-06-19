@@ -49,6 +49,20 @@ i18n_resolve_init_ubuntu_lang
 
 : "${INIT_UBUNTU_VERSION:=0.1.0-draft}"
 
+# ── i18n: user-facing interactive prompts (issue #185) ───────────────────────
+# Only human-readable prompts are localized; every log_* call stays English
+# (secrets diagnostics are operator-facing, not end-user-facing).
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
+declare -gA SECRETS_ENTRY_I18N=(
+    [en.token_prompt]="Enter value for token {0}: "
+    [zh-TW.token_prompt]="請輸入權杖 {0} 的值："
+)
+# kcov-exclude-end
+# SECRETS_ENTRY_I18N is consumed by i18n_t via a nameref on the table NAME passed
+# as a bareword argument — static analysis cannot follow that indirection, so
+# make the read explicit here to keep shellcheck honest (no disable directive).
+: "${SECRETS_ENTRY_I18N[@]+x}"
+
 # ── usage ────────────────────────────────────────────────────────────────────
 
 _secrets_usage() {
@@ -219,7 +233,7 @@ _secrets_token_set() {
         # argv (`ps`) or shell history (AC-20); printf is a bash builtin, so
         # the pipe below never exec()s the value either.
         local _value=""
-        printf 'Enter value for token %s: ' "${_name}" > /dev/tty
+        i18n_t SECRETS_ENTRY_I18N token_prompt "${_name}" > /dev/tty
         IFS= read -rs _value < /dev/tty
         printf '\n' > /dev/tty
         if [[ -z "${_value}" ]]; then

@@ -81,6 +81,8 @@ _load_engine() {
     source "${LIB_DIR}/logger.sh"
     # shellcheck source=../../lib/general.sh
     source "${LIB_DIR}/general.sh"
+    # shellcheck source=../../lib/i18n.sh
+    source "${LIB_DIR}/i18n.sh"
     # shellcheck source=../../lib/registry.sh
     source "${LIB_DIR}/registry.sh"
     # shellcheck source=../../lib/runner.sh
@@ -300,6 +302,25 @@ EOF
     run runner_verify
     assert_success
     assert_output --partial "No modules"
+}
+
+# ── i18n: user-facing strings render zh-TW (issue #185 Phase 2) ─────────────
+
+@test "progress lines render zh-TW under INIT_UBUNTU_LANG=zh-TW (#185)" {
+    _load_engine
+    INIT_UBUNTU_LANG=zh-TW run runner_install echo-mod
+    assert_success
+    # Per-module start line ("...: 安裝中…") and success line ("已安裝").
+    assert_output --partial "安裝中"
+    assert_output --partial "已安裝"
+}
+
+@test "progress lines stay English by default (en byte-identical, #185)" {
+    _load_engine
+    run runner_install echo-mod
+    assert_success
+    assert_output --partial "echo-mod: installing..."
+    assert_output --partial "✔ echo-mod installed"
 }
 
 # ── Session-end log retention wiring (PRD §10.2, AC-33) ─────────────────────

@@ -35,6 +35,62 @@ if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     return 0 2>/dev/null
 fi
 
+# i18n_t (issue #185) lives in lib/i18n.sh. The entrypoint sources it before
+# dispatching, but make this lib self-sufficient (unit specs source runner.sh
+# directly) by loading it on demand when the helper is not yet defined.
+if ! declare -F i18n_t >/dev/null 2>&1; then
+    # shellcheck source=lib/i18n.sh
+    source "${BASH_SOURCE[0]%/*}/i18n.sh"
+fi
+
+# ── i18n: user-facing strings (issue #185 Phase 2) ──────────────────────────
+# Human-readable progress / summary / failure-dump strings rendered via
+# i18n_t (lib/i18n.sh). log_* output stays English; only stdout/stderr lines
+# a human reads are localized here. en values are byte-identical to the
+# pre-i18n literals. zh-TW uses full-width punctuation.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
+declare -gA RUNNER_I18N=(
+    # Phase verb forms (gerund / past) used inside progress lines.
+    ["en.gerund.install"]="installing"
+    ["zh-TW.gerund.install"]="安裝中"
+    ["en.gerund.remove"]="removing"
+    ["zh-TW.gerund.remove"]="移除中"
+    ["en.gerund.purge"]="purging"
+    ["zh-TW.gerund.purge"]="清除中"
+    ["en.gerund.upgrade"]="upgrading"
+    ["zh-TW.gerund.upgrade"]="升級中"
+    ["en.gerund.verify"]="verifying"
+    ["zh-TW.gerund.verify"]="驗證中"
+    ["en.past.install"]="installed"
+    ["zh-TW.past.install"]="已安裝"
+    ["en.past.remove"]="removed"
+    ["zh-TW.past.remove"]="已移除"
+    ["en.past.purge"]="purged"
+    ["zh-TW.past.purge"]="已清除"
+    ["en.past.upgrade"]="upgraded"
+    ["zh-TW.past.upgrade"]="已升級"
+    ["en.past.verify"]="verified"
+    ["zh-TW.past.verify"]="已驗證"
+    # Progress lines (per-module start / per-module success).
+    # {0}=index {1}=total {2}=module {3}=gerund
+    ["en.progress_start"]="[{0}/{1}] {2}: {3}..."
+    ["zh-TW.progress_start"]="[{0}/{1}] {2}：{3}…"
+    # {0}=module {1}=past-verb {2}=duration-seconds
+    ["en.progress_done"]="  ✔ {0} {1} ({2}s)"
+    ["zh-TW.progress_done"]="  ✔ {0} {1}（{2} 秒）"
+    # Failure dump: human header above the captured tail. {0}=module
+    ["en.fail_tail_header"]="  ── last ~20 lines of {0} output ──"
+    ["zh-TW.fail_tail_header"]="  ── {0} 輸出的最後約 20 行 ──"
+    # Session-end "Action required" block header.
+    ["en.action_required_header"]="── Action required ─────────────────────"
+    ["zh-TW.action_required_header"]="── 需要採取的動作 ─────────────────────"
+)
+# kcov-exclude-end
+# RUNNER_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
+# bareword argument — static analysis cannot follow that indirection, so make
+# the read explicit here to keep shellcheck honest (no disable directive).
+: "${RUNNER_I18N[@]+x}"
+
 # ── Internal: env snapshot helpers for session_start (PRD §10.2) ────────────
 
 _runner_snapshot_os() {
@@ -54,26 +110,22 @@ _runner_snapshot_gpu() {
 
 # ── Internal: progress rendering helpers (PRD §7.7.1) ───────────────────────
 
-# English verb forms for the human-readable progress lines.
+# Localized verb forms for the human-readable progress lines (issue #185).
+# Known phases resolve via RUNNER_I18N; unknown phases keep the programmatic
+# English fallback (no table entry to localize).
 _runner_phase_gerund() {
     case "${1}" in
-        install) printf 'installing' ;;
-        remove)  printf 'removing'   ;;
-        purge)   printf 'purging'    ;;
-        upgrade) printf 'upgrading'  ;;
-        verify)  printf 'verifying'  ;;
-        *)       printf '%sing' "${1}" ;;
+        install|remove|purge|upgrade|verify)
+            i18n_t RUNNER_I18N "gerund.${1}" ;;
+        *)  printf '%sing' "${1}" ;;
     esac
 }
 
 _runner_phase_past() {
     case "${1}" in
-        install) printf 'installed' ;;
-        remove)  printf 'removed'   ;;
-        purge)   printf 'purged'    ;;
-        upgrade) printf 'upgraded'  ;;
-        verify)  printf 'verified'  ;;
-        *)       printf '%sed' "${1}" ;;
+        install|remove|purge|upgrade|verify)
+            i18n_t RUNNER_I18N "past.${1}" ;;
+        *)  printf '%sed' "${1}" ;;
     esac
 }
 
@@ -196,7 +248,8 @@ _runner_run_phase() {
 
     if [[ "${_rc}" -eq 0 ]]; then
         log_event info "${_name}" "${_phase}_done" "duration_s=${_duration}"
-        _runner_progress "  ✔ ${_name} $(_runner_phase_past "${_phase}") (${_duration}s)"
+        _runner_progress "$(i18n_t RUNNER_I18N progress_done \
+            "${_name}" "$(_runner_phase_past "${_phase}")" "${_duration}")"
         # Mirror successful lifecycle to state.json (unless dry-run).
         # Manual flag: true if the user named this module explicitly via
         # the CLI; false if it landed here as a transitive dep. dispatcher
@@ -243,7 +296,7 @@ _runner_run_phase() {
         # child output + trace_id + log path. Error-class output — printed
         # to stderr and NOT silenced by --quiet.
         if [[ -s "${_cmd_log}" ]]; then
-            printf '  ── last ~20 lines of %s output ──\n' "${_name}" >&2
+            printf '%s\n' "$(i18n_t RUNNER_I18N fail_tail_header "${_name}")" >&2
             tail -n 20 "${_cmd_log}" >&2
         fi
         printf '  trace_id=%s\n' "${INIT_UBUNTU_TRACE_ID:-unknown}" >&2
@@ -283,7 +336,7 @@ _runner_render_action_required() {
         [[ "${_line}" =~ ${_re_kind} ]] && _kind="${BASH_REMATCH[1]}"
         [[ "${_line}" =~ ${_re_msg} ]]  && _msg="${BASH_REMATCH[1]}"
         if [[ "${_header_done}" == "false" ]]; then
-            printf '\n── Action required ─────────────────────\n'
+            printf '\n%s\n' "$(i18n_t RUNNER_I18N action_required_header)"
             _header_done="true"
         fi
         case "${_kind}" in
@@ -337,7 +390,8 @@ _runner_run_batch() {
     local _idx=0 _total="${#_modules[@]}"
     for _name in "${_modules[@]}"; do
         _idx=$(( _idx + 1 ))
-        _runner_progress "[${_idx}/${_total}] ${_name}: $(_runner_phase_gerund "${_phase}")..."
+        _runner_progress "$(i18n_t RUNNER_I18N progress_start \
+            "${_idx}" "${_total}" "${_name}" "$(_runner_phase_gerund "${_phase}")")"
         if _runner_run_phase "${_phase}" "${_name}"; then
             _ok=$(( _ok + 1 ))
             _RUNNER_SESSION_OK["${_name}"]=1

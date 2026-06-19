@@ -270,3 +270,12 @@ EOF
     assert_failure 7
     assert_output --partial "scp download failed"
 }
+
+# ── i18n: zh-TW rendering (issue #185, Phase 2) ──────────────────────────────
+
+@test "sync_push needs <user@host> renders zh-TW under INIT_UBUNTU_LANG=zh-TW" {
+    _load_sync
+    INIT_UBUNTU_LANG=zh-TW run sync_push
+    assert_failure 2
+    assert_output --partial "sync_push 需要 <user@host>"
+}

@@ -705,6 +705,44 @@ EOF
     assert_output "Ubuntu 24.04 / tty"
 }
 
+# ── i18n (#185): backend's OWN labels localize under INIT_UBUNTU_LANG=zh-TW ──
+# tui_backend.sh sources lib/i18n.sh itself, so i18n_t + TUI_BACKEND_I18N are
+# available here. Pass-through caller text (module descriptions, ADR-0019
+# payload fields) stays as-is — only the lib's own authored labels translate.
+
+@test "i18n: main-menu rows render English by default (en byte-identical)" {
+    INIT_UBUNTU_LANG=en run tui_main_menu_entries "${FIXTURE_LIST_JSON}"
+    assert_success
+    assert_line --partial "Quick Setup"
+    assert_line --partial "Base Tools"
+    assert_line --partial "Manage Installed"
+}
+
+@test "i18n: main-menu rows render zh-TW under INIT_UBUNTU_LANG=zh-TW (#185)" {
+    INIT_UBUNTU_LANG=zh-TW run tui_main_menu_entries "${FIXTURE_LIST_JSON}"
+    assert_success
+    assert_line --partial "快速安裝"        # Quick Setup
+    assert_line --partial "基礎工具"        # Base Tools
+    assert_line --partial "管理已安裝項目"  # Manage Installed
+    # The recommended count interpolation survives translation.
+    assert_line --partial "推薦 (1/2)"
+}
+
+@test "i18n: platform choices localize the label but keep the tag (#185)" {
+    INIT_UBUNTU_LANG=zh-TW run tui_platform_choices
+    assert_success
+    # tag column is a stable machine value; only the label translates.
+    assert_line --partial "$(printf 'desktop\t桌機 / 筆電')"
+    assert_line --partial "$(printf 'server\t無頭伺服器')"
+}
+
+@test "i18n: destructive confirm body translates the authored chrome (#185)" {
+    INIT_UBUNTU_LANG=zh-TW run tui_manage_confirm_text purge neovim $'neovim'
+    assert_success
+    assert_output --partial "即將對 'neovim' 執行 PURGE"
+    assert_output --partial "清除也會刪除該模組的設定檔"
+}
+
 # ── G4 structural gate: TUI never sources engine libs / writes state ─────────
 
 @test "G4 gate: setup_ubuntu_tui.sh sources no engine lib" {

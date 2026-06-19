@@ -52,6 +52,32 @@ readonly SECRETS_PBKDF2_ITER=300000
 
 readonly SECRETS_PASS_PREFIX="init_ubuntu"
 
+# i18n_t (issue #185) lives in lib/i18n.sh. setup_secrets.sh sources it before
+# this lib, but make the lib self-sufficient (unit specs source secrets.sh
+# directly) by loading it on demand when the helper is not yet defined.
+if ! declare -F i18n_t >/dev/null 2>&1; then
+    # shellcheck source=lib/i18n.sh
+    source "${BASH_SOURCE[0]%/*}/i18n.sh"
+fi
+
+# ── i18n: user-facing interactive prompts (issue #185) ───────────────────────
+# Only the human-readable /dev/tty passphrase prompts are localized; every
+# log_* diagnostic stays English (operator-facing). i18n_t is provided by
+# lib/i18n.sh, which setup_secrets.sh sources before this lib; these prompts
+# only fire on the interactive (no passphrase-file) path.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
+declare -gA SECRETS_I18N=(
+    [en.passphrase_prompt]="Enter passphrase for the encrypted-file secrets backend: "
+    [zh-TW.passphrase_prompt]="請輸入加密檔案密鑰後端的密碼短語："
+    [en.passphrase_confirm]="Confirm passphrase: "
+    [zh-TW.passphrase_confirm]="請再次確認密碼短語："
+)
+# kcov-exclude-end
+# SECRETS_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
+# bareword argument — static analysis cannot follow that indirection, so make
+# the read explicit here to keep shellcheck honest (no disable directive).
+: "${SECRETS_I18N[@]+x}"
+
 # ── backend selection ────────────────────────────────────────────────────────
 
 _secrets_backend_pass_available() {
@@ -252,7 +278,7 @@ _secrets_passphrase_read() {
     fi
 
     local _p1="" _p2=""
-    printf 'Enter passphrase for the encrypted-file secrets backend: ' > /dev/tty
+    i18n_t SECRETS_I18N passphrase_prompt > /dev/tty
     IFS= read -rs _p1 < /dev/tty
     printf '\n' > /dev/tty
     if [[ -z "${_p1}" ]]; then
@@ -260,7 +286,7 @@ _secrets_passphrase_read() {
         return 1
     fi
     if [[ "${_mode}" == "encrypt" ]]; then
-        printf 'Confirm passphrase: ' > /dev/tty
+        i18n_t SECRETS_I18N passphrase_confirm > /dev/tty
         IFS= read -rs _p2 < /dev/tty
         printf '\n' > /dev/tty
         if [[ "${_p1}" != "${_p2}" ]]; then

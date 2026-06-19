@@ -52,6 +52,18 @@ readonly SECRETS_PBKDF2_ITER=300000
 
 readonly SECRETS_PASS_PREFIX="init_ubuntu"
 
+# ── i18n: user-facing interactive prompts (issue #185) ───────────────────────
+# Only the human-readable /dev/tty passphrase prompts are localized; every
+# log_* diagnostic stays English (operator-facing). i18n_t is provided by
+# lib/i18n.sh, which setup_secrets.sh sources before this lib; these prompts
+# only fire on the interactive (no passphrase-file) path.
+declare -gA SECRETS_I18N=(
+    [en.passphrase_prompt]="Enter passphrase for the encrypted-file secrets backend: "
+    [zh-TW.passphrase_prompt]="請輸入加密檔案密鑰後端的密碼短語："
+    [en.passphrase_confirm]="Confirm passphrase: "
+    [zh-TW.passphrase_confirm]="請再次確認密碼短語："
+)
+
 # ── backend selection ────────────────────────────────────────────────────────
 
 _secrets_backend_pass_available() {
@@ -252,7 +264,7 @@ _secrets_passphrase_read() {
     fi
 
     local _p1="" _p2=""
-    printf 'Enter passphrase for the encrypted-file secrets backend: ' > /dev/tty
+    i18n_t SECRETS_I18N passphrase_prompt > /dev/tty
     IFS= read -rs _p1 < /dev/tty
     printf '\n' > /dev/tty
     if [[ -z "${_p1}" ]]; then
@@ -260,7 +272,7 @@ _secrets_passphrase_read() {
         return 1
     fi
     if [[ "${_mode}" == "encrypt" ]]; then
-        printf 'Confirm passphrase: ' > /dev/tty
+        i18n_t SECRETS_I18N passphrase_confirm > /dev/tty
         IFS= read -rs _p2 < /dev/tty
         printf '\n' > /dev/tty
         if [[ "${_p1}" != "${_p2}" ]]; then

@@ -48,6 +48,20 @@ _load_secrets() {
     source "${LIB_DIR}/secrets.sh"
 }
 
+# Load i18n.sh alongside the lib so the localized prompt tables can be
+# rendered via i18n_t in-process (the interactive /dev/tty prompt path is
+# otherwise never reached under the passphrase-file test harness).
+_load_secrets_i18n() {
+    # shellcheck source=../../lib/logger.sh
+    source "${LIB_DIR}/logger.sh"
+    # shellcheck source=../../lib/i18n.sh
+    source "${LIB_DIR}/i18n.sh"
+    # shellcheck source=../../lib/config.sh
+    source "${LIB_DIR}/config.sh"
+    # shellcheck source=../../lib/secrets.sh
+    source "${LIB_DIR}/secrets.sh"
+}
+
 # _stub <name> [body...] — drop an executable stub on the stub PATH that
 # logs its argv to $SECRETS_STUB_LOG, then runs the optional body.
 _stub() {
@@ -658,4 +672,45 @@ _set_dbus() {
     run "${REPO_ROOT}/setup_secrets.sh" ssh-key copy alice@example.com \
         --file "${INIT_UBUNTU_TEST_SCRATCH}/sshkey"
     assert_failure 7
+}
+
+# ── i18n: localized interactive prompts (issue #185) ─────────────────────────
+
+@test "lib/secrets.sh passphrase prompt renders zh-TW under INIT_UBUNTU_LANG=zh-TW" {
+    _load_secrets_i18n
+    INIT_UBUNTU_LANG=zh-TW run i18n_t SECRETS_I18N passphrase_prompt
+    assert_success
+    assert_output "請輸入加密檔案密鑰後端的密碼短語："
+}
+
+@test "lib/secrets.sh passphrase prompt keeps the byte-identical en value by default" {
+    _load_secrets_i18n
+    INIT_UBUNTU_LANG=en run i18n_t SECRETS_I18N passphrase_prompt
+    assert_success
+    assert_output "Enter passphrase for the encrypted-file secrets backend: "
+}
+
+@test "lib/secrets.sh confirm-passphrase prompt renders zh-TW under INIT_UBUNTU_LANG=zh-TW" {
+    _load_secrets_i18n
+    INIT_UBUNTU_LANG=zh-TW run i18n_t SECRETS_I18N passphrase_confirm
+    assert_success
+    assert_output "請再次確認密碼短語："
+}
+
+@test "setup_secrets.sh token prompt table renders zh-TW with the name interpolated" {
+    # The SECRETS_ENTRY_I18N table lives in setup_secrets.sh; extract its
+    # declaration and exercise it through the real i18n_t engine.
+    source "${LIB_DIR}/i18n.sh"
+    eval "$(grep -A4 'declare -gA SECRETS_ENTRY_I18N=(' "${REPO_ROOT}/setup_secrets.sh")"
+    INIT_UBUNTU_LANG=zh-TW run i18n_t SECRETS_ENTRY_I18N token_prompt gh-token
+    assert_success
+    assert_output "請輸入權杖 gh-token 的值："
+}
+
+@test "setup_secrets.sh token prompt keeps the byte-identical en value by default" {
+    source "${LIB_DIR}/i18n.sh"
+    eval "$(grep -A4 'declare -gA SECRETS_ENTRY_I18N=(' "${REPO_ROOT}/setup_secrets.sh")"
+    INIT_UBUNTU_LANG=en run i18n_t SECRETS_ENTRY_I18N token_prompt gh-token
+    assert_success
+    assert_output "Enter value for token gh-token: "
 }

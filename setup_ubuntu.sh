@@ -68,6 +68,15 @@ source "${LIB_DIR}/sync.sh"
 source "${LIB_DIR}/registry.sh"
 # shellcheck source=lib/resolver.sh
 source "${LIB_DIR}/resolver.sh"
+# module_helper.sh defines the archetype macros (module_use_*_archetype) and
+# lifecycle helpers (module_dryrun_guard / module_skip_if_installed / the
+# github-release fetch helper). The runner sources each module in a subshell
+# that INHERITS these from this parent shell (lib/runner.sh), so they MUST be
+# loaded here — otherwise a real (non-dry-run) install of any archetype module
+# dies with `module_use_*_archetype: command not found`. (dry-run is dispatcher
+# plan-only and never reaches the runner, which is why this went unnoticed.)
+# shellcheck source=lib/module_helper.sh
+source "${LIB_DIR}/module_helper.sh"
 # shellcheck source=lib/runner.sh
 source "${LIB_DIR}/runner.sh"
 # shellcheck source=lib/dispatcher.sh

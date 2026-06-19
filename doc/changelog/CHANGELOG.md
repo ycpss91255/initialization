@@ -20,6 +20,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Fixed
+
+- **Real engine install of github-release (and config/custom) modules was
+  broken**: `setup_ubuntu.sh` never sourced `lib/module_helper.sh`, so a real
+  (non-dry-run) `setup_ubuntu install gum` (or fzf/eza/lazygit/…) died with
+  `module_use_github_release_archetype: command not found`. The runner sources
+  each module in a subshell that inherits the archetype macros / lifecycle
+  helpers from the parent, but the entrypoint never loaded them. Fixed by
+  sourcing `module_helper.sh` in `setup_ubuntu.sh`. It went unnoticed because
+  `--dry-run` is dispatcher plan-only (never reaches the runner) and the unit
+  `_load_engine` helper sourced `module_helper.sh` itself. Added an e2e
+  regression that drives the real runner path via `verify gum`
+  (`test/unit/e2e_spec.bats`).
+
 ### Added
 
 - **gum as the preferred TUI backend** (issue #171, ADR-0023): a new

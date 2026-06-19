@@ -395,3 +395,22 @@ EOF
     assert_success
     [[ "${output}" != *"[INFO]"* ]]
 }
+
+# ── Real runner path through the entrypoint (regression: module_helper) ───────
+# Everything above runs --dry-run, which the dispatcher answers with a
+# plan-only print and NEVER reaches the runner. `verify` DOES route through the
+# runner (runner_verify sources module/<m>.module.sh) and is explicitly root-
+# safe (no install/sudo, so it works in the root CI container — unlike install
+# which refuses EUID 0). So `verify gum` exercises the exact path that broke:
+# setup_ubuntu.sh -> runner -> `source gum.module.sh` -> module_use_github_
+# release_archetype (a module_helper macro). setup_ubuntu.sh once forgot to
+# `source lib/module_helper.sh`, so this died with `module_use_github_release_
+# archetype: command not found` and the archetype's verify() was never defined.
+# The unit _load_engine helper sourced module_helper itself, masking it. gum
+# is uninstalled here, so verify reports not-installed — that is fine; what we
+# assert is that the module SOURCED cleanly (macro ran, verify() defined).
+@test "real engine verify of a github-release module sources module_helper (regression)" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" verify gum
+    refute_output --partial "command not found"
+    refute_output --partial "does not define verify"
+}

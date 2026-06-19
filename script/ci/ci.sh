@@ -282,6 +282,7 @@ _bats_unit() {
     kcov \
         --include-path="${REPO_ROOT}" \
         --exclude-path="$(_kcov_exclude_path)" \
+        --exclude-region='kcov-exclude-start:kcov-exclude-end' \
         "${_out}" \
         bats "$@"
     # kcov leaves absolute-path convenience symlinks (e.g. bats →
@@ -365,6 +366,7 @@ _run_coverage() {
     kcov \
         --include-path="${REPO_ROOT}" \
         --exclude-path="$(_kcov_exclude_path)" \
+        --exclude-region='kcov-exclude-start:kcov-exclude-end' \
         "${REPO_ROOT}/coverage" \
         bats "${_targets[@]}"
 

@@ -41,6 +41,7 @@ fi
 # original English so existing English-asserting specs keep passing. Only true
 # user-facing prose is here — [dispatcher] diagnostics, log_* calls, JSON /
 # machine output, and key:value table rows stay English by design.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
 declare -gA DISPATCHER_I18N=(
   ["en.usage"]="Usage: setup_ubuntu <subcommand> [args] [flags]
 
@@ -149,6 +150,7 @@ See PRD §7 for the full CLI specification."
   ["en.will_upgrade"]="Will upgrade {0} module(s): {1}"
   ["zh-TW.will_upgrade"]="即將升級 {0} 個模組:{1}"
 )
+# kcov-exclude-end
 # DISPATCHER_I18N is consumed by i18n_t via a nameref on the table NAME passed as
 # a bareword argument — static analysis cannot follow that indirection, so make
 # the read explicit here to keep shellcheck honest (no disable directive).

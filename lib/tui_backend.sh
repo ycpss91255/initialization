@@ -74,6 +74,7 @@ fi
 # NOT translated here — only this lib's own default widget labels / prompts /
 # menu captions / confirm bodies. `en.<key>` is byte-identical to the prior
 # English literal; zh-TW uses full-width punctuation. {0}{1} are i18n_t args.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
 declare -gA TUI_BACKEND_I18N=(
     # Pre-launch gum install prompt (_tui_prelaunch_backend).
     [en.prompt_install_gum]="Install gum for a nicer TUI? [Y/n] "
@@ -151,6 +152,7 @@ declare -gA TUI_BACKEND_I18N=(
     [en.confirm_remove_note]="The module's config files are retained (Purge deletes them too)."
     [zh-TW.confirm_remove_note]="該模組的設定檔會保留 (清除則會一併刪除)。"
 )
+# kcov-exclude-end
 # TUI_BACKEND_I18N is consumed by i18n_t via a nameref on the table NAME passed
 # as a bareword argument — static analysis cannot follow that indirection, so
 # make the read explicit here to keep shellcheck honest (no disable directive).

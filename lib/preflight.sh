@@ -44,6 +44,7 @@ fi
 # File-local message catalog (issue #185, Phase 2). `en.<key>` MUST stay
 # byte-identical to the previous English literal (including leading spaces /
 # trailing spaces). Only human-facing prompts/status go through i18n_t.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
 declare -gA PREFLIGHT_I18N=(
     [en.missing_deps]="[preflight] missing tool dependencies: {0}"
     [zh-TW.missing_deps]="[preflight] 缺少工具相依套件：{0}"
@@ -78,6 +79,7 @@ declare -gA PREFLIGHT_I18N=(
     [en.installed]="[preflight] installed: {0}"
     [zh-TW.installed]="[preflight] 已安裝：{0}"
 )
+# kcov-exclude-end
 # PREFLIGHT_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
 # bareword argument — static analysis cannot follow that indirection, so make
 # the read explicit here to keep shellcheck honest (no disable directive).

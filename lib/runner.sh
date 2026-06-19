@@ -48,6 +48,7 @@ fi
 # i18n_t (lib/i18n.sh). log_* output stays English; only stdout/stderr lines
 # a human reads are localized here. en values are byte-identical to the
 # pre-i18n literals. zh-TW uses full-width punctuation.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
 declare -gA RUNNER_I18N=(
     # Phase verb forms (gerund / past) used inside progress lines.
     ["en.gerund.install"]="installing"
@@ -84,6 +85,7 @@ declare -gA RUNNER_I18N=(
     ["en.action_required_header"]="── Action required ─────────────────────"
     ["zh-TW.action_required_header"]="── 需要採取的動作 ─────────────────────"
 )
+# kcov-exclude-end
 # RUNNER_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
 # bareword argument — static analysis cannot follow that indirection, so make
 # the read explicit here to keep shellcheck honest (no disable directive).

@@ -700,6 +700,7 @@ _set_dbus() {
 @test "setup_secrets.sh token prompt table renders zh-TW with the name interpolated" {
     # The SECRETS_ENTRY_I18N table lives in setup_secrets.sh; extract its
     # declaration and exercise it through the real i18n_t engine.
+    # shellcheck source=../../lib/i18n.sh
     source "${LIB_DIR}/i18n.sh"
     eval "$(grep -A4 'declare -gA SECRETS_ENTRY_I18N=(' "${REPO_ROOT}/setup_secrets.sh")"
     INIT_UBUNTU_LANG=zh-TW run i18n_t SECRETS_ENTRY_I18N token_prompt gh-token
@@ -708,6 +709,7 @@ _set_dbus() {
 }
 
 @test "setup_secrets.sh token prompt keeps the byte-identical en value by default" {
+    # shellcheck source=../../lib/i18n.sh
     source "${LIB_DIR}/i18n.sh"
     eval "$(grep -A4 'declare -gA SECRETS_ENTRY_I18N=(' "${REPO_ROOT}/setup_secrets.sh")"
     INIT_UBUNTU_LANG=en run i18n_t SECRETS_ENTRY_I18N token_prompt gh-token

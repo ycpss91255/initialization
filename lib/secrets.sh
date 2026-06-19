@@ -65,12 +65,14 @@ fi
 # log_* diagnostic stays English (operator-facing). i18n_t is provided by
 # lib/i18n.sh, which setup_secrets.sh sources before this lib; these prompts
 # only fire on the interactive (no passphrase-file) path.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
 declare -gA SECRETS_I18N=(
     [en.passphrase_prompt]="Enter passphrase for the encrypted-file secrets backend: "
     [zh-TW.passphrase_prompt]="請輸入加密檔案密鑰後端的密碼短語："
     [en.passphrase_confirm]="Confirm passphrase: "
     [zh-TW.passphrase_confirm]="請再次確認密碼短語："
 )
+# kcov-exclude-end
 # SECRETS_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
 # bareword argument — static analysis cannot follow that indirection, so make
 # the read explicit here to keep shellcheck honest (no disable directive).

@@ -44,6 +44,7 @@ fi
 # File-local message catalog (issue #185, Phase 2). `en.<key>` MUST stay
 # byte-identical to the previous English literal. log_* lines stay English
 # (machine-grep'd); only human-facing stdout/stderr status goes through i18n_t.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
 declare -gA SYNC_I18N=(
     [en.ssh_not_found]="[sync] ERROR: ssh not found. Install openssh-client."
     [zh-TW.ssh_not_found]="[sync] 錯誤：找不到 ssh，請安裝 openssh-client。"
@@ -114,6 +115,7 @@ declare -gA SYNC_I18N=(
     [en.scp_download_failed]="[sync] ERROR: scp download failed"
     [zh-TW.scp_download_failed]="[sync] 錯誤：scp 下載失敗"
 )
+# kcov-exclude-end
 # SYNC_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
 # bareword argument — static analysis cannot follow that indirection, so make
 # the read explicit here to keep shellcheck honest (no disable directive).

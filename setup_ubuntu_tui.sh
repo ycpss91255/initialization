@@ -49,6 +49,7 @@ i18n_resolve_init_ubuntu_lang
 # Module descriptions / detect output / plan bullets are CLI pass-through and
 # are NOT translated. `en.<key>` is byte-identical to the prior literal; zh-TW
 # uses full-width punctuation. {0}{1} are i18n_t positional args.
+# kcov-exclude-start (i18n data table; excluded from coverage — kcov counts each entry line as uncoverable, issue #185)
 declare -gA TUI_I18N=(
     # System Info screen (_tui_screen_system_info).
     [en.title_system_info]="System Info"
@@ -178,6 +179,7 @@ declare -gA TUI_I18N=(
     [en.main_system]="System: {0}"
     [zh-TW.main_system]="系統:{0}"
 )
+# kcov-exclude-end
 # TUI_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
 # bareword argument — static analysis cannot follow that indirection, so make
 # the read explicit here to keep shellcheck honest (no disable directive).

@@ -19,6 +19,7 @@ SUPPORTED_UBUNTU=()
 SUPPORTED_PLATFORMS=()
 DEPENDS_ON=()
 CONFLICTS_WITH=()
+declare -A DESCRIPTION=( [en]="A no-op test module" [zh-TW]="空操作測試模組" )
 
 install() { return 0; }
 remove()  { return 0; }
@@ -104,6 +105,20 @@ _load_engine() {
     assert_output --partial "noop"
     assert_output --partial "category:"
     assert_output --partial "optional"
+}
+
+@test "dispatcher_dispatch show <module> prints the localized description (#183)" {
+    _load_engine
+    run dispatcher_dispatch show noop
+    assert_success
+    assert_output --partial "description: A no-op test module"
+}
+
+@test "dispatcher_dispatch show honors INIT_UBUNTU_LANG for the description (#183)" {
+    _load_engine
+    INIT_UBUNTU_LANG=zh-TW run dispatcher_dispatch show noop
+    assert_success
+    assert_output --partial "description: 空操作測試模組"
 }
 
 @test "dispatcher_dispatch show unknown returns exit 2" {
@@ -817,11 +832,24 @@ EOF
 
 @test "list --json emits null description/recommended when module lacks them" {
     _load_engine
+    # A bare module defining neither DESCRIPTION nor is_recommended: both null.
+    cat > "${FAKE_MODULE_DIR}/bare.module.sh" <<'EOF'
+NAME="bare"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
     run dispatcher_dispatch list --json
     assert_success
-    # noop fixture defines neither DESCRIPTION nor is_recommended: both null.
-    echo "${output}" | jq -e '.items[] | select(.name == "noop") | .description == null' > /dev/null
-    echo "${output}" | jq -e '.items[] | select(.name == "noop") | .recommended == null' > /dev/null
+    echo "${output}" | jq -e '.items[] | select(.name == "bare") | .description == null' > /dev/null
+    echo "${output}" | jq -e '.items[] | select(.name == "bare") | .recommended == null' > /dev/null
 }
 
 @test "list --json marks a defined-but-false is_recommended as false (not null)" {

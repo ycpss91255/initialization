@@ -22,6 +22,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **gum TUI over-truncated module descriptions; `show` omitted the description**
+  (issue #183): the #168 whiptail clip budget (sized for whiptail's 72-col
+  modal box) was applied in the SHARED checklist entries producers
+  (`tui_checklist_entries` / `_tui_qs_entries` in `lib/tui_backend.sh`), so the
+  gum backend — which manages its own width — received pre-clipped items and
+  showed `…` unnecessarily on a full terminal. Moved the clip out of the
+  producers into the whiptail adapter only (`_tui_checklist_whiptail` via the
+  new `_tui_clip_checklist_args` / `_tui_clip_budget` helpers): whiptail still
+  clips to its box (no #168 regression), gum now renders the full
+  `[tag] description`. Separately, `setup_ubuntu show <module>`
+  (`_dispatcher_show`) printed name/file/category/tags/deps/conflicts/ubuntu/
+  platforms but never the description; it now prints a localized `description:`
+  line (honors `INIT_UBUNTU_LANG` via the same module-i18n probe `list --json`
+  uses, fully offline).
+
 - **Real engine install of github-release (and config/custom) modules was
   broken**: `setup_ubuntu.sh` never sourced `lib/module_helper.sh`, so a real
   (non-dry-run) `setup_ubuntu install gum` (or fzf/eza/lazygit/…) died with

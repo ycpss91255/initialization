@@ -330,28 +330,62 @@ FIXTURE_LIST_JSON_LONG_DESC="$(jq '.items += [{
     [ "${#output}" -eq 5 ]
 }
 
-@test "tui_checklist_entries clips every item to the TUI_WIDTH budget (#168)" {
+@test "tui_checklist_entries emits the FULL description, unclipped (#183)" {
+    # #183: the producer no longer clips — the #168 budget moved into the
+    # whiptail adapter. gum reads this output directly and renders full text,
+    # so the producer MUST emit the whole "[tag] description" and no ellipsis.
     TUI_WIDTH=72 run tui_checklist_entries "${FIXTURE_LIST_JSON_LONG_DESC}" optional ""
     assert_success
-    # longest visible name in this page is "claude-code" (11) → budget is
-    # 72 - 11 - 8 = 53. No produced item (field 2) may exceed it.
-    local _budget=53
-    while IFS=$'\t' read -r _name _item _status; do
-        [ -n "${_item}" ] || continue
-        [ "${#_item}" -le "${_budget}" ] || {
-            printf 'item over budget (%d > %d): %s\n' "${#_item}" "${_budget}" "${_item}" >&3
-            return 1
-        }
-    done <<<"${output}"
+    assert_line --partial "[agent] Anthropic Claude Code CLI agent (official native installer, self-updating)"
+    refute_output --partial "…"
 }
 
-@test "tui_checklist_entries keeps the selectable name intact when clipping (#168)" {
-    TUI_WIDTH=72 run tui_checklist_entries "${FIXTURE_LIST_JSON_LONG_DESC}" optional ""
+@test "_tui_clip_checklist_args clips each item to the box budget, tag/status intact (#183)" {
+    # The clip now lives in the whiptail adapter via this helper. Longest tag
+    # here is "claude-code" (11) → budget 72 - 11 - 8 = 53. The helper emits
+    # one field per line (tag, item, status); the item is clipped, the tag and
+    # status pass through verbatim.
+    local _long="[agent] Anthropic Claude Code CLI agent (official native installer, self-updating)"
+    TUI_WIDTH=72 run _tui_clip_checklist_args claude-code "${_long}" off eza "[cli] ls" on
     assert_success
-    # The tag column (field 1) is never clipped — only the description display.
-    assert_line --partial "$(printf 'claude-code\t')"
-    # The clipped long item ends with the ellipsis (description was truncated).
-    assert_line --partial "…"
+    # tag + status survive verbatim.
+    assert_line --index 0 "claude-code"
+    assert_line --index 2 "off"
+    assert_line --index 3 "eza"
+    assert_line --index 5 "on"
+    # the long item is clipped to the 53-char budget with a trailing ellipsis.
+    local _clipped="${lines[1]}"
+    [ "${#_clipped}" -le 53 ]
+    assert_line --index 1 --partial "…"
+    # the short item is left untouched.
+    assert_line --index 4 "[cli] ls"
+}
+
+@test "tui_render_checklist (whiptail) clips items before they reach the binary (#168 stays fixed)" {
+    _make_mock_widget
+    local _long="[agent] Anthropic Claude Code CLI agent (official native installer, self-updating)"
+    # The whiptail-family adapter must clip — the logged argv shows the
+    # ellipsis (item truncated to the box budget) and never the full string.
+    MOCK_WIDGET_OUTPUT='' TUI_WIDTH=72 run tui_render_checklist "Optional" "Pick" \
+        claude-code "${_long}" off
+    assert_success
+    run cat "${MOCK_WIDGET_LOG}"
+    assert_output --partial "…"
+    refute_output --partial "self-updating)"
+}
+
+@test "tui_render_checklist (gum) passes the FULL item, unclipped (#183)" {
+    _make_mock_gum
+    local _long="[agent] Anthropic Claude Code CLI agent (official native installer, self-updating)"
+    # gum manages its own width: the adapter must hand gum the full item, so
+    # the logged argv contains the whole description and no adapter ellipsis.
+    MOCK_GUM_OUTPUT="${_long}"$'\n' TUI_WIDTH=72 run tui_render_checklist "Optional" "Pick" \
+        claude-code "${_long}" off
+    assert_success
+    assert_output "claude-code"
+    run cat "${MOCK_GUM_LOG}"
+    assert_output --partial "self-updating)"
+    refute_output --partial "…"
 }
 
 # ── Checkbox accumulator (#70, Q43 / §8.2) ───────────────────────────────────

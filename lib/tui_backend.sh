@@ -103,30 +103,40 @@ _tui_clip() {
     fi
 }
 
-# _tui_clip_items  (filter: stdin → stdout)
-# Reads "name<TAB>item<TAB>status" checklist rows and clips the item field
-# (field 2) to the per-page width budget while name and status pass through
-# untouched. The budget is derived from the longest name across the rows, so
-# each checklist sizes its own tag column:
+# _tui_clip_budget <tag1> <tag2> ... → per-page item width budget on stdout.
+# The budget is derived from the longest tag/name across the rows, so each
+# checklist sizes its own tag column:
 #   budget = TUI_WIDTH - longest-name - TUI_CHECKLIST_CHROME  (floored to MIN)
-# Buffers all rows because the budget needs the longest name first (checklists
-# are short — tens of rows, not a stream).
-_tui_clip_items() {
+# Pure (no globals beyond the TUI_* knobs, no I/O) — directly unit-testable.
+_tui_clip_budget() {
     local LC_ALL=C.UTF-8  # char-accurate widths for the budget math (see _tui_clip)
-    local -a _names=() _items=() _stats=()
-    local _name _item _stat _longest=0
-    while IFS=$'\t' read -r _name _item _stat; do
-        _names+=("${_name}")
-        _items+=("${_item}")
-        _stats+=("${_stat}")
+    local _name _longest=0
+    for _name in "$@"; do
         (( ${#_name} > _longest )) && _longest=${#_name}
     done
     local _budget=$(( TUI_WIDTH - _longest - TUI_CHECKLIST_CHROME ))
     (( _budget < TUI_CHECKLIST_MIN )) && _budget=${TUI_CHECKLIST_MIN}
+    printf '%s\n' "${_budget}"
+}
+
+# _tui_clip_checklist_args <tag item status ...> → the same triples on stdout
+# (one field per line) with each ITEM field (the rendered "[tag] description")
+# clipped to the whiptail box budget; tag and status pass through untouched.
+# This is the #168 clip — it lives in the WHIPTAIL adapter only (#183): the
+# shared entries producers now emit FULL descriptions so the gum backend, which
+# manages its own width, renders them unclipped. The budget needs the longest
+# tag first, so we buffer all triples (checklists are short — tens of rows).
+_tui_clip_checklist_args() {
+    local -a _tags=() _items=() _stats=()
+    while (( $# >= 3 )); do
+        _tags+=("$1"); _items+=("$2"); _stats+=("$3"); shift 3
+    done
+    local _budget
+    _budget="$(_tui_clip_budget "${_tags[@]}")"
     local _i
-    for _i in "${!_names[@]}"; do
-        printf '%s\t%s\t%s\n' \
-            "${_names[_i]}" "$(_tui_clip "${_items[_i]}" "${_budget}")" "${_stats[_i]}"
+    for _i in "${!_tags[@]}"; do
+        printf '%s\n%s\n%s\n' \
+            "${_tags[_i]}" "$(_tui_clip "${_items[_i]}" "${_budget}")" "${_stats[_i]}"
     done
 }
 
@@ -350,6 +360,8 @@ tui_modules_in_category() {
 # up only under its first tag), groups and names alphabetical. Dep chains
 # stay collapsed: a "(will pull N deps)" hint per §8.2 / arch Q-A3, never
 # the expanded chain (the Review screen owns the expandable detail).
+# The label is emitted FULL (#183): clipping to the whiptail box budget happens
+# inside the whiptail adapter (_tui_checklist_whiptail), so gum shows full text.
 tui_checklist_entries() {
     local _json="$1" _cat="$2" _selected=" ${3:-} "
     jq -r --arg c "$2" --arg sel "${_selected}" '
@@ -362,7 +374,7 @@ tui_checklist_entries() {
           + (if $ndeps > 0 then " (will pull \($ndeps) deps)" else "" end)
           + "\t"
           + (if ($sel | contains(" " + $n + " ")) then "on" else "off" end)
-    ' <<<"$1" | _tui_clip_items
+    ' <<<"$1"
 }
 
 # ── In-memory selection accumulator (Q43) ────────────────────────────────────
@@ -452,6 +464,7 @@ tui_effective_form_factor() {
 # exclude), enabled=true → "on" (force include), unset → recommended
 # decides the precheck. Absent fields read as null (ADR-0019: additive
 # fields are optional), which lands on "off" — never a silent install.
+# Descriptions are emitted FULL (#183): the whiptail adapter clips, gum doesn't.
 #   _tui_qs_entries <list_json> category <category> <form>
 #   _tui_qs_entries <list_json> tag <tag> <form>
 _tui_qs_entries() {
@@ -466,7 +479,7 @@ _tui_qs_entries() {
         | .[]
         | "\(.name)\t\(.description)\t"
           + (if .enabled == true or .recommended == true then "on" else "off" end)
-    ' <<<"$1" | _tui_clip_items
+    ' <<<"$1"
 }
 
 # §8.2.1 Step 2: recommended-category modules surviving the filter pipeline.
@@ -696,10 +709,15 @@ _tui_checklist_whiptail() {
     if [[ -n "${TUI_CANCEL_LABEL:-}" ]]; then
         mapfile -t _cancel < <(_tui_cancel_button_args "${TUI_CANCEL_LABEL}")
     fi
+    # #183: the clip lives HERE (whiptail-only). The shared entries producers
+    # emit full descriptions; whiptail's 72-col modal box can't wrap, so each
+    # item is clipped to the per-page budget before it reaches the binary.
+    local -a _rows=()
+    mapfile -t _rows < <(_tui_clip_checklist_args "$@")
     "${TUI_BACKEND:?TUI_BACKEND not set}" --title "${_title}" "${_cancel[@]}" \
         --separate-output \
         --checklist "${_text}" "${TUI_HEIGHT}" "${TUI_WIDTH}" "${TUI_MENU_HEIGHT}" \
-        "$@" 3>&1 1>&2 2>&3
+        "${_rows[@]}" 3>&1 1>&2 2>&3
 }
 
 _tui_msgbox_whiptail() {

@@ -446,7 +446,7 @@ _run_coverage_merge() {
     command -v kcov >/dev/null 2>&1 \
         || _die "kcov not found in container — merge runs in the kcov image (just -f justfile.ci coverage-merge)"
     _info "Merging ${#_shards[@]} coverage shard(s) into coverage/merged"
-    kcov --merge "${REPO_ROOT}/coverage/merged" "${_shards[@]}"
+    kcov --merge --exclude-region='kcov-exclude-start:kcov-exclude-end' "${REPO_ROOT}/coverage/merged" "${_shards[@]}"
     # chown BEFORE the gate assert: a failed gate is an expected outcome
     # and must not leave root-owned files behind on the host.
     _fix_permissions

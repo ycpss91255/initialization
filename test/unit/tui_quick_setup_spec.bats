@@ -28,6 +28,9 @@ source "${LIB_DIR}/tui_backend.sh"
 
 setup() {
     setup_test_env
+    # Clip helper (#168) counts characters; pin UTF-8 so the budget assertion
+    # matches under CI's C/POSIX kcov image (see tui_backend_spec.bats).
+    export LC_ALL=C.UTF-8
 }
 
 teardown() {

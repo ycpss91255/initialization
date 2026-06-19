@@ -91,6 +91,11 @@ TUI_CATEGORY_ORDER='["base","recommended","optional","experimental"]'
 # Pure (no globals, no I/O) so it is directly unit-testable.
 _tui_clip() {
     local _s="$1" _max="$2"
+    # UTF-8 locale so ${#_s} counts characters (not bytes) and ${_s:0:n}
+    # slices on character boundaries — module descriptions carry zh-TW
+    # (multibyte), and CI's kcov image runs under C/POSIX where byte-vs-char
+    # would mis-truncate. C.UTF-8 is always present on Debian/Ubuntu.
+    local LC_ALL=C.UTF-8
     if (( ${#_s} > _max )); then
         printf '%s…\n' "${_s:0:_max-1}"
     else
@@ -107,6 +112,7 @@ _tui_clip() {
 # Buffers all rows because the budget needs the longest name first (checklists
 # are short — tens of rows, not a stream).
 _tui_clip_items() {
+    local LC_ALL=C.UTF-8  # char-accurate widths for the budget math (see _tui_clip)
     local -a _names=() _items=() _stats=()
     local _name _item _stat _longest=0
     while IFS=$'\t' read -r _name _item _stat; do

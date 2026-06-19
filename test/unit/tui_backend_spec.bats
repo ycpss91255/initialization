@@ -40,6 +40,10 @@ _tui_has_sudo() {
 
 setup() {
     setup_test_env
+    # The clip helpers (#168) count characters; pin a UTF-8 locale so the
+    # test's own ${#output} / ${#_item} match the lib (CI's kcov image is
+    # C/POSIX, where they would count bytes and the multibyte "…" skews length).
+    export LC_ALL=C.UTF-8
     MOCK_AVAILABLE_CMDS=""
     MOCK_HAS_SUDO="true"
     unset TUI_BACKEND 2>/dev/null || true

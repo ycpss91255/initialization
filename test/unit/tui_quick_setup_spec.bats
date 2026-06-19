@@ -347,8 +347,13 @@ EOF
 }
 
 _run_qs_e2e() {
+    # TUI_BACKEND pinned to the scripted `dialog` mock so the run bypasses
+    # #171 detection / the gum install prompt (dialog is no longer a detected
+    # backend; the dispatcher routes a dialog-named binary through the
+    # whiptail family, whose --menu/--checklist shape the mock emulates).
     run env "PATH=${E2E_BIN}:${PATH}" "HOME=${E2E_HOME}" \
         "TUI_CLI=${E2E_BIN}/setup_ubuntu" \
+        "TUI_BACKEND=${E2E_BIN}/dialog" \
         "${REPO_ROOT}/setup_ubuntu_tui.sh"
 }
 

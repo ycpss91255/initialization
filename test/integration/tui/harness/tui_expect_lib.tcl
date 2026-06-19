@@ -25,7 +25,7 @@ proc tui_die {msg} {
     exit 99
 }
 
-proc tui_spawn {} {
+proc tui_spawn {args} {
     # `spawn` inside a proc writes a proc-LOCAL spawn_id unless it is
     # declared global — without this, every later `expect` silently reads
     # stdin instead of the pty (EOF/timeout with an empty buffer).
@@ -33,12 +33,15 @@ proc tui_spawn {} {
     foreach v {TUI_ENTRY TUI_FARM TUI_HOME TUI_CLI_MOCK} {
         if {![info exists env($v)]} { tui_die "$v not set" }
     }
+    # Optional extra argv (e.g. `--backend gum`) is appended to the TUI call
+    # so a gum smoke can force the backend deterministically (#171), skipping
+    # detection / the install prompt.
     # LINES/COLUMNS pin the ncurses/slang screen size deterministically
     # (CI has no real tty); TERM=xterm matches the terminfo baked into the
     # test-tools image (dockerfile comment: ncurses-terminfo).
-    spawn env PATH=$env(TUI_FARM) HOME=$env(TUI_HOME) TERM=xterm \
+    eval spawn env PATH=$env(TUI_FARM) HOME=$env(TUI_HOME) TERM=xterm \
         LINES=24 COLUMNS=80 TUI_CLI=$env(TUI_CLI_MOCK) \
-        bash $env(TUI_ENTRY)
+        bash $env(TUI_ENTRY) $args
     # Also size the pty itself — ncurses prefers the winsize ioctl when
     # it is non-zero. Non-fatal: LINES/COLUMNS above still pin the size.
     catch {stty rows 24 columns 80 < $spawn_out(slave,name)}

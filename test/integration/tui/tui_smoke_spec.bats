@@ -1,9 +1,10 @@
 #!/usr/bin/env bats
 # test/integration/tui/tui_smoke_spec.bats — AC-10 layer 2: live-widget smoke
 #
-# PRD §11.1 AC-10 (issue #73, layer 2 of 2): inside the test-tools
-# container, drive the REAL dialog and whiptail binaries on an expect
-# pseudo-tty through the literal AC-10 flow:
+# PRD §11.1 AC-10 (issue #73, layer 2 of 2; #171: gum + whiptail, dialog
+# dropped): inside the test-tools container, drive the REAL whiptail (and
+# gum, when present) binaries on an expect pseudo-tty through the literal
+# AC-10 flow:
 #   open main menu → enter Optional → check one item → OK → Exit
 # once per backend. Assertions:
 #   - every screen renders (text expected from the live widget output)
@@ -63,6 +64,15 @@ _run_smoke() {
         expect "${BATS_TEST_DIRNAME}/harness/smoke_flow.exp" "$1"
 }
 
+# gum drives a different *.exp flow (Space/Enter checklist, Esc = Exit) and
+# is forced via `--backend gum` (set inside smoke_flow_gum.exp's tui_spawn).
+_run_smoke_gum() {
+    run env "TUI_ENTRY=${REPO_ROOT}/setup_ubuntu_tui.sh" \
+        "TUI_FARM=${SMOKE_BIN}" "TUI_HOME=${SMOKE_HOME}" \
+        "TUI_CLI_MOCK=${SMOKE_BIN}/setup_ubuntu" \
+        expect "${BATS_TEST_DIRNAME}/harness/smoke_flow_gum.exp"
+}
+
 # Shared post-flow assertions (the in-flow screen assertions live in
 # smoke_flow.exp and fail with rc 99 + a TUI-HARNESS FAIL diagnostic).
 _assert_smoke_green() {
@@ -81,14 +91,23 @@ _assert_smoke_green() {
     assert_failure
 }
 
-@test "AC-10 smoke (dialog): main menu → Optional → check one → OK → Exit" {
-    _make_smoke_env dialog
-    _run_smoke dialog
-    _assert_smoke_green
-}
-
+# #171: dialog dropped from the backend set — the live smoke now covers
+# whiptail (always-present fallback, forced via --backend) and gum (preferred,
+# forced + skipped when absent from the image).
 @test "AC-10 smoke (whiptail): main menu → Optional → check one → OK → Exit" {
     _make_smoke_env whiptail
     _run_smoke whiptail
+    _assert_smoke_green
+}
+
+# #171: same literal AC-10 flow on the LIVE gum binary (the preferred
+# backend). Requires gum in the test-tools image (Slice B) — skip cleanly
+# when it is absent so single-backend images still pass.
+@test "AC-10 smoke (gum): main menu → Optional → check one → OK → Exit" {
+    if ! command -v gum >/dev/null 2>&1; then
+        skip "gum not in the test-tools image (Slice B) — gum live smoke deferred"
+    fi
+    _make_smoke_env gum
+    _run_smoke_gum
     _assert_smoke_green
 }

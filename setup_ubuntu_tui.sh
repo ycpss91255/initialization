@@ -58,16 +58,20 @@ _tui_usage() {
     cat <<'EOF'
 Usage: setup_ubuntu_tui.sh [flags]
 
-Interactive TUI frontend for setup_ubuntu. Renders menus with dialog
-(preferred) or whiptail (Ubuntu default) and forks `setup_ubuntu`
-subprocesses for all data and actions.
+Interactive TUI frontend for setup_ubuntu. Renders menus with gum
+(preferred, modern) or whiptail (Ubuntu default fallback) and forks
+`setup_ubuntu` subprocesses for all data and actions.
 
 Flags:
   -h / --help            Show this help
   --version              Show tool version
+  --backend gum|whiptail Force the rendering backend (skips detection and
+                         the install prompt). Invalid value → exit 2.
 
 Requirements:
-  - `dialog` or `whiptail` on PATH (no auto-install; see PRD §8.5)
+  - `gum` or `whiptail` on PATH. gum absent + interactive → you are offered
+    `setup_ubuntu install gum`; otherwise whiptail (no auto-install — the
+    TUI forks the CLI; see PRD §8.5).
   - sudo available (otherwise exit 4 — use the CLI instead:
     `setup_ubuntu install <module>`)
 
@@ -548,9 +552,12 @@ _tui_main_loop() {
 # ── Entry ────────────────────────────────────────────────────────────────────
 
 main() {
-    local _arg
-    for _arg in "$@"; do
-        case "${_arg}" in
+    # --backend is parsed BEFORE detection (#171): a valid value forces
+    # TUI_BACKEND and skips BOTH detection and the gum install prompt; an
+    # invalid value is a usage error (exit 2).
+    local _forced_backend=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
             -h | --help)
                 _tui_usage
                 return 0
@@ -559,8 +566,36 @@ main() {
                 printf 'init_ubuntu %s\n' "${INIT_UBUNTU_VERSION}"
                 return 0
                 ;;
+            --backend)
+                case "${2:-}" in
+                    gum | whiptail)
+                        _forced_backend="$2"
+                        shift 2
+                        ;;
+                    *)
+                        printf 'ERROR: --backend requires gum|whiptail (got %s)\n\n' \
+                            "${2:-<missing>}" >&2
+                        _tui_usage >&2
+                        return 2
+                        ;;
+                esac
+                ;;
+            --backend=*)
+                case "${1#--backend=}" in
+                    gum | whiptail)
+                        _forced_backend="${1#--backend=}"
+                        shift
+                        ;;
+                    *)
+                        printf 'ERROR: --backend requires gum|whiptail (got %s)\n\n' \
+                            "${1#--backend=}" >&2
+                        _tui_usage >&2
+                        return 2
+                        ;;
+                esac
+                ;;
             *)
-                printf 'ERROR: unknown flag %s\n\n' "${_arg}" >&2
+                printf 'ERROR: unknown flag %s\n\n' "$1" >&2
                 _tui_usage >&2
                 return 2
                 ;;
@@ -568,7 +603,18 @@ main() {
     done
 
     tui_require_sudo || return $?
-    tui_backend_init || return $?
+
+    # Backend resolution (#171). Precedence:
+    #   1. --backend flag      → force + skip detection AND the install prompt
+    #   2. pre-set TUI_BACKEND  → honor the env override (CI / harness lever)
+    #   3. otherwise            → pre-launch flow (gum present, interactive
+    #                             gum-install offer, or whiptail fallback)
+    if [[ -n "${_forced_backend}" ]]; then
+        TUI_BACKEND="${_forced_backend}"
+    elif [[ -z "${TUI_BACKEND:-}" ]]; then
+        TUI_BACKEND="$(_tui_prelaunch_backend)" || return $?
+    fi
+    export TUI_BACKEND
 
     # The TUI parses ADR-0019 JSON with jq. jq is a CLI self-dep
     # (lib/preflight.sh installs it on the first `setup_ubuntu` run), so

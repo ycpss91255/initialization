@@ -138,7 +138,7 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 - `--dry-run` 對所有破壞性操作
 
 **TUI**
-- `setup_ubuntu_tui` 多層選單(`dialog` / `whiptail` 雙後端)
+- `setup_ubuntu_tui` 多層選單(`gum`(優先)/ `whiptail`(fallback)雙後端,ADR-0023;`dialog` 已移除)
 - 主選單含 Manage Installed / Manage Secrets 入口
 - 子選單按 `TAGS[0]` 分組(cli-essentials / agent / editor / filemgr / logs / hardware / remote);主選單分類項只顯示**非空** CATEGORY(Q44 — experimental 目前為空故不顯示)
 - 安裝完成後仍能用 CLI / TUI 管理(見 §17)
@@ -546,7 +546,7 @@ stdout 只印 per-module 進度標頭 + `exec_cmd`(`lib/general.sh`,語法高亮
 
 > Module 在 TUI 內按 `TAGS[0]` 自動分組;每個 module 只在第一個 tag 群組顯示,避免重複勾選混淆。
 >
-> **Dep 鏈顯示**(arch §18.2 Q-A3,2026-06-06 定稿):勾選 module 時 dep 鏈預設**折疊**,僅顯示「will pull N deps」一行提示;可展開明細。dialog / whiptail 雙後端行為一致。
+> **Dep 鏈顯示**(arch §18.2 Q-A3,2026-06-06 定稿):勾選 module 時 dep 鏈預設**折疊**,僅顯示「will pull N deps」一行提示;可展開明細。gum / whiptail 雙後端行為一致。
 
 ### 8.2.1 Quick Setup 多 step 流程
 
@@ -585,7 +585,7 @@ Review & Install  -->  顯示完整安裝清單,Proceed / Back / Cancel
 
 #### Proceed 後執行畫面(2026-06-06 定稿)
 
-Review 按 Proceed 後 **TUI 清幕退出,改以 CLI pipeline 輸出**(§7.7:exec_cmd 命令流 + 結尾 Action required 聚合)。不做 dialog `--gauge` / `--prgbox`(whiptail 僅支援 dialog 功能子集,且 AC-11 要求 CLI / TUI 安裝行為完全一致 — 共用同一條輸出 pipeline 讓 AC-11 天然成立)。
+Review 按 Proceed 後 **TUI 清幕退出,改以 CLI pipeline 輸出**(§7.7:exec_cmd 命令流 + 結尾 Action required 聚合)。不做 gauge / progress 類 widget(AC-11 要求 CLI / TUI 安裝行為完全一致 — 共用同一條輸出 pipeline 讓 AC-11 天然成立)。
 
 #### Cancel / 中斷行為
 
@@ -641,25 +641,47 @@ dep 鏈拉進來、user 沒在 TUI 勾的 module → 維持 `manual=false`(orpha
 +-----------------------------------------------------------+
 ```
 
-### 8.5 後端偵測
+### 8.5 後端偵測(ADR-0023:gum 優先,whiptail fallback,dialog 已移除)
 
-Ubuntu Server / Desktop default 已 ship `whiptail`(Priority: important),因此實務上幾乎不會 trigger fatal。若 user 在被 strip 過的 image 上跑,印明確修復路徑:
+後端集合固定為 **gum + whiptail**:兩者都能原生渲染 4 個 contract widget。
+gum(`charmbracelet/gum`)是現代化的單一靜態 Go binary(多架構:x86_64 /
+rpi4/5 / Jetson);`whiptail` 是 Ubuntu Server / Desktop default 已 ship 的
+保底 fallback(Priority: important),所以實務上幾乎不會 trigger fatal。
+
+偵測 + 啟動流程:
 
 ```bash
 # 偽碼
-if command -v dialog >/dev/null; then
-  TUI_BACKEND="dialog"
+if [[ -n "$TUI_BACKEND" ]]; then
+  : # --backend gum|whiptail 已指定 → 跳過偵測與安裝詢問(invalid → exit 2 + usage)
+elif command -v gum >/dev/null; then
+  TUI_BACKEND="gum"
+elif [[ -t 0 ]]; then
+  # gum 缺席且 interactive:純 stdin/stdout read prompt(預設 Yes,不假設任何 TUI 工具)
+  read -rp "Install gum for a nicer TUI? [Y/n] " ans
+  if [[ "$ans" != [Nn]* ]]; then
+    setup_ubuntu install gum   # fork CLI 安裝(TUI 自己不裝任何東西,G4)
+    command -v gum >/dev/null && TUI_BACKEND="gum" || TUI_BACKEND="whiptail"
+  else
+    TUI_BACKEND="whiptail"
+  fi
 elif command -v whiptail >/dev/null; then
-  TUI_BACKEND="whiptail"
+  TUI_BACKEND="whiptail"   # 非 interactive:不詢問,直接 whiptail
 else
-  log_fatal "TUI requires 'whiptail' (default Ubuntu) or 'dialog'.
+  log_fatal "TUI requires 'gum' or 'whiptail' (default Ubuntu).
              Both missing — your install is unusually stripped.
              Fix:  sudo apt install whiptail
              Or:   use CLI mode: setup_ubuntu install <module>"
 fi
 ```
 
-無 bootstrap 自動裝(避免無 user 同意的 apt 操作)。沒 sudo 環境跑 TUI 退 code 4 提示改用 CLI。
+**`--backend gum|whiptail`**:強制 `TUI_BACKEND` 並**跳過偵測與安裝詢問**
+(invalid 值 → exit 2 + usage),讓 CI/QA 在任一後端已裝的情況下強測另一個
+(`just tui --backend whiptail`,沿用既有 `tui *args` pass-through recipe)。
+
+TUI 自己**不**裝任何東西(G4):需要 gum 時 fork `setup_ubuntu install gum`,
+安裝詢問是純文字 prompt(該時點還沒有任何 TUI 工具可用)。沒 sudo 環境跑
+TUI 退 code 4 提示改用 CLI(gum 走 user-home 安裝,whiptail fallback 不需 sudo)。
 
 ---
 
@@ -977,7 +999,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | AC-7 | `setup_ubuntu purge docker` 後 `~/.docker` 與 `/etc/docker` 不存在 | v0.1-mandatory |
 | AC-8 | `setup_ubuntu detect --json` 在 NVIDIA 機器輸出 `"gpu": {"vendor": "nvidia", ...}`(ship gate 以 mock `nvidia-smi` / sysfs fixture 在 Docker 內驗證,Q52;真機驗證列 post-0.1.0 人工 checklist) | v0.1-mandatory |
 | AC-9 | 在容器內跑 `setup_ubuntu detect` 偵測到 `"form_factor": "container"` 並把 nvidia-driver 從推薦排除 | v0.1-mandatory |
-| AC-10 | TUI(dialog 與 whiptail 兩種後端)主選單可顯示、可勾選、可退出(Q43 執行模型)。驗證雙層:`tui_backend.sh` mock 下的「勾選累積 → Run → 產生的 CLI 命令字串」bats 單元測 + CI 內 expect/偽 tty 對兩後端各跑一次煙霧測(開主選單 → 進 Optional 勾一項 → OK → Exit) | v0.1-mandatory |
+| AC-10 | TUI(gum 與 whiptail 兩種後端,ADR-0023)主選單可顯示、可勾選、可退出(Q43 執行模型)。驗證雙層:`tui_backend.sh` mock 下的「勾選累積 → Run → 產生的 CLI 命令字串」bats 單元測 + CI 內 expect/偽 tty 對兩後端各跑一次煙霧測(`--backend` 強制各後端;開主選單 → 進 Optional 勾一項 → OK → Exit) | v0.1-mandatory |
 | AC-11 | CLI 與 TUI 同一個 module 安裝結果完全一致(state.json diff = 0) | v0.1-mandatory |
 | AC-12 | `--dry-run` 不對檔案系統做任何寫入(用 strace 驗證) | v0.1-mandatory |
 | AC-13 | 無 sudo 環境下,`setup_ubuntu install eza` 走 user-home 安裝(裝到 `$HOME/.local/bin/eza`)且 `eza --version` 可執行 | v0.1-mandatory |

@@ -77,6 +77,11 @@ RUN apk add --no-cache curl xz && \
 #   - newt               [init_ubuntu addition] provides `whiptail`, the
 #                        fallback TUI backend; alpine packages it under
 #                        "newt"
+#   - gum                [init_ubuntu addition] the preferred modern TUI
+#                        backend (charmbracelet/gum, issue #171); alpine
+#                        packages it in community (v3.23 ships 0.16.2). Lets
+#                        the AC-10 dual-backend live smoke drive BOTH gum and
+#                        whiptail through the §8.1 flow
 #   - expect             [init_ubuntu addition] pseudo-tty driver for the
 #                        AC-10 layer-2 TUI smoke tests (issue #73): drives
 #                        the REAL dialog/whiptail through the §8.1 flow in
@@ -103,6 +108,7 @@ RUN apk add --no-cache \
         fish \
         dialog ncurses-terminfo \
         newt \
+        gum \
         expect \
         jq curl \
         openssl \
@@ -147,6 +153,7 @@ RUN bash --version >/dev/null && \
     fish -c 'functions -q fishtape; or exit 1' && \
     (dialog --version 2>&1 | head -1 >/dev/null || true) && \
     (whiptail --version 2>&1 | head -1 >/dev/null || true) && \
+    gum --version >/dev/null && \
     expect -v >/dev/null
 
 WORKDIR /source

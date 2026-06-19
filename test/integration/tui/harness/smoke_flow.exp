@@ -1,6 +1,7 @@
 #!/usr/bin/env expect
-# smoke_flow.exp <dialog|whiptail> — AC-10 layer 2: the literal §11.1 flow
-# on a live widget under a pseudo-tty:
+# smoke_flow.exp <whiptail> — AC-10 layer 2: the literal §11.1 flow on the
+# live whiptail widget under a pseudo-tty (#171 dropped dialog; gum drives
+# its own smoke_flow_gum.exp):
 #   open main menu → enter Optional → check one item → OK → Exit
 #
 # In-flow assertions (each tui_expect_text is one): every screen renders
@@ -13,10 +14,13 @@
 
 source [file join [file dirname [file normalize [info script]]] tui_expect_lib.tcl]
 
-if {[llength $argv] != 1} { tui_die "usage: smoke_flow.exp <dialog|whiptail>" }
+if {[llength $argv] != 1} { tui_die "usage: smoke_flow.exp <whiptail>" }
 set backend [lindex $argv 0]
 
-tui_spawn
+# #171: force the backend so the run skips detection AND the gum install
+# prompt (under a pty `[[ -t 0 ]]` is true, so an unforced gum-absent run
+# would block on "Install gum? [Y/n]").
+tui_spawn --backend $backend
 
 # 1. Main menu visible (§8.1 rows + the relabeled < Exit > button).
 tui_expect_text "Quick Setup"

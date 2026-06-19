@@ -151,12 +151,20 @@ _tui_has_sudo() {
     [[ -t 0 ]]
 }
 
-# ── Backend selection (§8.5) ─────────────────────────────────────────────────
+# ── Backend selection (§8.5, #171: gum > whiptail; dialog dropped) ───────────
 
-# Print the chosen backend on stdout. Preference: dialog > whiptail.
+# Print the chosen backend on stdout. Preference: gum > whiptail (#171 —
+# dialog dropped from the set). A pre-set TUI_BACKEND (gum|whiptail) is an
+# explicit override and short-circuits probing (the --backend flag / CI lever).
 tui_backend_detect() {
-    if _tui_has_cmd dialog; then
-        printf 'dialog\n'
+    case "${TUI_BACKEND:-}" in
+        gum | whiptail)
+            printf '%s\n' "${TUI_BACKEND}"
+            return 0
+            ;;
+    esac
+    if _tui_has_cmd gum; then
+        printf 'gum\n'
         return 0
     fi
     if _tui_has_cmd whiptail; then
@@ -171,7 +179,7 @@ tui_backend_detect() {
 tui_backend_init() {
     if ! TUI_BACKEND="$(tui_backend_detect)"; then
         cat >&2 <<'EOF'
-FATAL: TUI requires 'whiptail' (default Ubuntu) or 'dialog'.
+FATAL: TUI requires 'gum' (preferred) or 'whiptail' (default Ubuntu).
        Both missing — your install is unusually stripped.
        Fix:  sudo apt install whiptail
        Or:   use CLI mode: setup_ubuntu install <module>
@@ -179,6 +187,61 @@ EOF
         return 1
     fi
     export TUI_BACKEND
+}
+
+# ── Pre-launch backend resolution (#171) ─────────────────────────────────────
+# Decide which backend to launch with, possibly offering to install gum.
+# Prints the resolved backend ("gum"|"whiptail") on stdout; the §8.5 fatal
+# guidance + rc 1 only when whiptail itself is missing (no backend at all).
+#
+# Flow:
+#   gum present                         → gum (no prompt)
+#   gum absent + interactive (-t 0)     → plain stdin read prompt (default Yes)
+#       yes → fork `setup_ubuntu install gum` (G4: the TUI installs nothing
+#             itself), re-check `command -v gum`; success → gum, else warn +
+#             whiptail
+#       no  → whiptail
+#   gum absent + non-interactive        → whiptail silently
+#
+# The prompt is plain stdin/stdout — no TUI tool is assumed at this point.
+# `_tui_stdin_is_tty` is a tiny mockable seam (same pattern as _tui_has_cmd).
+_tui_stdin_is_tty() { [[ -t 0 ]]; }
+
+_tui_prelaunch_backend() {
+    if _tui_has_cmd gum; then
+        printf 'gum\n'
+        return 0
+    fi
+    if ! _tui_has_cmd whiptail; then
+        # No backend at all → reuse the §8.5 fatal guidance.
+        tui_backend_init >/dev/null
+        return 1
+    fi
+    if ! _tui_stdin_is_tty; then
+        printf 'whiptail\n'  # non-interactive: no prompt (#171)
+        return 0
+    fi
+
+    # Interactive: plain stdin prompt, default Yes.
+    printf 'Install gum for a nicer TUI? [Y/n] ' >&2
+    local _ans=""
+    read -r _ans || _ans=""
+    case "${_ans}" in
+        [Nn] | [Nn][Oo])
+            printf 'whiptail\n'
+            return 0
+            ;;
+    esac
+
+    # Yes (default): fork the CLI to install gum (G4 — never install here).
+    # The fork's stdout is redirected to stderr so command-substitution
+    # callers capture ONLY the resolved backend name from this function.
+    if "${TUI_CLI:?TUI_CLI not set}" install gum >&2 && _tui_has_cmd gum; then
+        printf 'gum\n'
+        return 0
+    fi
+    printf 'WARN: gum install failed — falling back to whiptail.\n' >&2
+    printf 'whiptail\n'
 }
 
 # ── Sudo gate (PRD §8.5: no sudo → exit 4, suggest CLI mode) ────────────────
@@ -586,16 +649,27 @@ tui_system_summary() {
     ' <<<"$1"
 }
 
-# ── Backend rendering wrappers ───────────────────────────────────────────────
-# dialog and whiptail share the --menu/--msgbox/--yesno argument shape, so
-# one wrapper per widget keeps both backends behaviorally identical (§8.2
-# note). Selections come back on stdout via the fd-swap idiom. These are
-# exercised by the AC-10 dual-backend smoke harness, not unit bats.
+# ── Backend rendering wrappers (#171 dispatcher → _tui_<widget>_<backend>) ────
+# The 4 contract widgets (menu / checklist / msgbox / yesno) keep a stable
+# argv contract (frontend passes `tag item [status]`, reads back the TAG),
+# but each backend renders natively. tui_render_* are thin dispatchers keyed
+# on the backend FAMILY (basename of TUI_BACKEND):
+#   - gum       → _tui_<widget>_gum   (modern; gum manages its own width)
+#   - otherwise → _tui_<widget>_whiptail  (whiptail family — also covers a
+#                 dialog-named binary, same --menu/--msgbox/--yesno shape)
+# Live-widget behavior is covered by the AC-10 dual-backend smoke harness;
+# argv-level + tag/index mapping by the unit bats.
+_tui_backend_family() {
+    case "${TUI_BACKEND##*/}" in
+        gum) printf 'gum\n' ;;
+        *)   printf 'whiptail\n' ;;
+    esac
+}
 
-# dialog and whiptail spell the Cancel-relabel flag differently; this is
-# how §8.1 < Exit > and §8.2 < Back > captions reach both backends.
-# Callers opt in via TUI_CANCEL_LABEL (call-scoped: `TUI_CANCEL_LABEL=Exit
-# tui_render_menu ...`).
+# ── whiptail family (the current, unchanged behavior) ────────────────────────
+# whiptail (and a dialog-named binary) spell the Cancel-relabel flag
+# differently; this is how §8.1 < Exit > and §8.2 < Back > captions reach the
+# backend. Callers opt in via TUI_CANCEL_LABEL (call-scoped).
 _tui_cancel_button_args() {
     case "${TUI_BACKEND##*/}" in
         whiptail) printf -- '--cancel-button\n%s\n' "$1" ;;
@@ -603,8 +677,7 @@ _tui_cancel_button_args() {
     esac
 }
 
-# tui_render_menu <title> <text> <tag1> <item1> [...] → chosen tag on stdout
-tui_render_menu() {
+_tui_menu_whiptail() {
     local _title="$1" _text="$2"
     shift 2
     local -a _cancel=()
@@ -616,11 +689,7 @@ tui_render_menu() {
         "$@" 3>&1 1>&2 2>&3
 }
 
-# tui_render_checklist <title> <text> <tag item on|off ...>
-#   → checked tags on stdout, one per line (--separate-output exists on
-#     BOTH backends — the §8.2 dual-backend-identical guarantee).
-#   rc != 0 = < Back > / ESC (page discarded by the caller, Q43).
-tui_render_checklist() {
+_tui_checklist_whiptail() {
     local _title="$1" _text="$2"
     shift 2
     local -a _cancel=()
@@ -633,15 +702,13 @@ tui_render_checklist() {
         "$@" 3>&1 1>&2 2>&3
 }
 
-# tui_render_msgbox <title> <text>
-tui_render_msgbox() {
+_tui_msgbox_whiptail() {
     "${TUI_BACKEND:?TUI_BACKEND not set}" --title "$1" \
         --msgbox "$2" "${TUI_HEIGHT}" "${TUI_WIDTH}"
 }
 
 # Yes/No relabel flags (the §8.4 < Proceed > / < Cancel > captions);
-# dialog and whiptail spell them differently, same split as
-# _tui_cancel_button_args. Callers opt in via TUI_YES_LABEL/TUI_NO_LABEL.
+# same split as _tui_cancel_button_args. Opt in via TUI_YES_LABEL/TUI_NO_LABEL.
 _tui_yesno_button_args() {
     case "${TUI_BACKEND##*/}" in
         whiptail) printf -- '--yes-button\n%s\n--no-button\n%s\n' "$1" "$2" ;;
@@ -649,8 +716,7 @@ _tui_yesno_button_args() {
     esac
 }
 
-# tui_render_yesno <title> <text> → rc 0 yes / rc 1 no
-tui_render_yesno() {
+_tui_yesno_whiptail() {
     local -a _btn=()
     if [[ -n "${TUI_YES_LABEL:-}" || -n "${TUI_NO_LABEL:-}" ]]; then
         mapfile -t _btn < <(_tui_yesno_button_args \
@@ -659,3 +725,92 @@ tui_render_yesno() {
     "${TUI_BACKEND:?TUI_BACKEND not set}" --title "$1" "${_btn[@]}" \
         --yesno "$2" "${TUI_HEIGHT}" "${TUI_WIDTH}"
 }
+
+# ── gum family (#171; default styling, gum owns its own width) ────────────────
+# gum has NO hidden value: `gum choose` echoes the chosen ITEM label, so the
+# menu/checklist adapters map the echoed label(s) back to the TAG by INDEX
+# over the (tag,item) pairs. Index-mapping is duplicate-label-safe: a label
+# that appears twice resolves to its FIRST occurrence's tag. Items pass to gum
+# unclipped — gum manages wrapping, so _tui_clip is NOT applied here (#168).
+
+# _tui_menu_gum <title> <text> <tag1> <item1> [...] → chosen tag on stdout.
+# rc != 0 (incl. gum's 130 on Esc/Ctrl-C) propagates as cancel/Back.
+_tui_menu_gum() {
+    local _title="$1" _text="$2"
+    shift 2
+    local -a _tags=() _items=()
+    while (( $# >= 2 )); do
+        _tags+=("$1"); _items+=("$2"); shift 2
+    done
+    local _picked
+    _picked="$("${TUI_BACKEND:?TUI_BACKEND not set}" choose \
+        --header "${_title}: ${_text}" -- "${_items[@]}")" || return $?
+    # Map the chosen item label back to its tag by first index match.
+    local _i
+    for _i in "${!_items[@]}"; do
+        if [[ "${_items[_i]}" == "${_picked}" ]]; then
+            printf '%s\n' "${_tags[_i]}"
+            return 0
+        fi
+    done
+    return 1  # gum echoed something we never offered — treat as cancel
+}
+
+# _tui_checklist_gum <title> <text> <tag item status ...>
+#   → checked tags, one per line (matches the whiptail --separate-output
+#     contract). Preselected ("on") rows are passed via gum --selected.
+_tui_checklist_gum() {
+    local _title="$1" _text="$2"
+    shift 2
+    local -a _tags=() _items=() _preselected=()
+    while (( $# >= 3 )); do
+        _tags+=("$1"); _items+=("$2")
+        [[ "$3" == "on" ]] && _preselected+=("$2")
+        shift 3
+    done
+    local -a _selflag=()
+    if (( ${#_preselected[@]} > 0 )); then
+        local _csv
+        printf -v _csv '%s,' "${_preselected[@]}"
+        _selflag=(--selected "${_csv%,}")
+    fi
+    local _picked
+    _picked="$("${TUI_BACKEND:?TUI_BACKEND not set}" choose --no-limit \
+        "${_selflag[@]}" --header "${_title}: ${_text}" -- "${_items[@]}")" \
+        || return $?
+    # Map each checked item label back to its tag (first index match), one
+    # per line. Empty pick → empty stdout + success (nothing checked).
+    local _line _i
+    while IFS= read -r _line; do
+        [[ -z "${_line}" ]] && continue
+        for _i in "${!_items[@]}"; do
+            if [[ "${_items[_i]}" == "${_line}" ]]; then
+                printf '%s\n' "${_tags[_i]}"
+                break
+            fi
+        done
+    done <<<"${_picked}"
+}
+
+# _tui_msgbox_gum <title> <text> → render + single-key continue.
+_tui_msgbox_gum() {
+    "${TUI_BACKEND:?TUI_BACKEND not set}" style --border rounded --padding "1 2" \
+        "$1" "" "$2"
+    printf 'Press Enter to continue...' >&2
+    read -r REPLY || true
+}
+
+# _tui_yesno_gum <title> <text> → gum confirm (native rc 0 yes / nonzero no).
+# Esc/Ctrl-C 130 and confirm-No 1 both propagate as nonzero (not swallowed).
+_tui_yesno_gum() {
+    local -a _flags=()
+    [[ -n "${TUI_YES_LABEL:-}" ]] && _flags+=(--affirmative "${TUI_YES_LABEL}")
+    [[ -n "${TUI_NO_LABEL:-}" ]] && _flags+=(--negative "${TUI_NO_LABEL}")
+    "${TUI_BACKEND:?TUI_BACKEND not set}" confirm "${_flags[@]}" "$1: $2"
+}
+
+# ── Public dispatchers (stable contract) ─────────────────────────────────────
+tui_render_menu()      { "_tui_menu_$(_tui_backend_family)" "$@"; }
+tui_render_checklist() { "_tui_checklist_$(_tui_backend_family)" "$@"; }
+tui_render_msgbox()    { "_tui_msgbox_$(_tui_backend_family)" "$@"; }
+tui_render_yesno()     { "_tui_yesno_$(_tui_backend_family)" "$@"; }

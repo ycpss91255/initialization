@@ -146,7 +146,11 @@ tui_e2e_make_harness() {
     E2E_RESPONSES="${_dir}/responses"     # popped one per widget invocation
     E2E_WIDGET_LOG="${_dir}/widget.log"
     E2E_CLI_LOG="${_dir}/cli.log"
-    export E2E_BIN E2E_HOME E2E_RESPONSES E2E_WIDGET_LOG E2E_CLI_LOG
+    # Absolute path to the scripted widget — pinned into TUI_BACKEND by
+    # tui_e2e_run so the run bypasses #171 detection / the gum install prompt.
+    E2E_WIDGET_PATH="${E2E_BIN}/${_widget}"
+    export E2E_BIN E2E_HOME E2E_RESPONSES E2E_WIDGET_LOG E2E_CLI_LOG \
+           E2E_WIDGET_PATH
 
     tui_harness_farm "${E2E_BIN}"
     tui_harness_mock_cli "${E2E_BIN}" "${_dir}" "${E2E_CLI_LOG}"
@@ -165,8 +169,14 @@ EOF
 }
 
 # Run the real TUI under the sealed harness PATH (bats `run` semantics).
+# TUI_BACKEND is pinned to the scripted-widget mock path so the run bypasses
+# #171 backend detection / the gum install prompt entirely: the adapter
+# dispatcher keys on the basename, so a mock named `dialog`/`whiptail` routes
+# through the whiptail family (the shared --menu/--checklist shape these
+# scripted widgets emulate), regardless of detection preference.
 tui_e2e_run() {
     run env "PATH=${E2E_BIN}" "HOME=${E2E_HOME}" \
         "TUI_CLI=${E2E_BIN}/setup_ubuntu" \
+        "TUI_BACKEND=${E2E_WIDGET_PATH}" \
         "${REPO_ROOT}/setup_ubuntu_tui.sh"
 }

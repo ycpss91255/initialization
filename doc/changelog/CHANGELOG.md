@@ -20,6 +20,45 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Added
+
+- **gum as the preferred TUI backend** (issue #171, ADR-0023): a new
+  `module/gum.module.sh` (github-release archetype, multi-arch asset
+  selection `gum_<ver>_Linux_{x86_64,arm64,armv7}.tar.gz`, user-home install
+  to `~/.local/bin` with Sidecar version tracking + `upgrade()`, discoverable
+  via `list`) installs `charmbracelet/gum`. `lib/tui_backend.sh` gains native
+  gum adapters for all four contract widgets — `menu` → `gum choose` (choice
+  mapped back to its tag by index), `checklist` → `gum choose --no-limit`
+  (one tag per line), `msgbox` → `gum style`/`gum format`, `yesno` →
+  `gum confirm` — at default (untheme) styling. A new
+  `setup_ubuntu_tui.sh --backend gum|whiptail` flag forces `TUI_BACKEND` and
+  skips both detection and the install prompt (invalid value → exit 2 with
+  usage), letting CI/QA force either backend; `just tui --backend whiptail`
+  works through the existing pass-through recipe. `gum` is added to the
+  test-tools image so the AC-10 dual-backend live smoke runs against both
+  gum and whiptail.
+
+### Changed
+
+- **TUI backend detection is now gum > whiptail** (issue #171, ADR-0023):
+  pre-launch detection prefers `gum` when present. When gum is absent and the
+  session is interactive (`[[ -t 0 ]]`), a plain stdin/stdout `read` prompt
+  (default Yes) offers to install gum — on yes the TUI forks
+  `setup_ubuntu install gum` (it never installs inline, per G4), re-detects,
+  and launches with gum; on no it uses whiptail. Non-interactive sessions
+  skip the prompt and use whiptail. The four widgets in `lib/tui_backend.sh`
+  became dispatchers (`_tui_<widget>_<backend>`); the whiptail adapters are
+  unchanged, the frontend contract is unchanged (still passes `tag item
+  [status]`, still reads back the tag), and exit codes still normalize to
+  `0`=confirm / non-zero=cancel across both backends.
+
+### Removed
+
+- **`dialog` TUI backend** (issue #171, ADR-0023): `dialog` is dropped from
+  the backend set, which is now exactly gum + whiptail (both render all four
+  contract widgets natively). The `dialog`-first detection branch and the
+  `dialog`-specific fatal-guidance wording are gone.
+
 ### Fixed
 
 - **TUI checklist rows no longer overflow the box** (issue #168): the

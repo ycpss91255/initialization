@@ -118,6 +118,102 @@ _dispatcher_list_installed() {
     done <<< "${_names}"
 }
 
+# Catalog (registry) JSON view (issue #165, ADR-0019 / G4). Emits ONLY a
+# JSON document to stdout that the TUI (lib/tui_backend.sh) can parse:
+#
+#   { "items": [ { "name", "category", "tags":[...],
+#                  "supported_platforms":[...], "description", "recommended" }, ... ] }
+#
+# Honors the same --category= / --tag= filters as the plain list view.
+# All strings are escaped by jq (never hand-rolled). description / recommended
+# are sourced per-module in an isolated subshell and degrade to JSON null when
+# the module omits them or errs (additive fields are optional, ADR-0019).
+_dispatcher_list_catalog_json() {
+    local -n _names_ref="$1"
+
+    local _lang="${INIT_UBUNTU_LANG:-en}"
+    local -a _rows=()
+    local _name _cat _tags_raw _plats_raw _file _desc _rec
+    local -a _tags_arr _plats_arr
+
+    while IFS= read -r _name; do
+        [[ -n "${_name}" ]] || continue
+        _cat="$(registry_get_field "${_name}" category)"
+        _tags_raw="$(registry_get_field "${_name}" tags)"
+        _plats_raw="$(registry_get_field "${_name}" platforms)"
+        _file="$(registry_get_field "${_name}" file)"
+
+        # Whitespace-split into arrays; empty → empty array.
+        read -r -a _tags_arr <<< "${_tags_raw}"
+        read -r -a _plats_arr <<< "${_plats_raw}"
+
+        # description + recommended come from the module itself, sourced in an
+        # isolated fork-style subshell (keeps declares / traps scoped, keeps
+        # set -u + coverage instrumentation happy — same rationale as runner).
+        # Output protocol on stdout: "<recommended-token>\n<description...>".
+        # recommended token: true | false | null. A missing description prints
+        # nothing after the newline → treated as null below.
+        _desc=""
+        _rec="null"
+        if [[ -n "${_file}" && -f "${_file}" ]]; then
+            local _probe _probe_rc=0
+            _probe="$(
+                # shellcheck source=/dev/null  # module path is dynamic; static resolution impossible — https://www.shellcheck.net/wiki/SC1090
+                source "${LIB_DIR}/logger.sh" >/dev/null 2>&1
+                # shellcheck source=/dev/null  # dynamic lib path
+                source "${LIB_DIR}/general.sh" >/dev/null 2>&1
+                # shellcheck source=/dev/null  # dynamic lib path
+                source "${LIB_DIR}/module_helper.sh" >/dev/null 2>&1
+                # shellcheck source=/dev/null  # module path is dynamic
+                source "${_file}" >/dev/null 2>&1 || exit 0
+                _r="null"
+                if declare -F is_recommended >/dev/null 2>&1; then
+                    if is_recommended >/dev/null 2>&1; then _r="true"; else _r="false"; fi
+                fi
+                printf '%s\n' "${_r}"
+                if declare -F module_get_description >/dev/null 2>&1; then
+                    module_get_description "${_lang}" 2>/dev/null
+                fi
+            )" || _probe_rc=$?
+            if [[ "${_probe_rc}" -eq 0 ]]; then
+                _rec="${_probe%%$'\n'*}"
+                case "${_rec}" in true|false|null) ;; *) _rec="null" ;; esac
+                if [[ "${_probe}" == *$'\n'* ]]; then
+                    _desc="${_probe#*$'\n'}"
+                else
+                    _desc=""
+                fi
+            fi
+        fi
+
+        # tags / supported_platforms → JSON arrays (jq escapes each element).
+        local _tags_json _plats_json
+        _tags_json="$(jq -cn '$ARGS.positional' --args "${_tags_arr[@]+"${_tags_arr[@]}"}")"
+        _plats_json="$(jq -cn '$ARGS.positional' --args "${_plats_arr[@]+"${_plats_arr[@]}"}")"
+
+        # Per-item object: jq escapes every string. description is passed as a
+        # JSON value (string or null); recommended is raw JSON (true/false/null).
+        local _desc_json='null'
+        [[ -n "${_desc}" ]] && _desc_json="$(jq -cn --arg d "${_desc}" '$d')"
+
+        local _row
+        _row="$(jq -cn \
+            --arg name "${_name}" \
+            --arg category "${_cat}" \
+            --argjson tags "${_tags_json}" \
+            --argjson supported_platforms "${_plats_json}" \
+            --argjson description "${_desc_json}" \
+            --argjson recommended "${_rec}" \
+            '{name:$name, category:$category, tags:$tags,
+              supported_platforms:$supported_platforms,
+              description:$description, recommended:$recommended}')"
+        _rows+=("${_row}")
+    done <<< "${_names_ref}"
+
+    # Combine all per-item objects into the final {"items":[...]} document.
+    printf '%s\n' "${_rows[@]+"${_rows[@]}"}" | jq -s '{items: .}'
+}
+
 _dispatcher_list() {
     local -a _filter_args=()
     local _installed="false"
@@ -142,9 +238,6 @@ _dispatcher_list() {
         _dispatcher_list_installed "${_json}"
         return $?
     fi
-    if [[ "${_json}" == "true" ]]; then
-        printf "[dispatcher] WARN: --json without --installed is stubbed; ignoring\n" >&2
-    fi
 
     if ! declare -F registry_list_names >/dev/null 2>&1; then
         printf "[dispatcher] ERROR: registry not loaded\n" >&2
@@ -153,6 +246,18 @@ _dispatcher_list() {
 
     local _names
     _names="$(registry_list_names "${_filter_args[@]}")"
+
+    # Catalog JSON view (issue #165): stdout is ONLY JSON. An empty registry
+    # still emits a well-formed {"items":[]} so the TUI parses cleanly.
+    if [[ "${_json}" == "true" ]]; then
+        if [[ -z "${_names}" ]]; then
+            printf '{"items":[]}\n'
+            return 0
+        fi
+        _dispatcher_list_catalog_json _names
+        return $?
+    fi
+
     if [[ -z "${_names}" ]]; then
         printf "(no modules registered)\n"
         return 0

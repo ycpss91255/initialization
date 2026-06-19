@@ -748,12 +748,101 @@ EOF
     assert_output --partial "stubbed"
 }
 
-@test "list --json without --installed warns and falls through" {
+# ── list --json catalog view (issue #165) ───────────────────────────────────
+
+@test "list --json emits valid catalog JSON with .items array" {
     _load_engine
     run dispatcher_dispatch list --json
     assert_success
-    assert_output --partial "stubbed"
-    assert_output --partial "noop"
+    echo "${output}" | jq -e '.items | type == "array"' > /dev/null
+    echo "${output}" | jq -e '.items[0] | has("name") and has("category") and has("tags")' > /dev/null
+    echo "${output}" | jq -e '.items[] | select(.name == "noop") | .category == "optional"' > /dev/null
+    echo "${output}" | jq -e '.items[] | select(.name == "noop") | .tags | type == "array"' > /dev/null
+}
+
+@test "list --json stdout carries no [dispatcher] warning text" {
+    _load_engine
+    run dispatcher_dispatch list --json
+    assert_success
+    refute_output --partial "[dispatcher]"
+    refute_output --partial "stubbed"
+}
+
+@test "list --json filters by --category" {
+    _load_engine
+    cat > "${FAKE_MODULE_DIR}/rec.module.sh" <<'EOF'
+NAME="rec"
+CATEGORY="recommended"
+TAGS=("test")
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    run dispatcher_dispatch list --category=recommended --json
+    assert_success
+    echo "${output}" | jq -e '.items | length == 1' > /dev/null
+    echo "${output}" | jq -e '.items[0].name == "rec"' > /dev/null
+    echo "${output}" | jq -e 'all(.items[]; .category == "recommended")' > /dev/null
+}
+
+@test "list --json honors module DESCRIPTION and is_recommended" {
+    _load_engine
+    cat > "${FAKE_MODULE_DIR}/desc.module.sh" <<'EOF'
+NAME="desc"
+CATEGORY="optional"
+TAGS=("editor" "cli")
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=("x86_64" "rpi5")
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+declare -gA DESCRIPTION=( [en]="a described module" )
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+is_recommended() { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    run dispatcher_dispatch list --json
+    assert_success
+    echo "${output}" | jq -e '.items[] | select(.name == "desc") | .description == "a described module"' > /dev/null
+    echo "${output}" | jq -e '.items[] | select(.name == "desc") | .recommended == true' > /dev/null
+    echo "${output}" | jq -e '.items[] | select(.name == "desc") | .tags == ["editor","cli"]' > /dev/null
+    echo "${output}" | jq -e '.items[] | select(.name == "desc") | .supported_platforms == ["x86_64","rpi5"]' > /dev/null
+}
+
+@test "list --json emits null description/recommended when module lacks them" {
+    _load_engine
+    run dispatcher_dispatch list --json
+    assert_success
+    # noop fixture defines neither DESCRIPTION nor is_recommended: both null.
+    echo "${output}" | jq -e '.items[] | select(.name == "noop") | .description == null' > /dev/null
+    echo "${output}" | jq -e '.items[] | select(.name == "noop") | .recommended == null' > /dev/null
+}
+
+@test "list --json marks a defined-but-false is_recommended as false (not null)" {
+    _load_engine
+    cat > "${FAKE_MODULE_DIR}/notrec.module.sh" <<'EOF'
+NAME="notrec"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+is_recommended() { return 1; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    run dispatcher_dispatch list --json
+    assert_success
+    echo "${output}" | jq -e '.items[] | select(.name == "notrec") | .recommended == false' > /dev/null
 }
 
 @test "status forwards flag validation to list --installed (exit 2 on bogus)" {

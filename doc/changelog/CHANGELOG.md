@@ -20,6 +20,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Fixed
+
+- **`setup_ubuntu list --json` (catalog view) now emits JSON** (issue #165):
+  it was stubbed (printed a warning + the plain table), which broke the TUI —
+  `setup_ubuntu_tui.sh` forks `list --json` and validates it with `jq -e`, so it
+  failed on a real run with `'setup_ubuntu list --json' did not return JSON
+  (ADR-0019)`. `list --json` now prints `{"items":[{name,category,tags,
+  supported_platforms,description,recommended},…]}` (jq-escaped; `description` /
+  `recommended` sourced per-module, degrading to `null` per ADR-0019), honors
+  `--category=` / `--tag=`, and keeps warnings off stdout. The TUI smoke test is
+  hardened to fork the real `list --json` so this can't regress.
+
 ### Added
 
 - **`auto-merge-on-green` skill + CI-monitor hook** (issue #154): a new skill

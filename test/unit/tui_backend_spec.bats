@@ -431,6 +431,31 @@ EOF
     assert_failure 2
 }
 
+# ── Real CLI list --json fork (issue #165 regression guard, G4 / ADR-0019) ───
+# The AC-10 layer-1 + Q43 e2e suites mock TUI_CLI, so they never exercised the
+# real `setup_ubuntu list --json`. This hardening test forks the REAL engine
+# entrypoint through the same _tui_cli_json validator the TUI uses at startup,
+# proving the catalog payload is valid JSON the TUI can parse (this is exactly
+# what failed at v0.1.0-rc2 with the stubbed emitter).
+
+@test "tui_cli_list_json forks the REAL setup_ubuntu and returns valid catalog JSON" {
+    TUI_CLI="${REPO_ROOT}/setup_ubuntu.sh"
+    export TUI_CLI
+    run tui_cli_list_json
+    assert_success
+    # _tui_cli_json already jq -e validated; re-confirm shape the TUI consumes.
+    echo "${output}" | jq -e '.items | type == "array"' > /dev/null
+    echo "${output}" | jq -e '.items[0] | has("name") and has("category") and has("tags")' > /dev/null
+}
+
+@test "real setup_ubuntu list --json keeps warnings off stdout (TUI parse safety)" {
+    # stderr is discarded by _tui_cli_json; assert stdout alone is pure JSON.
+    run "${REPO_ROOT}/setup_ubuntu.sh" list --json
+    assert_success
+    refute_output --partial "[dispatcher]"
+    echo "${output}" | jq -e . > /dev/null
+}
+
 # ── Q43 end-to-end: scripted backend + recorded CLI forks (#70, AC-10) ───────
 # tui_e2e_make_harness / tui_e2e_run (helper/tui_harness.bash) drive the
 # REAL setup_ubuntu_tui.sh process with a scripted widget + recording mock

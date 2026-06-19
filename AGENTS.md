@@ -6,6 +6,12 @@ agentic CLIs (Claude Code, Codex, etc.) at the start of a session.
 For richer per-domain rules and skills, see `.claude/rules/` (also installed
 to `~/.claude/rules/` via `install.sh`).
 
+Agent config has a single tool-agnostic source of truth: `hook/`, `rules/`,
+`script/`, and `skills/` live under **`.agents/`** and are symlinked into
+`.claude/` (so Claude Code, Codex, etc. share one copy). Edit the real files
+under `.agents/`; the `.claude/` paths are symlinks. Claude-runtime entries
+(`settings.json`, `projects/`, `worktrees/`) stay in `.claude/`.
+
 ## Repo at a glance
 
 - **Personal-use modular Ubuntu environment initialization tool** — bash +

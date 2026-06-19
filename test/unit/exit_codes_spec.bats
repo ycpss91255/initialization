@@ -179,13 +179,6 @@ EOF
     mkdir -p "${_md}"
     _mk_mod "${_md}" "alpha" '"nonexistent-dep"'
 
-    # TODO(prod-bug §7.4/AC-24): _dispatcher_doctor ignores its argv entirely
-    # — `--validate-modules` is a no-op, so no metadata lint runs and no exit 2
-    # is produced. Assert the documented contract but skip until the prod fix
-    # wires the flag + lint into doctor (resolver already returns 2 on an
-    # unresolvable dep; doctor just needs to invoke it per-module).
-    skip "TODO(prod-bug §7.4/AC-24): doctor --validate-modules is a no-op; metadata lint + exit 2 not implemented"
-
     run env INIT_UBUNTU_USER_MODULE_DIR="${_md}" bash "${SUT}" doctor --validate-modules
     assert_failure 2
 }
@@ -252,9 +245,7 @@ EOF
     # resolver rc without letting errexit swallow it, e.g.
     #   _resolved="$(resolver_resolve "${_modules[@]}")" || _rc=$?
     # or temporarily `set +e` around the substitution. Assert the documented
-    # exit 5; skip until the propagation is fixed.
-    skip "TODO(prod-bug §7.4): dep-cycle exit 5 masked to 1 through entrypoint (inherit_errexit swallows resolver rc in command substitution)"
-
+    # exit 5.
     run env INIT_UBUNTU_USER_MODULE_DIR="${_md}" bash "${SUT}" install loopa --dry-run
     assert_failure 5
 }
@@ -271,10 +262,7 @@ EOF
     # TODO(prod-bug §7.4): lib/resolver.sh parses CONFLICTS into
     # MODULES_CONFLICTS but never enforces it — resolver_resolve only does
     # topo-sort + cycle/unknown detection, so a conflicting pair resolves
-    # cleanly (exit 0) instead of exit 5. Assert the documented contract,
-    # skip until the prod fix adds a conflict check to the resolver.
-    skip "TODO(prod-bug §7.4): CONFLICTS_WITH is parsed but not enforced; resolver never returns 5 on conflict"
-
+    # cleanly (exit 0) instead of exit 5. Assert the documented contract.
     run env INIT_UBUNTU_USER_MODULE_DIR="${_md}" bash "${SUT}" install one two --dry-run
     assert_failure 5
 }
@@ -314,9 +302,7 @@ EOF
     # _runner_run_batch, which returns 6 (Action-class partial-failure) on ANY
     # module failure — including the Diag-class verify/doctor phases. Per §7.4
     # verify must use the Diag class (1 on fail), not 6. Assert the documented
-    # contract; skip until verify's failure mapping is corrected to 1.
-    skip "TODO(prod-bug §7.4): verify uses runner batch code 6 on failure; Diag class requires 1"
-
+    # contract.
     run bash "${SUT}" verify docker
     assert_failure 1
     refute [ "${status}" -eq 6 ]

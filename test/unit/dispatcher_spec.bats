@@ -932,9 +932,11 @@ EOF
     state_record_install noop true v1
     run dispatcher_dispatch verify noop
     # runner_verify runs verify() in a subshell; the noop fixture defines no
-    # verify(), so the runner reports a failure (exit 6) — what matters for
-    # coverage is that the real runner path (not the dry-run branch) executes.
-    assert_failure 6
+    # verify(), so the runner reports a failure — what matters for coverage is
+    # that the real runner path (not the dry-run branch) executes. verify is a
+    # Diag-class subcommand (PRD §7.4: 0 pass / 1 fail / 7 net), so a failure
+    # surfaces as 1, NOT the Action-class partial-failure code 6.
+    assert_failure 1
 }
 
 # ── import plan formatting branches (jq actions) ────────────────────────────

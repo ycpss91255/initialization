@@ -50,6 +50,8 @@ _load_engine() {
     source "${LIB_DIR}/resolver.sh"
     # shellcheck source=../../lib/runner.sh
     source "${LIB_DIR}/runner.sh"
+    # shellcheck source=../../lib/i18n.sh
+    source "${LIB_DIR}/i18n.sh"
     # shellcheck source=../../lib/dispatcher.sh
     source "${LIB_DIR}/dispatcher.sh"
     registry_load_all "${FAKE_MODULE_DIR}"
@@ -1101,4 +1103,45 @@ EOF
     assert_failure 1
     assert_output --partial "absent"
     assert_output --partial "DRIFTED"
+}
+
+# ── i18n: human-readable strings localize under INIT_UBUNTU_LANG (#185) ──────
+
+@test "usage renders in zh-TW under INIT_UBUNTU_LANG=zh-TW (#185)" {
+    _load_engine
+    INIT_UBUNTU_LANG=zh-TW run dispatcher_dispatch help
+    assert_success
+    assert_output --partial "用法:setup_ubuntu"
+    assert_output --partial "子命令:"
+}
+
+@test "usage default (en) output is unchanged (#185)" {
+    _load_engine
+    run dispatcher_dispatch help
+    assert_success
+    assert_output --partial "Usage: setup_ubuntu <subcommand> [args] [flags]"
+    assert_output --partial "See PRD §7 for the full CLI specification."
+}
+
+@test "search no-match renders in zh-TW (#185)" {
+    _load_engine
+    INIT_UBUNTU_LANG=zh-TW run dispatcher_dispatch search zzz-not-a-module
+    assert_success
+    assert_output --partial "沒有符合"
+}
+
+@test "list --installed empty-state renders in zh-TW (#185)" {
+    _load_engine
+    INIT_UBUNTU_LANG=zh-TW run dispatcher_dispatch list --installed
+    assert_success
+    assert_output --partial "沒有任何模組被記錄為已安裝"
+}
+
+@test "upgrade confirm prompt renders in zh-TW (#185)" {
+    _load_engine
+    INIT_UBUNTU_LANG=zh-TW run dispatcher_dispatch upgrade noop
+    assert_failure 1
+    assert_output --partial "即將升級 1 個模組"
+    assert_output --partial "是否繼續?[y/N]"
+    assert_output --partial "已中止。"
 }

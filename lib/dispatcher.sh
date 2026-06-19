@@ -26,11 +26,15 @@ fi
 : "${INIT_UBUNTU_YES:=false}"
 : "${INIT_UBUNTU_NO_DEPS:=false}"
 
-# ── Help ─────────────────────────────────────────────────────────────────────
-
-_dispatcher_usage() {
-    cat <<'EOF'
-Usage: setup_ubuntu <subcommand> [args] [flags]
+# ── i18n message table (issue #185, Phase 2) ─────────────────────────────────
+# File-local catalog for the HUMAN-readable strings the dispatcher prints to
+# stdout/stderr. Resolved by i18n_t (lib/i18n.sh): ${INIT_UBUNTU_LANG}.<key> ->
+# en.<key> -> literal <key>. The en.<key> values are byte-identical to the
+# original English so existing English-asserting specs keep passing. Only true
+# user-facing prose is here — [dispatcher] diagnostics, log_* calls, JSON /
+# machine output, and key:value table rows stay English by design.
+declare -gA DISPATCHER_I18N=(
+  ["en.usage"]="Usage: setup_ubuntu <subcommand> [args] [flags]
 
 Subcommands:
   install <module>...    Install modules (with their deps, topologically sorted)
@@ -74,8 +78,74 @@ Common flags:
   --tag=<t>              Filter list by tag
   --installed            With list: show modules recorded in state.json (--json for raw)
 
-See PRD §7 for the full CLI specification.
-EOF
+See PRD §7 for the full CLI specification."
+  ["zh-TW.usage"]="用法:setup_ubuntu <subcommand> [args] [flags]
+
+子命令:
+  install <module>...    安裝模組(連同其依賴,依拓樸排序)
+  remove  <module>...    移除模組(保留設定)
+  purge   <module>...    移除模組及其設定
+  list                   列出已註冊的模組(--installed 顯示 state.json 視圖)
+  show    <module>       印出某個模組的中繼資料
+  detect                 印出主機環境(使用 --json 取得機器可讀輸出)
+  export  <file>         匯出 state.json 的同步區段(使用 --modules=<csv>)
+  import  <file>         比對 payload 與本地狀態(預設為試運行;--apply 才提交)
+  upgrade [<module>...]  對指定模組執行 upgrade()(未指定則為所有已安裝模組)
+  verify  [<module>...]  對指定模組執行 verify()(未指定則為所有已安裝模組)
+  search  <keyword>      依名稱 / 分類 / 標籤搜尋模組
+  doctor                 比對 state.json 與系統實際狀態
+  config  set|get|unset|show <section.key> [<value>]
+                         讀取 / 寫入 ~/.config/init_ubuntu/config.ini
+  sync    <user@host>    透過 SSH 推送狀態(或以 --pull 反向拉取)
+  help    [<subcmd>]     顯示此說明
+  version                顯示工具版本
+
+已棄用:
+  status                 請改用 'list --installed'(會轉發並顯示警告)
+
+子命令(佔位,後續階段):
+  self-upgrade           更新工具本身(規劃於 0.3.0)
+
+全域旗標(任意位置):
+  --color=auto|always|never
+                         ANSI 色彩控制(預設 auto:管線輸出、設定 NO_COLOR、
+                         TERM=dumb 或於背景執行時關閉)
+  -v / --verbose         將日誌等級設為 DEBUG
+  --quiet                將日誌等級設為 WARN(抑制 info)
+
+常用旗標:
+  -y / --yes             對互動式提示一律假設為「是」
+  --dry-run              印出預定動作但不實際執行
+  --no-deps              跳過依賴解析(只安裝指定的模組)
+  --verbose              即時串流子命令輸出(預設:擷取至 JSONL)
+  --quiet                抑制進度列;僅保留 warn / error
+  --category=<c>         依分類過濾 list(base|recommended|optional|experimental)
+  --tag=<t>              依標籤過濾 list
+  --installed            搭配 list:顯示記錄於 state.json 的模組(--json 取得原始資料)
+
+完整 CLI 規格請參見 PRD §7。"
+  ["en.no_installed"]="(no modules recorded as installed)"
+  ["zh-TW.no_installed"]="(沒有任何模組被記錄為已安裝)"
+  ["en.no_registered"]="(no modules registered)"
+  ["zh-TW.no_registered"]="(沒有任何已註冊的模組)"
+  ["en.no_match"]="no module matches '{0}'"
+  ["zh-TW.no_match"]="沒有符合「{0}」的模組"
+  ["en.will_install"]="Will install: {0}"
+  ["zh-TW.will_install"]="即將安裝:{0}"
+  ["en.proceed_yn"]="Proceed? [Y/n] "
+  ["zh-TW.proceed_yn"]="是否繼續?[Y/n] "
+  ["en.proceed_ny"]="Proceed? [y/N] "
+  ["zh-TW.proceed_ny"]="是否繼續?[y/N] "
+  ["en.aborted"]="Aborted."
+  ["zh-TW.aborted"]="已中止。"
+  ["en.will_upgrade"]="Will upgrade {0} module(s): {1}"
+  ["zh-TW.will_upgrade"]="即將升級 {0} 個模組:{1}"
+)
+
+# ── Help ─────────────────────────────────────────────────────────────────────
+
+_dispatcher_usage() {
+    printf '%s\n' "$(i18n_t DISPATCHER_I18N usage)"
 }
 
 _dispatcher_version() {
@@ -105,7 +175,7 @@ _dispatcher_list_installed() {
 
     local _names; _names="$(state_list_installed)"
     if [[ -z "${_names}" ]]; then
-        printf "(no modules recorded as installed)\n"
+        printf '%s\n' "$(i18n_t DISPATCHER_I18N no_installed)"
         return 0
     fi
     printf "%-30s  %-7s  %-12s  %s\n" "MODULE" "MANUAL" "VERSION" "INSTALLED AT"
@@ -259,7 +329,7 @@ _dispatcher_list() {
     fi
 
     if [[ -z "${_names}" ]]; then
-        printf "(no modules registered)\n"
+        printf '%s\n' "$(i18n_t DISPATCHER_I18N no_registered)"
         return 0
     fi
 
@@ -391,7 +461,7 @@ _dispatcher_lifecycle() {
             [[ " ${_modules[*]} " == *" ${_n} "* ]] && continue
             _plan_deps+=("${_n}")
         done
-        local _plan="Will install: ${_modules[*]}"
+        local _plan; _plan="$(i18n_t DISPATCHER_I18N will_install "${_modules[*]}")"
         if [[ "${#_plan_deps[@]}" -gt 0 ]]; then
             local _dep_word="deps"
             [[ "${#_plan_deps[@]}" -eq 1 ]] && _dep_word="dep"
@@ -400,7 +470,7 @@ _dispatcher_lifecycle() {
             _plan+=" + ${#_plan_deps[@]} ${_dep_word} (${_dep_csv%, })"
         fi
         printf '%s\n' "${_plan}"
-        printf 'Proceed? [Y/n] '
+        printf '%s' "$(i18n_t DISPATCHER_I18N proceed_yn)"
         local _ans=""
         if [[ -t 0 ]]; then
             read -r _ans || _ans=""
@@ -409,7 +479,7 @@ _dispatcher_lifecycle() {
         fi
         case "${_ans}" in
             [nN]*)
-                printf 'Aborted.\n'
+                printf '%s\n' "$(i18n_t DISPATCHER_I18N aborted)"
                 return 1
                 ;;
         esac
@@ -693,7 +763,7 @@ _dispatcher_search() {
     fi
     local _names; _names="$(registry_list_names)"
     if [[ -z "${_names}" ]]; then
-        printf "(no modules registered)\n"
+        printf '%s\n' "$(i18n_t DISPATCHER_I18N no_registered)"
         return 0
     fi
 
@@ -714,7 +784,7 @@ _dispatcher_search() {
     done <<< "${_names}"
 
     if [[ "${_found}" -eq 0 ]]; then
-        printf "no module matches '%s'\n" "${_kw}"
+        printf '%s\n' "$(i18n_t DISPATCHER_I18N no_match "${_kw}")"
     fi
 }
 
@@ -765,8 +835,8 @@ _dispatcher_upgrade() {
     # default (unlike install's [Y/n]). Non-tty stdin has nobody to
     # answer, so the default (no) applies and the run aborts.
     if [[ "${INIT_UBUNTU_YES}" != "true" ]]; then
-        printf 'Will upgrade %s module(s): %s\n' "${#_modules[@]}" "${_modules[*]}"
-        printf 'Proceed? [y/N] '
+        printf '%s\n' "$(i18n_t DISPATCHER_I18N will_upgrade "${#_modules[@]}" "${_modules[*]}")"
+        printf '%s' "$(i18n_t DISPATCHER_I18N proceed_ny)"
         local _ans=""
         if [[ -t 0 ]]; then
             read -r _ans || _ans=""
@@ -776,7 +846,7 @@ _dispatcher_upgrade() {
         case "${_ans}" in
             [yY]*) ;;
             *)
-                printf 'Aborted.\n'
+                printf '%s\n' "$(i18n_t DISPATCHER_I18N aborted)"
                 return 1
                 ;;
         esac

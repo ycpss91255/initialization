@@ -36,6 +36,25 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Real engine-lifecycle integration harness** (issue #175 / #176): a new
+  `test/integration/lifecycle/engine_lifecycle_spec.bats` drives the REAL
+  non-dry-run path `setup_ubuntu.sh → dispatcher → runner → source module →
+  archetype macro → lifecycle fn` as a non-root user (install refuses root),
+  one module per archetype — github-release (`gum`: install → state.json →
+  verify → idempotent re-install → remove → upgrade with Sidecar bump),
+  config (`ssh-config`) and custom (`claude-code-config`) at full fidelity,
+  apt (`tmux`) at reduced level on the apt-less alpine image. It asserts no
+  `command not found` / no undefined-phase, so it catches the #174 bug class
+  the prior suite missed; the AC-1/2/3 integration matrix now exercises a
+  github-release module across ubuntu 22.04/24.04/26.04. To keep it offline
+  and deterministic, `lib/module_helper.sh`'s github-release archetype honors
+  two **test-only** env seams (no-ops in production): `INIT_UBUNTU_TEST_GH_
+  FIXTURE_DIR` (install a pre-staged tarball instead of fetching, while the
+  real gzip-sniff / tar-extract / symlink still run) and
+  `INIT_UBUNTU_TEST_GH_VERSION` (deterministic version in place of the GitHub
+  API lookup). The `test-tools` image gains `file` + `tar` for the real
+  extract path.
+
 - **gum as the preferred TUI backend** (issue #171, ADR-0023): a new
   `module/gum.module.sh` (github-release archetype, multi-arch asset
   selection `gum_<ver>_Linux_{x86_64,arm64,armv7}.tar.gz`, user-home install

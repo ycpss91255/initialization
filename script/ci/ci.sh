@@ -488,6 +488,7 @@ _run_in_container() {
         -e SYNC_E2E="${SYNC_E2E:-0}" \
         -e COVERAGE_MIN="${COVERAGE_MIN:-}" \
         -e COVERAGE_ENFORCE="${COVERAGE_ENFORCE:-}" \
+        -e INIT_UBUNTU_TEST_IMAGE="${INIT_UBUNTU_TEST_IMAGE:-}" \
         "${_service}" \
         -c "./script/ci/ci.sh ${_container_flag}"
 }

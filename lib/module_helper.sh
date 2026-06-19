@@ -253,8 +253,31 @@ module_default_github_release_is_installed() {
     [[ -n "${_bin}" ]] || return 1
     local _link="${BIN_LINK:-/usr/local/bin/${_bin}}"
     [[ -x "${_link}" ]] && return 0
+    # Test-only OFFLINE seam (issue #175/#176): under the offline harness the
+    # install target is the scratch-scoped BIN_LINK, so the system-PATH
+    # fallback below must NOT fire — otherwise a same-named binary baked into
+    # the (alpine) test-tools image (e.g. gum, baked for the AC-10 TUI smoke)
+    # makes is_installed report a never-installed module as present, masking
+    # the very real-install path #174 broke. Scoped to the fixture var so
+    # production keeps the PATH fallback (pre-Sidecar installs).
+    [[ -n "${INIT_UBUNTU_TEST_GH_FIXTURE_DIR:-}" ]] && return 1
     command -v "${_bin}" >/dev/null 2>&1
 }
+
+# Test-only OFFLINE version seam (issue #175/#176): when
+# INIT_UBUNTU_TEST_GH_VERSION is set, shadow the real (network) version
+# resolver from lib/general.sh with a deterministic constant. module_helper.sh
+# is sourced AFTER general.sh in setup_ubuntu.sh, so this redefinition wins
+# inside the real install subprocess — letting a module's asset-pattern
+# resolver (e.g. _gum_resolve_asset_pattern) run for real but offline. The
+# guard means production (var unset) keeps general.sh's GitHub-API lookup
+# untouched. Pairs with INIT_UBUNTU_TEST_GH_FIXTURE_DIR (the fetch seam).
+if [[ -n "${INIT_UBUNTU_TEST_GH_VERSION:-}" ]]; then
+    get_github_pkg_latest_version() {
+        local -n _outvar="${1:?get_github_pkg_latest_version needs <outvar>}"
+        _outvar="${INIT_UBUNTU_TEST_GH_VERSION}"
+    }
+fi
 
 # Internal: do the actual download + extract + symlink, used by install + update.
 _module_github_release_fetch_and_install() {
@@ -279,8 +302,24 @@ _module_github_release_fetch_and_install() {
 
     _url="https://github.com/${GITHUB_REPO}/releases/latest/download/${GITHUB_ASSET_PATTERN}"
     _tmp="$(mktemp 2>/dev/null || printf '/tmp/%s-%s' "${NAME}" "$$")"
-    log_info "[${NAME}] download ${_url}"
-    if ! curl -fsSL --retry 3 -o "${_tmp}" "${_url}"; then
+    # Test-only OFFLINE seam (issue #175/#176): when INIT_UBUNTU_TEST_GH_FIXTURE_DIR
+    # points at a directory holding a pre-staged release tarball named exactly
+    # ${GITHUB_ASSET_PATTERN}, copy it in instead of hitting the network. This
+    # injects ONLY the fetch boundary into the real (non-dry-run) install
+    # subprocess driven by setup_ubuntu.sh — everything downstream (the gzip
+    # sniff, backup, tar --strip-components extract, symlink) still runs for
+    # real, so the engine→runner→module-source→archetype-macro chain is
+    # exercised end to end while staying deterministic. Never set in
+    # production; the curl path below is the default.
+    if [[ -n "${INIT_UBUNTU_TEST_GH_FIXTURE_DIR:-}" ]]; then
+        local _fixture="${INIT_UBUNTU_TEST_GH_FIXTURE_DIR%/}/${GITHUB_ASSET_PATTERN}"
+        log_info "[${NAME}] [test-fixture] copy ${_fixture} (offline; INIT_UBUNTU_TEST_GH_FIXTURE_DIR set)"
+        if ! cp "${_fixture}" "${_tmp}"; then
+            log_error "[${NAME}] test fixture missing: ${_fixture}"
+            rm -f "${_tmp}"
+            return 1
+        fi
+    elif ! curl -fsSL --retry 3 -o "${_tmp}" "${_url}"; then
         log_error "[${NAME}] download failed: ${_url}"
         rm -f "${_tmp}"
         return 1

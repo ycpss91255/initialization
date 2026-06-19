@@ -133,3 +133,42 @@ teardown() {
     i18n_resolve_init_ubuntu_lang
     [[ "${INIT_UBUNTU_LANG}" == "zh-CN" ]]
 }
+
+# ─── i18n_t (engine-string lookup, issue #185) ───────────────────────────────
+
+@test "i18n_t returns the zh-TW value when INIT_UBUNTU_LANG=zh-TW" {
+    declare -gA _T_MSG=([en.hi]="Hello" [zh-TW.hi]="你好")
+    INIT_UBUNTU_LANG=zh-TW run i18n_t _T_MSG hi
+    [[ "${status}" -eq 0 ]]
+    [[ "${output}" == "你好" ]]
+}
+
+@test "i18n_t returns the en value by default" {
+    declare -gA _T_MSG=([en.hi]="Hello" [zh-TW.hi]="你好")
+    INIT_UBUNTU_LANG=en run i18n_t _T_MSG hi
+    [[ "${output}" == "Hello" ]]
+}
+
+@test "i18n_t falls back to en when the lang has no translation" {
+    declare -gA _T_MSG=([en.only]="EnglishOnly")
+    INIT_UBUNTU_LANG=zh-TW run i18n_t _T_MSG only
+    [[ "${output}" == "EnglishOnly" ]]
+}
+
+@test "i18n_t falls back to the literal key when no translation exists at all" {
+    declare -gA _T_MSG=([en.hi]="Hello")
+    INIT_UBUNTU_LANG=zh-TW run i18n_t _T_MSG missingkey
+    [[ "${output}" == "missingkey" ]]
+}
+
+@test "i18n_t substitutes positional placeholders {0} {1}" {
+    declare -gA _T_MSG=([en.inst]="installed {0} in {1}s" [zh-TW.inst]="已安裝 {0},耗時 {1} 秒")
+    INIT_UBUNTU_LANG=zh-TW run i18n_t _T_MSG inst neovim 9
+    [[ "${output}" == "已安裝 neovim,耗時 9 秒" ]]
+}
+
+@test "i18n_t prints no trailing newline" {
+    declare -gA _T_MSG=([en.hi]="Hello")
+    run i18n_t _T_MSG hi
+    [[ "${#output}" -eq 5 ]]
+}

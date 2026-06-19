@@ -128,6 +128,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **`hook/`, `rules/`, `script/` are now canonical under `.agents/`, symlinked
+  from `.claude/`**: extends the #151 skills pattern (real files live under
+  `.agents/<dir>`; `.claude/<dir>` is a symlink) to the rest of the vendorable
+  agent config, so there is a single tool-agnostic source of truth that other
+  agentic CLIs can share, not a `.claude`-only copy. All existing
+  `.claude/hook/…` / `.claude/script/…` / `.claude/rules/…` path references
+  (settings.json, specs, docs) resolve transparently through the symlinks.
+  Runtime/Claude-specific entries stay in `.claude/` (`settings.json`,
+  `settings.local.json`, `projects/`, `worktrees/` — moving the latter two
+  would break the memory symlink and live git worktrees).
+
 - **TUI backend detection is now gum > whiptail** (issue #171, ADR-0023):
   pre-launch detection prefers `gum` when present. When gum is absent and the
   session is interactive (`[[ -t 0 ]]`), a plain stdin/stdout `read` prompt

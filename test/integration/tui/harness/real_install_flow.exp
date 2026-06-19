@@ -1,0 +1,60 @@
+#!/usr/bin/env expect
+# real_install_flow.exp <backend> — AC-11 (issue #178, stream S2): drive the
+# live TUI all the way through Proceed into the REAL install pipeline.
+#
+# Unlike smoke_flow.exp (which Exits and forks nothing that installs), this
+# walks the Run → Review → Proceed leg so the TUI forks
+#   setup_ubuntu install gum -y
+# which the wrapper CLI routes to the REAL setup_ubuntu.sh (offline gh seam).
+# The bats wrapper then asserts state.json + Sidecar + the gum binary landed.
+#
+# Deterministic navigation (fixture: gum is the ONLY Optional module, so the
+# main menu has exactly one category row):
+#   main menu rows: quick-setup(0) optional(1) sep(2) manage(3) secrets(4)
+#                   sysinfo(5) sep(6) run(7)
+#   whiptail highlights row 0 on every (re)render (no --default-item).
+#
+# Exit codes: 0 = the forked real install succeeded (TUI propagates its rc);
+# 99 = harness assertion failed (see stderr); anything else = the real
+# install's own nonzero rc surfaced through the TUI.
+
+source [file join [file dirname [file normalize [info script]]] tui_expect_lib.tcl]
+
+if {[llength $argv] != 1} { tui_die "usage: real_install_flow.exp <backend>" }
+set backend [lindex $argv 0]
+
+# Force the backend → skip detection AND the gum install prompt under a pty.
+tui_spawn --backend $backend
+
+# 1. Main menu visible.
+tui_expect_text "Quick Setup"
+tui_expect_text "Optional"
+tui_expect_text "Run"
+
+# 2. Enter Optional (row 0 → row 1).
+tui_key_down
+tui_key_enter
+
+# 3. Optional checklist: gum is row 0. Check it, then < OK > (stores the page).
+tui_expect_text "Optional Modules"
+tui_expect_text "glamorous shell scripts toolkit"
+tui_key_space
+tui_expect_re {\*} "the checked \[*\] mark"
+tui_key_enter
+
+# 4. Back on the main menu (highlight reset to row 0). Walk to Run (row 7).
+tui_expect_text "Quick Setup"
+for {set i 0} {$i < 7} {incr i} { tui_key_down }
+tui_key_enter
+
+# 5. Review & Install: the plan is a single module (gum, no deps), so
+#    < proceed > is row 0. Confirm it → the TUI forks the REAL install.
+tui_expect_text "Review & Install"
+tui_expect_text "gum"
+tui_key_enter
+
+# 6. The forked real install streams on the plain terminal, then the TUI
+#    exits with the install's rc. Wait for that and require success.
+set rc [tui_wait_exit_rc]
+if {$rc != 0} { tui_die "TUI exited rc=$rc (want 0); real install fork failed on backend=$backend" }
+exit 0

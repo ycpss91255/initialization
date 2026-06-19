@@ -13,9 +13,23 @@ setup() {
     setup_test_env
     export LOG_LEVEL=INFO
     export LOG_COLOR=false
+    # HERMETIC is_installed (issue #180): the github-release archetype's
+    # is_installed() falls back to `command -v gum` on PATH when the
+    # scratch-scoped BIN_LINK is absent. The test-tools image bakes
+    # /usr/bin/gum (for the AC-10 TUI smoke, issue #171), so that PATH
+    # fallback would report a never-installed module as present and corrupt
+    # every install / sidecar / doctor / is_outdated assertion. Engaging the
+    # existing offline seam (INIT_UBUNTU_TEST_GH_FIXTURE_DIR, lib/module_helper.sh)
+    # suppresses the PATH fallback exactly as the #175 integration harness
+    # does — so is_installed reflects ONLY the scratch BIN_LINK, regardless of
+    # what binaries the image bakes. No production change; mirrors the
+    # integration-side isolation.
+    export INIT_UBUNTU_TEST_GH_FIXTURE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/gh-fixture"
+    mkdir -p "${INIT_UBUNTU_TEST_GH_FIXTURE_DIR}"
 }
 
 teardown() {
+    unset INIT_UBUNTU_TEST_GH_FIXTURE_DIR
     teardown_test_env
 }
 

@@ -61,6 +61,101 @@ if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     return 0 2>/dev/null
 fi
 
+# i18n engine (issue #185): provides i18n_t. The entrypoint sources this first,
+# but this lib is also sourced standalone by the unit bats — guard so the source
+# is idempotent and the helper is always available wherever tui_backend is used.
+if ! declare -F i18n_t >/dev/null 2>&1; then
+    # shellcheck source=lib/i18n.sh
+    source "${BASH_SOURCE[0]%/*}/i18n.sh"
+fi
+
+# ── i18n table (#185): strings tui_backend.sh ITSELF authors ─────────────────
+# Pass-through caller strings (module descriptions, ADR-0019 payload text) are
+# NOT translated here — only this lib's own default widget labels / prompts /
+# menu captions / confirm bodies. `en.<key>` is byte-identical to the prior
+# English literal; zh-TW uses full-width punctuation. {0}{1} are i18n_t args.
+declare -gA TUI_BACKEND_I18N=(
+    # Pre-launch gum install prompt (_tui_prelaunch_backend).
+    [en.prompt_install_gum]="Install gum for a nicer TUI? [Y/n] "
+    [zh-TW.prompt_install_gum]="是否安裝 gum 以獲得更佳的 TUI 體驗? [Y/n] "
+
+    # gum msgbox "continue" footer (_tui_msgbox_gum).
+    [en.press_enter]="Press Enter to continue..."
+    [zh-TW.press_enter]="按 Enter 繼續..."
+
+    # §7.5 form-factor menu labels (tui_platform_choices).
+    [en.pf_desktop]="Desktop / laptop"
+    [zh-TW.pf_desktop]="桌機 / 筆電"
+    [en.pf_server]="Headless server"
+    [zh-TW.pf_server]="無頭伺服器"
+    [en.pf_wsl]="Windows Subsystem for Linux"
+    [zh-TW.pf_wsl]="Windows Subsystem for Linux"
+    [en.pf_rpi4]="Raspberry Pi 4"
+    [zh-TW.pf_rpi4]="Raspberry Pi 4"
+    [en.pf_rpi5]="Raspberry Pi 5"
+    [zh-TW.pf_rpi5]="Raspberry Pi 5"
+    [en.pf_jetson]="NVIDIA Jetson Orin"
+    [zh-TW.pf_jetson]="NVIDIA Jetson Orin"
+
+    # §8.1 main-menu category rows (_tui_category_entry) + fixed rows
+    # (tui_main_menu_entries). Labels carry {0}/{1} where a count is rendered.
+    [en.cat_base_label]="Base Tools"
+    [zh-TW.cat_base_label]="基礎工具"
+    [en.cat_base_desc]="View / toggle base modules"
+    [zh-TW.cat_base_desc]="檢視 / 切換基礎模組"
+    [en.cat_recommended_label]="Recommended ({0}/{1})"
+    [zh-TW.cat_recommended_label]="推薦 ({0}/{1})"
+    [en.cat_recommended_desc]="Environment-aware suggestions"
+    [zh-TW.cat_recommended_desc]="依環境提供的建議"
+    [en.cat_optional_label]="Optional"
+    [zh-TW.cat_optional_label]="選用"
+    [en.cat_optional_desc]="Browse optional modules"
+    [zh-TW.cat_optional_desc]="瀏覽選用模組"
+    [en.cat_experimental_label]="Experimental"
+    [zh-TW.cat_experimental_label]="實驗性"
+    [en.cat_experimental_desc]="Browse experimental modules"
+    [zh-TW.cat_experimental_desc]="瀏覽實驗性模組"
+
+    [en.menu_quick_setup_label]="Quick Setup"
+    [zh-TW.menu_quick_setup_label]="快速安裝"
+    [en.menu_quick_setup_desc]="Install all recommended"
+    [zh-TW.menu_quick_setup_desc]="安裝所有推薦項目"
+    [en.menu_manage_label]="Manage Installed"
+    [zh-TW.menu_manage_label]="管理已安裝項目"
+    [en.menu_manage_desc]="Update / Remove / Purge"
+    [zh-TW.menu_manage_desc]="更新 / 移除 / 清除"
+    [en.menu_secrets_label]="Manage Secrets"
+    [zh-TW.menu_secrets_label]="管理密鑰"
+    [en.menu_secrets_desc]="setup_secrets (SSH/GPG)"
+    [zh-TW.menu_secrets_desc]="setup_secrets (SSH/GPG)"
+    [en.menu_sysinfo_label]="System Info"
+    [zh-TW.menu_sysinfo_label]="系統資訊"
+    [en.menu_sysinfo_desc]="Environment detection details"
+    [zh-TW.menu_sysinfo_desc]="環境偵測詳細資訊"
+    [en.menu_run_label]="Run"
+    [zh-TW.menu_run_label]="執行"
+    [en.menu_run_desc]="Review & install selected modules"
+    [zh-TW.menu_run_desc]="檢閱並安裝所選模組"
+
+    # §8.4 destructive-action confirm body (tui_manage_confirm_text).
+    [en.confirm_about_to]="About to {0} '{1}':"
+    [zh-TW.confirm_about_to]="即將對 '{1}' 執行 {0}:"
+    [en.confirm_run]="  - run: setup_ubuntu {0}"
+    [zh-TW.confirm_run]="  - 執行: setup_ubuntu {0}"
+    [en.confirm_action_module]="  - {0} module: {1}"
+    [zh-TW.confirm_action_module]="  - {0} 模組: {1}"
+    [en.confirm_remove_from_state]="  - remove '{0}' from state.json"
+    [zh-TW.confirm_remove_from_state]="  - 從 state.json 移除 '{0}'"
+    [en.confirm_purge_note]="Purge also deletes the module's config files (CONFIG_PATHS)."
+    [zh-TW.confirm_purge_note]="清除也會刪除該模組的設定檔 (CONFIG_PATHS)。"
+    [en.confirm_remove_note]="The module's config files are retained (Purge deletes them too)."
+    [zh-TW.confirm_remove_note]="該模組的設定檔會保留 (清除則會一併刪除)。"
+)
+# TUI_BACKEND_I18N is consumed by i18n_t via a nameref on the table NAME passed
+# as a bareword argument — static analysis cannot follow that indirection, so
+# make the read explicit here to keep shellcheck honest (no disable directive).
+: "${TUI_BACKEND_I18N[@]+x}"
+
 # Canonical CATEGORY order (PRD §6.3 / module contract §9.1).
 TUI_CATEGORY_ORDER='["base","recommended","optional","experimental"]'
 
@@ -233,7 +328,7 @@ _tui_prelaunch_backend() {
     fi
 
     # Interactive: plain stdin prompt, default Yes.
-    printf 'Install gum for a nicer TUI? [Y/n] ' >&2
+    i18n_t TUI_BACKEND_I18N prompt_install_gum >&2
     local _ans=""
     read -r _ans || _ans=""
     case "${_ans}" in
@@ -436,12 +531,12 @@ tui_install_args() {
 # single source for every platform-override menu (System Info, Quick
 # Setup Step 1).
 tui_platform_choices() {
-    printf 'desktop\tDesktop / laptop\n'
-    printf 'server\tHeadless server\n'
-    printf 'wsl\tWindows Subsystem for Linux\n'
-    printf 'rpi-4\tRaspberry Pi 4\n'
-    printf 'rpi-5\tRaspberry Pi 5\n'
-    printf 'jetson-orin\tNVIDIA Jetson Orin\n'
+    printf 'desktop\t%s\n'     "$(i18n_t TUI_BACKEND_I18N pf_desktop)"
+    printf 'server\t%s\n'      "$(i18n_t TUI_BACKEND_I18N pf_server)"
+    printf 'wsl\t%s\n'         "$(i18n_t TUI_BACKEND_I18N pf_wsl)"
+    printf 'rpi-4\t%s\n'       "$(i18n_t TUI_BACKEND_I18N pf_rpi4)"
+    printf 'rpi-5\t%s\n'       "$(i18n_t TUI_BACKEND_I18N pf_rpi5)"
+    printf 'jetson-orin\t%s\n' "$(i18n_t TUI_BACKEND_I18N pf_jetson)"
 }
 
 # The form factor the wizard filters against: the in-memory override when
@@ -579,18 +674,18 @@ tui_manage_confirm_text() {
     local -a _argv=()
     mapfile -t _argv < <(tui_manage_args "${_action}" "${_module}")
 
-    local _text="About to ${_action^^} '${_module}':"$'\n'
-    _text+="  - run: setup_ubuntu ${_argv[*]}"$'\n'
+    local _text; _text="$(i18n_t TUI_BACKEND_I18N confirm_about_to "${_action^^}" "${_module}")"$'\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N confirm_run "${_argv[*]}")"$'\n'
     local _n
     while IFS= read -r _n; do
-        [[ -n "${_n}" ]] && _text+="  - ${_action} module: ${_n}"$'\n'
+        [[ -n "${_n}" ]] && _text+="$(i18n_t TUI_BACKEND_I18N confirm_action_module "${_action}" "${_n}")"$'\n'
     done <<<"${_plan}"
-    _text+="  - remove '${_module}' from state.json"$'\n\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N confirm_remove_from_state "${_module}")"$'\n\n'
     case "${_action}" in
         purge)
-            _text+="Purge also deletes the module's config files (CONFIG_PATHS)." ;;
+            _text+="$(i18n_t TUI_BACKEND_I18N confirm_purge_note)" ;;
         remove)
-            _text+="The module's config files are retained (Purge deletes them too)." ;;
+            _text+="$(i18n_t TUI_BACKEND_I18N confirm_remove_note)" ;;
     esac
     printf '%s\n' "${_text}"
 }
@@ -602,14 +697,21 @@ _tui_category_entry() {
     read -r _installed _total <<<"$(tui_category_stats "${_json}" "${_cat}")"
     case "${_cat}" in
         base)
-            printf 'base\tBase Tools\tView / toggle base modules\n' ;;
+            printf 'base\t%s\t%s\n' \
+                "$(i18n_t TUI_BACKEND_I18N cat_base_label)" \
+                "$(i18n_t TUI_BACKEND_I18N cat_base_desc)" ;;
         recommended)
-            printf 'recommended\tRecommended (%s/%s)\tEnvironment-aware suggestions\n' \
-                "${_installed}" "${_total}" ;;
+            printf 'recommended\t%s\t%s\n' \
+                "$(i18n_t TUI_BACKEND_I18N cat_recommended_label "${_installed}" "${_total}")" \
+                "$(i18n_t TUI_BACKEND_I18N cat_recommended_desc)" ;;
         optional)
-            printf 'optional\tOptional\tBrowse optional modules\n' ;;
+            printf 'optional\t%s\t%s\n' \
+                "$(i18n_t TUI_BACKEND_I18N cat_optional_label)" \
+                "$(i18n_t TUI_BACKEND_I18N cat_optional_desc)" ;;
         experimental)
-            printf 'experimental\tExperimental\tBrowse experimental modules\n' ;;
+            printf 'experimental\t%s\t%s\n' \
+                "$(i18n_t TUI_BACKEND_I18N cat_experimental_label)" \
+                "$(i18n_t TUI_BACKEND_I18N cat_experimental_desc)" ;;
     esac
 }
 
@@ -633,20 +735,30 @@ tui_main_menu_entries() {
     #   Group 1 — build the pick: quick-setup + category browse rows
     #   Group 2 — manage / info:  manage, secrets, sysinfo
     #   Group 3 — action:         run (the only batch execution point, Q43)
-    printf 'quick-setup\tQuick Setup\tInstall all recommended\n'
+    printf 'quick-setup\t%s\t%s\n' \
+        "$(i18n_t TUI_BACKEND_I18N menu_quick_setup_label)" \
+        "$(i18n_t TUI_BACKEND_I18N menu_quick_setup_desc)"
     while IFS= read -r _cat; do
         _tui_category_entry "${_json}" "${_cat}"
     done < <(tui_categories "${_json}")
     _tui_menu_separator
-    printf 'manage\tManage Installed\tUpdate / Remove / Purge\n'
-    printf 'secrets\tManage Secrets\tsetup_secrets (SSH/GPG)\n'
-    printf 'sysinfo\tSystem Info\tEnvironment detection details\n'
+    printf 'manage\t%s\t%s\n' \
+        "$(i18n_t TUI_BACKEND_I18N menu_manage_label)" \
+        "$(i18n_t TUI_BACKEND_I18N menu_manage_desc)"
+    printf 'secrets\t%s\t%s\n' \
+        "$(i18n_t TUI_BACKEND_I18N menu_secrets_label)" \
+        "$(i18n_t TUI_BACKEND_I18N menu_secrets_desc)"
+    printf 'sysinfo\t%s\t%s\n' \
+        "$(i18n_t TUI_BACKEND_I18N menu_sysinfo_label)" \
+        "$(i18n_t TUI_BACKEND_I18N menu_sysinfo_desc)"
     _tui_menu_separator
     # §8.1 < Run > — the ONLY batch execution point (Q43). Rendered as the
     # last menu row because a second action button next to OK exists only
     # on dialog (--extra-button), not whiptail; a row keeps both backends
     # behaviorally identical. < Exit > is the relabeled Cancel button.
-    printf 'run\tRun\tReview & install selected modules\n'
+    printf 'run\t%s\t%s\n' \
+        "$(i18n_t TUI_BACKEND_I18N menu_run_label)" \
+        "$(i18n_t TUI_BACKEND_I18N menu_run_desc)"
 }
 
 # §8.1 header line from a detect --json payload, e.g.
@@ -814,7 +926,7 @@ _tui_checklist_gum() {
 _tui_msgbox_gum() {
     "${TUI_BACKEND:?TUI_BACKEND not set}" style --border rounded --padding "1 2" \
         "$1" "" "$2"
-    printf 'Press Enter to continue...' >&2
+    i18n_t TUI_BACKEND_I18N press_enter >&2
     read -r REPLY || true
 }
 

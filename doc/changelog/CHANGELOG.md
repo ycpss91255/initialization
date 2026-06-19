@@ -51,6 +51,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Traditional Chinese (zh-TW) for the TUI frontend + backend labels**
+  (issue #185 Phase 2): every user-facing string the TUI itself authors now
+  routes through the `i18n_t` helper and localizes under
+  `INIT_UBUNTU_LANG=zh-TW`. `setup_ubuntu_tui.sh` resolves the UI language
+  once at startup (`i18n_resolve_init_ubuntu_lang`) and adds a `TUI_I18N`
+  table covering the main menu, System Info, category checklists, Review &
+  Install, the Quick Setup wizard, Manage Installed / destructive-action
+  confirms, and button captions; `lib/tui_backend.sh` adds a
+  `TUI_BACKEND_I18N` table for its own default widget labels (category /
+  menu rows, form-factor choices, the gum install prompt, the §8.4 confirm
+  body). Caller pass-through text (module descriptions, ADR-0019 payload
+  fields, `setup_ubuntu detect`/dry-run output) is left as-is — only the
+  TUI's own strings translate, and both gum and whiptail render the
+  localized labels identically. English output is byte-identical to before.
+
 - **Real engine-lifecycle integration harness** (issue #175 / #176): a new
   `test/integration/lifecycle/engine_lifecycle_spec.bats` drives the REAL
   non-dry-run path `setup_ubuntu.sh → dispatcher → runner → source module →

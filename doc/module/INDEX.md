@@ -3,7 +3,7 @@
 
 # Module Index
 
-31 modules. Columns come from each module's metadata block
+32 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -25,6 +25,7 @@ to the module source.
 | [fzf](../../module/fzf.module.sh) | optional | cli-essentials | fzf command-line fuzzy finder (single-binary GitHub release) |
 | [gemini](../../module/gemini.module.sh) | optional | agent | gemini — Google Gemini CLI coding agent (npm install via fnm-managed Node.js) |
 | [git-config](../../module/git-config.module.sh) | recommended | config git dotfile | Personal ~/.gitconfig (aliases, delta diff, rebase pull, ...) |
+| [gum](../../module/gum.module.sh) | optional | cli-essentials tui | gum — a tool for glamorous shell scripts (preferred modern TUI backend) |
 | [jetson-stats](../../module/jetson-stats.module.sh) | optional | hardware | jetson-stats — jtop monitor TUI for NVIDIA Jetson (iGPU, nvpmodel, clocks, fan) |
 | [lazydocker](../../module/lazydocker.module.sh) | optional | cli-essentials | lazydocker — terminal UI (TUI) for Docker and docker compose |
 | [lazygit](../../module/lazygit.module.sh) | optional | cli-essentials | lazygit — terminal UI for git commands |

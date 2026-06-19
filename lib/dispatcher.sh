@@ -272,6 +272,30 @@ _dispatcher_list() {
     done <<< "${_names}"
 }
 
+# Localized module DESCRIPTION for `show` (issue #183). Sources the module in
+# an isolated fork-style subshell — same mechanism `list --json` uses for the
+# description field (keeps declares / traps scoped, set -u + coverage happy) and
+# stays fully offline (no network). Honors INIT_UBUNTU_LANG via the i18n catalog
+# (module_get_description → module_i18n_get). Prints nothing when the module
+# file is missing or exposes no DESCRIPTION.
+_dispatcher_module_description() {
+    local _file="$1" _lang="${INIT_UBUNTU_LANG:-en}"
+    [[ -n "${_file}" && -f "${_file}" ]] || return 0
+    (
+        # shellcheck source=/dev/null  # module path is dynamic; static resolution impossible — https://www.shellcheck.net/wiki/SC1090
+        source "${LIB_DIR}/logger.sh" >/dev/null 2>&1
+        # shellcheck source=/dev/null  # dynamic lib path
+        source "${LIB_DIR}/general.sh" >/dev/null 2>&1
+        # shellcheck source=/dev/null  # dynamic lib path
+        source "${LIB_DIR}/module_helper.sh" >/dev/null 2>&1
+        # shellcheck source=/dev/null  # module path is dynamic
+        source "${_file}" >/dev/null 2>&1 || exit 0
+        if declare -F module_get_description >/dev/null 2>&1; then
+            module_get_description "${_lang}" 2>/dev/null
+        fi
+    )
+}
+
 _dispatcher_show() {
     local _name="${1:-}"
     if [[ -z "${_name}" ]]; then
@@ -282,14 +306,16 @@ _dispatcher_show() {
         printf "[dispatcher] ERROR: unknown module %s\n" "${_name}" >&2
         return 2
     fi
-    printf "name:       %s\n"  "${_name}"
-    printf "file:       %s\n"  "$(registry_get_field "${_name}" file)"
-    printf "category:   %s\n"  "$(registry_get_field "${_name}" category)"
-    printf "tags:       %s\n"  "$(registry_get_field "${_name}" tags)"
-    printf "deps:       %s\n"  "$(registry_get_field "${_name}" deps)"
-    printf "conflicts:  %s\n"  "$(registry_get_field "${_name}" conflicts)"
-    printf "ubuntu:     %s\n"  "$(registry_get_field "${_name}" ubuntu)"
-    printf "platforms:  %s\n"  "$(registry_get_field "${_name}" platforms)"
+    local _file; _file="$(registry_get_field "${_name}" file)"
+    printf "name:        %s\n"  "${_name}"
+    printf "file:        %s\n"  "${_file}"
+    printf "description: %s\n"  "$(_dispatcher_module_description "${_file}")"
+    printf "category:    %s\n"  "$(registry_get_field "${_name}" category)"
+    printf "tags:        %s\n"  "$(registry_get_field "${_name}" tags)"
+    printf "deps:        %s\n"  "$(registry_get_field "${_name}" deps)"
+    printf "conflicts:   %s\n"  "$(registry_get_field "${_name}" conflicts)"
+    printf "ubuntu:      %s\n"  "$(registry_get_field "${_name}" ubuntu)"
+    printf "platforms:   %s\n"  "$(registry_get_field "${_name}" platforms)"
 }
 
 # ── install / remove / purge ─────────────────────────────────────────────────

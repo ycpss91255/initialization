@@ -197,21 +197,16 @@ FIXTURE_QS_DETECT_JSON='{"os":{"id":"ubuntu","version":"24.04","codename":"noble
 
 # ── Step 2: recommended entries (§15.3 platform → Q36 enabled → recommended) ─
 
-@test "tui_qs_recommended_entries clips long descriptions to the width budget (#168)" {
-    # Force a tiny width so the existing short fixture descriptions overflow,
-    # proving the QS rows are clipped too (#168 covers QS + category lists).
+@test "tui_qs_recommended_entries emits FULL descriptions, unclipped (#183)" {
+    # #183: the QS producer no longer clips (the #168 budget moved into the
+    # whiptail adapter). Even at an absurdly tiny width the producer must emit
+    # the whole description and inject no ellipsis — gum renders full text.
     TUI_WIDTH=24 run tui_qs_recommended_entries "${FIXTURE_QS_LIST_JSON}" desktop
     assert_success
-    # longest name here is "nvidia-driver" (13) → budget 24 - 13 - 8 = 3,
-    # floored to the minimum of 20. No item (field 2) may exceed 20.
-    local _budget=20
-    while IFS=$'\t' read -r _name _item _status; do
-        [ -n "${_item}" ] || continue
-        [ "${#_item}" -le "${_budget}" ] || {
-            printf 'QS item over budget (%d > %d): %s\n' "${#_item}" "${_budget}" "${_item}" >&3
-            return 1
-        }
-    done <<<"${output}"
+    refute_output --partial "…"
+    # full fixture descriptions survive verbatim (would be clipped at width 24).
+    assert_line --partial "$(printf '\tTerminal multiplexer\t')"
+    assert_line --partial "$(printf '\tDocker Engine\t')"
 }
 
 @test "tui_qs_recommended_entries preselects is_recommended modules" {

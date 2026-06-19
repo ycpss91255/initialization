@@ -32,11 +32,20 @@ _remote() {
 # slate (tests share one receiver container per suite run). Paths are
 # home-relative: ssh remote commands start in syncuser's home dir.
 _reset_receiver() {
-    _remote 'rm -f .local/state/init_ubuntu/state.json .local/share/e2e-probe-installed'
+    # state.json + every archetype's install artifact (e2e-probe marker,
+    # e2e-ghr binary + payload dir + Sidecar, ssh-config drop) so each test
+    # asserts from a clean slate. The e2e-ghr release tarball + the modules
+    # themselves are receiver-entry.sh fixtures and are NOT removed.
+    _remote 'rm -rf .local/state/init_ubuntu/state.json \
+        .local/share/e2e-probe-installed \
+        .local/bin/e2e-ghr \
+        .local/share/init_ubuntu/e2e-ghr \
+        .local/state/init_ubuntu/versions/e2e-ghr \
+        .ssh/config'
 }
 
 setup_file() {
-    # The two tests below share one receiver; remote state assertions are
+    # The tests below share one receiver; remote state assertions are
     # only meaningful when they do not interleave.
     export BATS_NO_PARALLELIZE_WITHIN_FILE=true
 
@@ -145,6 +154,73 @@ teardown() {
     # The import went through the real install pipeline (PRD §16.3 step 5):
     # the fixture module's install() left its marker.
     run _remote 'test -f .local/share/e2e-probe-installed'
+    assert_success
+
+    # The transferred payload is cleaned up on the remote side.
+    run _remote 'test -f /tmp/init_ubuntu_sync.json'
+    assert_failure
+}
+
+# Seed the SENDER state with a MIXED-archetype set on top of e2e-probe:
+# `e2e-ghr` (github-release) + `ssh-config` (config drop). Both are known to
+# the receiver's catalog — e2e-ghr via receiver-entry.sh's user-local module,
+# ssh-config via the bundled repo catalog mounted at /source.
+_seed_mixed_sender_state() {
+    (
+        # shellcheck source=../../lib/logger.sh
+        source "${LIB_DIR}/logger.sh"
+        # shellcheck source=../../lib/general.sh
+        source "${LIB_DIR}/general.sh"
+        # shellcheck source=../../lib/state.sh
+        source "${LIB_DIR}/state.sh"
+        state_init
+        # version_provided is remote-wins and lands in the receiver state.
+        state_record_install e2e-ghr true 1.2.3
+        state_record_install ssh-config false 1.0
+    )
+}
+
+@test "sync --apply with MIXED archetypes: receiver REALLY reinstalls github-release + config (AC-15)" {
+    _seed_mixed_sender_state
+
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" sync "${TARGET}" --apply
+    assert_success
+    assert_output --partial "pushed state"
+
+    # ── github-release archetype (e2e-ghr) reinstalled through the REAL
+    #    non-dry-run engine path on the receiver (PRD §16.3 step 5): the
+    #    offline fixture seam fed the fetch, then the macro-wired install
+    #    extracted + symlinked + wrote the Sidecar. No #174 wiring errors. ──
+    refute_output --partial "command not found"
+    refute_output --partial "module does not define"
+
+    # state.json records the github-release module, remote-wins version sticks.
+    run _remote 'jq -er ".installed[\"e2e-ghr\"].synced.version_provided" .local/state/init_ubuntu/state.json'
+    assert_success
+    assert_output "1.2.3"
+    run _remote 'jq -er ".installed[\"e2e-ghr\"].synced.manual" .local/state/init_ubuntu/state.json'
+    assert_success
+    assert_output "true"
+
+    # Real extract + symlink produced a runnable binary, and the payload dir
+    # was unpacked under the module's user-home INSTALL_DIR.
+    run _remote 'test -x .local/bin/e2e-ghr'
+    assert_success
+    run _remote '.local/bin/e2e-ghr'
+    assert_success
+    assert_output --partial "e2e-ghr version v1.2.3"
+    # Sidecar (ADR-0001) written on install success.
+    run _remote 'cat .local/state/init_ubuntu/versions/e2e-ghr'
+    assert_success
+    assert_output "1.2.3"
+
+    # ── config archetype (ssh-config) reinstalled: state entry + the managed
+    #    file dropped by the real config-drop install on the receiver. ──
+    run _remote 'jq -e ".installed[\"ssh-config\"]" .local/state/init_ubuntu/state.json'
+    assert_success
+    run _remote 'test -f .ssh/config'
+    assert_success
+    run _remote 'grep -q "init_ubuntu managed" .ssh/config'
     assert_success
 
     # The transferred payload is cleaned up on the remote side.

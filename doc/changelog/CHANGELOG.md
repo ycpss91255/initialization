@@ -52,13 +52,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 ### Added
 
 - **`enforce_long_job_timeout` PreToolUse hook**: blocks a known-long
-  FOREGROUND Bash command (full `just` test/coverage/lint, whole-tree `bats`
-  glob, `kcov`, `docker build`, `docker compose run`) that has neither
-  `run_in_background: true` nor a `timeout` param (a self-wrapped `timeout(1)`
-  also passes). Prevents hung jobs from wedging the session indefinitely (a
-  lint run once stalled 54 min, a coverage run 25 min). A first-token
-  whitelist (git/gh/grep/echo/…) keeps trigger words inside commit messages /
-  PR bodies from false-positiving.
+  FOREGROUND Bash command (full `just` test/coverage/lint, `kcov`,
+  `docker build`, `docker compose run`) that has neither `run_in_background:
+  true` nor a `timeout` param (a self-wrapped `timeout(1)` also passes).
+  Prevents hung jobs from wedging the session indefinitely (a lint run once
+  stalled 54 min, a coverage run 25 min). Detection is per-sub-command on a
+  quote-stripped copy (split on `; && || |` + newlines, leading `cd`/`sudo`/
+  `env`/`VAR=` wrappers stripped, text-carrier launchers like git/gh/grep/echo
+  skipped), so trigger words and separators inside commit messages, JSON test
+  payloads, or `gh` bodies do not false-positive — verified by the hook
+  blocking its own first dogfood command.
 
 - **Traditional Chinese (zh-TW) for the TUI frontend + backend labels**
   (issue #185 Phase 2): every user-facing string the TUI itself authors now

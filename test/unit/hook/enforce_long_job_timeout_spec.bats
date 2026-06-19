@@ -26,72 +26,96 @@ _bash_json() {
             + (if $to == null then {} else {timeout:$to} end))}'
 }
 
+# _run_hook <json> — feed JSON to the hook on stdin. JSON and the hook path are
+# passed as positional args (not interpolated into the command string), so
+# single quotes / `*` globs inside the command value can't break the harness.
+_run_hook() {
+    run bash -c 'printf "%s" "$1" | "$2"' _ "$1" "${HOOK_SH}"
+}
+
 # ── blocked: long foreground jobs with no time bound ─────────────────────────
 
 @test "blocks 'just coverage' with no timeout / not backgrounded" {
-    run bash -c "printf '%s' '$(_bash_json "just -f justfile.ci coverage")' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "just -f justfile.ci coverage")"
     [ "${status}" -eq 2 ]
     [[ "${output}" == *"BLOCKED"* ]]
 }
 
 @test "blocks 'just test-unit core' with no bound" {
-    run bash -c "printf '%s' '$(_bash_json "just -f justfile.ci test-unit core")' | '${HOOK_SH}'"
-    [ "${status}" -eq 2 ]
-}
-
-@test "blocks a whole-tree bats glob run" {
-    run bash -c "printf '%s' '$(_bash_json "docker run --entrypoint bash img -c 'bats test/unit/*.bats'")' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "just -f justfile.ci test-unit core")"
     [ "${status}" -eq 2 ]
 }
 
 @test "blocks 'docker build' with no bound" {
-    run bash -c "printf '%s' '$(_bash_json "docker build -t x .")' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "docker build -t x .")"
     [ "${status}" -eq 2 ]
 }
 
 @test "blocks a docker compose service run with no bound" {
-    run bash -c "printf '%s' '$(_bash_json "docker compose -f compose.yaml run --rm coverage -c x")' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "docker compose -f compose.yaml run --rm coverage -c x")"
     [ "${status}" -eq 2 ]
 }
 
 @test "blocks an env-prefixed long launch (first token is the env assignment)" {
-    run bash -c "printf '%s' '$(_bash_json "INIT_UBUNTU_LANG=x just -f justfile.ci coverage")' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "INIT_UBUNTU_LANG=x just -f justfile.ci coverage")"
     [ "${status}" -eq 2 ]
 }
 
 # ── allowed: bounded, backgrounded, short, or text-carriers ──────────────────
 
 @test "allows 'just coverage' when the timeout param is set" {
-    run bash -c "printf '%s' '$(_bash_json "just -f justfile.ci coverage" "" 600000)' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "just -f justfile.ci coverage" "" 600000)"
     [ "${status}" -eq 0 ]
 }
 
 @test "allows 'just coverage' when run_in_background is true" {
-    run bash -c "printf '%s' '$(_bash_json "just -f justfile.ci coverage" true)' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "just -f justfile.ci coverage" true)"
     [ "${status}" -eq 0 ]
 }
 
 @test "allows a self-wrapped timeout(1) command" {
-    run bash -c "printf '%s' '$(_bash_json "timeout 600 just -f justfile.ci lint")' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "timeout 600 just -f justfile.ci lint")"
     [ "${status}" -eq 0 ]
 }
 
 @test "allows a targeted single-spec bats run (no '*' glob)" {
-    run bash -c "printf '%s' '$(_bash_json "docker run --rm img bats test/unit/foo_spec.bats")' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "docker run --rm img bats test/unit/foo_spec.bats")"
     [ "${status}" -eq 0 ]
 }
 
 @test "allows a git commit whose message contains trigger words" {
-    run bash -c "printf '%s' '$(_bash_json "git commit -m 'just test the lint coverage wording'")' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "git commit -m 'just test the lint coverage wording'")"
     [ "${status}" -eq 0 ]
 }
 
 @test "allows a gh pr body that mentions just coverage" {
-    run bash -c "printf '%s' '$(_bash_json "gh pr create --body 'runs just coverage in CI'")' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "gh pr create --body 'runs just coverage in CI'")"
     [ "${status}" -eq 0 ]
 }
 
 @test "allows a short ordinary command" {
-    run bash -c "printf '%s' '$(_bash_json "git status")' | '${HOOK_SH}'"
+    _run_hook "$(_bash_json "git status")"
+    [ "${status}" -eq 0 ]
+}
+
+# ── per-sub-command analysis (cd-prefixed compounds) ─────────────────────────
+
+@test "allows 'cd repo && git commit' whose message mentions kcov / coverage" {
+    _run_hook "$(_bash_json "cd /repo && git commit -m 'fix under CI kcov run; just coverage wording'")"
+    [ "${status}" -eq 0 ]
+}
+
+@test "allows a multi-line cd + git commit with trigger words in the body" {
+    _run_hook "$(_bash_json "$(printf 'cd /repo\ngit add x\ngit commit -m "ran kcov and just coverage"')")"
+    [ "${status}" -eq 0 ]
+}
+
+@test "still blocks a real long launch after a cd prefix" {
+    _run_hook "$(_bash_json "cd /repo && just -f justfile.ci coverage")"
+    [ "${status}" -eq 2 ]
+}
+
+@test "allows a bare 'cd repo'" {
+    _run_hook "$(_bash_json "cd /home/x/repo")"
     [ "${status}" -eq 0 ]
 }

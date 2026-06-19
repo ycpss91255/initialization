@@ -252,6 +252,17 @@ jobs:
   # irrelevant. 26.04 is mandatory from day one: no `continue-on-error`
   # on any shard (AC-3 / AC-18 carry no exemption). Skipped on doc-only
   # changes like the other heavy jobs.
+  #
+  # Issue #175/#176: this matrix now also runs the real engine-lifecycle
+  # harness (test/integration/lifecycle/engine_lifecycle_spec.bats) — a
+  # NON-ROOT user driving the REAL non-dry-run setup_ubuntu.sh per archetype
+  # (github-release full incl. upgrade/Sidecar bump; config + custom full;
+  # apt reduced) with ONLY the github-release fetch stubbed offline. Because
+  # AC-1/2/3 base-install now exercises a github-release-archetype module
+  # across all three ubuntu shards, the engine wiring the #174 bug broke is
+  # asserted on 22.04/24.04/26.04. INIT_UBUNTU_TEST_IMAGE (set below) is
+  # forwarded into the container by script/ci/ci.sh so the harness can record
+  # which matrix target each shard stands in for.
   test-integration:
     name: test-integration (ubuntu:${{ matrix.ubuntu }})
     needs: [changes, build-image]

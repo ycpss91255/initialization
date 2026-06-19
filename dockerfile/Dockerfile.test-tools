@@ -89,6 +89,15 @@ RUN apk add --no-cache curl xz && \
 #   - curl               [init_ubuntu addition] tool self-dep (preflight,
 #                        PRD §3.4): e2e specs drive the real entrypoint,
 #                        which gates non-help subcommands on jq/curl/git
+#   - file               [init_ubuntu addition] real engine-lifecycle
+#                        harness (issue #175/#176): the github-release
+#                        archetype sniffs the fetched tarball with `file`
+#                        before extracting; busybox alpine omits it, so the
+#                        offline real-install spec needs the GNU package
+#   - tar                [init_ubuntu addition] same harness: the
+#                        github-release extract uses `tar --strip-components`;
+#                        bundle GNU tar so behaviour matches the real
+#                        ubuntu targets rather than busybox tar
 #   - openssl            [init_ubuntu addition] secrets encrypted-file
 #                        backend round-trip tests run real `openssl enc`
 #                        inside the container (PRD §14.3, issue #44)
@@ -111,6 +120,8 @@ RUN apk add --no-cache \
         gum \
         expect \
         jq curl \
+        file \
+        tar \
         openssl \
         openssh
 

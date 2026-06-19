@@ -68,6 +68,14 @@ test-unit module="": _ensure-image
     ./script/ci/ci.sh --unit-only {{ if module != "" { "--module " + module } else { "" } }}
 
 # Run integration bats only (slower; container-based).
+#
+# Sweeps the whole test/integration/ tree, including the real
+# engine-lifecycle harness (test/integration/lifecycle/, issue #175/#176):
+# a NON-ROOT user drives the REAL non-dry-run setup_ubuntu.sh per archetype
+# (github-release / config / custom real; apt reduced) with ONLY the
+# github-release network fetch stubbed offline. CI runs this recipe across
+# the ubuntu:22.04/24.04/26.04 matrix (ci.yaml test-integration), so AC-1/2/3
+# "lands on all three images" is the green aggregate of the three shards.
 test-integration: _ensure-image
     ./script/ci/ci.sh --integration-only
 

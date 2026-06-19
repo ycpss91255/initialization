@@ -56,6 +56,10 @@ declare -gA SECRETS_ENTRY_I18N=(
     [en.token_prompt]="Enter value for token {0}: "
     [zh-TW.token_prompt]="請輸入權杖 {0} 的值："
 )
+# SECRETS_ENTRY_I18N is consumed by i18n_t via a nameref on the table NAME passed
+# as a bareword argument — static analysis cannot follow that indirection, so
+# make the read explicit here to keep shellcheck honest (no disable directive).
+: "${SECRETS_ENTRY_I18N[@]+x}"
 
 # ── usage ────────────────────────────────────────────────────────────────────
 

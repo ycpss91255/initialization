@@ -78,6 +78,10 @@ declare -gA PREFLIGHT_I18N=(
     [en.installed]="[preflight] installed: {0}"
     [zh-TW.installed]="[preflight] 已安裝：{0}"
 )
+# PREFLIGHT_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
+# bareword argument — static analysis cannot follow that indirection, so make
+# the read explicit here to keep shellcheck honest (no disable directive).
+: "${PREFLIGHT_I18N[@]+x}"
 
 : "${INIT_UBUNTU_YES:=false}"
 

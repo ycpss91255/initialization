@@ -35,6 +35,14 @@ if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     return 0 2>/dev/null
 fi
 
+# i18n_t (issue #185) lives in lib/i18n.sh. The entrypoint sources it before
+# dispatching, but make this lib self-sufficient (unit specs source runner.sh
+# directly) by loading it on demand when the helper is not yet defined.
+if ! declare -F i18n_t >/dev/null 2>&1; then
+    # shellcheck source=lib/i18n.sh
+    source "${BASH_SOURCE[0]%/*}/i18n.sh"
+fi
+
 # ── i18n: user-facing strings (issue #185 Phase 2) ──────────────────────────
 # Human-readable progress / summary / failure-dump strings rendered via
 # i18n_t (lib/i18n.sh). log_* output stays English; only stdout/stderr lines

@@ -26,6 +26,14 @@ fi
 : "${INIT_UBUNTU_YES:=false}"
 : "${INIT_UBUNTU_NO_DEPS:=false}"
 
+# i18n_t (issue #185) lives in lib/i18n.sh. The entrypoint sources it before
+# dispatching, but make this lib self-sufficient (unit specs source dispatcher.sh
+# directly) by loading it on demand when the helper is not yet defined.
+if ! declare -F i18n_t >/dev/null 2>&1; then
+    # shellcheck source=lib/i18n.sh
+    source "${BASH_SOURCE[0]%/*}/i18n.sh"
+fi
+
 # ── i18n message table (issue #185, Phase 2) ─────────────────────────────────
 # File-local catalog for the HUMAN-readable strings the dispatcher prints to
 # stdout/stderr. Resolved by i18n_t (lib/i18n.sh): ${INIT_UBUNTU_LANG}.<key> ->
@@ -141,6 +149,10 @@ See PRD §7 for the full CLI specification."
   ["en.will_upgrade"]="Will upgrade {0} module(s): {1}"
   ["zh-TW.will_upgrade"]="即將升級 {0} 個模組:{1}"
 )
+# DISPATCHER_I18N is consumed by i18n_t via a nameref on the table NAME passed as
+# a bareword argument — static analysis cannot follow that indirection, so make
+# the read explicit here to keep shellcheck honest (no disable directive).
+: "${DISPATCHER_I18N[@]+x}"
 
 # ── Help ─────────────────────────────────────────────────────────────────────
 

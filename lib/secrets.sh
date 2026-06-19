@@ -52,6 +52,14 @@ readonly SECRETS_PBKDF2_ITER=300000
 
 readonly SECRETS_PASS_PREFIX="init_ubuntu"
 
+# i18n_t (issue #185) lives in lib/i18n.sh. setup_secrets.sh sources it before
+# this lib, but make the lib self-sufficient (unit specs source secrets.sh
+# directly) by loading it on demand when the helper is not yet defined.
+if ! declare -F i18n_t >/dev/null 2>&1; then
+    # shellcheck source=lib/i18n.sh
+    source "${BASH_SOURCE[0]%/*}/i18n.sh"
+fi
+
 # ── i18n: user-facing interactive prompts (issue #185) ───────────────────────
 # Only the human-readable /dev/tty passphrase prompts are localized; every
 # log_* diagnostic stays English (operator-facing). i18n_t is provided by
@@ -63,6 +71,10 @@ declare -gA SECRETS_I18N=(
     [en.passphrase_confirm]="Confirm passphrase: "
     [zh-TW.passphrase_confirm]="請再次確認密碼短語："
 )
+# SECRETS_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
+# bareword argument — static analysis cannot follow that indirection, so make
+# the read explicit here to keep shellcheck honest (no disable directive).
+: "${SECRETS_I18N[@]+x}"
 
 # ── backend selection ────────────────────────────────────────────────────────
 

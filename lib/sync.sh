@@ -114,6 +114,10 @@ declare -gA SYNC_I18N=(
     [en.scp_download_failed]="[sync] ERROR: scp download failed"
     [zh-TW.scp_download_failed]="[sync] 錯誤：scp 下載失敗"
 )
+# SYNC_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
+# bareword argument — static analysis cannot follow that indirection, so make
+# the read explicit here to keep shellcheck honest (no disable directive).
+: "${SYNC_I18N[@]+x}"
 
 readonly SYNC_SSH_OPTS=(
     -o "StrictHostKeyChecking=yes"

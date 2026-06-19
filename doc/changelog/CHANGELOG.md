@@ -55,6 +55,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   API lookup). The `test-tools` image gains `file` + `tar` for the real
   extract path.
 
+- **AC-11 TUI → Proceed → REAL install integration test** (issue #178): a new
+  `test/integration/tui/tui_real_install_spec.bats` drives the live TUI on a
+  pseudo-tty through `Run → Review → Proceed` and proves the TUI forks the
+  REAL `setup_ubuntu install` pipeline (CLI/TUI parity, PRD G4) — the AC-10
+  smoke stopped at `< Exit >` with a recording-mock CLI and never reached a
+  real install. A wrapper CLI serves the menu's `list/detect --json` reads
+  from a controlled fixture (gum as the lone Optional module → deterministic
+  navigation) while routing the Proceed fork to the real `setup_ubuntu.sh`,
+  reusing the #175 offline github-release seam + `INIT_UBUNTU_NO_DEPS` so gum
+  installs offline as a non-root user; the spec asserts the module actually
+  landed (state.json + Sidecar + binary). Covers whiptail (always) and gum
+  (skips when absent from the image). Test-only; no production code changed.
+
 - **gum as the preferred TUI backend** (issue #171, ADR-0023): a new
   `module/gum.module.sh` (github-release archetype, multi-arch asset
   selection `gum_<ver>_Linux_{x86_64,arm64,armv7}.tar.gz`, user-home install

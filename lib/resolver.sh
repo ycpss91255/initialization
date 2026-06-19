@@ -91,6 +91,27 @@ resolver_resolve() {
         fi
     done
 
+    # 2b. Conflict enforcement (PRD §7.4 dep/conflict class = 5). A module's
+    # CONFLICTS_WITH (MODULES_CONFLICTS, populated by registry_load_all) names
+    # modules it cannot coexist with. If any closure member declares a conflict
+    # against another closure member, the requested set is unsatisfiable —
+    # fail dep resolution with 5 (not topo-sorted into an install order).
+    local _other _conflicts_str
+    local -a _conflicts
+    for _name in "${!_closure[@]}"; do
+        _conflicts_str="${MODULES_CONFLICTS[${_name}]:-}"
+        [[ -z "${_conflicts_str}" ]] && continue
+        read -r -a _conflicts <<< "${_conflicts_str}"
+        for _other in "${_conflicts[@]}"; do
+            [[ -z "${_other}" ]] && continue
+            if [[ -n "${_closure[${_other}]:-}" ]]; then
+                printf "[resolver] ERROR: module %s conflicts with %s (CONFLICTS_WITH)\n" \
+                    "${_name}" "${_other}" >&2
+                return 5
+            fi
+        done
+    done
+
     # 3. In-degree per node (edge dep -> dependent; in-degree counts deps).
     local -A _indeg=()
     for _name in "${!_closure[@]}"; do

@@ -296,10 +296,24 @@ _runner_render_action_required() {
 
 # ── Public: orchestrators for each phase ─────────────────────────────────────
 
+# Map a phase to its PRD §7.4 lifecycle-class failure code:
+#   Action class (install/upgrade/remove/purge) → 6 (partial module failure)
+#   Diag   class (verify/doctor)               → 1 (general fail; §7.4 reserves
+#                                                    7 for the network subcase)
+# A wrong mapping leaks the Action-class code 6 out of the Diag subcommands.
+_runner_fail_code() {
+    case "${1}" in
+        verify|doctor) printf '1' ;;
+        *)             printf '6' ;;
+    esac
+}
+
 _runner_run_batch() {
     local _phase="${1:?_runner_run_batch needs <phase>}"
     shift
     local -a _modules=("$@")
+    local _fail_code
+    _fail_code="$(_runner_fail_code "${_phase}")"
 
     if [[ "${#_modules[@]}" -eq 0 ]]; then
         log_info "[runner] No modules to ${_phase}."
@@ -338,7 +352,7 @@ _runner_run_batch() {
     # (PRD §10.2). The runner has no skip path yet, so skipped is always 0
     # until a skip-producing feature (e.g. compat filtering) lands.
     local _exit_code=0
-    [[ "${_failures}" -gt 0 ]] && _exit_code=6
+    [[ "${_failures}" -gt 0 ]] && _exit_code="${_fail_code}"
     log_event info "" "session_end" \
         "phase=${_phase}" \
         "exit_code=${_exit_code}" \
@@ -357,7 +371,7 @@ _runner_run_batch() {
 
     if [[ "${_failures}" -gt 0 ]]; then
         log_error "[runner] ${_failures} module(s) failed during ${_phase}; ${_ok} succeeded."
-        return 6
+        return "${_fail_code}"
     fi
     log_info "[runner] ${_phase} batch complete: ${_ok} module(s) processed."
     return 0

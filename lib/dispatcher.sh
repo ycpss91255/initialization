@@ -333,9 +333,16 @@ _dispatcher_lifecycle() {
     if [[ "${INIT_UBUNTU_NO_DEPS}" == "true" ]]; then
         _order=("${_modules[@]}")
     else
-        local _resolved
-        _resolved="$(resolver_resolve "${_modules[@]}")"
-        local _rc=$?
+        # PRD §7.4: the resolver returns 2 (unknown module) / 5 (dep cycle or
+        # CONFLICTS_WITH) on failure. setup_ubuntu.sh runs under
+        # `set -euo pipefail; shopt -s inherit_errexit`, so a bare command
+        # substitution would abort the whole script with status 1 before we
+        # could read $? — masking the real 2/5 to a generic 1. The `|| _rc=$?`
+        # tail both suspends errexit for the substitution AND preserves the
+        # resolver's real status (unlike `if ! ...`, where the negation resets
+        # $? to 0 inside the branch), so we can propagate 2/5 verbatim.
+        local _resolved _rc=0
+        _resolved="$(resolver_resolve "${_modules[@]}")" || _rc=$?
         if [[ "${_rc}" -ne 0 ]]; then
             return "${_rc}"
         fi
@@ -800,7 +807,97 @@ _dispatcher_verify() {
     runner_verify "${_modules[@]}"
 }
 
+# doctor --validate-modules (PRD §9.1 / §7.4 / AC-24): lint every registered
+# module's metadata. Each module must declare a name + category, every
+# DEPENDS_ON entry must resolve through the registry, and every CONFLICTS_WITH
+# entry must name a real module. Any invalid metadata / unresolvable dep is an
+# argument-class error → exit 2 (NOT the drift-report 0/1 of plain doctor).
+_dispatcher_doctor_validate_modules() {
+    if ! declare -F registry_list_names >/dev/null 2>&1; then
+        printf "[dispatcher] ERROR: registry not loaded\n" >&2
+        return 1
+    fi
+
+    printf "%-30s  %s\n" "MODULE" "METADATA"
+    local _names; _names="$(registry_list_names)"
+    local _invalid=0
+    local _n _cat _deps _conflicts _c
+    local -a _conflict_arr
+    if [[ -n "${_names}" ]]; then
+        while IFS= read -r _n; do
+            [[ -n "${_n}" ]] || continue
+            _cat="$(registry_get_field "${_n}" category)"
+            _deps="$(registry_get_field "${_n}" deps)"
+            _conflicts="$(registry_get_field "${_n}" conflicts)"
+
+            if [[ -z "${_cat}" ]]; then
+                printf "%-30s  %s\n" "${_n}" "INVALID (missing category)"
+                _invalid=$((_invalid + 1))
+                continue
+            fi
+
+            # DEPENDS_ON must resolve (resolver returns 2 unknown / 5 cycle).
+            if ! resolver_resolve "${_n}" >/dev/null 2>&1; then
+                printf "%-30s  %s\n" "${_n}" "INVALID (unresolvable DEPENDS_ON / dep conflict)"
+                _invalid=$((_invalid + 1))
+                continue
+            fi
+
+            # CONFLICTS_WITH must name real modules.
+            local _bad_conflict=""
+            if [[ -n "${_conflicts}" ]]; then
+                read -r -a _conflict_arr <<< "${_conflicts}"
+                for _c in "${_conflict_arr[@]}"; do
+                    [[ -z "${_c}" ]] && continue
+                    if ! registry_has "${_c}"; then
+                        _bad_conflict="${_c}"
+                        break
+                    fi
+                done
+            fi
+            if [[ -n "${_bad_conflict}" ]]; then
+                printf "%-30s  %s\n" "${_n}" "INVALID (CONFLICTS_WITH unknown module ${_bad_conflict})"
+                _invalid=$((_invalid + 1))
+                continue
+            fi
+
+            printf "%-30s  %s\n" "${_n}" "OK"
+        done <<< "${_names}"
+    fi
+
+    if [[ "${_invalid}" -gt 0 ]]; then
+        printf "\n[dispatcher] doctor --validate-modules: %s module(s) have invalid metadata\n" "${_invalid}" >&2
+        return 2
+    fi
+    printf "\n[dispatcher] doctor --validate-modules: all module metadata is valid.\n"
+}
+
 _dispatcher_doctor() {
+    # PRD §9.1 / AC-24: `--validate-modules` runs the metadata linter instead
+    # of the state-drift report. Parse argv so the flag is honored; an unknown
+    # flag is an argument error (exit 2). Plain `doctor` (no args) keeps the
+    # original 0/1 drift behavior.
+    local _arg
+    for _arg in "$@"; do
+        case "${_arg}" in
+            --validate-modules)
+                _dispatcher_doctor_validate_modules
+                return $?
+                ;;
+            --fix)
+                printf "[dispatcher] WARN: %s is stubbed; ignoring\n" "${_arg}" >&2
+                ;;
+            -*)
+                printf "[dispatcher] ERROR: unknown doctor flag %s\n" "${_arg}" >&2
+                return 2
+                ;;
+            *)
+                printf "[dispatcher] ERROR: doctor takes no positional args (got '%s')\n" "${_arg}" >&2
+                return 2
+                ;;
+        esac
+    done
+
     if ! declare -F state_list_installed >/dev/null 2>&1; then
         printf "[dispatcher] ERROR: state lib not loaded\n" >&2
         return 1

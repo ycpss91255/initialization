@@ -70,6 +70,60 @@ TUI_CATEGORY_ORDER='["base","recommended","optional","experimental"]'
 : "${TUI_WIDTH:=72}"
 : "${TUI_MENU_HEIGHT:=10}"
 
+# Sentinel tag for a non-selectable main-menu separator row (#169). The
+# dispatch loop ignores it; both dialog and whiptail render arbitrary
+# tag/item rows, so a divider row works identically on both backends.
+: "${TUI_MENU_SEPARATOR:=-}"
+
+# Checklist chrome (#168): dialog/whiptail render a --checklist row as
+# "[status] <tag>   <item>". The fixed overhead is the checkbox + its gutter
+# plus the gutter between the tag column and the item — empirically 8 cols on
+# both backends for a 72-col box. The item budget is therefore
+#   TUI_WIDTH - (longest visible tag/name width) - TUI_CHECKLIST_CHROME
+# floored to TUI_CHECKLIST_MIN so a narrow box still shows a usable stub.
+: "${TUI_CHECKLIST_CHROME:=8}"
+: "${TUI_CHECKLIST_MIN:=20}"
+
+# ── Pure display helpers ─────────────────────────────────────────────────────
+
+# _tui_clip <string> <max> → <string> clipped to <max> chars with a trailing
+# single-char ellipsis "…" when it would exceed <max>, unchanged otherwise.
+# Pure (no globals, no I/O) so it is directly unit-testable.
+_tui_clip() {
+    local _s="$1" _max="$2"
+    if (( ${#_s} > _max )); then
+        printf '%s…\n' "${_s:0:_max-1}"
+    else
+        printf '%s\n' "${_s}"
+    fi
+}
+
+# _tui_clip_items  (filter: stdin → stdout)
+# Reads "name<TAB>item<TAB>status" checklist rows and clips the item field
+# (field 2) to the per-page width budget while name and status pass through
+# untouched. The budget is derived from the longest name across the rows, so
+# each checklist sizes its own tag column:
+#   budget = TUI_WIDTH - longest-name - TUI_CHECKLIST_CHROME  (floored to MIN)
+# Buffers all rows because the budget needs the longest name first (checklists
+# are short — tens of rows, not a stream).
+_tui_clip_items() {
+    local -a _names=() _items=() _stats=()
+    local _name _item _stat _longest=0
+    while IFS=$'\t' read -r _name _item _stat; do
+        _names+=("${_name}")
+        _items+=("${_item}")
+        _stats+=("${_stat}")
+        (( ${#_name} > _longest )) && _longest=${#_name}
+    done
+    local _budget=$(( TUI_WIDTH - _longest - TUI_CHECKLIST_CHROME ))
+    (( _budget < TUI_CHECKLIST_MIN )) && _budget=${TUI_CHECKLIST_MIN}
+    local _i
+    for _i in "${!_names[@]}"; do
+        printf '%s\t%s\t%s\n' \
+            "${_names[_i]}" "$(_tui_clip "${_items[_i]}" "${_budget}")" "${_stats[_i]}"
+    done
+}
+
 # ── Probes (mockable) ────────────────────────────────────────────────────────
 
 _tui_has_cmd() {
@@ -239,7 +293,7 @@ tui_checklist_entries() {
           + (if $ndeps > 0 then " (will pull \($ndeps) deps)" else "" end)
           + "\t"
           + (if ($sel | contains(" " + $n + " ")) then "on" else "off" end)
-    ' <<<"$1"
+    ' <<<"$1" | _tui_clip_items
 }
 
 # ── In-memory selection accumulator (Q43) ────────────────────────────────────
@@ -343,7 +397,7 @@ _tui_qs_entries() {
         | .[]
         | "\(.name)\t\(.description)\t"
           + (if .enabled == true or .recommended == true then "on" else "off" end)
-    ' <<<"$1"
+    ' <<<"$1" | _tui_clip_items
 }
 
 # §8.2.1 Step 2: recommended-category modules surviving the filter pipeline.
@@ -477,19 +531,35 @@ _tui_category_entry() {
     esac
 }
 
+# #169 non-selectable divider row: sentinel tag + a box-drawing rule in the
+# label column, empty description. The main loop's _tui_dispatch ignores the
+# sentinel tag, so landing on it is a harmless no-op on both backends.
+_tui_menu_separator() {
+    printf '%s\t──────────────\t\n' "${TUI_MENU_SEPARATOR}"
+}
+
 # Full §8.1 main-menu rows ("tag<TAB>label<TAB>description" per line).
 # Category rows are derived from the live payload, so empty categories
 # disappear and future non-empty ones appear without a spec change (Q44).
 tui_main_menu_entries() {
     local _json="$1" _cat
 
+    # #169: three logical groups, divided by non-selectable separator rows
+    # (sentinel tag TUI_MENU_SEPARATOR). A divider row renders identically on
+    # dialog and whiptail (both accept arbitrary tag/item rows); the main loop
+    # treats the sentinel as a no-op so it never dispatches an action.
+    #   Group 1 — build the pick: quick-setup + category browse rows
+    #   Group 2 — manage / info:  manage, secrets, sysinfo
+    #   Group 3 — action:         run (the only batch execution point, Q43)
     printf 'quick-setup\tQuick Setup\tInstall all recommended\n'
     while IFS= read -r _cat; do
         _tui_category_entry "${_json}" "${_cat}"
     done < <(tui_categories "${_json}")
+    _tui_menu_separator
     printf 'manage\tManage Installed\tUpdate / Remove / Purge\n'
     printf 'secrets\tManage Secrets\tsetup_secrets (SSH/GPG)\n'
     printf 'sysinfo\tSystem Info\tEnvironment detection details\n'
+    _tui_menu_separator
     # §8.1 < Run > — the ONLY batch execution point (Q43). Rendered as the
     # last menu row because a second action button next to OK exists only
     # on dialog (--extra-button), not whiptail; a row keeps both backends

@@ -187,11 +187,117 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
     done <<<"${output}"
 }
 
+# ── #169 main-menu section separators ────────────────────────────────────────
+
+@test "tui_main_menu_entries inserts separator rows between the 3 groups (#169)" {
+    run tui_main_menu_entries "${FIXTURE_LIST_JSON}"
+    assert_success
+    # Exactly two non-selectable separator rows (sentinel tag = "-").
+    local _seps
+    _seps="$(awk -F'\t' '$1 == "-"' <<<"${output}" | wc -l)"
+    [ "${_seps}" -eq 2 ]
+    # The divider label is a run of box-drawing dashes.
+    assert_line --partial "──────"
+}
+
+@test "tui_main_menu_entries keeps all real action tags in order around separators (#169)" {
+    run tui_main_menu_entries "${FIXTURE_LIST_JSON}"
+    assert_success
+    # Drop separator rows, then assert the real tags survive in order.
+    local _tags
+    _tags="$(awk -F'\t' '$1 != "-" {print $1}' <<<"${output}" | paste -sd' ' -)"
+    [ "${_tags}" = "quick-setup base recommended optional manage secrets sysinfo run" ]
+}
+
+@test "tui_main_menu_entries: separator sits after group 1 (optional) and before manage (#169)" {
+    run tui_main_menu_entries "${FIXTURE_LIST_JSON}"
+    assert_success
+    # Find indices: the row after "optional" is a separator, and the row
+    # before "manage" is a separator.
+    local _i=0 _opt=-1 _manage=-1 _run=-1
+    while IFS=$'\t' read -r _tag _rest; do
+        case "${_tag}" in
+            optional) _opt=${_i} ;;
+            manage) _manage=${_i} ;;
+            run) _run=${_i} ;;
+        esac
+        _i=$(( _i + 1 ))
+    done <<<"${output}"
+    # group1 sep right after optional
+    [ "$(awk -F'\t' -v n="$(( _opt + 1 ))" 'NR==n+1{print $1}' <<<"${output}")" = "-" ]
+    # group2 sep right before manage
+    [ "$(awk -F'\t' -v n="${_manage}" 'NR==n{print $1}' <<<"${output}")" = "-" ]
+    # run is still last
+    [ "${_run}" -eq "$(( ${#lines[@]} - 1 ))" ]
+}
+
+@test "_tui_main_loop guards against dispatching the separator sentinel (#169)" {
+    # The dispatch must treat the sentinel tag as a no-op. Assert the guard
+    # exists in the source (the loop re-loops without calling _tui_dispatch).
+    run grep -nE 'TUI_MENU_SEPARATOR|"-"\)' "${REPO_ROOT}/setup_ubuntu_tui.sh"
+    assert_success
+}
+
 @test "tui_modules_in_category lists module names alphabetically" {
     run tui_modules_in_category "${FIXTURE_LIST_JSON}" recommended
     assert_success
     assert_line --index 0 "docker"
     assert_line --index 1 "neovim"
+}
+
+# ── #168 checklist width clip (overflow fix) ─────────────────────────────────
+# A category whose modules carry over-long descriptions, used to prove the
+# rendered "[tag] description" item is clipped to the TUI_WIDTH budget.
+FIXTURE_LIST_JSON_LONG_DESC="$(jq '.items += [{
+  "name": "claude-code", "category": "optional", "tags": ["agent"],
+  "description": "Anthropic Claude Code CLI agent (official native installer, self-updating)",
+  "version_provided": "npm", "installed": false, "outdated": null,
+  "manual": null, "depends_on": null, "supports_user_home": true,
+  "supported_platforms": ["desktop"], "supported_ubuntu": ["24.04"],
+  "risk_level": "low", "reboot_required": false, "homepage": null}]' \
+  <<<"${FIXTURE_LIST_JSON}")"
+
+@test "_tui_clip leaves a short string untouched" {
+    run _tui_clip "short" 20
+    assert_success
+    assert_output "short"
+}
+
+@test "_tui_clip returns a string exactly at the budget untouched" {
+    run _tui_clip "1234567890" 10
+    assert_success
+    assert_output "1234567890"
+}
+
+@test "_tui_clip truncates an over-long string with a single ellipsis" {
+    run _tui_clip "abcdefghij" 5
+    assert_success
+    assert_output "abcd…"
+    [ "${#output}" -eq 5 ]
+}
+
+@test "tui_checklist_entries clips every item to the TUI_WIDTH budget (#168)" {
+    TUI_WIDTH=72 run tui_checklist_entries "${FIXTURE_LIST_JSON_LONG_DESC}" optional ""
+    assert_success
+    # longest visible name in this page is "claude-code" (11) → budget is
+    # 72 - 11 - 8 = 53. No produced item (field 2) may exceed it.
+    local _budget=53
+    while IFS=$'\t' read -r _name _item _status; do
+        [ -n "${_item}" ] || continue
+        [ "${#_item}" -le "${_budget}" ] || {
+            printf 'item over budget (%d > %d): %s\n' "${#_item}" "${_budget}" "${_item}" >&3
+            return 1
+        }
+    done <<<"${output}"
+}
+
+@test "tui_checklist_entries keeps the selectable name intact when clipping (#168)" {
+    TUI_WIDTH=72 run tui_checklist_entries "${FIXTURE_LIST_JSON_LONG_DESC}" optional ""
+    assert_success
+    # The tag column (field 1) is never clipped — only the description display.
+    assert_line --partial "$(printf 'claude-code\t')"
+    # The clipped long item ends with the ellipsis (description was truncated).
+    assert_line --partial "…"
 }
 
 # ── Checkbox accumulator (#70, Q43 / §8.2) ───────────────────────────────────

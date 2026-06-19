@@ -22,6 +22,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **TUI checklist rows no longer overflow the box** (issue #168): the
+  category browse checklists (`base`/`recommended`/`optional`) and the Quick
+  Setup steps passed the full module description as the checklist item text,
+  so long descriptions wrapped/overflowed past the `TUI_WIDTH=72` border on
+  both dialog and whiptail. A new pure helper `_tui_clip <string> <max>`
+  truncates with a single-char ellipsis `…`, and `_tui_clip_items` clips each
+  checklist item to a per-page budget of
+  `TUI_WIDTH − longest-name − 8` (checkbox + tag-column gutter chrome),
+  floored to 20. Only the displayed `[tag] description` is clipped; the
+  selectable module name/tag is left intact.
+
 - **`setup_ubuntu list --json` (catalog view) now emits JSON** (issue #165):
   it was stubbed (printed a warning + the plain table), which broke the TUI —
   `setup_ubuntu_tui.sh` forks `list --json` and validates it with `jq -e`, so it
@@ -31,6 +42,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `recommended` sourced per-module, degrading to `null` per ADR-0019), honors
   `--category=` / `--tag=`, and keeps warnings off stdout. The TUI smoke test is
   hardened to fork the real `list --json` so this can't regress.
+
+### Changed
+
+- **TUI main menu visually separates its three sections** (issue #169):
+  `tui_main_menu_entries` now emits non-selectable divider rows (sentinel tag
+  `-`, a `──────────────` rule in the label column) between the three logical
+  groups — build-the-pick (quick-setup + category browse), manage/info
+  (manage, secrets, sysinfo), and the `run` action. The dividers render
+  identically on dialog and whiptail (both accept arbitrary tag/item rows);
+  `_tui_main_loop` skips the sentinel as a no-op so landing on a separator
+  never dispatches an action. Real items are neither reordered nor renamed,
+  `run` stays the last row, and `< Exit >` behavior is unchanged.
 
 ### Added
 

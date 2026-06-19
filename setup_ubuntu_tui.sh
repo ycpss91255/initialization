@@ -538,6 +538,9 @@ _tui_main_loop() {
         _choice="$(TUI_CANCEL_LABEL="Exit" tui_render_menu \
             "init_ubuntu v${INIT_UBUNTU_VERSION}" \
             "System: ${_summary}" "${_menu_args[@]}")" || return 0
+        # #169: landing on a non-selectable section separator is a no-op —
+        # re-loop without dispatching any action.
+        [[ "${_choice}" == "${TUI_MENU_SEPARATOR:--}" ]] && continue
         _tui_dispatch "${_choice}" "${_list_json}" "${_detect_json}"
     done
 }

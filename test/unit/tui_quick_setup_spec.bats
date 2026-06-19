@@ -28,6 +28,9 @@ source "${LIB_DIR}/tui_backend.sh"
 
 setup() {
     setup_test_env
+    # Clip helper (#168) counts characters; pin UTF-8 so the budget assertion
+    # matches under CI's C/POSIX kcov image (see tui_backend_spec.bats).
+    export LC_ALL=C.UTF-8
 }
 
 teardown() {
@@ -193,6 +196,23 @@ FIXTURE_QS_DETECT_JSON='{"os":{"id":"ubuntu","version":"24.04","codename":"noble
 }
 
 # ── Step 2: recommended entries (§15.3 platform → Q36 enabled → recommended) ─
+
+@test "tui_qs_recommended_entries clips long descriptions to the width budget (#168)" {
+    # Force a tiny width so the existing short fixture descriptions overflow,
+    # proving the QS rows are clipped too (#168 covers QS + category lists).
+    TUI_WIDTH=24 run tui_qs_recommended_entries "${FIXTURE_QS_LIST_JSON}" desktop
+    assert_success
+    # longest name here is "nvidia-driver" (13) → budget 24 - 13 - 8 = 3,
+    # floored to the minimum of 20. No item (field 2) may exceed 20.
+    local _budget=20
+    while IFS=$'\t' read -r _name _item _status; do
+        [ -n "${_item}" ] || continue
+        [ "${#_item}" -le "${_budget}" ] || {
+            printf 'QS item over budget (%d > %d): %s\n' "${#_item}" "${_budget}" "${_item}" >&3
+            return 1
+        }
+    done <<<"${output}"
+}
 
 @test "tui_qs_recommended_entries preselects is_recommended modules" {
     run tui_qs_recommended_entries "${FIXTURE_QS_LIST_JSON}" desktop

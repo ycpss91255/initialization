@@ -14,7 +14,7 @@ graph TB
 
     subgraph frontend["Front-end (共用同一個 Engine)"]
         cli["setup_ubuntu.sh<br/>(CLI dispatcher)"]
-        tui["setup_ubuntu_tui.sh<br/>(TUI - dialog/whiptail)"]
+        tui["setup_ubuntu_tui.sh<br/>(TUI - gum/whiptail)"]
         secrets["setup_secrets.sh<br/>[N4] SSH/GPG 互動"]
     end
 
@@ -118,7 +118,7 @@ initialization/
 │   │   ├── en.sh
 │   │   └── zh-TW.sh
 │   ├── color.sh                        # [N12] ANSI 偵測 + escape
-│   ├── tui_backend.sh                  # dialog/whiptail wrapper
+│   ├── tui_backend.sh                  # gum/whiptail wrapper(ADR-0023)
 │   ├── secrets.sh                      # setup_secrets 共用 helper
 │   ├── general.sh                      # 從 module/function/general.sh 遷移
 │   └── logger.sh                       # 從 module/function/logger.sh 遷移
@@ -455,6 +455,13 @@ TUI prompts -> collect_tui_selections() -> 組 CLI 命令字串
 ```
 
 TUI 不 source engine lib、不寫 state;AC-11(CLI/TUI 一致)結構性成立。
+
+後端為 **gum(優先)+ whiptail(fallback)**(ADR-0023,取代原本的 dialog >
+whiptail;dialog 已移除)。`lib/tui_backend.sh` 把 4 個 contract widget
+(`menu` / `checklist` / `msgbox` / `yesno`)各做成 dispatcher → 各後端原生渲染。
+契約對齊的是**行為/結果(讀回 tag、exit code 語意),不是像素**(HTML+JS 類比,
+同 G4)。`--backend gum|whiptail` 可強制後端並**跳過偵測與安裝詢問**(invalid →
+exit 2),是 CI/QA 強測單一後端的槓桿(`just tui --backend whiptail`)。
 
 ### Secrets-tool 路徑 [N4]
 

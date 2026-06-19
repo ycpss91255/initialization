@@ -236,3 +236,14 @@ teardown() {
     assert_success
     [[ ! -f "${APT_STUB_LOG}" ]]
 }
+
+# ── i18n: zh-TW rendering (issue #185, Phase 2) ──────────────────────────────
+
+@test "preflight: missing + no sudo guidance renders zh-TW under INIT_UBUNTU_LANG=zh-TW" {
+    MOCK_MISSING_DEPS="jq"
+    MOCK_HAS_SUDO=false
+    INIT_UBUNTU_LANG=zh-TW run preflight_self_deps install foo
+    assert_failure 4
+    assert_output --partial "缺少工具相依套件：jq"
+    assert_output --partial "無法使用 sudo"
+}

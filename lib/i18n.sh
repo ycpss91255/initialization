@@ -41,6 +41,31 @@ i18n_resolve_init_ubuntu_lang() {
     i18n_sanitize_lang INIT_UBUNTU_LANG
 }
 
+# i18n_t <table-name> <key> [arg0 arg1 ...]
+#   Generic engine-string lookup (issue #185). <table-name> is a `declare -gA`
+#   keyed "<lang>.<msgkey>" (e.g. [en.proceed]="Proceed? [Y/n] "
+#   [zh-TW.proceed]="是否繼續? [Y/n] "). Resolution order:
+#     ${INIT_UBUNTU_LANG}.<key>  ->  en.<key>  ->  the literal <key>.
+#   Positional placeholders {0} {1} ... are substituted from the trailing args
+#   via parameter expansion (NOT printf) — the format never comes from a
+#   variable, so no SC2059 / no shellcheck-disable. Prints to stdout with no
+#   trailing newline (callers add their own). Logs (log_*) stay English; only
+#   user-facing stdout/TUI strings use this.
+i18n_t() {
+    local _tbl="${1:?i18n_t requires <table-name>}"
+    local _key="${2:?i18n_t requires <key>}"
+    shift 2
+    local -n _t_ref="${_tbl}"
+    local _lang="${INIT_UBUNTU_LANG:-en}"
+    local _s="${_t_ref["${_lang}.${_key}"]:-${_t_ref["en.${_key}"]:-${_key}}}"
+    local _i=0 _arg
+    for _arg in "$@"; do
+        _s="${_s//\{${_i}\}/${_arg}}"
+        _i=$((_i + 1))
+    done
+    printf '%s' "${_s}"
+}
+
 i18n_sanitize_lang() {
     local -n _sl_ref="${1:?i18n_sanitize_lang requires <outvar>}"
     local _who="${2:-i18n}"

@@ -128,6 +128,14 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **`.claude/skills` is now a single whole-dir symlink to `.agents/skills`**
+  (was 37 per-item symlinks): the tracked-vs-machine-local distinction already
+  lives at the canonical end (`.agents/skills/` tracks the repo-owned skills,
+  gitignores third-party ones), so the per-item layer in `.claude/skills/` was
+  redundant. Now uniform with `.claude/{hook,rules,script}`; new skills appear
+  automatically without adding a `.claude` symlink. `.gitignore` drops the
+  per-item `.claude/skills/*` block.
+
 - **`hook/`, `rules/`, `script/` are now canonical under `.agents/`, symlinked
   from `.claude/`**: extends the #151 skills pattern (real files live under
   `.agents/<dir>`; `.claude/<dir>` is a symlink) to the rest of the vendorable

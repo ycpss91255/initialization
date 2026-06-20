@@ -355,7 +355,8 @@ _run_qs_e2e() {
 @test "e2e qs: four steps -> Review -> Proceed forks one named-only install" {
     _make_qs_harness
     # quick-setup → Step1 continue → Step2 keep only neovim → Step3 pick
-    # lazygit+eza → Step4 uncheck everything (OK, empty) → Review → Proceed.
+    # lazygit+eza → Step4 uncheck everything (OK, empty) → Review → Proceed
+    # → pre-install summary (#213) confirm Yes.
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|quick-setup
 0|continue
@@ -364,6 +365,7 @@ _run_qs_e2e() {
 0|eza\nlazygit\n
 0|
 0|proceed
+0|
 EOF
     _run_qs_e2e
     assert_success
@@ -389,17 +391,20 @@ EOF
 0|eza\nlazygit\n
 0|
 0|proceed
+0|
 EOF
     _run_qs_e2e
     assert_success
+    # The dry-run plan is forked twice (read-only): once for the Review screen
+    # and once for the #213 pre-install summary — both over the same argv.
     run grep -c "^install --dry-run neovim eza lazygit$" "${E2E_CLI_LOG}"
-    assert_output "1"
+    assert_output "2"
 }
 
 @test "e2e qs: platform override is written to config ONLY at Proceed" {
     _make_qs_harness
     # Step1 override → server → continue; Step2 keep docker; Step3 skip;
-    # Step4 keep claude-code; Review → Proceed.
+    # Step4 keep claude-code; Review → Proceed → pre-install summary Yes.
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|quick-setup
 0|override
@@ -409,15 +414,16 @@ EOF
 0|skip
 0|claude-code\n
 0|proceed
+0|
 EOF
     _run_qs_e2e
     assert_success
     # The config write happened exactly once, on the Proceed leg: it must
-    # appear AFTER the Review dry-run fork and BEFORE the install fork.
+    # appear AFTER the (last) dry-run fork and BEFORE the install fork.
     run grep -c "^config set platform.override server$" "${E2E_CLI_LOG}"
     assert_output "1"
     local _dry _cfg _inst
-    _dry="$(grep -n "^install --dry-run" "${E2E_CLI_LOG}" | cut -d: -f1)"
+    _dry="$(grep -n "^install --dry-run" "${E2E_CLI_LOG}" | tail -n1 | cut -d: -f1)"
     _cfg="$(grep -n "^config set" "${E2E_CLI_LOG}" | cut -d: -f1)"
     _inst="$(grep -n "^install --profile" "${E2E_CLI_LOG}" | cut -d: -f1)"
     [ "${_cfg}" -gt "${_dry}" ]
@@ -440,6 +446,7 @@ EOF
 0|skip
 0|
 0|proceed
+0|
 EOF
     _run_qs_e2e
     assert_success
@@ -527,6 +534,7 @@ EOF
 0|eza\nlazygit\n
 0|
 0|proceed
+0|
 EOF
     _run_qs_e2e
     # §8.2.1 stage table: after Proceed the CLI pipeline owns the terminal;

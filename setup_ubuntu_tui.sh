@@ -84,14 +84,8 @@ declare -gA TUI_I18N=(
     [zh-TW.review_plan_failed]="錯誤:'setup_ubuntu install --dry-run' 執行失敗 — 無法產生安裝計畫。"
     [en.review_will_install]="Will install {0} module(s):"
     [zh-TW.review_will_install]="將安裝 {0} 個模組:"
-    [en.review_will_pull]="will pull {0} deps"
-    [zh-TW.review_will_pull]="將連帶安裝 {0} 個相依套件"
     [en.review_proceed]="Install now (forks setup_ubuntu)"
     [zh-TW.review_proceed]="立即安裝 (fork setup_ubuntu)"
-    [en.review_show_deps]="Show dependency details ({0})"
-    [zh-TW.review_show_deps]="顯示相依詳細資訊 ({0})"
-    [en.title_dep_details]="Dependency details"
-    [zh-TW.title_dep_details]="相依詳細資訊"
     [en.nothing_selected]="nothing selected"
     [zh-TW.nothing_selected]="未選擇任何項目"
 
@@ -112,12 +106,8 @@ declare -gA TUI_I18N=(
     [zh-TW.qs_step3_skip]="略過"
     [en.title_qs_step3_pick]="Quick Setup — Step 3/4: CLI Essentials"
     [zh-TW.title_qs_step3_pick]="快速安裝 — 步驟 3/4:CLI 必備套件"
-    [en.qs_step3_pick_help]="Check the tools to install."
-    [zh-TW.qs_step3_pick_help]="勾選要安裝的工具。"
     [en.title_qs_step4]="Quick Setup — Step 4/4: AI agent CLI? (multi-select)"
     [zh-TW.title_qs_step4]="快速安裝 — 步驟 4/4:AI agent CLI? (可多選)"
-    [en.qs_step4_help]="Check the agent CLIs to install."
-    [zh-TW.qs_step4_help]="勾選要安裝的 agent CLI。"
     [en.title_qs_step1]="Quick Setup — Step 1/4: Confirm platform"
     [zh-TW.title_qs_step1]="快速安裝 — 步驟 1/4:確認平台"
     [en.qs_step1_detected]="Detected: {0}"
@@ -132,6 +122,18 @@ declare -gA TUI_I18N=(
     [zh-TW.title_quick_setup]="快速安裝"
     [en.qs_persist_failed]="ERROR: failed to persist the platform override — nothing was installed."
     [zh-TW.qs_persist_failed]="錯誤:無法儲存平台覆寫 — 未安裝任何項目。"
+    # #213(a): richer per-step context (counts / what each choice includes).
+    [en.qs_step3_pick_help_rich]="Check the tools to install ({0} in the suite)."
+    [zh-TW.qs_step3_pick_help_rich]="勾選要安裝的工具 (套件共 {0} 項)。"
+    [en.qs_step4_help_rich]="Check the agent CLIs to install ({0} available, {1} recommended)."
+    [zh-TW.qs_step4_help_rich]="勾選要安裝的 agent CLI (共 {0} 項,推薦 {1} 項)。"
+    [en.qs_step3_suite_choice]="{0}: install the whole suite ({1} tools), pick individually, or skip."
+    [zh-TW.qs_step3_suite_choice]="{0}:安裝整組套件 ({1} 項工具)、逐項挑選,或略過。"
+    # #213(b): final pre-install summary (reuses the Review provenance lines).
+    [en.title_qs_summary]="Quick Setup — Pre-install Summary"
+    [zh-TW.title_qs_summary]="快速安裝 — 安裝前摘要"
+    [en.qs_summary_intro]="The following {0} module(s) will be installed:"
+    [zh-TW.qs_summary_intro]="將安裝以下 {0} 個模組:"
 
     # Manage Installed (#72, §8.3 / §8.4).
     [en.confirm_action_title]="Confirm {0}"
@@ -492,6 +494,8 @@ _tui_screen_category() {
 # caller decides what selection memory survives (Run: the Q43 accumulator
 # stays; Quick Setup: the wizard locals die with the caller → pure cancel).
 _tui_screen_review() {
+    local _list_json="$1"
+    shift
     local -a _sel=("$@")
 
     local _title_rv
@@ -502,42 +506,28 @@ _tui_screen_review() {
             "$(i18n_t TUI_I18N review_plan_failed)"
         return 1
     fi
-    local -a _deps=()
-    mapfile -t _deps < <(tui_plan_deps "${_plan}" "${_sel[@]}")
 
-    local _text
-    _text="$(i18n_t TUI_I18N review_will_install "${#_sel[@]}")"$'\n'
-    _text+="$(printf '  %s\n' "${_sel[@]}")"
-    if [[ "${#_deps[@]}" -gt 0 ]]; then
-        _text+=$'\n'"$(i18n_t TUI_I18N review_will_pull "${#_deps[@]}")"
+    # #214: per-item dependency provenance — "(your selection)" vs "(required
+    # by X)" — instead of a flat "+N deps" count. Heading carries the total
+    # module count (picks + pulled deps), the body lists every module with its
+    # origin (tui_review_text, resolver plan order).
+    local _total _text
+    _total="$(printf '%s\n' "${_plan}" | grep -c .)"
+    _text="$(i18n_t TUI_I18N review_will_install "${_total}")"$'\n'
+    _text+="$(tui_review_text "${_list_json}" "${_plan}" "${_sel[@]}")"
+
+    if ! TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
+        "${_title_rv}" "${_text}" \
+        "proceed" "$(i18n_t TUI_I18N review_proceed)" >/dev/null; then
+        return 1  # Back / Cancel: the caller owns what survives
     fi
-
-    local -a _entries=("proceed" "$(i18n_t TUI_I18N review_proceed)")
-    if [[ "${#_deps[@]}" -gt 0 ]]; then
-        _entries+=("deps" "$(i18n_t TUI_I18N review_show_deps "${#_deps[@]}")")
-    fi
-
-    local _choice
-    while :; do
-        if ! _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-            "${_title_rv}" "${_text}" "${_entries[@]}")"; then
-            return 1  # Back / Cancel: the caller owns what survives
-        fi
-        case "${_choice}" in
-            deps)
-                tui_render_msgbox "$(i18n_t TUI_I18N title_dep_details)" \
-                    "$(printf '%s\n' "${_deps[@]}")"
-                ;;
-            proceed)
-                return 0
-                ;;
-        esac
-    done
+    return 0
 }
 
 # < Run > (§8.1): Review & Install over the Q43 accumulator. Back keeps
 # the selections and returns to the main menu.
 _tui_screen_run() {
+    local _list_json="$1"
     if [[ "$(tui_selection_count)" -eq 0 ]]; then
         tui_render_msgbox "$(i18n_t TUI_I18N title_review)" \
             "$(i18n_t TUI_I18N nothing_selected)"
@@ -546,7 +536,7 @@ _tui_screen_run() {
 
     local -a _sel=()
     mapfile -t _sel < <(tui_selection_list)
-    _tui_screen_review "${_sel[@]}" || return 0
+    _tui_screen_review "${_list_json}" "${_sel[@]}" || return 0
     _tui_exec_install "${_sel[@]}"  # never returns
 }
 
@@ -623,17 +613,23 @@ _tui_qs_step3() {
     _joined="$(printf '%s / ' "${_names[@]}")"
     _joined="${_joined% / }"
 
+    # #213(a): richer step context — the suite-choice line names the tools and
+    # spells out what each choice includes (whole suite count / pick / skip).
+    local _help
+    _help="$(i18n_t TUI_I18N qs_step3_suite_choice "${_joined}" "${#_names[@]}")"
+
     local _choice
     _choice="$(tui_render_menu \
         "$(i18n_t TUI_I18N title_qs_step3_suite "${#_names[@]}")" \
-        "${_joined}" \
+        "${_help}" \
         "all"  "$(i18n_t TUI_I18N qs_step3_all)" \
         "pick" "$(i18n_t TUI_I18N qs_step3_pick)" \
         "skip" "$(i18n_t TUI_I18N qs_step3_skip)")" || return 1
     case "${_choice}" in
         all)  printf '%s\n' "${_names[@]}" ;;
         pick) tui_render_checklist "$(i18n_t TUI_I18N title_qs_step3_pick)" \
-                  "$(i18n_t TUI_I18N qs_step3_pick_help)" "${_rows[@]}" || return 1 ;;
+                  "$(i18n_t TUI_I18N qs_step3_pick_help_rich "${#_names[@]}")" \
+                  "${_rows[@]}" || return 1 ;;
         skip) : ;;
     esac
 }
@@ -641,14 +637,36 @@ _tui_qs_step3() {
 # Step 4/4: AI agent CLI multi-select (recommended ones preselected).
 _tui_qs_step4() {
     local -a _rows=()
-    local _name _label _status
+    local _name _label _status _on=0
     while IFS=$'\t' read -r _name _label _status; do
         _rows+=("${_name}" "${_label}" "${_status}")
+        [[ "${_status}" == "on" ]] && _on=$((_on + 1))
     done < <(tui_qs_tag_entries "$1" agent "$2")
     [[ "${#_rows[@]}" -eq 0 ]] && return 0
 
+    # #213(a): richer context — how many agent CLIs are offered / preselected.
     tui_render_checklist "$(i18n_t TUI_I18N title_qs_step4)" \
-        "$(i18n_t TUI_I18N qs_step4_help)" "${_rows[@]}"
+        "$(i18n_t TUI_I18N qs_step4_help_rich "$(( ${#_rows[@]} / 3 ))" "${_on}")" \
+        "${_rows[@]}"
+}
+
+# #213: final PRE-INSTALL SUMMARY before the fork. Re-forks the dry-run plan
+# (read-only) and lists EVERY module that will actually be installed — the
+# user's picks AND the engine-pulled deps — each with its provenance
+# (tui_summary_text). yes = proceed, no / ESC = pure cancel (rc 1).
+#   _tui_qs_preinstall_summary <list_json> <module...>
+_tui_qs_preinstall_summary() {
+    local _list_json="$1"
+    shift
+    local _plan
+    _plan="$(tui_cli_install_plan "$@")" || return 0
+    local _total _text
+    _total="$(printf '%s\n' "${_plan}" | grep -c .)"
+    _text="$(i18n_t TUI_I18N qs_summary_intro "${_total}")"$'\n'
+    _text+="$(tui_summary_text "${_list_json}" "${_plan}" "$@")"
+    TUI_YES_LABEL="$(i18n_t TUI_I18N review_proceed)" \
+    TUI_NO_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_yesno \
+        "$(i18n_t TUI_I18N title_qs_summary)" "${_text}"
 }
 
 # §8.2.1 wizard driver: Step 1 platform confirm → Steps 2-4 accumulate →
@@ -696,7 +714,12 @@ _tui_screen_quick_setup() {
 
     # Review backing out before Proceed = pure cancel: the override and
     # the picks die with this function's locals (§8.2.1 cancel table).
-    _tui_screen_review "${_sel[@]}" || return 0
+    _tui_screen_review "${_list_json}" "${_sel[@]}" || return 0
+
+    # #213: a final PRE-INSTALL SUMMARY listing EVERY module that will be
+    # installed (picks AND engine-pulled deps, with provenance) before the
+    # fork. Decline = pure cancel (no override write, no install fork).
+    _tui_qs_preinstall_summary "${_list_json}" "${_sel[@]}" || return 0
 
     # Proceed leg: the ONE point where the Step-1 override leaves TUI
     # memory (§8.2.1 "not written to config.ini until Review"). Persisting
@@ -1031,7 +1054,7 @@ _tui_dispatch() {
             _tui_screen_category "$1" "$2"
             ;;
         run)
-            _tui_screen_run
+            _tui_screen_run "$2"
             ;;
         manage)
             _tui_screen_manage "$2"

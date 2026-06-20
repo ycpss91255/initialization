@@ -651,6 +651,66 @@ EOF
     assert_output ""
 }
 
+# ── Review dependency provenance (#214) ──────────────────────────────────────
+# tui_plan_provenance maps each plan node to its origin using the depends_on
+# graph from `list --json`: a user pick is "self"; a pulled dep is
+# "req:<the requested module whose transitive closure pulled it>".
+
+_PROV_LIST_JSON='{"items":[
+  {"name":"apt-essentials","depends_on":[]},
+  {"name":"docker","depends_on":["apt-essentials"]},
+  {"name":"font","depends_on":["apt-essentials"]},
+  {"name":"neovim","depends_on":[]}
+]}'
+
+@test "tui_plan_provenance tags a user pick as self" {
+    local _plan=$'apt-essentials\nfont'
+    run tui_plan_provenance "${_PROV_LIST_JSON}" "${_plan}" font
+    assert_success
+    assert_line "$(printf 'font\tself')"
+}
+
+@test "tui_plan_provenance attributes a pulled dep to the requesting pick" {
+    # font (your selection) pulls apt-essentials (required by font).
+    local _plan=$'apt-essentials\nfont'
+    run tui_plan_provenance "${_PROV_LIST_JSON}" "${_plan}" font
+    assert_success
+    assert_line "$(printf 'apt-essentials\treq:font')"
+}
+
+@test "tui_plan_provenance keeps the resolver plan order" {
+    local _plan=$'apt-essentials\ndocker\nfont'
+    run tui_plan_provenance "${_PROV_LIST_JSON}" "${_plan}" docker font
+    assert_success
+    assert_line --index 0 "$(printf 'apt-essentials\treq:docker')"
+    assert_line --index 1 "$(printf 'docker\tself')"
+    assert_line --index 2 "$(printf 'font\tself')"
+}
+
+# tui_review_text renders the provenance map into the human-readable Review
+# body: "<name> (your selection)" vs "<name> (required by X)". Per-item, no
+# flat "+N deps" count line.
+@test "tui_review_text shows per-item provenance, not a flat dep count" {
+    local _plan=$'apt-essentials\nfont'
+    run tui_review_text "${_PROV_LIST_JSON}" "${_plan}" font
+    assert_success
+    assert_output --partial "font (your selection)"
+    assert_output --partial "apt-essentials (required by font)"
+    refute_output --partial "will pull"
+}
+
+# ── Pre-install summary (#213): every module that will be installed ───────────
+# tui_summary_text reuses the provenance map to list BOTH picks and pulled
+# deps before the install is forked.
+@test "tui_summary_text lists picks and pulled deps with provenance" {
+    local _plan=$'apt-essentials\ndocker\nfont'
+    run tui_summary_text "${_PROV_LIST_JSON}" "${_plan}" docker font
+    assert_success
+    assert_output --partial "docker (your selection)"
+    assert_output --partial "font (your selection)"
+    assert_output --partial "apt-essentials (required by"
+}
+
 # ── Checklist render wrapper (mock backend binary) ───────────────────────────
 
 # Mock whiptail-family binary: logs argv, replays MOCK_WIDGET_OUTPUT on

@@ -201,6 +201,13 @@ declare -gA TUI_BACKEND_I18N=(
     # Compact marker appended to an unregistered module's Manage-list row.
     [en.detail_unregistered_marker]="(unregistered)"
     [zh-TW.detail_unregistered_marker]="(未登錄)"
+    # Review / pre-install dependency provenance (#214, #213). Per-item origin
+    # annotation rendered by tui_review_text / tui_summary_text: a user pick is
+    # "(your selection)"; an engine-pulled dep is "(required by <module>)".
+    [en.prov_self]="{0} (your selection)"
+    [zh-TW.prov_self]="{0} (你的選擇)"
+    [en.prov_required_by]="{0} (required by {1})"
+    [zh-TW.prov_required_by]="{0} (由 {1} 連帶安裝)"
 )
 # kcov-exclude-end
 # TUI_BACKEND_I18N is consumed by i18n_t via a nameref on the table NAME passed
@@ -529,6 +536,72 @@ tui_plan_deps() {
             printf '%s\n' "${_name}"
         fi
     done <<<"${_plan}"
+}
+
+# ── Dependency provenance (#214) ─────────────────────────────────────────────
+# Per-item origin for the Review / pre-install summary, in resolver plan order:
+#   tui_plan_provenance <list_json> <plan-lines> <selected...>
+# Each output line is "<name><TAB>self" (a user pick) or "<name><TAB>req:<m>"
+# (an engine-pulled dep, <m> = the FIRST requested module whose transitive
+# depends_on closure contains it). The depends_on graph is parsed from
+# `list --json` (the same source the checklist basic-first sort uses, #212) —
+# the TUI never re-resolves the closure, it only attributes the resolver's plan.
+tui_plan_provenance() {
+    local _json="$1" _plan="$2"
+    shift 2
+    jq -r --arg sel " $* " --arg plan "${_plan}" '
+        (reduce .items[] as $m ({}; .[$m.name] = ($m.depends_on // []))) as $deps
+        | def transitive($n):
+            { seen: [], frontier: ($deps[$n] // []) }
+            | until((.frontier | length) == 0;
+                .seen as $s
+                | (.frontier | map(select(. as $x | ($s | index($x)) | not)))
+                  as $new
+                | { seen: ($s + $new | unique),
+                    frontier: ([$new[] | ($deps[.] // [])] | add // []) })
+            | .seen;
+        ($sel | split(" ") | map(select(. != ""))) as $picks
+        | ($plan | split("\n") | map(select(. != "")))[]
+        | . as $node
+        | if ($picks | index($node)) then "\($node)\tself"
+          else
+            ([$picks[] | select(transitive(.) | index($node))] | first) as $by
+            | "\($node)\treq:\($by // "?")"
+          end
+    ' <<<"${_json}"
+}
+
+# Render a provenance map (tui_plan_provenance output) into human lines using
+# the i18n templates: "<name> (your selection)" / "<name> (required by X)".
+#   _tui_render_provenance <provenance-tsv>
+_tui_render_provenance() {
+    local _name _role
+    while IFS=$'\t' read -r _name _role; do
+        [[ -z "${_name}" ]] && continue
+        if [[ "${_role}" == "self" ]]; then
+            i18n_t TUI_BACKEND_I18N prov_self "${_name}"
+        else
+            i18n_t TUI_BACKEND_I18N prov_required_by "${_name}" "${_role#req:}"
+        fi
+        printf '\n'
+    done <<<"$1"
+}
+
+# Review-screen body (#214): every plan node with its per-item provenance,
+# replacing the old flat "will pull N deps" count. Resolver plan order.
+#   tui_review_text <list_json> <plan-lines> <selected...>
+tui_review_text() {
+    local _json="$1" _plan="$2"
+    shift 2
+    _tui_render_provenance "$(tui_plan_provenance "${_json}" "${_plan}" "$@")"
+}
+
+# Pre-install summary body (#213): identical provenance listing, reused before
+# the install fork so the user sees BOTH picks and pulled deps. Kept distinct
+# from tui_review_text so callers/intents read clearly (same content today).
+#   tui_summary_text <list_json> <plan-lines> <selected...>
+tui_summary_text() {
+    tui_review_text "$@"
 }
 
 # ── ADR-0019 payload parsing ─────────────────────────────────────────────────

@@ -35,6 +35,27 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   and touches no selection state). The TUI forks the engine (G4 — sources no
   engine lib); en + zh-TW strings added.
 
+- **TUI Review screen now shows per-item dependency provenance** (#214): the
+  Review & Install screen previously rendered a flat "will pull N deps" count
+  that did not say which selection pulled each dependency. It now lists every
+  module in resolver plan order, each annotated with its origin — a user pick
+  shows `<module> (your selection)` and an engine-pulled dependency shows
+  `<dep> (required by <module>)`. Provenance is computed in the TUI from the
+  `depends_on` graph in `setup_ubuntu list --json` (the same source the
+  basic-first checklist sort uses; the resolver stays the single dep
+  authority — the TUI only attributes the plan, never re-resolves it). The
+  forked install command's argv is unchanged: only the display changed.
+  Consistent across gum and whiptail; en + zh-TW strings added.
+- **TUI Quick Setup shows richer context + a pre-install summary** (#213): each
+  wizard step now spells out what each choice includes (the CLI-essentials
+  suite line names the tools and the whole-suite count; the agent-CLI step
+  reports how many are offered and preselected). Before the install is forked,
+  Quick Setup now shows a final PRE-INSTALL SUMMARY (reusing the Review
+  provenance listing) of EVERY module that will actually be installed — the
+  user's picks AND the dependencies pulled in for them — so nothing installs
+  unseen. Declining the summary is a pure cancel (no platform-override write,
+  no install fork). Consistent across gum and whiptail; en + zh-TW strings
+  added.
 - **TUI Manage Secrets is now a real sub-menu** (#202): `Manage Secrets`
   previously forked bare `setup_secrets`, which just printed usage and exited
   rc2. It now opens a sub-menu (design §4) whose entries each fork a

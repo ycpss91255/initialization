@@ -298,24 +298,38 @@ _bats_unit() {
     # exist on a fresh checkout ("kcov: error: Can't write helper").
     mkdir -p "${_out}"
     _info "kcov shard output: ${_out}"
-    # Bound the kcov run: a test that hangs under kcov ptrace (deep fork trees
-    # can deadlock) must fail FAST with the last-run TAP line visible, not stall
-    # the CI job for the full GitHub timeout. Tunable via KCOV_BATS_TIMEOUT.
-    local _kcov_timeout="${KCOV_BATS_TIMEOUT:-900}"
-    local _kcov_rc=0
-    timeout "${_kcov_timeout}" kcov \
-        --include-path="${REPO_ROOT}" \
-        --exclude-path="$(_kcov_exclude_path)" \
-        --exclude-region='kcov-exclude-start:kcov-exclude-end' \
-        "${_out}" \
-        bats "$@" || _kcov_rc=$?
-    # kcov leaves absolute-path convenience symlinks (e.g. bats →
-    # /source/coverage/...) that dangle outside the container and can
-    # break the per-shard artifact upload — prune them. `kcov --merge`
-    # reads the real bats.<hash>/ data dirs, not the symlinks.
-    find "${_out}" -maxdepth 1 -type l -delete
-    if (( _kcov_rc == 124 )); then
-        _die "kcov bats run exceeded ${_kcov_timeout}s — a test is hanging under kcov (see the TAP output above for the last test before the stall)."
+    # Bound + retry the kcov run. A deep-fork e2e spec can deadlock kcov ptrace
+    # nondeterministically; per-shard the normal run is ~1.5 min, so a short
+    # timeout (KCOV_BATS_TIMEOUT, default 180s) catches a hang fast, --kill-after
+    # guarantees the SIGKILL of a ptrace-wedged process, and we retry the shard
+    # (KCOV_BATS_ATTEMPTS, default 2) before failing. A genuine test failure
+    # (rc not 124/137) is NOT retried.
+    local _kcov_timeout="${KCOV_BATS_TIMEOUT:-180}"
+    local _attempts="${KCOV_BATS_ATTEMPTS:-2}"
+    local _kcov_rc=0 _try=1
+    while (( _try <= _attempts )); do
+        _kcov_rc=0
+        timeout --kill-after=20 "${_kcov_timeout}" kcov \
+            --include-path="${REPO_ROOT}" \
+            --exclude-path="$(_kcov_exclude_path)" \
+            --exclude-region='kcov-exclude-start:kcov-exclude-end' \
+            "${_out}" \
+            bats "$@" || _kcov_rc=$?
+        # kcov leaves absolute-path convenience symlinks (e.g. bats →
+        # /source/coverage/...) that dangle outside the container and can
+        # break the per-shard artifact upload — prune them. `kcov --merge`
+        # reads the real bats.<hash>/ data dirs, not the symlinks.
+        find "${_out}" -maxdepth 1 -type l -delete 2>/dev/null || true
+        # 124 = timeout fired; 137 = SIGKILL after --kill-after (ptrace-wedged).
+        if (( _kcov_rc != 124 && _kcov_rc != 137 )); then
+            break
+        fi
+        _info "kcov shard hung (rc=${_kcov_rc}) on attempt ${_try}/${_attempts}; retrying"
+        rm -rf "${_out}"; mkdir -p "${_out}"
+        _try=$(( _try + 1 ))
+    done
+    if (( _kcov_rc == 124 || _kcov_rc == 137 )); then
+        _die "kcov bats run hung past ${_kcov_timeout}s on all ${_attempts} attempts — a test deadlocks under kcov (see the TAP output above for the last test before the stall)."
     fi
     return "${_kcov_rc}"
 }

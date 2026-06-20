@@ -1075,19 +1075,30 @@ EOF
     assert_output "install eza -y"
 }
 
-@test "e2e: Exit drops in-memory selections with zero file writes (fs snapshot)" {
+@test "e2e: Exit with pending selections asks the guard, then drops them (#206)" {
     tui_e2e_make_harness
+    # optional → check eza+zoxide (accumulator now has 2) → main-menu Exit →
+    # guard yesno → confirm leave (rc 0 = Yes).
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
 0|eza\nzoxide\n
 1|
+0|
 EOF
     tui_e2e_run
     assert_success
-    # Selections lived ONLY in TUI process memory: nothing under $HOME...
+    # Q43 holds: selections lived only in TUI memory, nothing under $HOME...
     run find "${E2E_HOME}" -mindepth 1
     assert_output ""
-    # ...and no install was ever forked.
+    # ...and no install was ever forked (confirming Exit, not Proceed).
     run grep -c "^install" "${E2E_CLI_LOG}"
     assert_failure
 }
+
+# NOTE: the exit-guard DECLINE path (guard No -> stay -> guard Yes -> leave) is
+# covered end-to-end by the integration smoke (smoke_flow*.exp), not by an extra
+# e2e unit case here: looping the TUI subprocess twice under kcov ptrace pushed
+# the core shard's fork density high enough to occasionally deadlock kcov. The
+# single "Exit asks the guard, then drops" e2e above keeps the guard + Q43
+# coverage at a much lower fork cost.
+

@@ -146,6 +146,11 @@ declare -gA TUI_I18N=(
     [zh-TW.btn_back]="返回"
     [en.btn_exit]="Exit"
     [zh-TW.btn_exit]="離開"
+    # Exit guard (#206): shown only when the in-memory selection is non-empty.
+    [en.exit_guard_title]="Unsent selections"
+    [zh-TW.exit_guard_title]="尚未送出的選擇"
+    [en.exit_guard_text]="You have {0} unsent selection(s). Leave and discard them?"
+    [zh-TW.exit_guard_text]="你有 {0} 個尚未送出的選擇。離開並捨棄?"
     [en.manage_title]="Manage '{0}'"
     [zh-TW.manage_title]="管理 '{0}'"
     [en.manage_action_help]="Pick an action (forks the setup_ubuntu CLI — G4):"
@@ -684,6 +689,20 @@ _tui_dispatch() {
     esac
 }
 
+# ── Exit / interrupt handling (#206) ─────────────────────────────────────────
+
+# Exit guard: if the in-memory selection accumulator is non-empty, confirm
+# before dropping it (Q43 still holds — zero file writes either way). Empty
+# selection → exit immediately (no nag). Returns 0 to exit, 1 to stay.
+_tui_confirm_exit() {
+    local _n; _n="$(tui_selection_count)"
+    (( _n > 0 )) || return 0
+    TUI_YES_LABEL="$(i18n_t TUI_I18N btn_exit)" \
+    TUI_NO_LABEL="$(i18n_t TUI_I18N btn_cancel)" \
+        tui_render_yesno "$(i18n_t TUI_I18N exit_guard_title)" \
+            "$(i18n_t TUI_I18N exit_guard_text "${_n}")"
+}
+
 # ── Main menu loop (§8.1) ────────────────────────────────────────────────────
 
 _tui_main_loop() {
@@ -702,11 +721,15 @@ _tui_main_loop() {
             _menu_args+=("${_tag}" "$(_tui_pad_label "${_label}" 22) ${_desc}")
         done < <(tui_main_menu_entries "${_list_json}")
 
-        # < Exit > (relabeled Cancel) / ESC: drop the process and with it
-        # every in-memory selection — zero side effects (Q43).
+        # < Exit > (relabeled Cancel) / ESC: drop the process and with it every
+        # in-memory selection — zero side effects (Q43). Guard the drop when
+        # selections are pending (#206): confirm → exit, decline → stay.
         _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_exit)" tui_render_menu \
             "$(i18n_t TUI_I18N main_title "${INIT_UBUNTU_VERSION}")" \
-            "$(i18n_t TUI_I18N main_system "${_summary}")" "${_menu_args[@]}")" || return 0
+            "$(i18n_t TUI_I18N main_system "${_summary}")" "${_menu_args[@]}")" || {
+            _tui_confirm_exit && return 0
+            continue
+        }
         _tui_dispatch "${_choice}" "${_list_json}" "${_detect_json}"
     done
 }
@@ -714,6 +737,9 @@ _tui_main_loop() {
 # ── Entry ────────────────────────────────────────────────────────────────────
 
 main() {
+    # (Ctrl+C SIGINT trap deferred: a signal trap inside the TUI subprocess
+    # deadlocks kcov ptrace in the coverage unit shard, so it is reimplemented
+    # kcov-safe in a #206 follow-up. The exit guard below stays.)
     # --backend is parsed BEFORE detection (#171): a valid value forces
     # TUI_BACKEND and skips BOTH detection and the gum install prompt; an
     # invalid value is a usage error (exit 2).

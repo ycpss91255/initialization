@@ -52,8 +52,12 @@ tui_key_enter   ;# < OK > stores the page in the in-memory accumulator
 # 4. Back on the main menu (fresh redraw).
 tui_expect_text "Quick Setup"
 
-# 5. < Exit >: selections dropped with the process — clean rc 0 (Q43).
+# 5. < Exit > with a pending selection: the #206 guard asks to confirm before
+#    dropping it. Confirm "leave" (the yesno default is Yes/Exit) → clean rc 0,
+#    selection dropped with the process (Q43).
 tui_press_exit $backend
+tui_expect_text "Unsent selections"
+tui_key_enter
 set rc [tui_wait_exit_rc]
 if {$rc != 0} { tui_die "TUI exited rc=$rc (want 0) on backend=$backend" }
 exit 0

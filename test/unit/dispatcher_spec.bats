@@ -881,6 +881,111 @@ EOF
     assert_failure 2
 }
 
+# ── show --json machine-readable detail (issue #211) ────────────────────────
+
+@test "show --json emits valid JSON for a known module" {
+    _load_engine
+    run dispatcher_dispatch show noop --json
+    assert_success
+    echo "${output}" | jq -e 'type == "object"' > /dev/null
+    echo "${output}" | jq -e '.name == "noop"' > /dev/null
+}
+
+@test "show --json exposes the documented structured fields" {
+    _load_engine
+    cat > "${FAKE_MODULE_DIR}/full.module.sh" <<'EOF'
+NAME="full"
+CATEGORY="optional"
+TAGS=("editor" "cli")
+SUPPORTED_UBUNTU=("22.04" "24.04")
+SUPPORTED_PLATFORMS=("x86_64" "rpi5")
+DEPENDS_ON=("noop")
+CONFLICTS_WITH=("other")
+declare -gA DESCRIPTION=( [en]="a full module" )
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    run dispatcher_dispatch show full --json
+    assert_success
+    echo "${output}" | jq -e '.name == "full"' > /dev/null
+    echo "${output}" | jq -e '.category == "optional"' > /dev/null
+    echo "${output}" | jq -e '.description == "a full module"' > /dev/null
+    echo "${output}" | jq -e '.tags == ["editor","cli"]' > /dev/null
+    echo "${output}" | jq -e '.supported_ubuntu == ["22.04","24.04"]' > /dev/null
+    echo "${output}" | jq -e '.supported_platforms == ["x86_64","rpi5"]' > /dev/null
+    echo "${output}" | jq -e '.depends_on == ["noop"]' > /dev/null
+    echo "${output}" | jq -e '.conflicts == ["other"]' > /dev/null
+}
+
+@test "show --json emits null description and empty arrays when module lacks them" {
+    _load_engine
+    cat > "${FAKE_MODULE_DIR}/bare2.module.sh" <<'EOF'
+NAME="bare2"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    run dispatcher_dispatch show bare2 --json
+    assert_success
+    echo "${output}" | jq -e '.description == null' > /dev/null
+    echo "${output}" | jq -e '.tags == []' > /dev/null
+    echo "${output}" | jq -e '.depends_on == []' > /dev/null
+    echo "${output}" | jq -e '.conflicts == []' > /dev/null
+}
+
+@test "show --json accepts the flag before the module name" {
+    _load_engine
+    run dispatcher_dispatch show --json noop
+    assert_success
+    echo "${output}" | jq -e '.name == "noop"' > /dev/null
+}
+
+@test "show --json honors INIT_UBUNTU_LANG for the description (#211)" {
+    _load_engine
+    INIT_UBUNTU_LANG=zh-TW run dispatcher_dispatch show noop --json
+    assert_success
+    echo "${output}" | jq -e '.description == "空操作測試模組"' > /dev/null
+}
+
+@test "show --json stdout carries no [dispatcher] or human-readable decoration" {
+    _load_engine
+    run dispatcher_dispatch show noop --json
+    assert_success
+    refute_output --partial "[dispatcher]"
+    refute_output --partial "name:        "
+    refute_output --partial "description: "
+}
+
+@test "show --json unknown module returns exit 2 (error on stderr, not stdout)" {
+    _load_engine
+    # Exit code is 2 (run merges stderr so we check status here only).
+    run dispatcher_dispatch show nonexistent --json
+    assert_failure 2
+    # stdout must carry no JSON for the TUI; the diagnostic goes to stderr.
+    local _out _rc=0
+    _out="$(dispatcher_dispatch show nonexistent --json 2>/dev/null)" || _rc=$?
+    [[ "${_rc}" -eq 2 ]]
+    [[ -z "${_out}" ]]
+}
+
+@test "show without --json is unchanged (human-readable view)" {
+    _load_engine
+    run dispatcher_dispatch show noop
+    assert_success
+    assert_output --partial "name:"
+    assert_output --partial "description: A no-op test module"
+    refute_output --partial "{"
+}
+
 # ── lifecycle flag handling (--verbose / --quiet / unknown) ─────────────────
 
 @test "lifecycle --verbose flag is accepted and dry-run still lists order" {

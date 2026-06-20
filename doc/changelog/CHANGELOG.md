@@ -113,6 +113,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`show --json` machine-readable module detail** (#211, part 1):
+  `setup_ubuntu show <module> --json` now emits a single JSON object for one
+  module (`name`, `category`, `description`, `tags`, `depends_on`, `conflicts`,
+  `supported_ubuntu`, `supported_platforms`) — the structured record the
+  upcoming TUI module-detail and Manage-detail views consume. stdout is JSON
+  only (warnings/errors stay on stderr, same guarantee as `list --json`); an
+  unknown module exits 2 with no stdout. The plain (non-`--json`) `show` view is
+  unchanged. JSON keys/strings are jq-escaped, reusing the same helpers and
+  isolated-subshell description probe as the `list --json` catalog view.
+
 - **TUI exit guard** (#206): pressing Exit on the main menu with unsent
   selections now asks to confirm before discarding them (empty selection
   leaves immediately; Q43 still holds — zero file writes either way). The

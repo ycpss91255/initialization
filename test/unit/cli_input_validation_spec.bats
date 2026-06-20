@@ -133,7 +133,7 @@ teardown() {
     assert_output --partial "no positional"
 }
 
-# ── Bad language input (env-driven; whitelist {en,zh-TW,zh-CN,ja}) ────────────
+# ── Bad language input (env-driven; whitelist {en,zh-TW} for 0.1.0) ───────────
 # There is no --lang flag; language comes from INIT_UBUNTU_LANG / config
 # (lib/i18n.sh i18n_sanitize_lang). A bad value must NOT crash: it falls back
 # to "en" with a bilingual warning on stderr and the command still succeeds.

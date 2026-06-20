@@ -252,9 +252,99 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
     refute_line --regexp $'^-\t'
     local _tags
     _tags="$(awk -F'\t' '{print $1}' <<<"${output}" | paste -sd' ' -)"
-    [ "${_tags}" = "quick-setup base recommended optional manage secrets sysinfo run" ]
+    [ "${_tags}" = "quick-setup base recommended optional manage secrets sysinfo help run" ]
     # run stays the last row (the only batch execution point, Q43).
     [ "$(awk -F'\t' 'END{print $1}' <<<"${output}")" = "run" ]
+}
+
+# ── Help menu entry (#203, design §3) ────────────────────────────────────────
+
+@test "tui_main_menu_entries carries a Help row (#203, backend-aware key reference)" {
+    run tui_main_menu_entries "${FIXTURE_LIST_JSON}"
+    assert_success
+    assert_line --partial "Help"
+    # The Help row sits after System Info and before Run (run stays last).
+    local _tags
+    _tags="$(awk -F'\t' '{print $1}' <<<"${output}" | paste -sd' ' -)"
+    [[ "${_tags}" == *"sysinfo help run" ]]
+}
+
+# ── ui.tui_hints inline-hint gating (#203, design §3) ────────────────────────
+# TUI_HINTS=1 (default/unset) keeps the inline hints; TUI_HINTS=0 suppresses
+# the gum --show-help footer + header hint and the whiptail multi-select hint.
+
+@test "gum menu: TUI_HINTS=0 drops --show-help and the keybind hint (#203)" {
+    _make_mock_gum
+    TUI_HINTS=0 MOCK_GUM_OUTPUT='Run\n' run tui_render_menu "Main" "Pick one" run "Run"
+    assert_success
+    run cat "${MOCK_GUM_LOG}"
+    refute_output --partial "--show-help"
+    refute_output --partial "esc"
+}
+
+@test "gum menu: TUI_HINTS=1 keeps --show-help and the keybind hint (#203 default)" {
+    _make_mock_gum
+    TUI_HINTS=1 MOCK_GUM_OUTPUT='Run\n' run tui_render_menu "Main" "Pick one" run "Run"
+    assert_success
+    run cat "${MOCK_GUM_LOG}"
+    assert_output --partial "--show-help"
+    assert_output --partial "esc"
+}
+
+@test "gum checklist: TUI_HINTS=0 drops --show-help and the toggle hint (#203)" {
+    _make_mock_gum
+    TUI_HINTS=0 MOCK_GUM_OUTPUT='' run tui_render_checklist "Optional" "Pick" \
+        eza "ls alternative" off
+    assert_success
+    run cat "${MOCK_GUM_LOG}"
+    refute_output --partial "--show-help"
+    refute_output --partial "space/x"
+}
+
+@test "whiptail checklist: TUI_HINTS=1 appends the multi-select hint line (#203)" {
+    _make_mock_widget
+    export MOCK_WIDGET_OUTPUT=''
+    TUI_HINTS=1 run tui_render_checklist "Optional" "Pick" eza "[x] eza" off
+    assert_success
+    run cat "${MOCK_WIDGET_LOG}"
+    assert_output --partial "tab"
+}
+
+@test "whiptail checklist: TUI_HINTS=0 omits the multi-select hint line (#203)" {
+    _make_mock_widget
+    export MOCK_WIDGET_OUTPUT=''
+    TUI_HINTS=0 run tui_render_checklist "Optional" "Pick" eza "[x] eza" off
+    assert_success
+    run cat "${MOCK_WIDGET_LOG}"
+    refute_output --partial "tab to"
+}
+
+@test "whiptail menu: hint gating never rewrites the menu widget (multi-select only, #203)" {
+    _make_mock_widget
+    export MOCK_WIDGET_OUTPUT='run'
+    TUI_HINTS=1 run tui_render_menu "Main" "Pick one" run "Run"
+    assert_success
+    run cat "${MOCK_WIDGET_LOG}"
+    # The whiptail hint is multi-select only (design §3); the --menu text is not
+    # rewritten — the help line lives in the Help menu entry, not here.
+    refute_output --partial "tab to"
+}
+
+# ── Help-screen body text (#203, design §3) ──────────────────────────────────
+# Backend-aware reference. gum body documents j/k (vim) + esc semantics;
+# whiptail body centers on Tab.
+
+@test "tui_help_text (gum) documents j/k and esc-drops-selections (#203)" {
+    run tui_help_text gum
+    assert_success
+    assert_output --partial "j/k"
+    assert_output --partial "esc"
+}
+
+@test "tui_help_text (whiptail) centers on Tab (#203)" {
+    run tui_help_text whiptail
+    assert_success
+    assert_output --partial "Tab"
 }
 
 @test "tui_modules_in_category lists module names alphabetically" {

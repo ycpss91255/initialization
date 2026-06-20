@@ -276,6 +276,11 @@ declare -gA TUI_I18N=(
     [zh-TW.main_title]="init_ubuntu v{0}"
     [en.main_system]="System: {0}"
     [zh-TW.main_system]="系統:{0}"
+
+    # Help screen (#203, design §3). The body is backend-aware and authored by
+    # the backend lib (tui_help_text); the entrypoint only owns the title.
+    [en.title_help]="Help — keyboard reference"
+    [zh-TW.title_help]="說明 — 鍵盤操作"
 )
 # kcov-exclude-end
 # TUI_I18N is consumed by i18n_t via a nameref on the table NAME passed as a
@@ -1043,6 +1048,18 @@ _tui_screen_secrets() {
     done
 }
 
+# ── Help screen (#203, design §3) ────────────────────────────────────────────
+# A read-only msgbox of the backend-aware key reference. gum's native footer
+# omits j/k + esc semantics; whiptail has no footer at all and Tab (to reach the
+# Back/Exit buttons) is the non-obvious key — so each backend gets its own body
+# (tui_help_text, authored in the backend lib). This menu entry is the ONLY
+# help mechanism: a contextual `?`-key inside a widget is impossible on both
+# backends (neither lets us intercept keys mid-dialog).
+_tui_screen_help() {
+    tui_render_msgbox "$(i18n_t TUI_I18N title_help)" \
+        "$(tui_help_text "$(_tui_backend_family)")"
+}
+
 # ── Menu action dispatch ─────────────────────────────────────────────────────
 
 _tui_dispatch() {
@@ -1064,6 +1081,9 @@ _tui_dispatch() {
             ;;
         sysinfo)
             _tui_screen_system_info
+            ;;
+        help)
+            _tui_screen_help
             ;;
     esac
 }
@@ -1111,6 +1131,26 @@ _tui_main_loop() {
         }
         _tui_dispatch "${_choice}" "${_list_json}" "${_detect_json}"
     done
+}
+
+# ── ui.tui_hints startup read (#203, design §3) ──────────────────────────────
+# Resolve the inline-hint switch ONCE at startup and export TUI_HINTS (1/0) for
+# the backend hint code (lib/tui_backend.sh). The TUI is a CLI frontend
+# (ADR-0019 / G4): the value is FORKED from `setup_ubuntu config get
+# ui.tui_hints`, never sourced. The key may be unset (no config_get capability
+# here, an empty value, or a non-zero rc) — all of those degrade to the default
+# ON. Only an explicit "off" (case-insensitive, whitespace-trimmed) turns the
+# inline hints off; any other value is ON (default/unset/garbage → 1).
+_tui_read_hints() {
+    local _val
+    _val="$("${TUI_CLI}" config get ui.tui_hints 2>/dev/null)" || _val=""
+    _val="${_val//[[:space:]]/}"
+    if [[ "${_val,,}" == "off" ]]; then
+        TUI_HINTS=0
+    else
+        TUI_HINTS=1
+    fi
+    export TUI_HINTS
 }
 
 # ── Entry ────────────────────────────────────────────────────────────────────
@@ -1208,6 +1248,9 @@ main() {
         printf '       (its preflight offers to install jq), e.g.: setup_ubuntu list\n' >&2
         return 1
     fi
+
+    # #203: resolve ui.tui_hints once (single fork), before any screen draws.
+    _tui_read_hints
 
     _tui_main_loop
 }

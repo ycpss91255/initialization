@@ -22,6 +22,23 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **TUI Help system + `ui.tui_hints` inline-hint switch** (#203, design §3): the
+  main menu gains a backend-aware **Help** entry (after System Info, before
+  Run) that documents what each backend hides — the gum body covers j/k (vim
+  motion) and esc semantics (on the main menu esc exits and drops unsent
+  selections) that gum's native footer omits; the whiptail body centers on
+  **Tab** (the non-obvious key to reach the `< Back >` / `< Exit >` buttons),
+  plus space/enter/esc. A contextual `?`-key inside a widget is impossible on
+  both backends, so the Help entry is the mechanism. New config switch
+  `ui.tui_hints` (default ON) toggles the INLINE per-screen hints (the gum
+  header hint + `gum --show-help`; the whiptail multi-select hint line); when
+  `off` screens render clean and the user relies on the Help entry. The TUI is a
+  CLI frontend (ADR-0019 / G4): it reads the value ONCE at startup by forking
+  `setup_ubuntu config get ui.tui_hints` (never sources the engine) and threads
+  it as a single exported `TUI_HINTS` global; an unset key / empty value / error
+  degrades to the default ON, and only an explicit `off` turns hints off. en +
+  zh-TW strings added for both backends.
+
 - **TUI module detail view** (#211 part 2): a read-only detail msgbox shows a
   module's full `setup_ubuntu show <module> --json` data — description,
   category, tags, depends_on, conflicts, supported_ubuntu, supported_platforms

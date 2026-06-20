@@ -167,6 +167,40 @@ declare -gA TUI_BACKEND_I18N=(
     [zh-TW.confirm_purge_note]="清除也會刪除該模組的設定檔 (CONFIG_PATHS)。"
     [en.confirm_remove_note]="The module's config files are retained (Purge deletes them too)."
     [zh-TW.confirm_remove_note]="該模組的設定檔會保留 (清除則會一併刪除)。"
+
+    # Module detail view (#211 part 2 / #215). Read-only label:value lines built
+    # from a forked `setup_ubuntu show <module> --json` payload. (none) is the
+    # placeholder for an absent description or an empty array.
+    [en.detail_name]="Name:"
+    [zh-TW.detail_name]="名稱:"
+    [en.detail_category]="Category:"
+    [zh-TW.detail_category]="類別:"
+    [en.detail_description]="Description:"
+    [zh-TW.detail_description]="描述:"
+    [en.detail_tags]="Tags:"
+    [zh-TW.detail_tags]="標籤:"
+    [en.detail_depends_on]="Depends on:"
+    [zh-TW.detail_depends_on]="相依於:"
+    [en.detail_conflicts]="Conflicts:"
+    [zh-TW.detail_conflicts]="衝突:"
+    [en.detail_supported_ubuntu]="Supported Ubuntu:"
+    [zh-TW.detail_supported_ubuntu]="支援的 Ubuntu:"
+    [en.detail_supported_platforms]="Supported platforms:"
+    [zh-TW.detail_supported_platforms]="支援的平台:"
+    [en.detail_none]="(none)"
+    [zh-TW.detail_none]="(無)"
+    # #215: unregistered installed entry — present in state.json but absent from
+    # the current catalog (`show --json` fails). version_provided / installed_at
+    # are whatever state.json holds; the note makes the gap explicit.
+    [en.detail_version]="Installed version:"
+    [zh-TW.detail_version]="已安裝版本:"
+    [en.detail_installed_at]="Installed at:"
+    [zh-TW.detail_installed_at]="安裝時間:"
+    [en.detail_unregistered_note]="This module is not in the current catalog (showing state.json data only)."
+    [zh-TW.detail_unregistered_note]="此模組不在目前的目錄中(僅顯示 state.json 資料)。"
+    # Compact marker appended to an unregistered module's Manage-list row.
+    [en.detail_unregistered_marker]="(unregistered)"
+    [zh-TW.detail_unregistered_marker]="(未登錄)"
 )
 # kcov-exclude-end
 # TUI_BACKEND_I18N is consumed by i18n_t via a nameref on the table NAME passed
@@ -454,6 +488,16 @@ tui_cli_list_json()      { _tui_cli_json list --json; }
 tui_cli_detect_json()    { _tui_cli_json detect --json; }
 tui_cli_installed_json() { _tui_cli_json list --installed --json; }
 
+# Module detail payload for the #211 detail view, one forked subprocess:
+#   tui_cli_show_json <module>
+# Forks `setup_ubuntu show <module> --json` (G4 — the engine `show --json`
+# already exists, lib/dispatcher.sh). The CLI returns rc 2 + "unknown module"
+# on stderr for a name absent from the registry, so an UNREGISTERED installed
+# module (state.json survives, the module file is gone) makes this fail — the
+# caller falls back to a state-only detail (#215). Success → the JSON object on
+# stdout, rc 0; failure → rc 1 (the engine's diagnostic stays on stderr).
+tui_cli_show_json() { _tui_cli_json show "$1" --json; }
+
 # Resolver-ordered install plan for the Review screen, one module per line:
 #   tui_cli_install_plan <module...>
 # Forks `setup_ubuntu install --dry-run <module...>` and strips the
@@ -698,24 +742,36 @@ tui_qs_tag_entries() { _tui_qs_entries "$1" tag "$2" "$3"; }
 # modules missing from it (file deleted, state survives) fall back to the
 # "other" bucket instead of erroring. flat sorts by name, grouped by
 # tag-then-name with a "[tag]" prefix (same convention as §8.2 checklists).
+# #215: a name present in state.json but ABSENT from the catalog (list --json)
+# is UNREGISTERED — its module file is gone (or it was a stale test install),
+# so it has no metadata to act on. Such rows used to render with a bare "other"
+# tag, indistinguishable from a registered module that merely lacks a TAGS[0].
+# They now carry an explicit " (unregistered)" marker so the user can tell the
+# two apart; the registered rows are unchanged. (The bare "unknown" VERSION is
+# the legitimate state.json default — lib/state.sh writes it when a module
+# exports no VERSION_PROVIDED — so it is left as-is, not relabelled.)
 tui_installed_entries() {
     local _state="$1" _list="$2" _mode="${3:-flat}"
-    jq -r --argjson list "${_list}" --arg mode "${_mode}" '
+    local _marker; _marker="$(i18n_t TUI_BACKEND_I18N detail_unregistered_marker)"
+    jq -r --argjson list "${_list}" --arg mode "${_mode}" --arg mark "${_marker}" '
         ([$list.items[]? | {key: .name, value: (.tags[0] // "other")}]
          | from_entries) as $tagof
         | (.installed // {}) | to_entries
-        | map({name: .key,
+        | map(.key as $k
+              | {name: $k,
+               registered: ($tagof | has($k)),
                version: (((.value.synced.version_provided // "?")
                           + "              ")[0:14]),
                at: ((.value.synced.installed_at // "?")
                     | sub("T"; " ") | .[0:16]),
-               tag: ($tagof[.key] // "other")})
+               tag: ($tagof[$k] // "other")})
         | (if $mode == "grouped" then sort_by(.tag, .name)
            else sort_by(.name) end)
         | .[]
+        | (if .registered then "" else " " + $mark end) as $suffix
         | if $mode == "grouped"
-          then "\(.name)\t[\(.tag)] \(.version)\(.at)"
-          else "\(.name)\t\(.version)\(.at)"
+          then "\(.name)\t[\(.tag)] \(.version)\(.at)\($suffix)"
+          else "\(.name)\t\(.version)\(.at)\($suffix)"
           end
     ' <<<"${_state}"
 }
@@ -792,6 +848,62 @@ tui_manage_confirm_text() {
         remove)
             _text+="$(i18n_t TUI_BACKEND_I18N confirm_remove_note)" ;;
     esac
+    printf '%s\n' "${_text}"
+}
+
+# ── Module detail view (#211 part 2 / #215) ──────────────────────────────────
+
+# A single show-payload field as a readable string for the detail msgbox:
+# arrays are comma-joined; an empty array or a JSON null becomes the localized
+# "(none)" placeholder. <show_json> is a `show --json` object; <jq-path> selects
+# the field (e.g. .tags, .description).
+#   _tui_detail_field <show_json> <jq-path>
+_tui_detail_field() {
+    local _none; _none="$(i18n_t TUI_BACKEND_I18N detail_none)"
+    jq -r --arg none "${_none}" "
+        ($2) as \$v
+        | if (\$v | type) == \"array\"
+          then (if (\$v | length) == 0 then \$none else (\$v | join(\", \")) end)
+          else (\$v // \$none)
+          end" <<<"$1"
+}
+
+# Read-only detail text for a REGISTERED module, built from a forked
+# `setup_ubuntu show <module> --json` payload (#211 fields only):
+#   tui_detail_text <show_json>
+# Emits localized "Label: value" lines (arrays comma-joined). Pure rendering —
+# it forks nothing and never prints an action/command (it is a read-only view).
+tui_detail_text() {
+    local _json="$1" _text=""
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_name) $(_tui_detail_field "${_json}" .name)"$'\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_category) $(_tui_detail_field "${_json}" .category)"$'\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_description) $(_tui_detail_field "${_json}" .description)"$'\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_tags) $(_tui_detail_field "${_json}" .tags)"$'\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_depends_on) $(_tui_detail_field "${_json}" .depends_on)"$'\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_conflicts) $(_tui_detail_field "${_json}" .conflicts)"$'\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_supported_ubuntu) $(_tui_detail_field "${_json}" .supported_ubuntu)"$'\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_supported_platforms) $(_tui_detail_field "${_json}" .supported_platforms)"
+    printf '%s\n' "${_text}"
+}
+
+# #215 fallback: detail text for an UNREGISTERED installed entry — present in
+# state.json but absent from the current catalog (`show --json` failed). Shows
+# the facts state.json actually holds (version_provided / installed_at) plus a
+# clear "not in current catalog" note:
+#   tui_detail_unregistered_text <module> <state_json>
+tui_detail_unregistered_text() {
+    local _module="$1" _state="$2"
+    local _none; _none="$(i18n_t TUI_BACKEND_I18N detail_none)"
+    local _ver _at
+    _ver="$(jq -r --arg m "${_module}" --arg none "${_none}" \
+        '.installed[$m].synced.version_provided // $none' <<<"${_state}")"
+    _at="$(jq -r --arg m "${_module}" --arg none "${_none}" \
+        '(.installed[$m].synced.installed_at // $none) | sub("T"; " ") | .[0:16]' <<<"${_state}")"
+    local _text=""
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_name) ${_module}"$'\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_version) ${_ver}"$'\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_installed_at) ${_at}"$'\n\n'
+    _text+="$(i18n_t TUI_BACKEND_I18N detail_unregistered_note)"
     printf '%s\n' "${_text}"
 }
 

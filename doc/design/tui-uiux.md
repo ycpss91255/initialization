@@ -147,6 +147,37 @@ Manage Secrets
 
 ---
 
+## 5b. Module detail view (#211 part 2 / #215)
+
+A read-only detail msgbox renders a module's full `setup_ubuntu show <module>
+--json` data: name, category, description, tags, depends_on, conflicts,
+supported_ubuntu, supported_platforms (arrays comma-joined; absent / empty →
+`(none)`). The TUI forks the engine and parses with jq — G4, no engine lib
+sourced. It changes NO selection state.
+
+**Trigger (decision):** neither gum nor whiptail can attach a per-row "info"
+key inside a checklist (gum exposes no key rebinding; whiptail/newt supports no
+custom keys — same constraint as the excluded in-widget `?`, §3). So the detail
+view uses a **pick-then-show companion menu**, not a per-row key:
+
+- **Category checklists** (base/recommended/optional/experimental): a
+  `View details...` sentinel row is appended to the checklist. Toggling it +
+  OK commits the real picks (the sentinel is filtered out — it can never be a
+  module name), opens a module picker → detail box, then **re-renders the same
+  checklist with selections intact**. The page is committed before the detour,
+  so opening/closing the detail view never loses a selection (Q43 accumulator
+  is the source of truth; the re-render reflects it).
+- **Manage Installed**: a `View details` action on the per-module action menu
+  (alongside Update / Remove / Purge). For an **unregistered** entry (#215 —
+  present in state.json, absent from the catalog, so `show --json` fails) it
+  falls back to a state-only detail (installed version + installed_at) plus a
+  clear "not in the current catalog" note.
+
+`(unregistered)` rendering: a Manage-list row for a state-only module carries an
+explicit `(unregistered)` marker so it is distinguishable from a registered
+module without a `TAGS[0]`. The bare `unknown` *version* is left as-is — it is
+the legitimate `version_provided` default written by the engine, not a defect.
+
 ## 6. i18n policy (0.1.0)
 
 - Officially supported: **en + zh-TW only**.
@@ -201,6 +232,7 @@ Manage Secrets
 | Q11 | Exit guard when unsent selections exist. |
 | Q11b | Ctrl+C = clean full quit, terminal restored, zero writes, distinct from Esc. |
 | Q12 | All of the above is 0.1.0/M1; one epic issue + per-block sub-issues; cut rc3 only after the batch lands green. |
+| Q13 | Module detail view (#211/#215): read-only msgbox of `show --json`; trigger is a pick-then-show companion menu (no per-row info key — impossible on both backends); reachable from checklists (selection-preserving) + Manage; unregistered entries marked `(unregistered)` with a state-only fallback detail (§5b). |
 
 ---
 

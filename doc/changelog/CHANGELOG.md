@@ -22,6 +22,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **TUI module detail view** (#211 part 2): a read-only detail msgbox shows a
+  module's full `setup_ubuntu show <module> --json` data — description,
+  category, tags, depends_on, conflicts, supported_ubuntu, supported_platforms
+  (arrays comma-joined, empty/absent fields shown as `(none)`). It is reachable
+  from the category checklists (base / recommended / optional / experimental)
+  via a `View details...` companion entry AND from Manage Installed via a
+  `View details` action. Neither gum nor whiptail can attach a per-row info key
+  inside a checklist, so the trigger is a pick-then-show menu: on a checklist
+  the companion entry opens a module picker → detail box and returns to the
+  SAME checklist with selections intact (the read-only view forks `show --json`
+  and touches no selection state). The TUI forks the engine (G4 — sources no
+  engine lib); en + zh-TW strings added.
+
 - **TUI Manage Secrets is now a real sub-menu** (#202): `Manage Secrets`
   previously forked bare `setup_secrets`, which just printed usage and exited
   rc2. It now opens a sub-menu (design §4) whose entries each fork a
@@ -58,6 +71,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   (#208). `--lang` help and the supported set now read `en | zh-TW`.
 
 ### Fixed
+
+- **TUI Manage Installed labels unregistered entries clearly** (#215): a
+  state.json entry whose module is no longer in the catalog (`list --json` /
+  registry) — a deleted module file or a stale test install — used to render
+  with a bare `[other]` tag, indistinguishable from a registered module that
+  merely lacks a `TAGS[0]`. Such rows now carry an explicit `(unregistered)`
+  marker, and the new `View details` action falls back (when `show --json`
+  fails for the missing module) to the facts state.json actually holds
+  (installed version + installed_at) plus a `not in the current catalog` note,
+  instead of crashing or showing nothing. Note: the bare `unknown` *version* is
+  not a bug — it is the legitimate state.json default (`lib/state.sh` /
+  `lib/runner.sh` write `version_provided=unknown` when a module exports no
+  `VERSION_PROVIDED`), so it is left as-is.
 
 - **`setup_apt_mirror` no-op detection was dead code** (#152, via #172): a brace
   typo `cmp -s "{$_file}"` (instead of `"${_file}"`) made `cmp` open a literal

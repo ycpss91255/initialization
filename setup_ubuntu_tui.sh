@@ -174,6 +174,23 @@ declare -gA TUI_I18N=(
     [en.manage_list_help]="Module / Version / Installed at — pick one to manage:"
     [zh-TW.manage_list_help]="模組 / 版本 / 安裝時間 — 選一項進行管理:"
 
+    # Module detail view (#211 part 2 / #215). A "View details..." companion
+    # entry (checklist + Manage action menu) opens a READ-ONLY detail msgbox —
+    # neither backend can add a per-row info key inside a checklist, so a
+    # separate pick-then-show menu is the trigger (design §2 / doc note).
+    [en.detail_title]="Details: {0}"
+    [zh-TW.detail_title]="詳細資訊:{0}"
+    [en.detail_view_entry]="View details..."
+    [zh-TW.detail_view_entry]="檢視詳細資訊…"
+    [en.detail_pick_title]="View module details"
+    [zh-TW.detail_pick_title]="檢視模組詳細資訊"
+    [en.detail_pick_help]="Pick a module to view (read-only; your selections are kept):"
+    [zh-TW.detail_pick_help]="選擇要檢視的模組 (唯讀;不影響你的選擇):"
+    [en.detail_failed]="ERROR: 'setup_ubuntu show {0} --json' failed and no state data is available."
+    [zh-TW.detail_failed]="錯誤:'setup_ubuntu show {0} --json' 執行失敗,且沒有可用的 state 資料。"
+    [en.manage_detail]="View details (read-only)"
+    [zh-TW.manage_detail]="檢視詳細資訊 (唯讀)"
+
     # Manage Secrets sub-menu (_tui_screen_secrets, #202 / design §4).
     [en.secrets_title]="Manage Secrets"
     [zh-TW.secrets_title]="管理密鑰"
@@ -350,6 +367,59 @@ _tui_screen_system_info() {
     fi
 }
 
+# ── Module detail view (#211 part 2 / #215) ──────────────────────────────────
+# Read-only msgbox showing a module's full `show --json` data. Reachable from
+# the category checklists (via a "View details..." companion entry) AND from
+# Manage Installed (via a "View details" action). The detail view forks
+# `setup_ubuntu show <module> --json` (G4) and renders the parsed fields; it
+# changes no selection state, so opening/closing it never disturbs the Q43
+# accumulator. For an UNREGISTERED installed module (#215) the show fork fails
+# (the name is gone from the registry) — when a state.json payload is supplied
+# the view falls back to the state-only detail + a not-in-catalog note.
+
+# Sentinel row name for the checklist "View details..." companion entry. It is
+# never a real module name (module names are catalog identifiers), so it can
+# never collide with a selection — it is filtered out before the page commits.
+TUI_DETAIL_SENTINEL="__details__"
+
+#   _tui_screen_detail <module> [<state_json>]
+_tui_screen_detail() {
+    local _module="$1" _state="${2:-}"
+    local _title; _title="$(i18n_t TUI_I18N detail_title "${_module}")"
+    local _show
+    if _show="$(tui_cli_show_json "${_module}")"; then
+        tui_render_msgbox "${_title}" "$(tui_detail_text "${_show}")"
+        return 0
+    fi
+    # show --json failed → unregistered (or unknown) module.
+    if [[ -n "${_state}" ]]; then
+        tui_render_msgbox "${_title}" \
+            "$(tui_detail_unregistered_text "${_module}" "${_state}")"
+        return 0
+    fi
+    tui_render_msgbox "${_title}" "$(i18n_t TUI_I18N detail_failed "${_module}")"
+}
+
+# Pick-a-module-then-show-detail menu used by the checklist companion entry.
+# <names> is a newline-separated module-name list (the current category's
+# rows). Cancel / empty forks nothing and returns to the checklist with the
+# accumulator untouched.
+#   _tui_screen_detail_picker <names>
+_tui_screen_detail_picker() {
+    local _names="$1"
+    local -a _rows=()
+    local _n
+    while IFS= read -r _n; do
+        [[ -n "${_n}" ]] && _rows+=("${_n}" "${_n}")
+    done <<<"${_names}"
+    [[ "${#_rows[@]}" -eq 0 ]] && return 0
+    local _choice
+    _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
+        "$(i18n_t TUI_I18N detail_pick_title)" \
+        "$(i18n_t TUI_I18N detail_pick_help)" "${_rows[@]}")" || return 0
+    _tui_screen_detail "${_choice}"
+}
+
 # ── Checkbox accumulator screens (#70, Q43 / §8.2) ───────────────────────────
 
 # One category page as a pure check-list. < OK > stores the page in the
@@ -358,33 +428,59 @@ _tui_screen_system_info() {
 # `< Run >` on the main menu is the only batch execution point.
 _tui_screen_category() {
     local _cat="$1" _json="$2"
-    local -a _rows=()
-    local _name _label _status
-    while IFS=$'\t' read -r _name _label _status; do
-        _rows+=("${_name}" "${_label}" "${_status}")
-    done < <(tui_checklist_entries "${_json}" "${_cat}" \
-        "$(tui_selection_list | tr '\n' ' ')")
+    # Loop so the "View details..." companion entry (#211) can show a detail
+    # msgbox and return to the SAME checklist with selections intact: each pass
+    # re-derives the rows from the persistent accumulator (tui_selection_list),
+    # so the just-committed page is reflected and nothing is lost.
+    while :; do
+        local -a _rows=()
+        local _name _label _status
+        while IFS=$'\t' read -r _name _label _status; do
+            _rows+=("${_name}" "${_label}" "${_status}")
+        done < <(tui_checklist_entries "${_json}" "${_cat}" \
+            "$(tui_selection_list | tr '\n' ' ')")
 
-    if [[ "${#_rows[@]}" -eq 0 ]]; then
-        tui_render_msgbox "$(i18n_t TUI_I18N title_modules)" \
-            "$(i18n_t TUI_I18N no_modules_in_cat "${_cat}")"
+        if [[ "${#_rows[@]}" -eq 0 ]]; then
+            tui_render_msgbox "$(i18n_t TUI_I18N title_modules)" \
+                "$(i18n_t TUI_I18N no_modules_in_cat "${_cat}")"
+            return 0
+        fi
+
+        # Companion "View details..." row: a sentinel checklist entry. Neither
+        # backend can attach a per-row info key inside a checklist, so toggling
+        # this row + OK opens a module picker → detail msgbox (filtered out of
+        # the committed page below). It renders unchecked every pass.
+        _rows+=("${TUI_DETAIL_SENTINEL}" "$(i18n_t TUI_I18N detail_view_entry)" "off")
+
+        local _picked
+        if ! _picked="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_checklist \
+            "$(i18n_t TUI_I18N cat_modules_title "${_cat^}")" \
+            "$(i18n_t TUI_I18N check_modules_help)" \
+            "${_rows[@]}")"; then
+            return 0  # Back / ESC: discard this page's changes (Q43)
+        fi
+
+        local -a _names=()
+        local _line _wants_detail="false"
+        while IFS= read -r _line; do
+            [[ -z "${_line}" ]] && continue
+            if [[ "${_line}" == "${TUI_DETAIL_SENTINEL}" ]]; then
+                _wants_detail="true"
+                continue  # never a real selection — filtered out (#211)
+            fi
+            _names+=("${_line}")
+        done <<<"${_picked}"
+        # Commit the real picks regardless: opening details does not discard the
+        # page, so the user's checkbox state survives the detail round trip.
+        tui_selection_replace_page "${_json}" "${_cat}" "${_names[@]}"
+
+        if [[ "${_wants_detail}" == "true" ]]; then
+            _tui_screen_detail_picker \
+                "$(tui_modules_in_category "${_json}" "${_cat}")"
+            continue  # back to the same checklist, selections preserved
+        fi
         return 0
-    fi
-
-    local _picked
-    if ! _picked="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_checklist \
-        "$(i18n_t TUI_I18N cat_modules_title "${_cat^}")" \
-        "$(i18n_t TUI_I18N check_modules_help)" \
-        "${_rows[@]}")"; then
-        return 0  # Back / ESC: discard this page's changes (Q43)
-    fi
-
-    local -a _names=()
-    local _line
-    while IFS= read -r _line; do
-        [[ -n "${_line}" ]] && _names+=("${_line}")
-    done <<<"${_picked}"
-    tui_selection_replace_page "${_json}" "${_cat}" "${_names[@]}"
+    done
 }
 
 # Review & Install screen shared by < Run > (#70) and Quick Setup (#71):
@@ -652,14 +748,20 @@ _tui_screen_confirm_destructive() {
 # §8.4 only gates Remove / Purge); Remove / Purge route through the
 # confirm dialog. < Back > returns to the module list.
 _tui_screen_manage_action() {
-    local _module="$1" _action
+    local _module="$1" _state="${2:-}" _action
     _action="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
         "$(i18n_t TUI_I18N manage_title "${_module}")" \
         "$(i18n_t TUI_I18N manage_action_help)" \
+        "detail" "$(i18n_t TUI_I18N manage_detail)" \
         "update" "$(i18n_t TUI_I18N manage_update)" \
         "remove" "$(i18n_t TUI_I18N manage_remove)" \
         "purge"  "$(i18n_t TUI_I18N manage_purge)")" || return 0
     case "${_action}" in
+        detail)
+            # Read-only (#211 / #215): forks `show --json`; for an unregistered
+            # entry the show fails and the state-only fallback kicks in.
+            _tui_screen_detail "${_module}" "${_state}"
+            ;;
         update)
             local -a _argv=()
             mapfile -t _argv < <(tui_manage_args update "${_module}")
@@ -719,7 +821,7 @@ _tui_screen_manage() {
             fi
             continue
         fi
-        _tui_screen_manage_action "${_choice}"
+        _tui_screen_manage_action "${_choice}" "${_state_json}"
     done
 }
 

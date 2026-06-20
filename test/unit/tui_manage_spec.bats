@@ -92,7 +92,8 @@ FIXTURE_DETECT_JSON='{"os":{"id":"ubuntu","version":"24.04","codename":"noble"},
     run tui_installed_entries "${FIXTURE_STATE_JSON}" "${FIXTURE_LIST_JSON}" flat
     assert_success
     assert_line --index 0 "$(printf 'docker\t27.4.0        2026-05-13 14:22')"
-    assert_line --index 1 "$(printf 'ghost\tunknown       2026-05-13 14:31')"
+    # ghost is in state.json but absent from list --json → unregistered (#215).
+    assert_line --index 1 "$(printf 'ghost\tunknown       2026-05-13 14:31 (unregistered)')"
     assert_line --index 2 "$(printf 'neovim\t0.10.2        2026-05-13 14:25')"
 }
 
@@ -102,7 +103,8 @@ FIXTURE_DETECT_JSON='{"os":{"id":"ubuntu","version":"24.04","codename":"noble"},
     # container < editor < other (ghost has no module file → "other").
     assert_line --index 0 "$(printf 'docker\t[container] 27.4.0        2026-05-13 14:22')"
     assert_line --index 1 "$(printf 'neovim\t[editor] 0.10.2        2026-05-13 14:25')"
-    assert_line --index 2 "$(printf 'ghost\t[other] unknown       2026-05-13 14:31')"
+    # ghost is absent from list --json → unregistered marker (#215).
+    assert_line --index 2 "$(printf 'ghost\t[other] unknown       2026-05-13 14:31 (unregistered)')"
 }
 
 @test "tui_installed_entries is empty when nothing is installed" {

@@ -35,24 +35,21 @@ module/config/fish/fish_variables*
 # Other agent CLIs' local state
 skills-lock.json
 
-# Skill layout (refs #150, supersedes the 2026-05-21 migration): EVERY skill
-# lives canonically under .agents/skills/<name>/ and is symlinked from
-# .claude/skills/<name>. Third-party skills (installed via the `skills` CLI)
-# stay machine-local; repo-owned skills are tracked at BOTH ends — the
-# canonical dir under .agents/skills/ and the symlink under .claude/skills/.
-# git cannot re-include a path once a parent dir is ignored, so .agents is
-# ignored at the contents level (/*) with layer-by-layer negations.
+# Skill layout (refs #150): EVERY skill lives canonically under
+# .agents/skills/<name>/. `.claude/skills` is a single whole-dir symlink into
+# .agents/skills (like .claude/{hook,rules,script}), so the tracked-vs-local
+# distinction is made ONCE, at the canonical end: repo-owned skills are tracked
+# under .agents/skills/; third-party skills (installed via the `skills` CLI)
+# stay machine-local + gitignored there, but still resolve through the same
+# .claude/skills symlink. git cannot re-include a path once a parent dir is
+# ignored, so .agents is ignored at the contents level (/*) with layer-by-layer
+# negations. The .claude/skills symlink itself is tracked (no rule ignores it).
 .agents/*
 !.agents/skills
 .agents/skills/*
 !.agents/skills/auto-merge-on-green
 !.agents/skills/semver-bump
 !.agents/skills/wait-pr-ci
-
-.claude/skills/*
-!.claude/skills/auto-merge-on-green
-!.claude/skills/semver-bump
-!.claude/skills/wait-pr-ci
 
 # git worktree workspaces — per-branch checkouts for fix/feature work.
 # Convention: worktree/<N>-<slug>/ where N is the issue/task number.

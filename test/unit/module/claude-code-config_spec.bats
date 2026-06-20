@@ -264,15 +264,24 @@ _run_statusline() {
     local home="${INIT_UBUNTU_TEST_SCRATCH}/sl-home"
     local bin="${INIT_UBUNTU_TEST_SCRATCH}/sl-bin"
     mkdir -p "${home}/.claude/plugins/cache/cc-statusline/cc-statusline/2.2.19" "${bin}"
-    # Fake renderer: report whatever width the launcher handed down.
-    printf '#!/bin/sh\nprintf "WIDTH=%%s\\n" "${CCSTATUSLINE_WIDTH:-unset}"\n' \
-        > "${bin}/node"
+    # Fake renderer: report whatever width the launcher handed down. Quoted
+    # heredoc keeps ${CCSTATUSLINE_WIDTH} literal — it must expand when the
+    # fake runs, not while this helper writes it.
+    cat > "${bin}/node" <<'NODE'
+#!/bin/sh
+printf 'WIDTH=%s\n' "${CCSTATUSLINE_WIDTH:-unset}"
+NODE
     # Fake tmux: emit a fixed pane width, or fail when MOCK_TMUX_FAIL=1.
     if [[ "${MOCK_TMUX_FAIL:-0}" == "1" ]]; then
-        printf '#!/bin/sh\nexit 1\n' > "${bin}/tmux"
+        cat > "${bin}/tmux" <<'TMUX'
+#!/bin/sh
+exit 1
+TMUX
     else
-        printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "${MOCK_PANE_WIDTH:-99}" \
-            > "${bin}/tmux"
+        cat > "${bin}/tmux" <<TMUX
+#!/bin/sh
+printf '%s\n' "${MOCK_PANE_WIDTH:-99}"
+TMUX
     fi
     chmod +x "${bin}/node" "${bin}/tmux"
     HOME="${home}" PATH="${bin}:${PATH}" \

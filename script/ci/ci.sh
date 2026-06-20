@@ -146,6 +146,9 @@ _find_lintable_sh() {
     find "${REPO_ROOT}" \
         \( -path "${REPO_ROOT}/.git" -o \
            -path "${REPO_ROOT}/.tmp" -o \
+           -path "${REPO_ROOT}/.worktree" -o \
+           -path "${REPO_ROOT}/.claude/worktrees" -o \
+           -path "${REPO_ROOT}/worktree" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
            -path "${REPO_ROOT}/tool" -o \
@@ -163,6 +166,9 @@ _find_lintable_fish() {
     find "${REPO_ROOT}" \
         \( -path "${REPO_ROOT}/.git" -o \
            -path "${REPO_ROOT}/.tmp" -o \
+           -path "${REPO_ROOT}/.worktree" -o \
+           -path "${REPO_ROOT}/.claude/worktrees" -o \
+           -path "${REPO_ROOT}/worktree" -o \
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
            -path "${REPO_ROOT}/tool" -o \

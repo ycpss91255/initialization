@@ -51,6 +51,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`WorktreeCreate` hook → worktrees at repo-root `.worktree/`**
+  (`.agents/hook/worktree_create.sh`): Claude Code's agent/workflow git
+  worktrees now land in a dedicated, gitignored `<repo>/.worktree/<name>`
+  instead of the upstream default `.claude/worktrees/` — kept in-repo (easy to
+  manage) but out of `.claude/`. The lint/coverage `find` in `script/ci/ci.sh`
+  now prunes `.worktree`, `.claude/worktrees`, and `worktree`, so per-worktree
+  full-repo copies are never scanned (that scan once wedged a lint run ~54 min).
+  7 bats cases; unsafe names rejected; stdout carries only the path.
+
 - **`enforce_long_job_timeout` PreToolUse hook**: blocks a known-long
   FOREGROUND Bash command (full `just` test/coverage/lint, `kcov`,
   `docker build`, `docker compose run`) that has neither `run_in_background:

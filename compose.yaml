@@ -47,14 +47,18 @@ services:
       - -c
       - ./script/ci/ci.sh --ci
 
-  # Coverage: kcov instrumentation wraps bats. Uses upstream kcov/kcov
-  # debian image because kcov is not in any alpine repo (main / community
-  # / edge / testing) as of 2026-05. ci.sh `_install_deps_for_coverage`
-  # apt-installs bats + shellcheck + bats-mock inside this container on
-  # demand (slower path, kept for the slow `just -f justfile.ci coverage` workflow only;
-  # fast lint/bats stays on the content-keyed test-tools image).
+  # Coverage: kcov instrumentation wraps bats. Defaults to the content-keyed
+  # kcov-tools image (issue #226) — the upstream kcov/kcov debian base with
+  # the bats toolchain baked in (dockerfile/Dockerfile.kcov-tools) — so
+  # ci.sh `_install_deps_for_coverage` early-returns via `command -v bats`
+  # instead of apt-installing on every shard. $KCOV_TOOLS_IMAGE is resolved
+  # by script/ci/resolve_kcov_tools_tag.sh and exported by justfile.ci /
+  # ci.sh (same content-keyed pattern as test-tools, issue #113). The
+  # fallback `kcov/kcov` still works (ci.sh then apt-installs the toolchain
+  # on demand) — kcov is not in any alpine repo (main / community / edge /
+  # testing) as of 2026-05, hence the separate debian image.
   coverage:
-    image: kcov/kcov
+    image: ${KCOV_TOOLS_IMAGE:-kcov/kcov}
     security_opt:
       - seccomp=unconfined
     volumes:

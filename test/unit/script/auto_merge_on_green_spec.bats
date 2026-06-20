@@ -20,10 +20,21 @@ setup() {
     GH_LOG="${BATS_TEST_TMPDIR}/gh-calls.log"
     export FIXTURE_JSON GH_LOG
 
-    # `gh pr view ...` -> fixture; other subcommands -> logged no-op.
+    # `gh pr view ...` -> fixture; `gh api ...` -> canned JSON for the
+    # re-trigger chain (head sha/ref, head commit tree, created commit sha);
+    # every other subcommand -> logged no-op.
     cat > "${STUB_DIR}/gh" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${GH_LOG}"
+if [[ "$1" == "api" ]]; then
+    case "$*" in
+        *"git/commits/"*)   echo '{"tree":{"sha":"tree1"}}' ;;
+        *"git/commits"*)    echo '{"sha":"newsha1"}' ;;
+        *"git/refs/heads"*) : ;;
+        *"pulls/"*)         echo '{"head":{"sha":"headsha1","ref":"my-branch"}}' ;;
+    esac
+    exit 0
+fi
 if [[ "$2" == "view" ]]; then cat "${FIXTURE_JSON}"; fi
 exit 0
 EOF
@@ -117,4 +128,47 @@ _fixture() { printf '%s' "$1" > "${FIXTURE_JSON}"; }
     assert_success
     run grep -qE "pr merge 9 --repo o/r --auto --squash --delete-branch" "${GH_LOG}"
     assert_success
+}
+
+@test "no CI run on head (ci=none) past retrigger grace -> pushes empty commit" {
+    # The recurrence to prevent: a push that created no workflow run leaves the
+    # head with zero checks (ci=none) forever. With --retrigger-grace 0 the
+    # script re-triggers on first observation by pushing an empty commit via
+    # the git API.
+    _fixture '{"state":"OPEN","mergeStateStatus":"BLOCKED","statusCheckRollup":[]}'
+    run "${SCRIPT}" --repo o/r --pr 5 --no-arm --interval 0 \
+        --grace 0 --retrigger-grace 0 --max-iterations 1
+    assert_output --partial "re-triggering"
+    # Full chain executed against the git API and moved the branch ref.
+    run grep -q "api repos/o/r/pulls/5" "${GH_LOG}"
+    assert_success
+    run grep -q "api repos/o/r/git/refs/heads/my-branch -X PATCH" "${GH_LOG}"
+    assert_success
+}
+
+@test "ci=none re-trigger fires at most once per run" {
+    _fixture '{"state":"OPEN","mergeStateStatus":"BLOCKED","statusCheckRollup":[]}'
+    run "${SCRIPT}" --repo o/r --pr 5 --no-arm --interval 0 \
+        --grace 0 --retrigger-grace 0 --max-iterations 3
+    # Three poll iterations, but only one ref-moving PATCH.
+    run bash -c "grep -c 'git/refs/heads/my-branch -X PATCH' '${GH_LOG}'"
+    assert_output "1"
+}
+
+@test "ci=none with --no-retrigger -> never re-triggers" {
+    _fixture '{"state":"OPEN","mergeStateStatus":"BLOCKED","statusCheckRollup":[]}'
+    run "${SCRIPT}" --repo o/r --pr 5 --no-arm --interval 0 \
+        --grace 0 --no-retrigger --max-iterations 2
+    refute_output --partial "re-triggering"
+    run grep -q "git/refs/heads" "${GH_LOG}"
+    assert_failure
+}
+
+@test "ci=pending does not re-trigger even with retrigger-grace 0" {
+    _fixture '{"state":"OPEN","mergeStateStatus":"BLOCKED","statusCheckRollup":[{"name":"ci-passed","status":"IN_PROGRESS","conclusion":null}]}'
+    run "${SCRIPT}" --repo o/r --pr 5 --no-arm --interval 0 \
+        --grace 0 --retrigger-grace 0 --max-iterations 2
+    refute_output --partial "re-triggering"
+    run grep -q "git/refs/heads" "${GH_LOG}"
+    assert_failure
 }

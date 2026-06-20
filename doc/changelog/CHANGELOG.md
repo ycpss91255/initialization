@@ -22,6 +22,13 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **whiptail multi-select descriptions truncated at the wrong boundary under
+  zh-TW / ja**: `_tui_clip` / `_tui_clip_budget` measured by character count, so
+  double-width CJK glyphs over-ran the whiptail box and the clip cut at the wrong
+  visual column. Both now measure by display width (via `_tui_disp_width`):
+  `_tui_clip` reserves one column for the `…`, never splits a wide glyph, and the
+  per-page budget sizes the tag column by display width. 5 new unit cases. (#204)
+
 - **System Info (and any gum msgbox/yesno) crashed when content started with
   `-`**: `gum style` / `gum confirm` parsed forked text beginning with
   `------ init_ubuntu environment ------` (the `detect` banner) as a flag and

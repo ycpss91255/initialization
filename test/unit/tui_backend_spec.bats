@@ -330,6 +330,28 @@ FIXTURE_LIST_JSON_LONG_DESC="$(jq '.items += [{
     [ "${#output}" -eq 5 ]
 }
 
+@test "_tui_clip clips by DISPLAY width, not char count (CJK = 2 cols)" {
+    # 中文測試=8 cols + abc=3 = 11 cols; budget 6 → reserve 1 for …, keep ≤5:
+    # 中文=4, 測 would make 6 (>5) → stop → "中文…" (4 + 1 = 5 display cols).
+    run _tui_clip "中文測試abc" 6
+    assert_success
+    assert_output "中文…"
+    [ "$(_tui_disp_width "${output}")" -eq 5 ]
+}
+
+@test "_tui_clip never splits a wide glyph at the boundary" {
+    # 中文 = 4 cols, budget 3 → reserve 1, keep ≤2: 中=2 ok, 文 would make 4 → stop.
+    run _tui_clip "中文" 3
+    assert_success
+    assert_output "中…"
+}
+
+@test "_tui_clip leaves a CJK string within budget untouched" {
+    run _tui_clip "中文" 4
+    assert_success
+    assert_output "中文"
+}
+
 @test "_tui_disp_width counts ASCII as 1 column each" {
     run _tui_disp_width "Quick Setup"
     assert_success
@@ -377,6 +399,14 @@ FIXTURE_LIST_JSON_LONG_DESC="$(jq '.items += [{
     assert_success
     assert_line --partial "[agent] Anthropic Claude Code CLI agent (official native installer, self-updating)"
     refute_output --partial "…"
+}
+
+@test "_tui_clip_budget uses DISPLAY width for the longest tag (CJK)" {
+    # 中文標籤 = 8 display cols (not 4 chars): budget = 72 - 8 - 8 = 56.
+    # A char-count budget would wrongly give 72 - 4 - 8 = 60.
+    TUI_WIDTH=72 run _tui_clip_budget "中文標籤" "eza"
+    assert_success
+    assert_output "56"
 }
 
 @test "_tui_clip_checklist_args clips each item to the box budget, tag/status intact (#183)" {

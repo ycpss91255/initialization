@@ -74,6 +74,14 @@
             "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/remind_workflow_tdd.sh"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/remind_no_emoji.sh"
+          }
+        ]
       }
     ]
   }

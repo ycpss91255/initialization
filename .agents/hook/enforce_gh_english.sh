@@ -115,15 +115,46 @@ if m:
     print(f"FOUND:{m.group()}:{excerpt}")
 ' 2>/dev/null)"
 
-  [[ -z "${has_cjk}" ]] && return 0
+  # Emoji detection (separate from CJK). Functional symbols are EXCLUDED so
+  # legitimate technical text passes: arrows U+2190-21FF, box-drawing
+  # U+2500-257F, bullet U+2022, middle dot U+00B7, ellipsis U+2026.
+  local has_emoji
+  has_emoji="$(printf '%s' "${to_scan}" | python3 -c '
+import sys, re
+text = sys.stdin.read()
+emoji = re.compile(
+    "["
+    "\U0001F000-\U0001FAFF"   # emoticons / pictographs / transport / symbols ext
+    "\U00002600-\U000026FF"   # miscellaneous symbols
+    "\U00002700-\U000027BF"   # dingbats (check mark, scissors, sparkles, ...)
+    "\U00002B00-\U00002BFF"   # misc symbols & decorative arrows (star, ...)
+    "\U0000FE0F"              # emoji variation selector
+    "\U0000200D"              # zero-width joiner (emoji sequences)
+    "\U000020E3"              # combining enclosing keycap
+    "]"
+)
+m = emoji.search(text)
+if m:
+    i = m.start()
+    print(f"FOUND:{m.group()}:" + text[max(0, i-20):i+20].replace("\n", " "))
+' 2>/dev/null)"
 
-  local msg="GitHub English-only rule (init_ubuntu / docker_harness alignment):
-  gh issue/pr create/comment body / title must be English only.
-  Detected CJK character(s): ${has_cjk}
+  [[ -z "${has_cjk}" && -z "${has_emoji}" ]] && return 0
 
-  Rewrite the title / body in English and retry. Project / private notes
-  in CJK belong in commit messages or chat, not on GitHub artifacts that
-  are public + indexed.
+  local kind detail
+  if [[ -n "${has_cjk}" ]]; then
+    kind="CJK character(s)"; detail="${has_cjk}"
+  else
+    kind="emoji"; detail="${has_emoji}"
+  fi
+
+  local msg="GitHub text rule (init_ubuntu / docker_harness alignment):
+  gh issue/pr create/comment body / title must be English-only and emoji-free.
+  Detected ${kind}: ${detail}
+
+  Rewrite the title / body without it and retry. Emoji belong nowhere in this
+  project; CJK belongs in commit messages or chat, not on GitHub artifacts
+  (public + indexed).
 
   Hook source: .claude/hook/enforce_gh_english.sh"
 

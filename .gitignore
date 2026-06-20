@@ -29,13 +29,12 @@ module/config/fish/fish_variables*
 # creates here at runtime (auto-cleaned). Runtime scratch, never vendored.
 .claude/worktrees/
 
-# Claude Code session state: ignore everything under projects/ (JSONL
-# transcripts + session sidecar dirs are large + contain privacy data). Memory
-# now lives canonically under .agents/memory/ (tool-agnostic, shareable);
-# .claude/projects/memory is a compat symlink into it so Claude's HOME-side
-# projects symlink keeps resolving. Track the symlink (no trailing slash).
-.claude/projects/*
-!.claude/projects/memory
+# Claude Code session state: never vendor anything the repo-side .claude/
+# projects/ might hold (JSONL transcripts + session sidecars are large +
+# privacy data). Memory lives canonically under .agents/memory/ (tracked,
+# shareable); Claude's HOME-side ~/.claude/projects/<key>/memory symlink points
+# straight at .agents/memory (no repo-side .claude/projects/memory needed).
+.claude/projects/
 
 # Other agent CLIs' local state
 skills-lock.json

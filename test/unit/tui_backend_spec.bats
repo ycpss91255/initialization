@@ -672,6 +672,26 @@ EOF
     assert_output --partial "--no-limit"
 }
 
+@test "gum menu: header carries the keybind hint + --show-help (Esc=back is otherwise hidden)" {
+    _make_mock_gum
+    MOCK_GUM_OUTPUT='Run\n' run tui_render_menu "Main" "Pick one" run "Run"
+    assert_success
+    run cat "${MOCK_GUM_LOG}"
+    assert_output --partial "--show-help"
+    # gum's native footer never advertises Esc; the header hint must.
+    assert_output --partial "esc"
+}
+
+@test "gum checklist: header carries the toggle/back keybind hint + --show-help" {
+    _make_mock_gum
+    MOCK_GUM_OUTPUT='' run tui_render_checklist "Optional" "Pick" eza "ls alternative" off
+    assert_success
+    run cat "${MOCK_GUM_LOG}"
+    assert_output --partial "--show-help"
+    # The select key (the user's question: "is it space?") must be visible.
+    assert_output --partial "space/x"
+}
+
 @test "gum checklist: nothing checked yields empty stdout, success" {
     _make_mock_gum
     MOCK_GUM_OUTPUT='' run tui_render_checklist "Optional" "Pick" eza "ls alternative" off

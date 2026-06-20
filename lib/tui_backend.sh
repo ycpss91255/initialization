@@ -84,6 +84,16 @@ declare -gA TUI_BACKEND_I18N=(
     [en.press_enter]="Press Enter to continue..."
     [zh-TW.press_enter]="按 Enter 繼續..."
 
+    # gum interaction hints appended to the header (_tui_menu_gum /
+    # _tui_checklist_gum). gum's native footer is easy to miss / can be clipped,
+    # and it never advertises Esc=back; a header hint is always visible. The
+    # whiptail backend shows < OK > / < Back > buttons natively, so this is
+    # gum-only. (gum toggles a multi-select row with space OR x.)
+    [en.gum_keys_menu]="[enter: select · esc: back]"
+    [zh-TW.gum_keys_menu]="[enter:選擇 · esc:返回]"
+    [en.gum_keys_checklist]="[space/x: toggle · enter: confirm · esc: back]"
+    [zh-TW.gum_keys_checklist]="[space/x:勾選 · enter:確認 · esc:返回]"
+
     # §7.5 form-factor menu labels (tui_platform_choices).
     [en.pf_desktop]="Desktop / laptop"
     [zh-TW.pf_desktop]="桌機 / 筆電"
@@ -919,9 +929,10 @@ _tui_menu_gum() {
     while (( $# >= 2 )); do
         _tags+=("$1"); _items+=("$2"); shift 2
     done
-    local _picked
-    _picked="$("${TUI_BACKEND:?TUI_BACKEND not set}" choose \
-        --header "${_title}: ${_text}" -- "${_items[@]}")" || return $?
+    local _picked _hint
+    _hint="$(i18n_t TUI_BACKEND_I18N gum_keys_menu)"
+    _picked="$("${TUI_BACKEND:?TUI_BACKEND not set}" choose --show-help \
+        --header "${_title}: ${_text} ${_hint}" -- "${_items[@]}")" || return $?
     # Map the chosen item label back to its tag by first index match.
     local _i
     for _i in "${!_items[@]}"; do
@@ -951,9 +962,10 @@ _tui_checklist_gum() {
         printf -v _csv '%s,' "${_preselected[@]}"
         _selflag=(--selected "${_csv%,}")
     fi
-    local _picked
-    _picked="$("${TUI_BACKEND:?TUI_BACKEND not set}" choose --no-limit \
-        "${_selflag[@]}" --header "${_title}: ${_text}" -- "${_items[@]}")" \
+    local _picked _hint
+    _hint="$(i18n_t TUI_BACKEND_I18N gum_keys_checklist)"
+    _picked="$("${TUI_BACKEND:?TUI_BACKEND not set}" choose --no-limit --show-help \
+        "${_selflag[@]}" --header "${_title}: ${_text} ${_hint}" -- "${_items[@]}")" \
         || return $?
     # Map each checked item label back to its tag (first index match), one
     # per line. Empty pick → empty stdout + success (nothing checked).

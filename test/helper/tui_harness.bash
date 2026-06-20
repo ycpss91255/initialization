@@ -108,10 +108,15 @@ tui_harness_mock_cli() {
     local _bindir="$1" _datadir="$2" _logfile="$3"
     printf '%s\n' "${FIXTURE_LIST_JSON}"   >"${_datadir}/list.json"
     printf '%s\n' "${FIXTURE_DETECT_JSON}" >"${_datadir}/detect.json"
+    # MOCK_TUI_HINTS (read from the env at fork time) lets a test choose what
+    # `config get ui.tui_hints` returns ("off" / "on" / unset → empty). The
+    # TUI reads this ONCE at startup (#203); the logged line is the single-read
+    # assertion grep target.
     cat >"${_bindir}/setup_ubuntu" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >>"${_logfile}"
 case "\$*" in
+    "config get ui.tui_hints") printf '%s\n' "\${MOCK_TUI_HINTS:-}" ;;
     "list --json")   cat "${_datadir}/list.json" ;;
     "detect --json") cat "${_datadir}/detect.json" ;;
     detect)          cat "${_datadir}/detect.json" ;;
@@ -175,8 +180,12 @@ EOF
 # through the whiptail family (the shared --menu/--checklist shape these
 # scripted widgets emulate), regardless of detection preference.
 tui_e2e_run() {
+    # MOCK_TUI_HINTS reaches the forked mock `setup_ubuntu` so a test can drive
+    # the startup `config get ui.tui_hints` read (#203). `env` resets the
+    # environment to the listed vars only, so it must be passed explicitly.
     run env "PATH=${E2E_BIN}" "HOME=${E2E_HOME}" \
         "TUI_CLI=${E2E_BIN}/setup_ubuntu" \
         "TUI_BACKEND=${E2E_WIDGET_PATH}" \
+        "MOCK_TUI_HINTS=${MOCK_TUI_HINTS:-}" \
         "${REPO_ROOT}/setup_ubuntu_tui.sh"
 }

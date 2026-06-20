@@ -147,3 +147,67 @@ EOF
     run grep -c "^install" "${E2E_CLI_LOG}"
     assert_failure
 }
+
+# ── #203: ui.tui_hints config switch (startup read) + Help menu entry ─────────
+
+# Empty interaction: straight main-menu Exit (no pending selections → leaves
+# immediately, no guard).
+_hints_just_exit() {
+    cat >"${E2E_RESPONSES}" <<'EOF'
+1|
+EOF
+}
+
+@test "#203 (whiptail): startup forks 'config get ui.tui_hints' exactly once" {
+    tui_e2e_make_harness whiptail
+    _hints_just_exit
+    tui_e2e_run
+    assert_success
+    run grep -c "^config get ui.tui_hints$" "${E2E_CLI_LOG}"
+    assert_output "1"
+}
+
+@test "#203 (whiptail): ui.tui_hints=off suppresses the checklist hint line" {
+    tui_e2e_make_harness whiptail
+    export MOCK_TUI_HINTS="off"
+    # optional checklist (commit nothing) → Back → main Exit (no selections).
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|optional
+1|
+1|
+EOF
+    tui_e2e_run
+    assert_success
+    # The whiptail multi-select hint must be absent from every widget invocation.
+    run grep -i "tab to" "${E2E_WIDGET_LOG}"
+    assert_failure
+}
+
+@test "#203 (whiptail): default (on) keeps the checklist hint line" {
+    tui_e2e_make_harness whiptail
+    # MOCK_TUI_HINTS unset → config get returns empty → default ON.
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|optional
+1|
+1|
+EOF
+    tui_e2e_run
+    assert_success
+    run grep -i "tab" "${E2E_WIDGET_LOG}"
+    assert_success
+}
+
+@test "#203 (whiptail): Help main-menu entry renders the Tab-centric reference" {
+    tui_e2e_make_harness whiptail
+    # main-menu Help (rc 0, tag "help") → Help msgbox → main Exit.
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|help
+0|
+1|
+EOF
+    tui_e2e_run
+    assert_success
+    # The Help msgbox body (passed as the whiptail --msgbox text) centers on Tab.
+    run grep -i "tab" "${E2E_WIDGET_LOG}"
+    assert_success
+}

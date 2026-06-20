@@ -153,6 +153,24 @@ declare -gA TUI_BACKEND_I18N=(
     [zh-TW.menu_run_label]="執行"
     [en.menu_run_desc]="Review & install selected modules"
     [zh-TW.menu_run_desc]="檢閱並安裝所選模組"
+    [en.menu_help_label]="Help"
+    [zh-TW.menu_help_label]="說明"
+    [en.menu_help_desc]="Keyboard reference for this backend"
+    [zh-TW.menu_help_desc]="此後端的鍵盤操作說明"
+
+    # #203 Help screen body (design §3). Backend-aware: the gum body documents
+    # what the native --show-help footer omits (j/k vim motion, esc semantics —
+    # on the main menu esc exits and DROPS selections); the whiptail body
+    # centers on Tab (the non-obvious "Tab reaches the Back/Exit buttons"), plus
+    # space/enter/esc. Multi-line (\n expanded by i18n consumers); NO emoji.
+    [en.help_gum]="gum backend keys:\n\n  arrows / j k    move (j/k = vim down/up)\n  h / l           jump to start / end\n  space or x      toggle a checklist row\n  ctrl+a          select all (checklist)\n  enter           select / confirm\n  esc             back one level\n\nOn the MAIN menu, esc (or Exit) leaves the TUI and DROPS any unsent\nselections. Ctrl+C quits cleanly from anywhere."
+    [zh-TW.help_gum]="gum 後端按鍵:\n\n  方向鍵 / j k    移動 (j/k = vim 下/上)\n  h / l           跳到開頭 / 結尾\n  space 或 x      切換勾選列\n  ctrl+a          全選 (勾選清單)\n  enter           選擇 / 確認\n  esc             返回上一層\n\n在主選單上,esc (或離開) 會離開 TUI 並捨棄尚未送出的選擇。\nCtrl+C 可從任何畫面乾淨地退出。"
+    [en.help_whiptail]="whiptail backend keys:\n\n  Tab             move between the list and the < Back > / < Exit >\n                  buttons (the key people miss)\n  arrows          move within the list\n  space           toggle a checklist row\n  enter           activate the focused item / button\n  esc             back one level (Exit on the main menu)\n\nThere is no key footer on whiptail, so use Tab to reach the buttons.\nOn the MAIN menu, Exit / esc DROPS any unsent selections.\nCtrl+C quits cleanly from anywhere."
+    [zh-TW.help_whiptail]="whiptail 後端按鍵:\n\n  Tab             在清單與 < 返回 > / < 離開 > 按鈕之間移動\n                  (最容易被忽略的按鍵)\n  方向鍵          在清單內移動\n  space           切換勾選列\n  enter           啟用所選項目 / 按鈕\n  esc             返回上一層 (主選單為離開)\n\nwhiptail 沒有按鍵列,請用 Tab 移到按鈕。\n在主選單上,離開 / esc 會捨棄尚未送出的選擇。\nCtrl+C 可從任何畫面乾淨地退出。"
+    # whiptail multi-select inline hint (design §3; gated by ui.tui_hints).
+    # Prepended to the --checklist body text only — the menu widget is untouched.
+    [en.hint_checklist_whiptail]="(space toggle · tab to buttons · enter confirm)"
+    [zh-TW.hint_checklist_whiptail]="(space 勾選 · tab 到按鈕 · enter 確認)"
 
     # §8.4 destructive-action confirm body (tui_manage_confirm_text).
     [en.confirm_about_to]="About to {0} '{1}':"
@@ -217,6 +235,14 @@ declare -gA TUI_BACKEND_I18N=(
 
 # Canonical CATEGORY order (PRD §6.3 / module contract §9.1).
 TUI_CATEGORY_ORDER='["base","recommended","optional","experimental"]'
+
+# #203 inline-hint switch (`ui.tui_hints`, design §3). 1 = show the per-screen
+# inline hints (gum --show-help + header hint; whiptail multi-select hint line);
+# 0 = render clean and rely on the Help menu entry. The entrypoint resolves the
+# config value ONCE at startup (fork: setup_ubuntu config get ui.tui_hints) and
+# exports TUI_HINTS; this default keeps unit tests / standalone sourcing ON,
+# matching how TUI_BACKEND is threaded as a single global.
+: "${TUI_HINTS:=1}"
 
 # Backend dialog geometry. dialog autosizes with 0s but whiptail does not,
 # so fixed sizes keep both backends rendering identically (§8.5).
@@ -1032,6 +1058,12 @@ tui_main_menu_entries() {
     printf 'sysinfo\t%s\t%s\n' \
         "$(i18n_t TUI_BACKEND_I18N menu_sysinfo_label)" \
         "$(i18n_t TUI_BACKEND_I18N menu_sysinfo_desc)"
+    # #203 Help — a backend-aware key reference (design §3). Placed after info
+    # and before Run so the action row stays last; a contextual `?`-key inside a
+    # widget is impossible on both backends, so this menu entry IS the mechanism.
+    printf 'help\t%s\t%s\n' \
+        "$(i18n_t TUI_BACKEND_I18N menu_help_label)" \
+        "$(i18n_t TUI_BACKEND_I18N menu_help_desc)"
     # §8.1 < Run > — the ONLY batch execution point (Q43). Rendered as the
     # last menu row because a second action button next to OK exists only
     # on dialog (--extra-button), not whiptail; a row keeps both backends
@@ -1039,6 +1071,17 @@ tui_main_menu_entries() {
     printf 'run\t%s\t%s\n' \
         "$(i18n_t TUI_BACKEND_I18N menu_run_label)" \
         "$(i18n_t TUI_BACKEND_I18N menu_run_desc)"
+}
+
+# #203 Help-screen body text for the active backend (design §3). gum gets the
+# j/k + esc-semantics reference (footer-omitted keys); whiptail gets the
+# Tab-centric reference. <backend> is the backend FAMILY ("gum"|"whiptail");
+# anything other than "gum" maps to the whiptail body (same family rule as the
+# render dispatchers). \n escapes are expanded so the msgbox renders real lines.
+tui_help_text() {
+    local _key="help_whiptail"
+    [[ "${1:-}" == "gum" ]] && _key="help_gum"
+    printf '%b\n' "$(i18n_t TUI_BACKEND_I18N "${_key}")"
 }
 
 # §8.1 header line from a detect --json payload, e.g.
@@ -1097,6 +1140,12 @@ _tui_menu_whiptail() {
 _tui_checklist_whiptail() {
     local _title="$1" _text="$2"
     shift 2
+    # #203 inline-hint gating: whiptail has no key footer, so when hints are ON
+    # the multi-select hint is appended to the prompt text (checklist only — the
+    # --menu widget is never rewritten). TUI_HINTS=0 renders the prompt clean.
+    if [[ "${TUI_HINTS:-1}" != "0" ]]; then
+        _text+=$'\n'"$(i18n_t TUI_BACKEND_I18N hint_checklist_whiptail)"
+    fi
     local -a _cancel=()
     if [[ -n "${TUI_CANCEL_LABEL:-}" ]]; then
         mapfile -t _cancel < <(_tui_cancel_button_args "${TUI_CANCEL_LABEL}")
@@ -1162,10 +1211,17 @@ _tui_menu_gum() {
     while (( $# >= 2 )); do
         _tags+=("$1"); _items+=("$2"); shift 2
     done
-    local _picked _hint
-    _hint="$(i18n_t TUI_BACKEND_I18N gum_keys_menu)"
-    _picked="$("${TUI_BACKEND:?TUI_BACKEND not set}" choose --show-help \
-        --header "${_title}: ${_text} ${_hint}" -- "${_items[@]}")" || return $?
+    # #203 inline-hint gating: with TUI_HINTS=0 drop both gum's native footer
+    # (--show-help) AND the header keybind hint, so the screen renders clean and
+    # the user relies on the Help menu entry instead.
+    local _picked
+    local -a _hintflag=() _hdr=("${_title}: ${_text}")
+    if [[ "${TUI_HINTS:-1}" != "0" ]]; then
+        _hintflag=(--show-help)
+        _hdr=("${_title}: ${_text} $(i18n_t TUI_BACKEND_I18N gum_keys_menu)")
+    fi
+    _picked="$("${TUI_BACKEND:?TUI_BACKEND not set}" choose "${_hintflag[@]}" \
+        --header "${_hdr[*]}" -- "${_items[@]}")" || return $?
     # Map the chosen item label back to its tag by first index match.
     local _i
     for _i in "${!_items[@]}"; do
@@ -1195,10 +1251,16 @@ _tui_checklist_gum() {
         printf -v _csv '%s,' "${_preselected[@]}"
         _selflag=(--selected "${_csv%,}")
     fi
-    local _picked _hint
-    _hint="$(i18n_t TUI_BACKEND_I18N gum_keys_checklist)"
-    _picked="$("${TUI_BACKEND:?TUI_BACKEND not set}" choose --no-limit --show-help \
-        "${_selflag[@]}" --header "${_title}: ${_text} ${_hint}" -- "${_items[@]}")" \
+    # #203 inline-hint gating (same as the menu adapter): TUI_HINTS=0 drops both
+    # --show-help and the header keybind hint.
+    local _picked
+    local -a _hintflag=() _hdr=("${_title}: ${_text}")
+    if [[ "${TUI_HINTS:-1}" != "0" ]]; then
+        _hintflag=(--show-help)
+        _hdr=("${_title}: ${_text} $(i18n_t TUI_BACKEND_I18N gum_keys_checklist)")
+    fi
+    _picked="$("${TUI_BACKEND:?TUI_BACKEND not set}" choose --no-limit "${_hintflag[@]}" \
+        "${_selflag[@]}" --header "${_hdr[*]}" -- "${_items[@]}")" \
         || return $?
     # Map each checked item label back to its tag (first index match), one
     # per line. Empty pick → empty stdout + success (nothing checked).

@@ -452,6 +452,90 @@ FIXTURE_LIST_JSON_LONG_DESC="$(jq '.items += [{
     assert_line --partial "$(printf 'neovim\t[editor] Neovim editor\toff')"
 }
 
+# ── Issue #212 (I): sub-categorized + basic-first module lists ───────────────
+# Decision (issue #212): order sub-category groups AND items within them
+# "basic-first" by a dependency-depth heuristic derived from the depends_on
+# graph in the list --json payload. A module that OTHERS depend on (higher
+# transitive reverse-dependency count) is MORE BASIC and sorts EARLIER;
+# alphabetical (TAGS[0] then name) is the stable fallback for ties. The output
+# schema (name<TAB>label<TAB>on|off) and the TAGS[0] grouping are unchanged.
+
+# A single category where modules depend on each other: lib-core is depended
+# on (transitively) by every other [tool] module, mid depends on lib-core and
+# is in turn depended on by leaf-a/leaf-b. So the reverse-dep ranking is
+#   lib-core (3) > mid (2) > leaf-a (0) = leaf-b (0)
+# and within the [tool] group lib-core must precede mid, which precedes the
+# leaves; the [aaa-early] group's single member sorts after the more-basic
+# [tool] group because [tool] holds the most-depended-on module.
+FIXTURE_LIST_JSON_DEPTH="$(jq '.items = [
+  {"name": "leaf-b", "category": "optional", "tags": ["tool"],
+   "description": "leaf b", "version_provided": "github-release",
+   "installed": false, "outdated": null, "manual": null,
+   "depends_on": ["mid"], "supports_user_home": true,
+   "supported_platforms": ["desktop"], "supported_ubuntu": ["24.04"],
+   "risk_level": "low", "reboot_required": false, "homepage": null},
+  {"name": "leaf-a", "category": "optional", "tags": ["tool"],
+   "description": "leaf a", "version_provided": "github-release",
+   "installed": false, "outdated": null, "manual": null,
+   "depends_on": ["mid"], "supports_user_home": true,
+   "supported_platforms": ["desktop"], "supported_ubuntu": ["24.04"],
+   "risk_level": "low", "reboot_required": false, "homepage": null},
+  {"name": "mid", "category": "optional", "tags": ["tool"],
+   "description": "mid layer", "version_provided": "github-release",
+   "installed": false, "outdated": null, "manual": null,
+   "depends_on": ["lib-core"], "supports_user_home": true,
+   "supported_platforms": ["desktop"], "supported_ubuntu": ["24.04"],
+   "risk_level": "low", "reboot_required": false, "homepage": null},
+  {"name": "lib-core", "category": "optional", "tags": ["tool"],
+   "description": "core library", "version_provided": "github-release",
+   "installed": false, "outdated": null, "manual": null,
+   "depends_on": [], "supports_user_home": true,
+   "supported_platforms": ["desktop"], "supported_ubuntu": ["24.04"],
+   "risk_level": "low", "reboot_required": false, "homepage": null},
+  {"name": "loner", "category": "optional", "tags": ["aaa-early"],
+   "description": "no deps", "version_provided": "github-release",
+   "installed": false, "outdated": null, "manual": null,
+   "depends_on": null, "supports_user_home": true,
+   "supported_platforms": ["desktop"], "supported_ubuntu": ["24.04"],
+   "risk_level": "low", "reboot_required": false, "homepage": null}
+] | .count = 5' <<<"${FIXTURE_LIST_JSON}")"
+
+@test "tui_checklist_entries (#212) ranks a depended-on module before its dependents" {
+    run tui_checklist_entries "${FIXTURE_LIST_JSON_DEPTH}" optional ""
+    assert_success
+    # Within the [tool] group, basic-first by transitive reverse-dep count:
+    # lib-core (3) > mid (2) > leaf-a (0) = leaf-b (0, alpha tie-break).
+    local _names
+    _names="$(awk -F'\t' '{print $1}' <<<"${output}" | paste -sd' ' -)"
+    [ "${_names}" = "lib-core mid leaf-a leaf-b loner" ] \
+        || fail "got order: ${_names}"
+}
+
+@test "tui_checklist_entries (#212) orders sub-category groups basic-first" {
+    run tui_checklist_entries "${FIXTURE_LIST_JSON_DEPTH}" optional ""
+    assert_success
+    # The [tool] group owns the most-depended-on module (lib-core), so it is
+    # MORE BASIC than the dependency-free [aaa-early] group and renders first —
+    # even though "tool" > "aaa-early" would lose a pure alphabetical sort.
+    local _first_tag _last_tag
+    _first_tag="$(awk -F'\t' 'NR==1 {print $2}' <<<"${output}")"
+    _last_tag="$(awk -F'\t' 'END {print $2}' <<<"${output}")"
+    [[ "${_first_tag}" == "[tool]"* ]] || fail "first group: ${_first_tag}"
+    [[ "${_last_tag}" == "[aaa-early]"* ]] || fail "last group: ${_last_tag}"
+}
+
+@test "tui_checklist_entries (#212) keeps the name<TAB>label<TAB>status schema" {
+    run tui_checklist_entries "${FIXTURE_LIST_JSON_DEPTH}" optional "mid"
+    assert_success
+    # Schema unchanged: every row is exactly 3 tab fields; status tracks the
+    # selection set; the TAGS[0] prefix stays in the label column.
+    while IFS= read -r _line; do
+        [ "$(awk -F'\t' '{print NF}' <<<"${_line}")" -eq 3 ]
+    done <<<"${output}"
+    assert_line --partial "$(printf 'mid\t[tool] mid layer (will pull 1 deps)\ton')"
+    assert_line --partial "$(printf 'lib-core\t[tool] core library\toff')"
+}
+
 @test "tui_selection_replace_page accumulates pages across categories (Q43 OK)" {
     tui_selection_replace_page "${FIXTURE_LIST_JSON}" optional eza zoxide
     tui_selection_replace_page "${FIXTURE_LIST_JSON}" recommended neovim

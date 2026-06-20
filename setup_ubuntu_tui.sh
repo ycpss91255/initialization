@@ -696,7 +696,10 @@ _tui_main_loop() {
     while :; do
         local -a _menu_args=()
         while IFS=$'\t' read -r _tag _label _desc; do
-            _menu_args+=("${_tag}" "$(printf '%-22s %s' "${_label}" "${_desc}")")
+            # Display-width-aware pad (not printf '%-22s', which counts chars
+            # and so leaves zh-TW / ja double-width labels ragged — issue: the
+            # main-menu description column did not line up under --lang zh-TW).
+            _menu_args+=("${_tag}" "$(_tui_pad_label "${_label}" 22) ${_desc}")
         done < <(tui_main_menu_entries "${_list_json}")
 
         # < Exit > (relabeled Cancel) / ESC: drop the process and with it

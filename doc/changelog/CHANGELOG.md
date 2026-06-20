@@ -22,6 +22,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **TUI main-menu description column was ragged under zh-TW / ja** (CJK
+  alignment): `_tui_main_loop` padded the menu label with `printf '%-22s'`,
+  which counts characters, not terminal columns — East-Asian Wide labels
+  (each CJK glyph is 2 display columns) under-padded, so the description
+  column did not line up (visible with `just tui --lang=zh-TW`). Added
+  display-width primitives `_tui_disp_width` / `_tui_pad_label` to
+  `lib/tui_backend.sh` (wide/fullwidth codepoints count as 2) and switched the
+  main menu to `_tui_pad_label`, so zh-TW / ja labels align the same as ASCII.
+  5 new unit cases.
+
 - **gum TUI over-truncated module descriptions; `show` omitted the description**
   (issue #183): the #168 whiptail clip budget (sized for whiptail's 72-col
   modal box) was applied in the SHARED checklist entries producers

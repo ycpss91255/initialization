@@ -330,6 +330,45 @@ FIXTURE_LIST_JSON_LONG_DESC="$(jq '.items += [{
     [ "${#output}" -eq 5 ]
 }
 
+@test "_tui_disp_width counts ASCII as 1 column each" {
+    run _tui_disp_width "Quick Setup"
+    assert_success
+    assert_output "11"
+}
+
+@test "_tui_disp_width counts CJK ideographs as 2 columns each" {
+    run _tui_disp_width "選用"
+    assert_success
+    assert_output "4"
+    run _tui_disp_width "快速安裝"
+    assert_success
+    assert_output "8"
+}
+
+@test "_tui_disp_width handles mixed CJK + ASCII (zh-TW label with a count)" {
+    # 推薦 = 2 wide (4) + " (0/7)" = 6 ASCII → 10 columns.
+    run _tui_disp_width "推薦 (0/7)"
+    assert_success
+    assert_output "10"
+}
+
+@test "_tui_pad_label right-pads zh-TW and ASCII labels to the SAME display width" {
+    # The main-menu bug: char-count padding left the description column ragged
+    # for double-width labels. Display-width padding lands every label on the
+    # same column regardless of CJK/ASCII mix.
+    local _w
+    for _label in "Quick Setup" "選用" "快速安裝" "管理已安裝項目"; do
+        _w="$(_tui_disp_width "$(_tui_pad_label "${_label}" 22)")"
+        [ "${_w}" -eq 22 ] || fail "padded '${_label}' to ${_w} cols, want 22"
+    done
+}
+
+@test "_tui_pad_label never truncates a label wider than the target" {
+    run _tui_pad_label "管理已安裝項目" 4   # 14 cols > 4 target
+    assert_success
+    assert_output "管理已安裝項目"
+}
+
 @test "tui_checklist_entries emits the FULL description, unclipped (#183)" {
     # #183: the producer no longer clips — the #168 budget moved into the
     # whiptail adapter. gum reads this output directly and renders full text,

@@ -303,8 +303,7 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
 
 @test "whiptail checklist: TUI_HINTS=1 appends the multi-select hint line (#203)" {
     _make_mock_widget
-    export MOCK_WIDGET_OUTPUT=''
-    TUI_HINTS=1 run tui_render_checklist "Optional" "Pick" eza "[x] eza" off
+    MOCK_WIDGET_OUTPUT='' TUI_HINTS=1 run tui_render_checklist "Optional" "Pick" eza "[x] eza" off
     assert_success
     run cat "${MOCK_WIDGET_LOG}"
     assert_output --partial "tab"
@@ -312,8 +311,7 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
 
 @test "whiptail checklist: TUI_HINTS=0 omits the multi-select hint line (#203)" {
     _make_mock_widget
-    export MOCK_WIDGET_OUTPUT=''
-    TUI_HINTS=0 run tui_render_checklist "Optional" "Pick" eza "[x] eza" off
+    MOCK_WIDGET_OUTPUT='' TUI_HINTS=0 run tui_render_checklist "Optional" "Pick" eza "[x] eza" off
     assert_success
     run cat "${MOCK_WIDGET_LOG}"
     refute_output --partial "tab to"
@@ -321,8 +319,7 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
 
 @test "whiptail menu: hint gating never rewrites the menu widget (multi-select only, #203)" {
     _make_mock_widget
-    export MOCK_WIDGET_OUTPUT='run'
-    TUI_HINTS=1 run tui_render_menu "Main" "Pick one" run "Run"
+    MOCK_WIDGET_OUTPUT='run' TUI_HINTS=1 run tui_render_menu "Main" "Pick one" run "Run"
     assert_success
     run cat "${MOCK_WIDGET_LOG}"
     # The whiptail hint is multi-select only (design §3); the --menu text is not
@@ -839,8 +836,7 @@ EOF
 
 @test "tui_render_checklist passes --separate-output and returns one tag per line" {
     _make_mock_widget
-    export MOCK_WIDGET_OUTPUT='eza\nzoxide\n'
-    run tui_render_checklist "Optional" "Pick" eza "[x] eza" off zoxide "[x] zoxide" off
+    MOCK_WIDGET_OUTPUT='eza\nzoxide\n' run tui_render_checklist "Optional" "Pick" eza "[x] eza" off zoxide "[x] zoxide" off
     assert_success
     assert_line --index 0 "eza"
     assert_line --index 1 "zoxide"

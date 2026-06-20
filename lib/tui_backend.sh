@@ -519,17 +519,54 @@ tui_modules_in_category() {
 #   tui_checklist_entries <list_json> <category> <selected>
 # <selected> is a space-separated module-name list (the in-memory
 # accumulator) — those rows come back "on" so reopening a page shows the
-# current selection. Rows are grouped by TAGS[0] (§8.2: each module shows
-# up only under its first tag), groups and names alphabetical. Dep chains
-# stay collapsed: a "(will pull N deps)" hint per §8.2 / arch Q-A3, never
-# the expanded chain (the Review screen owns the expandable detail).
-# The label is emitted FULL (#183): clipping to the whiptail box budget happens
-# inside the whiptail adapter (_tui_checklist_whiptail), so gum shows full text.
+# current selection. Rows are grouped by TAGS[0] (§8.2: each module shows up
+# only under its first tag). Groups AND the items inside them are ordered
+# BASIC-FIRST (issue #212, decision on #212): a module that OTHERS depend on
+# ranks earlier. "Basic-ness" is the transitive REVERSE-dependency count
+# derived from the whole payload's depends_on graph — apt-essentials, which
+# many modules depend_on, sorts before its dependents. A group inherits the
+# max rank of its members, so the sub-category holding the most-depended-on
+# module renders first. Alphabetical (TAGS[0] then name) is the stable
+# fallback for ties — no new metadata field is introduced. Dep chains stay
+# collapsed: a "(will pull N deps)" hint per §8.2 / arch Q-A3, never the
+# expanded chain (the Review screen owns the expandable detail). The label is
+# emitted FULL (#183): clipping to the whiptail box budget happens inside the
+# whiptail adapter (_tui_checklist_whiptail), so gum shows full text.
 tui_checklist_entries() {
     local _json="$1" _cat="$2" _selected=" ${3:-} "
     jq -r --arg c "$2" --arg sel "${_selected}" '
-        [.items[] | select(.category == $c)]
-        | sort_by(.tags[0], .name)
+        # Direct forward deps per module name (over the WHOLE payload — a base
+        # module is typically depended on from OTHER categories).
+        (reduce .items[] as $m ({}; .[$m.name] = ($m.depends_on // []))) as $deps
+        # transitive($n): the full set of modules $n (transitively) depends on.
+        # Iterates the closure to a fixed point; the catalog graph is a DAG, so
+        # the `until` terminates once no new ancestor is added.
+        | def transitive($n):
+            { seen: [], frontier: ($deps[$n] // []) }
+            | until((.frontier | length) == 0;
+                .seen as $seen
+                | (.frontier | map(select(. as $x | ($seen | index($x)) | not)))
+                  as $new
+                | { seen: ($seen + $new | unique),
+                    frontier: ([$new[] | ($deps[.] // [])] | add // []) })
+            | .seen;
+        # rank($n) = transitive REVERSE-dependency count: how many modules have
+        # $n anywhere in their transitive dep closure. Higher = more basic.
+        ([.items[].name] | map({ (.): 0 }) | add) as $zero
+        | (reduce (.items[].name) as $m ($zero;
+            reduce (transitive($m)[]) as $anc (.; .[$anc] += 1))) as $rank
+        # Render only the requested category, but rank against the full graph.
+        | [.items[] | select(.category == $c)]
+        # Group rank = the max member rank, so the sub-category that owns the
+        # most-depended-on module sorts first. Sort groups basic-first then
+        # alphabetically (negate the rank so jq ascending sort = basic-first).
+        | group_by(.tags[0])
+        | map({ tag: .[0].tags[0],
+                grank: ([.[] | $rank[.name]] | max),
+                items: . })
+        | sort_by([(- .grank), .tag])
+        | map(.items | sort_by([(- $rank[.name]), .name]))
+        | add
         | .[]
         | .name as $n
         | ((.depends_on // []) | length) as $ndeps

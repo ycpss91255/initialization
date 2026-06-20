@@ -380,8 +380,68 @@ _dispatcher_module_description() {
     )
 }
 
+# Machine-readable detail for a single module (issue #211, part 1 — the TUI
+# module-detail / Manage-detail views consume this). stdout is ONLY a single
+# JSON object; warnings/errors stay on stderr (same guarantee as list --json).
+# All strings/arrays are escaped by jq (never hand-rolled), matching
+# _dispatcher_list_catalog_json. description is sourced in the same isolated
+# fork-style subshell as list --json and degrades to JSON null when the module
+# omits it (additive fields are optional, ADR-0019). JSON keys use the canonical
+# module-spec snake_case (depends_on / conflicts / supported_ubuntu /
+# supported_platforms) — the names issue #211 expects.
+_dispatcher_show_json() {
+    local _name="$1"
+    local _file; _file="$(registry_get_field "${_name}" file)"
+    local _cat;  _cat="$(registry_get_field "${_name}" category)"
+
+    local -a _tags_arr _deps_arr _conf_arr _ubuntu_arr _plats_arr
+    read -r -a _tags_arr   <<< "$(registry_get_field "${_name}" tags)"
+    read -r -a _deps_arr   <<< "$(registry_get_field "${_name}" deps)"
+    read -r -a _conf_arr   <<< "$(registry_get_field "${_name}" conflicts)"
+    read -r -a _ubuntu_arr <<< "$(registry_get_field "${_name}" ubuntu)"
+    read -r -a _plats_arr  <<< "$(registry_get_field "${_name}" platforms)"
+
+    local _tags_json _deps_json _conf_json _ubuntu_json _plats_json
+    _tags_json="$(jq -cn   '$ARGS.positional' --args "${_tags_arr[@]+"${_tags_arr[@]}"}")"
+    _deps_json="$(jq -cn   '$ARGS.positional' --args "${_deps_arr[@]+"${_deps_arr[@]}"}")"
+    _conf_json="$(jq -cn   '$ARGS.positional' --args "${_conf_arr[@]+"${_conf_arr[@]}"}")"
+    _ubuntu_json="$(jq -cn '$ARGS.positional' --args "${_ubuntu_arr[@]+"${_ubuntu_arr[@]}"}")"
+    _plats_json="$(jq -cn  '$ARGS.positional' --args "${_plats_arr[@]+"${_plats_arr[@]}"}")"
+
+    # description is a JSON string or null (empty/missing → null).
+    local _desc; _desc="$(_dispatcher_module_description "${_file}")"
+    local _desc_json='null'
+    [[ -n "${_desc}" ]] && _desc_json="$(jq -cn --arg d "${_desc}" '$d')"
+
+    jq -cn \
+        --arg name "${_name}" \
+        --arg category "${_cat}" \
+        --argjson description "${_desc_json}" \
+        --argjson tags "${_tags_json}" \
+        --argjson depends_on "${_deps_json}" \
+        --argjson conflicts "${_conf_json}" \
+        --argjson supported_ubuntu "${_ubuntu_json}" \
+        --argjson supported_platforms "${_plats_json}" \
+        '{name:$name, category:$category, description:$description,
+          tags:$tags, depends_on:$depends_on, conflicts:$conflicts,
+          supported_ubuntu:$supported_ubuntu,
+          supported_platforms:$supported_platforms}'
+}
+
 _dispatcher_show() {
-    local _name="${1:-}"
+    local _name="" _json="false"
+    local _arg
+    for _arg in "$@"; do
+        case "${_arg}" in
+            --json) _json="true" ;;
+            -*)
+                printf "[dispatcher] ERROR: unknown flag %s\n" "${_arg}" >&2
+                return 2
+                ;;
+            *) _name="${_arg}" ;;
+        esac
+    done
+
     if [[ -z "${_name}" ]]; then
         printf "[dispatcher] ERROR: show requires <module>\n" >&2
         return 2
@@ -390,6 +450,12 @@ _dispatcher_show() {
         printf "[dispatcher] ERROR: unknown module %s\n" "${_name}" >&2
         return 2
     fi
+
+    if [[ "${_json}" == "true" ]]; then
+        _dispatcher_show_json "${_name}"
+        return $?
+    fi
+
     local _file; _file="$(registry_get_field "${_name}" file)"
     printf "name:        %s\n"  "${_name}"
     printf "file:        %s\n"  "${_file}"

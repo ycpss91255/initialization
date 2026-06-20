@@ -137,6 +137,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Hook & skill text is now English** (was zh in places): hook comments and
+  emitted messages (`remind_ci_auto_merge`, `check_main_fresh_before_worktree`,
+  `remind_main_sync`, `check_changelog_drift`) and the `wait-pr-ci` skill are
+  English — agent-tooling is English-only (zh stays in `rules/zh/`). The
+  detection ranges in `enforce_gh_english.sh` keep their CJK by design (that IS
+  the banned-character pattern). Also: `remind_ci_auto_merge` now appends a
+  **dual-watch** reminder to its PR/auto-merge nudges — pair the auto-merge
+  Monitor with an independent background watchdog so a silently-dead primary
+  Monitor never strands the loop.
+
 - **Memory canonical store moved to `.agents/memory/`** (was
   `.claude/projects/memory/`): joins `hook/rules/script/skills` as a
   tool-agnostic, shareable source of truth that other agent CLIs can read, and

@@ -192,6 +192,6 @@ For non-bot PRs, rebase locally + force-push, then re-invoke.
 ## See also
 
 - `.claude/script/wait-pr-ci.sh` / `.claude/script/wait-pr-ci-batch.sh` / `.claude/script/wait-tag-ci.sh` — the polling implementations. `--help` prints usage.
-- doc/process/release.md → "## CI 監控（PR open 後）" — the project-level rule pointing back here.
+- doc/process/release.md → "### 3. Wait CI green on the chore PR" — the project-level rule pointing back here.
 - `.claude/commands/pr.md` — full PR workflow, calls this skill at step 6 ("Wait for CI").
 - `.claude/commands/release.md` — release / tag workflow that should call the tag flavour after pushing the tag.

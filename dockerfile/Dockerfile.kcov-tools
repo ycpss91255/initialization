@@ -1,0 +1,82 @@
+# Dockerfile.kcov-tools — kcov image with the bats toolchain baked in
+#
+# Issue #226: every per-shard coverage job (core sub-shards + per-module
+# matrix) runs in the upstream `kcov/kcov` debian image, which ships ONLY
+# kcov. So script/ci/ci.sh `_install_deps_for_coverage` apt-installs bats +
+# bats-support + bats-assert + shellcheck + parallel + git-cloned bats-mock
+# on EVERY kcov job (~20-30s + GitHub-clone network risk per shard). Baking
+# the toolchain into the image once makes that step early-return via
+# `command -v bats` instead — no per-job apt/clone.
+#
+# This is the debian counterpart of dockerfile/Dockerfile.test-tools (the
+# alpine fast lint/bats image): kcov is NOT packaged for alpine
+# (main/community/edge/testing, 2026-05), so the coverage path stays on the
+# debian kcov base while reusing the same bats core + extension layout
+# (/usr/lib/bats/bats-{support,assert,mock}).
+#
+# Usage:
+#   docker build -t kcov-tools:local -f dockerfile/Dockerfile.kcov-tools .
+#
+# Sync upstream: see doc/TESTING.md "Borrowed from base repo" section.
+
+FROM bats/bats:latest AS bats-src
+
+FROM alpine:latest AS bats-extensions
+RUN apk add --no-cache git && \
+    git clone --depth 1 -b v0.3.0 \
+        https://github.com/bats-core/bats-support /bats/bats-support && \
+    git clone --depth 1 -b v2.1.0 \
+        https://github.com/bats-core/bats-assert  /bats/bats-assert && \
+    git clone --depth 1 -b v1.2.5 \
+        https://github.com/jasonkarns/bats-mock   /bats/bats-mock
+
+# Final stage: the upstream kcov/kcov debian image (keeps the kcov binary +
+# its shared libs intact) extended with the bats toolchain so the coverage
+# jobs need no runtime apt-install (issue #226).
+#
+# Apt packages mirror `_install_deps_for_coverage` in script/ci/ci.sh — the
+# set those kcov jobs used to install on every run — minus bats-mock (not in
+# debian bookworm; copied from the bats-extensions stage instead, same as
+# bats-support/bats-assert):
+#   - bats               run the unit specs under kcov; ci.sh early-returns
+#                        on `command -v bats` once this is on PATH
+#   - shellcheck         the lint pass shares this image's bats invocation
+#                        contract; kept for parity with test-tools
+#   - git ca-certificates test fixtures init/commit git repos over HTTPS
+#   - parallel           bats --jobs N delegates to GNU parallel (the core
+#                        sub-shards still run serial under kcov, but the
+#                        plain non-kcov path may parallelize)
+#   - make               forward-compat (fixtures that shell out to make)
+#   - jq curl            tool self-deps exercised by e2e/preflight specs
+#   - unzip              fixtures that unpack archives
+FROM kcov/kcov AS kcov-tools
+# hadolint ignore=DL3008,DL3015
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+        bats bats-support bats-assert \
+        shellcheck git ca-certificates \
+        parallel make jq curl unzip && \
+    rm -rf /var/lib/apt/lists/*
+
+# bats core + extensions (bats-support / bats-assert / bats-mock) — copied
+# from the pinned upstream stages so the versions match Dockerfile.test-tools
+# exactly (and bats-mock, absent from debian, is available at the same
+# /usr/lib/bats/bats-mock path the specs `load`).
+COPY --from=bats-src /opt/bats /opt/bats
+COPY --from=bats-src /usr/lib/bats /usr/lib/bats
+COPY --from=bats-extensions /bats /usr/lib/bats
+
+# /opt/bats/bin/bats is the canonical entry; expose it on PATH so ci.sh's
+# `command -v bats` short-circuits the runtime apt-install path.
+RUN ln -sf /opt/bats/bin/bats /usr/local/bin/bats
+
+# Smoke check baked into the image so a corrupted build fails fast at CI
+# build time rather than discovering missing tools mid-coverage-run.
+RUN bash --version >/dev/null && \
+    bats --version >/dev/null && \
+    shellcheck --version >/dev/null && \
+    parallel --version >/dev/null && \
+    kcov --version >/dev/null
+
+WORKDIR /source
+ENTRYPOINT ["/bin/bash"]

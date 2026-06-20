@@ -575,6 +575,32 @@ _set_dbus() {
     assert_failure 2
 }
 
+# ── gpg list (issue #201 B; READ-ONLY) ──────────────────────────────────────
+
+@test "gpg list delegates to gpg --list-keys, never --list-secret-keys" {
+    _stub gpg "printf 'pub   ed25519 2024-01-01 [SC]\n      ABCDEF0123456789\nuid   alice <alice@host>\n'"
+    run "${REPO_ROOT}/setup_secrets.sh" gpg list
+    assert_success
+    assert_output --partial "ABCDEF0123456789"
+    assert_output --partial "alice@host"
+    grep -q -- '^gpg .*--list-keys' "${SECRETS_STUB_LOG}"
+    # READ-ONLY: never touch private/secret key material or export it
+    run ! grep -qE -- '--list-secret-keys|--export-secret|--export ' "${SECRETS_STUB_LOG}"
+}
+
+@test "gpg list takes no arguments (exit 2)" {
+    _stub gpg
+    run "${REPO_ROOT}/setup_secrets.sh" gpg list extra
+    assert_failure 2
+}
+
+@test "gpg list when gpg is absent exits 3 with an install hint" {
+    command -v gpg >/dev/null 2>&1 && skip "real gpg installed in image"
+    run "${REPO_ROOT}/setup_secrets.sh" gpg list
+    assert_failure 3
+    assert_output --partial "gpg is not installed"
+}
+
 # ── ssh-key generate: argv hygiene (AC-20) ──────────────────────────────────
 
 @test "ssh-key generate calls ssh-keygen without any passphrase in argv" {
@@ -672,6 +698,127 @@ _set_dbus() {
     run "${REPO_ROOT}/setup_secrets.sh" ssh-key copy alice@example.com \
         --file "${INIT_UBUNTU_TEST_SCRATCH}/sshkey"
     assert_failure 7
+}
+
+# ── ssh-key list (issue #201 B; READ-ONLY) ──────────────────────────────────
+
+@test "ssh-key list prints ~/.ssh/*.pub paths and public contents only" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf 'ssh-ed25519 AAAAPUBLIC alice@host\n' \
+        > "${_fakehome}/.ssh/id_ed25519.pub"
+    # a private key in the same dir must NEVER be read or printed
+    printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\nPRIVCANARY\n' \
+        > "${_fakehome}/.ssh/id_ed25519"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" ssh-key list
+    assert_success
+    assert_output --partial "id_ed25519.pub"
+    assert_output --partial "ssh-ed25519 AAAAPUBLIC alice@host"
+    refute_output --partial "PRIVCANARY"
+    refute_output --partial "BEGIN OPENSSH PRIVATE KEY"
+}
+
+@test "ssh-key list also reports agent identities via ssh-add -l when available" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    _set_agent_sock "${INIT_UBUNTU_TEST_SCRATCH}/fake.sock"
+    _stub ssh-add "printf '256 SHA256:AGENTFPR alice@host (ED25519)\n'"
+    run env HOME="${_fakehome}" SSH_AUTH_SOCK="${INIT_UBUNTU_TEST_SCRATCH}/fake.sock" \
+        PATH="${SECRETS_STUB_DIR}:${PATH}" "${REPO_ROOT}/setup_secrets.sh" ssh-key list
+    assert_success
+    assert_output --partial "SHA256:AGENTFPR"
+    grep -q -- '^ssh-add -l' "${SECRETS_STUB_LOG}"
+}
+
+@test "ssh-key list on an empty ~/.ssh succeeds and prints no key material" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" ssh-key list
+    assert_success
+}
+
+# ── ssh-key remove (issue #201 B; DESTRUCTIVE) ──────────────────────────────
+
+@test "ssh-key remove --file deletes only the targeted private + .pub pair" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf 'priv\n' > "${_fakehome}/.ssh/id_ed25519"
+    printf 'pub\n'  > "${_fakehome}/.ssh/id_ed25519.pub"
+    printf 'keep\n' > "${_fakehome}/.ssh/id_rsa"
+    printf 'keep\n' > "${_fakehome}/.ssh/id_rsa.pub"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" \
+        ssh-key remove --file "${_fakehome}/.ssh/id_ed25519" --yes
+    assert_success
+    [[ ! -e "${_fakehome}/.ssh/id_ed25519" ]]
+    [[ ! -e "${_fakehome}/.ssh/id_ed25519.pub" ]]
+    [[ -e "${_fakehome}/.ssh/id_rsa" ]]
+    [[ -e "${_fakehome}/.ssh/id_rsa.pub" ]]
+}
+
+@test "ssh-key remove by name resolves under ~/.ssh and deletes the pair" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf 'priv\n' > "${_fakehome}/.ssh/id_ed25519"
+    printf 'pub\n'  > "${_fakehome}/.ssh/id_ed25519.pub"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" \
+        ssh-key remove id_ed25519 --yes
+    assert_success
+    [[ ! -e "${_fakehome}/.ssh/id_ed25519" ]]
+    [[ ! -e "${_fakehome}/.ssh/id_ed25519.pub" ]]
+}
+
+@test "ssh-key remove rejects a traversal name (exit 2), deletes nothing" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf 'secret\n' > "${INIT_UBUNTU_TEST_SCRATCH}/outside"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" \
+        ssh-key remove "../../outside" --yes
+    assert_failure 2
+    [[ -e "${INIT_UBUNTU_TEST_SCRATCH}/outside" ]]
+}
+
+@test "ssh-key remove --file outside ~/.ssh is rejected (exit 2)" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf 'secret\n' > "${INIT_UBUNTU_TEST_SCRATCH}/escape"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" \
+        ssh-key remove --file "${INIT_UBUNTU_TEST_SCRATCH}/escape" --yes
+    assert_failure 2
+    [[ -e "${INIT_UBUNTU_TEST_SCRATCH}/escape" ]]
+}
+
+@test "ssh-key remove --file with a traversal segment is rejected (exit 2)" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf 'secret\n' > "${INIT_UBUNTU_TEST_SCRATCH}/loot"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" \
+        ssh-key remove --file "${_fakehome}/.ssh/../../loot" --yes
+    assert_failure 2
+    [[ -e "${INIT_UBUNTU_TEST_SCRATCH}/loot" ]]
+}
+
+@test "ssh-key remove of a non-existent key fails (exit 1)" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" \
+        ssh-key remove id_absent --yes
+    assert_failure 1
+}
+
+@test "ssh-key remove without --yes in non-interactive mode refuses (exit 2)" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf 'priv\n' > "${_fakehome}/.ssh/id_ed25519"
+    printf 'pub\n'  > "${_fakehome}/.ssh/id_ed25519.pub"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" \
+        ssh-key remove id_ed25519 </dev/null
+    assert_failure 2
+    [[ -e "${_fakehome}/.ssh/id_ed25519" ]]
+}
+
+@test "ssh-key unknown action exits 2" {
+    run "${REPO_ROOT}/setup_secrets.sh" ssh-key frobnicate
+    assert_failure 2
 }
 
 # ── i18n: localized interactive prompts (issue #185) ─────────────────────────

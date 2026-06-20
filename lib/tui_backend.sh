@@ -200,6 +200,51 @@ _tui_clip() {
     fi
 }
 
+# _tui_disp_width <string> → terminal display COLUMNS on stdout. Counts
+# East-Asian Wide / Fullwidth codepoints (CJK ideographs, kana, hangul,
+# fullwidth punctuation) as 2 columns and everything else as 1. zh-TW / ja
+# labels are double-width, so a char-count pad (printf '%-Ns') makes the menu
+# description column ragged — this is the width primitive that fixes it.
+# Pure (no globals, no I/O) so it is directly unit-testable.
+_tui_disp_width() {
+    local _s="$1" _i _ch _cp _w=0
+    # UTF-8 locale: ${_s:_i:1} slices on char boundaries and the printf "'…"
+    # trick yields the multibyte codepoint (not a raw byte). C.UTF-8 is always
+    # present on Debian/Ubuntu and in the kcov image (see _tui_clip).
+    local LC_ALL=C.UTF-8
+    for (( _i = 0; _i < ${#_s}; _i++ )); do
+        _ch="${_s:_i:1}"
+        printf -v _cp '%d' "'${_ch}"
+        if (( (_cp >= 0x1100 && _cp <= 0x115F) \
+           || (_cp >= 0x2E80 && _cp <= 0x303E) \
+           || (_cp >= 0x3041 && _cp <= 0x33FF) \
+           || (_cp >= 0x3400 && _cp <= 0x4DBF) \
+           || (_cp >= 0x4E00 && _cp <= 0x9FFF) \
+           || (_cp >= 0xA000 && _cp <= 0xA4CF) \
+           || (_cp >= 0xAC00 && _cp <= 0xD7A3) \
+           || (_cp >= 0xF900 && _cp <= 0xFAFF) \
+           || (_cp >= 0xFE30 && _cp <= 0xFE4F) \
+           || (_cp >= 0xFF00 && _cp <= 0xFF60) \
+           || (_cp >= 0xFFE0 && _cp <= 0xFFE6) \
+           || (_cp >= 0x20000 && _cp <= 0x3FFFD) )); then
+            _w=$(( _w + 2 ))
+        else
+            _w=$(( _w + 1 ))
+        fi
+    done
+    printf '%s\n' "${_w}"
+}
+
+# _tui_pad_label <label> <columns> → <label> right-padded with spaces to at
+# least <columns> DISPLAY columns (never truncates). Display-width aware so
+# zh-TW / ja labels align the same as ASCII ones. Pure (no globals, no I/O).
+_tui_pad_label() {
+    local _label="$1" _cols="$2" _w _pad
+    _w="$(_tui_disp_width "${_label}")"
+    _pad=$(( _cols > _w ? _cols - _w : 0 ))
+    printf '%s%*s' "${_label}" "${_pad}" ''
+}
+
 # _tui_clip_budget <tag1> <tag2> ... → per-page item width budget on stdout.
 # The budget is derived from the longest tag/name across the rows, so each
 # checklist sizes its own tag column:

@@ -64,6 +64,14 @@ _run_smoke() {
         expect "${BATS_TEST_DIRNAME}/harness/smoke_flow.exp" "$1"
 }
 
+# `--lang zh-TW` render proof: same sealed env, the lang_flow.exp variant.
+_run_lang() {
+    run env "TUI_ENTRY=${REPO_ROOT}/setup_ubuntu_tui.sh" \
+        "TUI_FARM=${SMOKE_BIN}" "TUI_HOME=${SMOKE_HOME}" \
+        "TUI_CLI_MOCK=${SMOKE_BIN}/setup_ubuntu" \
+        expect "${BATS_TEST_DIRNAME}/harness/lang_flow.exp" "$1"
+}
+
 # gum drives a different *.exp flow (Space/Enter checklist, Esc = Exit) and
 # is forced via `--backend gum` (set inside smoke_flow_gum.exp's tui_spawn).
 _run_smoke_gum() {
@@ -110,4 +118,18 @@ _assert_smoke_green() {
     _make_smoke_env gum
     _run_smoke_gum
     _assert_smoke_green
+}
+
+# `--lang zh-TW` forces the UI language at the entrypoint, overriding the
+# source-time resolution. The live whiptail main menu must render zh-TW text
+# (lang_flow.exp asserts 系統 / 離開) and still exit cleanly with zero writes.
+@test "TUI --lang zh-TW renders the main menu in zh-TW (whiptail)" {
+    _make_smoke_env whiptail
+    _run_lang whiptail
+    assert_success
+    # The pty echo proves the zh-TW catalog reached the live widget.
+    assert_output --partial "系統"
+    # Exit dropped everything with the process — zero file writes (Q43).
+    run find "${SMOKE_HOME}" -mindepth 1
+    assert_output ""
 }

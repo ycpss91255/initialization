@@ -1,0 +1,33 @@
+#!/usr/bin/env expect
+# lang_flow.exp <whiptail> — `--lang` render proof (TUI i18n, #185 follow-up).
+#
+# Spawns the REAL whiptail widget under a pty with `--lang zh-TW` forced and
+# asserts the main menu renders zh-TW text (proving --lang overrides the
+# source-time language resolution and reaches i18n_t at render time), then
+# exits cleanly (rc 0). The English render is already covered by
+# smoke_flow.exp; this only adds the language-override dimension.
+#
+# Exit codes: 0 = render proof green; 99 = harness assertion failed;
+# anything else = the TUI's own nonzero rc.
+
+source [file join [file dirname [file normalize [info script]]] tui_expect_lib.tcl]
+
+if {[llength $argv] != 1} { tui_die "usage: lang_flow.exp <whiptail>" }
+set backend [lindex $argv 0]
+
+# Force backend (skip detection + gum install prompt under a pty) AND force
+# zh-TW. tui_spawn appends both flags to the setup_ubuntu_tui.sh call.
+tui_spawn --backend $backend --lang zh-TW
+
+# Main menu body renders the zh-TW "System:" label ([zh-TW.main_system]),
+# and the relabeled Cancel button shows the zh-TW "Exit" ([zh-TW.btn_exit]).
+# Both come straight from _tui_main_loop's i18n_t calls, so their presence
+# proves the --lang override landed on the catalog.
+tui_expect_text "系統"
+tui_expect_text "離開"
+
+# < Exit >: clean rc 0, zero side effects (Q43) — same as the smoke flow.
+tui_press_exit $backend
+set rc [tui_wait_exit_rc]
+if {$rc != 0} { tui_die "TUI exited rc=$rc (want 0) on backend=$backend" }
+exit 0

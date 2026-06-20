@@ -51,6 +51,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`setup_ubuntu_tui.sh --lang <code>` forces the UI language** (en|zh-TW|
+  zh-CN|ja) for the session, overriding the source-time resolution (env >
+  config `ui.lang` > `$LANG`). `just tui --lang=zh-TW` now renders the TUI in
+  zh-TW without touching `$LANG` or config. An invalid value is not a usage
+  error — `i18n_sanitize_lang` downgrades it to `en` with a bilingual warning,
+  matching the engine entrypoint contract (#185). Deliberately scoped to the
+  TUI entrypoint (no global dispatcher flag). Covered by a live-widget
+  `--lang zh-TW` render smoke (`lang_flow.exp`, asserts 系統 / 離開 on the real
+  whiptail main menu).
+
 - **`WorktreeCreate` hook → worktrees at repo-root `.worktree/`**
   (`.agents/hook/worktree_create.sh`): Claude Code's agent/workflow git
   worktrees now land in a dedicated, gitignored `<repo>/.worktree/<name>`

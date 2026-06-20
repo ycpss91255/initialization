@@ -214,6 +214,9 @@ Flags:
   --version              Show tool version
   --backend gum|whiptail Force the rendering backend (skips detection and
                          the install prompt). Invalid value → exit 2.
+  --lang <code>          Force the UI language for this session
+                         (en|zh-TW|zh-CN|ja); overrides $LANG / config.
+                         Invalid value → falls back to en with a warning.
 
 Requirements:
   - `gum` or `whiptail` on PATH. gum absent + interactive → you are offered
@@ -752,6 +755,23 @@ main() {
                         return 2
                         ;;
                 esac
+                ;;
+            # --lang forces the UI language for this session, overriding the
+            # source-time resolution (env > config > $LANG, line ~45). i18n_t
+            # reads INIT_UBUNTU_LANG at render time, so setting it here (before
+            # any screen draws) is enough. An invalid value is NOT a usage
+            # error: i18n_sanitize_lang downgrades it to "en" with a bilingual
+            # warning — same contract as the engine entrypoint (#185).
+            --lang)
+                shift
+                export INIT_UBUNTU_LANG="${1:-en}"
+                i18n_sanitize_lang INIT_UBUNTU_LANG setup_ubuntu_tui
+                shift || true
+                ;;
+            --lang=*)
+                export INIT_UBUNTU_LANG="${1#--lang=}"
+                i18n_sanitize_lang INIT_UBUNTU_LANG setup_ubuntu_tui
+                shift
                 ;;
             *)
                 printf 'ERROR: unknown flag %s\n\n' "$1" >&2

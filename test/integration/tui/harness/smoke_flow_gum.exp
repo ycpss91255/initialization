@@ -39,9 +39,13 @@ tui_key_enter
 # 4. Back on the main menu (gum re-renders the header rows).
 tui_expect_text "Quick Setup"
 
-# 5. < Exit > on gum is Esc: cancels gum choose (130) → the TUI main loop
-#    drops the selection and exits cleanly (rc 0, Q43).
+# 5. < Exit > on gum is Esc: cancels gum choose (130). With a pending selection
+#    the #206 guard appears (gum confirm), defaulting to the SAFE choice (stay).
+#    The affirmative "Exit" is the left button, so Left+Enter deliberately
+#    selects it → the TUI drops the selection and exits cleanly (rc 0, Q43).
 send -- "\x1b"
+tui_expect_text "Unsent selections"
+send -- "y"
 set rc [tui_wait_exit_rc]
 if {$rc != 0} { tui_die "TUI exited rc=$rc (want 0) on gum" }
 exit 0

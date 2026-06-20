@@ -253,6 +253,44 @@ _fake_claude_on_path() {
     [[ "$(stat -c '%a' "${HOME}/.claude/settings.statusline.json")" == "644" ]]
 }
 
+# ── statusline width feeding (#228) ──────────────────────────────────────────
+# Claude Code invokes the status line with a piped (non-TTY) stdout, so the
+# cc-statusline renderer cannot auto-detect terminal width and clips with `...`.
+# run-statusline.sh must feed the real width (from tmux pane_width, minus a
+# small margin) via CCSTATUSLINE_WIDTH. These run the launcher with stubbed
+# tmux/node + a fake plugin cache so the renderer just echoes the width it got.
+
+_run_statusline() {
+    local home="${INIT_UBUNTU_TEST_SCRATCH}/sl-home"
+    local bin="${INIT_UBUNTU_TEST_SCRATCH}/sl-bin"
+    mkdir -p "${home}/.claude/plugins/cache/cc-statusline/cc-statusline/2.2.19" "${bin}"
+    # Fake renderer: report whatever width the launcher handed down.
+    printf '#!/bin/sh\nprintf "WIDTH=%%s\\n" "${CCSTATUSLINE_WIDTH:-unset}"\n' \
+        > "${bin}/node"
+    # Fake tmux: emit a fixed pane width, or fail when MOCK_TMUX_FAIL=1.
+    if [[ "${MOCK_TMUX_FAIL:-0}" == "1" ]]; then
+        printf '#!/bin/sh\nexit 1\n' > "${bin}/tmux"
+    else
+        printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "${MOCK_PANE_WIDTH:-99}" \
+            > "${bin}/tmux"
+    fi
+    chmod +x "${bin}/node" "${bin}/tmux"
+    HOME="${home}" PATH="${bin}:${PATH}" \
+        bash "${MODULE_DIR}/config/claude/run-statusline.sh"
+}
+
+@test "statusline feeds tmux pane width minus a small margin (#228)" {
+    MOCK_PANE_WIDTH=99 run _run_statusline
+    assert_success
+    assert_output "WIDTH=97"
+}
+
+@test "statusline omits the width override when tmux is unavailable (#228)" {
+    MOCK_TMUX_FAIL=1 run _run_statusline
+    assert_success
+    assert_output "WIDTH=unset"
+}
+
 @test "install localizes template-author home paths to the current HOME" {
     _load_module
     install

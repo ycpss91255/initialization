@@ -267,6 +267,7 @@ cc-statusline 的 README 建議 `statusLine.command` 寫 `node ${CLAUDE_PLUGIN_R
 解法：用 wrapper script 自己解析 plugin 路徑。
 
 - 已建立 `module/config/claude/run-statusline.sh`，glob `~/.claude/plugins/cache/cc-statusline/cc-statusline/*/` 取最新版本目錄後 `exec node`
+- 寬度餵入（#228）：Claude Code 呼叫 statusline 時 stdout 是 pipe（非 TTY），renderer 偵測不到終端寬度而 fallback 到窄預設、用 `...` 截斷。launcher 改為以 `tmux display-message -p '#{pane_width}'` 取真實寬度，扣掉極小邊界（`WIDTH_MARGIN=2`）後 `export CCSTATUSLINE_WIDTH`；非 tmux 環境則不覆寫，維持原行為
 - 新機器手動步驟：
   1. `claude plugin marketplace add NYCU-Chung/cc-statusline`
   2. `claude plugin install cc-statusline@cc-statusline`

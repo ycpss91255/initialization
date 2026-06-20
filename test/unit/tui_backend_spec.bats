@@ -756,6 +756,53 @@ os.id: ubuntu"
     assert_output --partial "--cancel-button Exit"
 }
 
+# ── Input widget (§5: tui_render_input; gum input / whiptail --inputbox) ─────
+# Contract: success → typed value on stdout + rc 0; cancel (nonzero rc) → fail;
+# empty submit (rc 0, empty value) → treated as cancel → fail. No no-echo
+# variant (secret values never pass through this widget — AC-20).
+
+@test "input (gum): gum input returns the typed value, invoked as 'input'" {
+    _make_mock_gum
+    MOCK_GUM_OUTPUT='git@github.com\n' run tui_render_input "Copy SSH key" "user@host" ""
+    assert_success
+    assert_output "git@github.com"
+    run cat "${MOCK_GUM_LOG}"
+    assert_output --partial "input"
+}
+
+@test "input (whiptail): --inputbox returns the typed value (captured from stderr)" {
+    _make_mock_widget
+    MOCK_WIDGET_OUTPUT='my-token' run tui_render_input "Set token" "Token name" ""
+    assert_success
+    assert_output "my-token"
+    run cat "${MOCK_WIDGET_LOG}"
+    assert_output --partial "--inputbox"
+}
+
+@test "input (gum): cancel (rc 1) → tui_render_input fails (nonzero)" {
+    _make_mock_gum
+    MOCK_GUM_RC=1 run tui_render_input "Set token" "Token name" ""
+    assert_failure
+}
+
+@test "input (whiptail): cancel (rc 1) → tui_render_input fails (nonzero)" {
+    _make_mock_widget
+    MOCK_WIDGET_RC=1 run tui_render_input "Set token" "Token name" ""
+    assert_failure
+}
+
+@test "input (gum): empty submit (rc 0, empty value) → fails (empty = cancel)" {
+    _make_mock_gum
+    MOCK_GUM_OUTPUT='' MOCK_GUM_RC=0 run tui_render_input "Set token" "Token name" ""
+    assert_failure
+}
+
+@test "input (whiptail): empty submit (rc 0, empty value) → fails (empty = cancel)" {
+    _make_mock_widget
+    MOCK_WIDGET_OUTPUT='' MOCK_WIDGET_RC=0 run tui_render_input "Set token" "Token name" ""
+    assert_failure
+}
+
 # ── System summary (detect --json fixture; §8.1 header) ──────────────────────
 
 @test "tui_system_summary renders the §8.1 one-line header" {

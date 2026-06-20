@@ -241,7 +241,10 @@ jobs:
       matrix:
         core-shard: ['0', '1', '2', '3']
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Headroom for ci.sh's in-shard kcov retry (KCOV_BATS_TIMEOUT~180s x
+    # KCOV_BATS_ATTEMPTS=2 ~= 6 min worst case) so a retried hang fails with
+    # a TAP-visible _die rather than a GitHub job cancel.
+    timeout-minutes: 15
     env:
       CORE_SHARD_COUNT: '4'
     steps:

@@ -9,21 +9,22 @@ metadata:
 
 The git-tracked **memory** for this repo lives canonically at
 `<repo>/.agents/memory/` (tool-agnostic, shareable by other agent CLIs — same
-canonical store as `.agents/{hook,rules,script,skills}`). `<repo>/.claude/
-projects/memory` is a **compat symlink** into it, so Claude's HOME-side
-`memory` symlink keeps resolving without touching the fragile HOME symlink.
-Only the `memory/` subdir is symlinked — **not** the whole project directory.
+canonical store as `.agents/{hook,rules,script,skills}`). The HOME-side
+`memory` symlink points **directly** at it — there is NO repo-side
+`.claude/projects/memory` indirection. Only the `memory/` subdir is symlinked
+on the HOME side — **not** the whole project directory.
 
 **Correct layout (target):**
 ```
-.agents/memory/                                             ← REAL files (canonical, tracked)
-<repo>/.claude/projects/memory  →  ../../.agents/memory     ← compat symlink (tracked)
-~/.claude/projects/-home-cyc-Desktop-initialization/        ← REAL directory
+<repo>/.agents/memory/                                      ← REAL files (canonical, tracked)
+~/.claude/projects/-home-cyc-Desktop-initialization/        ← REAL directory (Claude's fixed HOME convention)
         ├── <session-id>.jsonl, <session-id>/               ← machine-local, gitignored
-        └── memory  →  <repo>/.claude/projects/memory       ← HOME symlink (unchanged) → compat → .agents/memory
+        └── memory  →  <repo>/.agents/memory                ← HOME symlink → straight to .agents/memory
 ```
-So the full resolve chain is HOME `memory` → repo `.claude/projects/memory` →
-`.agents/memory/`.
+The `projects/<key>/` layer only exists on the HOME side (Claude reads memory
+from `~/.claude/projects/<key>/memory/` by hard convention — that part cannot
+move); the repo side has NOTHING under `.claude/projects/`. Resolve chain:
+HOME `memory` → `<repo>/.agents/memory/`.
 
 **Why not symlink the whole `projects/<key>` dir** (the original mistake,
 2026-05 migration): Claude Code's session picker enumerates
@@ -36,22 +37,22 @@ following the symlink). Confirmed 2026-06-18 on v2.1.179; the
 the only one with a broken picker. Session names persist as `customTitle`
 in each transcript's first JSONL line, so name-resume is otherwise supported.
 
-**Tracking (`.gitignore`):** real memory tracked under `.agents/memory/`,
-the `.claude` compat symlink tracked, sessions ignored —
+**Tracking (`.gitignore`):** real memory tracked under `.agents/memory/`;
+the whole repo-side `.claude/projects/` ignored (nothing vendored there now) —
 ```
 .agents/*
 !.agents/memory
 !.agents/memory/**
-.claude/projects/*
-!.claude/projects/memory      # the compat symlink (no trailing slash)
+.claude/projects/
 ```
-Session `.jsonl` are machine-local and gitignored anyway, so keeping them
-under `~/.claude` (real dir) loses nothing.
+Session `.jsonl` are machine-local and live under `~/.claude` (real dir), so
+nothing of value is in the repo-side `.claude/projects/` (it no longer exists).
 
 **Fix script:** `~/fix-claude-projects-symlink.sh` (idempotent; aborts if a
-live claude session for the repo is running) converts the whole-dir symlink
-into the correct layout above — real project dir + `memory/`-only symlink —
-and moves existing transcripts in so they stay resumable.
+live claude session for the repo is running) ensures `~/.claude/projects/<key>`
+is a REAL dir (not a whole-dir symlink) with `memory/` symlinked **directly to
+`<repo>/.agents/memory`**, and moves existing transcripts in so they stay
+resumable.
 
 **Multi-machine note:** on another machine ([[user-profile]]: rpi4/rpi5/
 jetson), recreate the `memory/`-only symlink (run the fix script there), not

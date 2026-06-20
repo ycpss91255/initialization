@@ -131,11 +131,12 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 - **Memory canonical store moved to `.agents/memory/`** (was
   `.claude/projects/memory/`): joins `hook/rules/script/skills` as a
   tool-agnostic, shareable source of truth that other agent CLIs can read.
-  `.claude/projects/memory` is now a tracked compat symlink into it, so the
-  HOME-side `~/.claude/projects/<key>/memory` symlink (and Claude's session
-  picker) are untouched — full resolve chain: HOME → `.claude/projects/memory`
-  → `.agents/memory/`. `.gitignore` tracks `.agents/memory/**` + the compat
-  symlink.
+  Claude's HOME-side `~/.claude/projects/<key>/memory` symlink points
+  **directly** at `.agents/memory/` (the `projects/<key>/` layer is Claude's
+  fixed HOME convention and stays HOME-only) — there is NO repo-side
+  `.claude/projects/memory` indirection; `.claude/projects/` is gone from the
+  repo entirely. `.gitignore` tracks `.agents/memory/**` and ignores all of
+  `.claude/projects/`.
 
 - **`.claude/worktrees/` is now gitignored**: Claude Code's transient
   agent/workflow git worktrees are runtime scratch (auto-cleaned), never

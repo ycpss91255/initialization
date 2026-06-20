@@ -379,20 +379,24 @@ EOF
     assert_output --partial "[editor]"
 }
 
-@test "e2e: Manage Secrets forks setup_secrets and returns to the main menu" {
+@test "e2e: Manage Secrets opens a sub-menu (no bare fork) and Back returns to main" {
+    # #202 replaced the bare `setup_secrets` fork (usage + rc2 dump) with a
+    # sub-menu. Opening it renders a 2nd --menu; Back returns to a 3rd (main)
+    # --menu render. No setup_secrets is forked on the open+Back path.
     _make_e2e_harness
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
 1|
+1|
 EOF
     _run_tui_e2e
     assert_success
-    run cat "${E2E_SECRETS_LOG}"
-    assert_output "invoked "
-    # Back at the main menu after the fork: a second main-menu render
-    # happened (the response file's trailing Exit was consumed).
+    # The sub-menu is a real menu, not a bare setup_secrets fork.
+    run test -f "${E2E_SECRETS_LOG}"
+    assert_failure
+    # main menu (1) + secrets sub-menu (1) + main menu again (1) = 3 menus.
     run grep -c -- "--menu" "${E2E_WIDGET_LOG}"
-    assert_output "2"
+    assert_output "3"
 }
 
 @test "e2e: empty installed list shows a message instead of an empty menu" {

@@ -10,9 +10,11 @@
 #   ssh-key generate [--type t] [--file path] [--comment c] [--no-passphrase]
 #   ssh-key load     [--file path]
 #   ssh-key copy <user@host> [--file path]
+#   ssh-key list                          (public keys / agent identities only)
+#   ssh-key remove [--file <path>] | <name> [--yes]   (DESTRUCTIVE)
 #   token set <name>      (value via interactive prompt or stdin pipe)
 #   token get <name>      (value to stdout, nothing else on stdout)
-#   gpg generate / gpg import [<file>]
+#   gpg generate / gpg import [<file>] / gpg list   (list = id/uid/fpr only)
 #   list / remove <name>
 #
 # Security (AC-20): anything sensitive (key passphrases, future tokens) is
@@ -79,6 +81,18 @@ Commands:
                        Add a private key to the running ssh-agent.
   ssh-key copy <user@host> [--file <path>]
                        Install the public key on a remote host (ssh-copy-id).
+  ssh-key list         List public SSH keys (~/.ssh/*.pub) and, when an agent
+                       is running, the identities it holds (ssh-add -l).
+                       READ-ONLY: public material / fingerprints only — never
+                       any private key.
+  ssh-key remove [--file <path>] | <name> [--yes]
+                       DESTRUCTIVE: delete a key pair (private + .pub). <name>
+                       resolves under ~/.ssh; --file must also live under
+                       ~/.ssh (traversal / absolute escapes are rejected, same
+                       guard as the secret store). When stdin is not a tty the
+                       deletion proceeds only with --yes (the TUI layers its
+                       own type-to-confirm on top; non-interactive callers must
+                       pass --yes explicitly).
 
   token set <name>     Store a token/secret under <name>. The value is read
                        from an interactive no-echo prompt (or from a stdin
@@ -90,6 +104,9 @@ Commands:
   gpg generate         Generate a GPG key pair (gpg --full-generate-key;
                        all prompts are owned by gpg on its own tty).
   gpg import [<file>]  Import GPG key material from <file> (or stdin).
+  gpg list             List GPG keys — key id / uid / fingerprint only
+                       (gpg --list-keys). READ-ONLY: private key material is
+                       never listed or exported.
   list                 List stored secret names — names only, never values.
   remove <name>        Delete the named secret from the active backend.
 
@@ -202,9 +219,130 @@ _secrets_ssh_key_copy() {
     log_info "public key installed on ${_target}"
 }
 
+# READ-ONLY: enumerate public SSH key material only. Public keys (~/.ssh/*.pub)
+# and agent-loaded identities (ssh-add -l) are safe to print; private key files
+# are deliberately never opened.
+_secrets_ssh_key_list() {
+    if (( $# != 0 )); then
+        log_error "ssh-key list takes no arguments"
+        exit 2
+    fi
+    local _ssh_dir="${HOME}/.ssh"
+    local _found=false _pub
+    if [[ -d "${_ssh_dir}" ]]; then
+        for _pub in "${_ssh_dir}"/*.pub; do
+            [[ -e "${_pub}" ]] || continue
+            _found=true
+            # Path + the public key line itself (public by definition).
+            printf '%s: %s\n' "${_pub}" "$(cat -- "${_pub}")"
+        done
+    fi
+
+    # Agent identities are fingerprints only — never private material.
+    if [[ -n "${SSH_AUTH_SOCK:-}" ]] && command -v ssh-add >/dev/null 2>&1; then
+        local _agent
+        if _agent="$(ssh-add -l 2>/dev/null)" && [[ -n "${_agent}" ]]; then
+            printf 'agent identities:\n%s\n' "${_agent}"
+            _found=true
+        fi
+    fi
+
+    if [[ "${_found}" == false ]]; then
+        log_info "no public SSH keys found in ${_ssh_dir} and no agent identities"
+    fi
+}
+
+# DESTRUCTIVE: delete a key pair (private + .pub). The target is resolved to an
+# absolute path and constrained to ~/.ssh so traversal / absolute escapes can
+# never delete files elsewhere (same guard intent as the secret store path).
+_secrets_ssh_key_remove() {
+    local _file="" _name="" _yes=false
+    while (( $# > 0 )); do
+        case "$1" in
+            --file) _file="${2:?--file needs a value}"; shift 2 ;;
+            --yes)  _yes=true; shift ;;
+            -*) log_error "unknown option for ssh-key remove: $1"; exit 2 ;;
+            *)
+                if [[ -n "${_name}" ]]; then
+                    log_error "unexpected extra argument: $1"
+                    exit 2
+                fi
+                _name="$1"; shift
+                ;;
+        esac
+    done
+
+    if [[ -n "${_file}" && -n "${_name}" ]]; then
+        log_error "ssh-key remove takes either --file <path> OR <name>, not both"
+        exit 2
+    fi
+
+    local _ssh_dir _target
+    _ssh_dir="$(cd -- "${HOME}" 2>/dev/null && pwd -P)/.ssh"
+    if [[ -n "${_name}" ]]; then
+        # A bare name must be a single safe basename (no separators / traversal).
+        if [[ ! "${_name}" =~ ^[A-Za-z0-9][A-Za-z0-9._@-]*$ ]]; then
+            log_error "invalid ssh-key name '${_name}' (allowed: alnum start, then [A-Za-z0-9._@-])"
+            exit 2
+        fi
+        _target="${_ssh_dir}/${_name}"
+    elif [[ -n "${_file}" ]]; then
+        # Strip a trailing .pub so callers can name either half of the pair.
+        _file="${_file%.pub}"
+        local _dir _base
+        _dir="$(dirname -- "${_file}")"
+        _base="$(basename -- "${_file}")"
+        # Canonicalize the directory; reject anything outside ~/.ssh (this also
+        # collapses any ../ segments, so a traversal cannot escape).
+        local _real_dir
+        if ! _real_dir="$(cd -- "${_dir}" 2>/dev/null && pwd -P)"; then
+            log_error "ssh-key remove: cannot resolve directory of '${_file}'"
+            exit 2
+        fi
+        if [[ "${_real_dir}" != "${_ssh_dir}" ]]; then
+            log_error "ssh-key remove: refusing to delete outside ${_ssh_dir} (got '${_real_dir}/${_base}')"
+            exit 2
+        fi
+        if [[ "${_base}" == "." || "${_base}" == ".." || "${_base}" == */* ]]; then
+            log_error "invalid ssh-key file basename '${_base}'"
+            exit 2
+        fi
+        _target="${_real_dir}/${_base}"
+    else
+        log_error "ssh-key remove requires --file <path> or a <name>"
+        exit 2
+    fi
+
+    if [[ ! -e "${_target}" && ! -e "${_target}.pub" ]]; then
+        log_error "no SSH key pair found at: ${_target}"
+        exit 1
+    fi
+
+    # Confirmation contract: in a non-interactive context (no tty on stdin) the
+    # destructive delete proceeds ONLY with --yes. Interactively, prompt once.
+    # The TUI passes --yes after its own type-to-confirm widget.
+    if [[ "${_yes}" != true ]]; then
+        if [[ ! -t 0 ]]; then
+            log_error "ssh-key remove is destructive; pass --yes for non-interactive deletion"
+            exit 2
+        fi
+        local _reply=""
+        printf 'Delete SSH key pair %s (private + .pub)? [y/N] ' "${_target}" > /dev/tty
+        IFS= read -r _reply < /dev/tty
+        if [[ ! "${_reply}" =~ ^[Yy]$ ]]; then
+            log_info "ssh-key remove aborted"
+            exit 0
+        fi
+    fi
+
+    rm -f -- "${_target}" "${_target}.pub"
+    log_event info setup_secrets ssh_key_remove "file=${_target}"
+    log_info "SSH key pair removed: ${_target}"
+}
+
 _secrets_cmd_ssh_key() {
     if (( $# == 0 )); then
-        log_error "ssh-key requires an action: generate | load | copy <user@host>"
+        log_error "ssh-key requires an action: generate | load | copy <user@host> | list | remove"
         exit 2
     fi
     local _action="$1"; shift
@@ -212,8 +350,10 @@ _secrets_cmd_ssh_key() {
         generate) _secrets_ssh_key_generate "$@" ;;
         load)     _secrets_ssh_key_load "$@" ;;
         copy)     _secrets_ssh_key_copy "$@" ;;
+        list)     _secrets_ssh_key_list "$@" ;;
+        remove)   _secrets_ssh_key_remove "$@" ;;
         *)
-            log_error "unknown ssh-key action '${_action}' (valid: generate | load | copy)"
+            log_error "unknown ssh-key action '${_action}' (valid: generate | load | copy | list | remove)"
             exit 2
             ;;
     esac
@@ -324,17 +464,30 @@ _secrets_gpg_import() {
     log_info "GPG key material imported"
 }
 
+# READ-ONLY: list public key id / uid / fingerprint via `gpg --list-keys`.
+# `--list-secret-keys` and any `--export*` are deliberately never used, so no
+# private key material is ever read or emitted.
+_secrets_gpg_list() {
+    if (( $# != 0 )); then
+        log_error "gpg list takes no arguments"
+        exit 2
+    fi
+    _secrets_require_gpg
+    gpg --list-keys --keyid-format long --fingerprint
+}
+
 _secrets_cmd_gpg() {
     if (( $# == 0 )); then
-        log_error "gpg requires an action: generate | import [<file>]"
+        log_error "gpg requires an action: generate | import [<file>] | list"
         exit 2
     fi
     local _action="$1"; shift
     case "${_action}" in
         generate) _secrets_gpg_generate "$@" ;;
         import)   _secrets_gpg_import "$@" ;;
+        list)     _secrets_gpg_list "$@" ;;
         *)
-            log_error "unknown gpg action '${_action}' (valid: generate | import)"
+            log_error "unknown gpg action '${_action}' (valid: generate | import | list)"
             exit 2
             ;;
     esac

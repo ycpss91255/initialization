@@ -416,3 +416,52 @@ _set_dbus() {
     assert_failure 2
     [[ ! -f "${INIT_UBUNTU_SECRETS_DIR}/k.enc" ]]
 }
+
+# ── 6. ssh-key remove: destructive-path injection / escape hardening (#201 B) ─
+# `ssh-key remove` deletes files, so its name/path gate must reject every
+# escape BEFORE any rm runs. The fake HOME below keeps a real key pair plus a
+# "loot" file outside ~/.ssh; an escape that deleted either would be a finding.
+
+@test "ssh-key remove name with a command-substitution payload is rejected (exit 2)" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf 'priv\n' > "${_fakehome}/.ssh/id_ed25519"
+    local _evil="id${_DOLLAR}(rm -rf /)"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" \
+        ssh-key remove "${_evil}" --yes
+    assert_failure 2
+    [[ -e "${_fakehome}/.ssh/id_ed25519" ]]
+}
+
+@test "ssh-key remove name with a path separator is rejected (exit 2)" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf 'loot\n' > "${INIT_UBUNTU_TEST_SCRATCH}/loot"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" \
+        ssh-key remove '../loot' --yes
+    assert_failure 2
+    [[ -e "${INIT_UBUNTU_TEST_SCRATCH}/loot" ]]
+}
+
+@test "ssh-key remove --file with an absolute escape is rejected (exit 2)" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf 'secret\n' > "${INIT_UBUNTU_TEST_SCRATCH}/abs-loot"
+    run env HOME="${_fakehome}" "${REPO_ROOT}/setup_secrets.sh" \
+        ssh-key remove --file "${INIT_UBUNTU_TEST_SCRATCH}/abs-loot" --yes
+    assert_failure 2
+    [[ -e "${INIT_UBUNTU_TEST_SCRATCH}/abs-loot" ]]
+}
+
+@test "ssh-key remove never reads or echoes private key contents" {
+    local _fakehome="${INIT_UBUNTU_TEST_SCRATCH}/home"
+    mkdir -p "${_fakehome}/.ssh"
+    printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\nPRIV-DELETE-CANARY\n' \
+        > "${_fakehome}/.ssh/id_ed25519"
+    printf 'pub\n' > "${_fakehome}/.ssh/id_ed25519.pub"
+    run bash -c "HOME='${_fakehome}' '${REPO_ROOT}/setup_secrets.sh' \
+        ssh-key remove id_ed25519 --yes 2>&1"
+    assert_success
+    refute_output --partial "PRIV-DELETE-CANARY"
+    [[ ! -e "${_fakehome}/.ssh/id_ed25519" ]]
+}

@@ -20,6 +20,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Changed
+
+- **i18n officially supports en + zh-TW only for 0.1.0** (#205): `--lang` and
+  `$LANG` auto-detection previously accepted `zh-CN` / `ja` but rendered English
+  (claimed support, delivered en). `i18n_detect_lang` now resolves unsupported
+  locales to `en` silently, and `i18n_sanitize_lang` rejects `zh-CN` / `ja` →
+  `en` with a warning (the warning fires only on an explicit unsupported
+  `--lang`, not on auto-detect). zh-CN / ja translations are deferred to 0.2.0
+  (#208). `--lang` help and the supported set now read `en | zh-TW`.
+
 ### Fixed
 
 - **whiptail multi-select descriptions truncated at the wrong boundary under

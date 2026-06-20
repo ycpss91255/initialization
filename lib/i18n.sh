@@ -2,7 +2,7 @@
 # lib/i18n.sh — locale detection + validation.
 #
 # Provides:
-#   i18n_detect_lang             # reads $LANG, prints one of {en, zh-TW, zh-CN, ja}
+#   i18n_detect_lang             # reads $LANG, prints one of {en, zh-TW}
 #   i18n_sanitize_lang <outvar>  # validates outvar value; if invalid, set to "en" + bilingual warn
 
 if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
@@ -11,11 +11,13 @@ if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
 fi
 
 i18n_detect_lang() {
+    # 0.1.0 ships en + zh-TW only (#205). Unsupported locales (zh-CN, ja, ...)
+    # resolve to en silently on auto-detect — the warning is reserved for an
+    # explicit `--lang` of an unsupported value (see i18n_sanitize_lang). zh-CN
+    # / ja translations are deferred to 0.2.0 (#208).
     case "${LANG:-}" in
-        zh_TW*)         printf 'zh-TW' ;;
-        zh_CN*|zh_SG*)  printf 'zh-CN' ;;
-        ja*)            printf 'ja' ;;
-        *)              printf 'en' ;;
+        zh_TW*) printf 'zh-TW' ;;
+        *)      printf 'en' ;;
     esac
 }
 
@@ -69,27 +71,22 @@ i18n_t() {
 i18n_sanitize_lang() {
     local -n _sl_ref="${1:?i18n_sanitize_lang requires <outvar>}"
     local _who="${2:-i18n}"
+    # 0.1.0 supported set: en + zh-TW only (#205). zh-CN / ja are deferred
+    # (#208) — an explicit unsupported --lang falls back to en with a warning.
     case "${_sl_ref}" in
-        en|zh-TW|zh-CN|ja) return 0 ;;
+        en|zh-TW) return 0 ;;
     esac
-    # Detect sys locale fresh (cannot trust the invalid _sl_ref value).
+    # Detect sys locale fresh (cannot trust the invalid _sl_ref value) to pick
+    # the warning's language. Only en / zh-TW are possible now.
     local _sys_lang; _sys_lang="$(i18n_detect_lang)"
     case "${_sys_lang}" in
         zh-TW)
             printf '[%s] 警告:不支援的 lang 值 %q,改用 "en"\n' "${_who}" "${_sl_ref}" >&2
-            printf '[%s]       可用值:en | zh-TW | zh-CN | ja\n' "${_who}" >&2
-            ;;
-        zh-CN)
-            printf '[%s] 警告:不支持的 lang 值 %q,改用 "en"\n' "${_who}" "${_sl_ref}" >&2
-            printf '[%s]       可用值:en | zh-TW | zh-CN | ja\n' "${_who}" >&2
-            ;;
-        ja)
-            printf '[%s] 警告: サポート外の lang 値 %q, "en" にフォールバックします\n' "${_who}" "${_sl_ref}" >&2
-            printf '[%s]       利用可能: en | zh-TW | zh-CN | ja\n' "${_who}" >&2
+            printf '[%s]       可用值:en | zh-TW\n' "${_who}" >&2
             ;;
         *)
             printf '[%s] WARNING: unsupported lang %q, falling back to "en"\n' "${_who}" "${_sl_ref}" >&2
-            printf '[%s]          allowed: en | zh-TW | zh-CN | ja\n' "${_who}" >&2
+            printf '[%s]          allowed: en | zh-TW\n' "${_who}" >&2
             ;;
     esac
     _sl_ref="en"

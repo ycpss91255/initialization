@@ -24,18 +24,20 @@ teardown() {
     [[ "${output}" == "zh-TW" ]]
 }
 
-@test "i18n_detect_lang returns 'zh-CN' when LANG=zh_CN.UTF-8" {
+# 0.1.0 supports en + zh-TW only (#205): unsupported locales auto-detect to en
+# silently (zh-CN / ja translations deferred to #208).
+@test "i18n_detect_lang returns 'en' for zh_CN (unsupported in 0.1.0)" {
     export LANG="zh_CN.UTF-8"
     run i18n_detect_lang
     [[ "${status}" -eq 0 ]]
-    [[ "${output}" == "zh-CN" ]]
+    [[ "${output}" == "en" ]]
 }
 
-@test "i18n_detect_lang returns 'ja' when LANG=ja_JP.UTF-8" {
+@test "i18n_detect_lang returns 'en' for ja (unsupported in 0.1.0)" {
     export LANG="ja_JP.UTF-8"
     run i18n_detect_lang
     [[ "${status}" -eq 0 ]]
-    [[ "${output}" == "ja" ]]
+    [[ "${output}" == "en" ]]
 }
 
 @test "i18n_detect_lang returns 'en' for unrecognized LANG" {
@@ -66,16 +68,22 @@ teardown() {
     [[ "${_lang}" == "zh-TW" ]]
 }
 
-@test "i18n_sanitize_lang keeps valid 'zh-CN' unchanged" {
+@test "i18n_sanitize_lang downgrades zh-CN to 'en' (unsupported in 0.1.0)" {
     local _lang="zh-CN"
-    i18n_sanitize_lang _lang
-    [[ "${_lang}" == "zh-CN" ]]
+    i18n_sanitize_lang _lang 2>/dev/null
+    [[ "${_lang}" == "en" ]]
 }
 
-@test "i18n_sanitize_lang keeps valid 'ja' unchanged" {
+@test "i18n_sanitize_lang downgrades ja to 'en' (unsupported in 0.1.0)" {
     local _lang="ja"
-    i18n_sanitize_lang _lang
-    [[ "${_lang}" == "ja" ]]
+    i18n_sanitize_lang _lang 2>/dev/null
+    [[ "${_lang}" == "en" ]]
+}
+
+@test "i18n_sanitize_lang warns and falls back when given zh-CN" {
+    local _lang="zh-CN"
+    run i18n_sanitize_lang _lang
+    [[ "${output}" == *"en | zh-TW"* ]]
 }
 
 @test "i18n_sanitize_lang replaces invalid value with 'en'" {
@@ -110,10 +118,10 @@ teardown() {
 # ─── i18n_resolve_init_ubuntu_lang ───────────────────────────────────────────
 
 @test "i18n_resolve_init_ubuntu_lang honors explicit INIT_UBUNTU_LANG" {
-    export INIT_UBUNTU_LANG="ja"
-    export LANG="zh_TW.UTF-8"   # would auto-detect to zh-TW if env didn't win
+    export INIT_UBUNTU_LANG="zh-TW"
+    export LANG="en_US.UTF-8"   # would auto-detect to en if env didn't win
     i18n_resolve_init_ubuntu_lang
-    [[ "${INIT_UBUNTU_LANG}" == "ja" ]]
+    [[ "${INIT_UBUNTU_LANG}" == "zh-TW" ]]
 }
 
 @test "i18n_resolve_init_ubuntu_lang auto-detects from \$LANG when env unset" {
@@ -125,13 +133,13 @@ teardown() {
 
 @test "i18n_resolve_init_ubuntu_lang uses config_get when env unset (beats auto)" {
     unset INIT_UBUNTU_LANG
-    export LANG="zh_TW.UTF-8"   # auto would say zh-TW
+    export LANG="en_US.UTF-8"   # auto would say en
     config_get() {
-        [[ "$1" == "ui.lang" ]] && { printf 'zh-CN'; return 0; }
+        [[ "$1" == "ui.lang" ]] && { printf 'zh-TW'; return 0; }
         return 1
     }
     i18n_resolve_init_ubuntu_lang
-    [[ "${INIT_UBUNTU_LANG}" == "zh-CN" ]]
+    [[ "${INIT_UBUNTU_LANG}" == "zh-TW" ]]
 }
 
 # ─── i18n_t (engine-string lookup, issue #185) ───────────────────────────────

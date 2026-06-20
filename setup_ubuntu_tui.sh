@@ -215,7 +215,7 @@ Flags:
   --backend gum|whiptail Force the rendering backend (skips detection and
                          the install prompt). Invalid value → exit 2.
   --lang <code>          Force the UI language for this session
-                         (en|zh-TW|zh-CN|ja); overrides $LANG / config.
+                         (en|zh-TW); overrides $LANG / config.
                          Invalid value → falls back to en with a warning.
 
 Requirements:

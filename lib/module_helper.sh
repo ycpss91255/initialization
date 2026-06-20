@@ -526,7 +526,7 @@ Phases:
 
 Options:
   --dry-run, -n      do not perform side effects; log what would happen
-  --lang=<code>      override INIT_UBUNTU_LANG for i18n output (en, zh-TW, ...)
+  --lang=<code>      override INIT_UBUNTU_LANG for i18n output (en, zh-TW)
   --help,    -h
   --version, -V
 

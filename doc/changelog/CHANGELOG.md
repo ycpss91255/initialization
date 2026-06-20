@@ -22,6 +22,14 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Removed the main-menu section separators** (#216): the `------` divider
+  rows confused navigation — gum / whiptail have no non-selectable row, so a
+  divider could be landed on and pressing it re-rendered the menu with the
+  cursor reset to the top (it looked like a jump to Quick Setup). The three
+  logical groups are now conveyed by row ordering alone; every visible row is a
+  real, selectable action. Dropped `TUI_MENU_SEPARATOR` / `_tui_menu_separator`
+  and the main-loop sentinel guard.
+
 - **i18n officially supports en + zh-TW only for 0.1.0** (#205): `--lang` and
   `$LANG` auto-detection previously accepted `zh-CN` / `ja` but rendered English
   (claimed support, delivered en). `i18n_detect_lang` now resolves unsupported

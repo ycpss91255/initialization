@@ -241,55 +241,20 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
     done <<<"${output}"
 }
 
-# ── #169 main-menu section separators ────────────────────────────────────────
+# ── main-menu rows (#216: no separator rows — gum/whiptail can't render a
+#    non-selectable divider, so ordering conveys the grouping) ────────────────
 
-@test "tui_main_menu_entries inserts separator rows between the 3 groups (#169)" {
+@test "tui_main_menu_entries renders all action rows in order, no separators (#216)" {
     run tui_main_menu_entries "${FIXTURE_LIST_JSON}"
     assert_success
-    # Exactly two non-selectable separator rows (sentinel tag = "-").
-    local _seps
-    _seps="$(awk -F'\t' '$1 == "-"' <<<"${output}" | wc -l)"
-    [ "${_seps}" -eq 2 ]
-    # The divider label is a run of box-drawing dashes.
-    assert_line --partial "──────"
-}
-
-@test "tui_main_menu_entries keeps all real action tags in order around separators (#169)" {
-    run tui_main_menu_entries "${FIXTURE_LIST_JSON}"
-    assert_success
-    # Drop separator rows, then assert the real tags survive in order.
+    # No sentinel/divider rows: every row is a real, selectable action tag.
+    refute_output --partial "──────"
+    refute_line --regexp $'^-\t'
     local _tags
-    _tags="$(awk -F'\t' '$1 != "-" {print $1}' <<<"${output}" | paste -sd' ' -)"
+    _tags="$(awk -F'\t' '{print $1}' <<<"${output}" | paste -sd' ' -)"
     [ "${_tags}" = "quick-setup base recommended optional manage secrets sysinfo run" ]
-}
-
-@test "tui_main_menu_entries: separator sits after group 1 (optional) and before manage (#169)" {
-    run tui_main_menu_entries "${FIXTURE_LIST_JSON}"
-    assert_success
-    # Find indices: the row after "optional" is a separator, and the row
-    # before "manage" is a separator.
-    local _i=0 _opt=-1 _manage=-1 _run=-1
-    while IFS=$'\t' read -r _tag _rest; do
-        case "${_tag}" in
-            optional) _opt=${_i} ;;
-            manage) _manage=${_i} ;;
-            run) _run=${_i} ;;
-        esac
-        _i=$(( _i + 1 ))
-    done <<<"${output}"
-    # group1 sep right after optional
-    [ "$(awk -F'\t' -v n="$(( _opt + 1 ))" 'NR==n+1{print $1}' <<<"${output}")" = "-" ]
-    # group2 sep right before manage
-    [ "$(awk -F'\t' -v n="${_manage}" 'NR==n{print $1}' <<<"${output}")" = "-" ]
-    # run is still last
-    [ "${_run}" -eq "$(( ${#lines[@]} - 1 ))" ]
-}
-
-@test "_tui_main_loop guards against dispatching the separator sentinel (#169)" {
-    # The dispatch must treat the sentinel tag as a no-op. Assert the guard
-    # exists in the source (the loop re-loops without calling _tui_dispatch).
-    run grep -nE 'TUI_MENU_SEPARATOR|"-"\)' "${REPO_ROOT}/setup_ubuntu_tui.sh"
-    assert_success
+    # run stays the last row (the only batch execution point, Q43).
+    [ "$(awk -F'\t' 'END{print $1}' <<<"${output}")" = "run" ]
 }
 
 @test "tui_modules_in_category lists module names alphabetically" {

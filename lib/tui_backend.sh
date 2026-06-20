@@ -51,6 +51,12 @@
 #                                 Thin backend wrappers (argv-level unit tests
 #                                 via a mock widget binary; live-widget smoke
 #                                 belongs to the AC-10 expect harness)
+#   tui_render_input <title> <prompt> [default]
+#                                 §5 single-line text input (gum input /
+#                                 whiptail --inputbox). Success → value + rc 0;
+#                                 cancel (nonzero rc) propagates; EMPTY result =
+#                                 cancel → rc 1. NO no-echo variant (secret
+#                                 values never pass through this widget — AC-20)
 #
 # Internal probes `_tui_has_cmd` / `_tui_has_sudo` are deliberately small
 # named functions so bats can override them with mocks (same pattern as
@@ -889,6 +895,16 @@ _tui_msgbox_whiptail() {
         --msgbox "$2" "${TUI_HEIGHT}" "${TUI_WIDTH}"
 }
 
+# _tui_input_whiptail <title> <prompt> [default] → typed value on stdout.
+# whiptail writes the edited value to stderr; the 3>&1 1>&2 2>&3 swap (same as
+# --menu/--checklist) brings it to stdout. rc 1/255 on Cancel/Esc propagates.
+# The empty=cancel contract lives in the tui_render_input dispatcher (shared
+# with the gum adapter) — this adapter is purely the backend invocation.
+_tui_input_whiptail() {
+    "${TUI_BACKEND:?TUI_BACKEND not set}" --title "$1" \
+        --inputbox "$2" "${TUI_HEIGHT}" "${TUI_WIDTH}" "${3:-}" 3>&1 1>&2 2>&3
+}
+
 # Yes/No relabel flags (the §8.4 < Proceed > / < Cancel > captions);
 # same split as _tui_cancel_button_args. Opt in via TUI_YES_LABEL/TUI_NO_LABEL.
 _tui_yesno_button_args() {
@@ -996,8 +1012,31 @@ _tui_yesno_gum() {
     "${TUI_BACKEND:?TUI_BACKEND not set}" confirm "${_flags[@]}" -- "$1: $2"
 }
 
+# _tui_input_gum <title> <prompt> [default] → typed value on stdout.
+# gum input prints the value to stdout natively; rc nonzero (incl. gum's 130 on
+# Esc/Ctrl-C) propagates as cancel. The header combines title + prompt the same
+# way the gum menu/checklist headers do. The empty=cancel contract lives in the
+# tui_render_input dispatcher (shared with whiptail) — this is the invocation.
+_tui_input_gum() {
+    "${TUI_BACKEND:?TUI_BACKEND not set}" input \
+        --header "$1: $2" --value "${3:-}"
+}
+
 # ── Public dispatchers (stable contract) ─────────────────────────────────────
 tui_render_menu()      { "_tui_menu_$(_tui_backend_family)" "$@"; }
 tui_render_checklist() { "_tui_checklist_$(_tui_backend_family)" "$@"; }
 tui_render_msgbox()    { "_tui_msgbox_$(_tui_backend_family)" "$@"; }
 tui_render_yesno()     { "_tui_yesno_$(_tui_backend_family)" "$@"; }
+
+# tui_render_input <title> <prompt> [default] → typed value on stdout, rc 0.
+# §5 contract enforced HERE (shared across both backends): a cancel (nonzero rc
+# from the adapter) propagates as nonzero; a successful-but-EMPTY result is
+# treated as cancel → rc 1, no value printed. Success → value + rc 0. There is
+# deliberately NO no-echo variant — secret values never pass through this widget
+# (AC-20); the tool prompts for those on its own no-echo tty.
+tui_render_input() {
+    local _value
+    _value="$("_tui_input_$(_tui_backend_family)" "$@")" || return $?
+    [[ -n "${_value}" ]] || return 1
+    printf '%s\n' "${_value}"
+}

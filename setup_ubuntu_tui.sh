@@ -737,11 +737,9 @@ _tui_main_loop() {
 # ── Entry ────────────────────────────────────────────────────────────────────
 
 main() {
-    # Ctrl+C anywhere → clean quit, terminal restored (cursor shown), zero
-    # writes (#206). Inlined (not a named handler) so shellcheck doesn't read
-    # the body as unreachable. Distinct from Esc: Esc returns rc 130 with NO
-    # signal (handled as Back/Exit by the widgets); only a real SIGINT trips this.
-    trap 'printf "\033[?25h" >&2; exit 130' INT
+    # (Ctrl+C SIGINT trap deferred: a signal trap inside the TUI subprocess
+    # deadlocks kcov ptrace in the coverage unit shard, so it is reimplemented
+    # kcov-safe in a #206 follow-up. The exit guard below stays.)
     # --backend is parsed BEFORE detection (#171): a valid value forces
     # TUI_BACKEND and skips BOTH detection and the gum install prompt; an
     # invalid value is a usage error (exit 2).

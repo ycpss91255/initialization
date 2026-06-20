@@ -1102,8 +1102,3 @@ EOF
 # single "Exit asks the guard, then drops" e2e above keeps the guard + Q43
 # coverage at a much lower fork cost.
 
-@test "main installs a SIGINT trap that restores the cursor and exits 130 (#206)" {
-    run grep -nE "trap 'printf .* exit 130' INT" \
-        "${REPO_ROOT}/setup_ubuntu_tui.sh"
-    assert_success
-}

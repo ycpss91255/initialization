@@ -193,21 +193,30 @@ TUI_CATEGORY_ORDER='["base","recommended","optional","experimental"]'
 
 # ── Pure display helpers ─────────────────────────────────────────────────────
 
-# _tui_clip <string> <max> → <string> clipped to <max> chars with a trailing
-# single-char ellipsis "…" when it would exceed <max>, unchanged otherwise.
-# Pure (no globals, no I/O) so it is directly unit-testable.
+# _tui_clip <string> <max> → <string> clipped to <max> DISPLAY COLUMNS with a
+# trailing single-column ellipsis "…" when it would exceed <max>, unchanged
+# otherwise. Display-width aware (via _tui_disp_width): a zh-TW/ja glyph is 2
+# columns, so a char-count clip truncated at the wrong visual boundary and
+# over-ran whiptail's box. Never splits a wide glyph. Pure (no globals, no I/O).
 _tui_clip() {
     local _s="$1" _max="$2"
-    # UTF-8 locale so ${#_s} counts characters (not bytes) and ${_s:0:n}
-    # slices on character boundaries — module descriptions carry zh-TW
-    # (multibyte), and CI's kcov image runs under C/POSIX where byte-vs-char
-    # would mis-truncate. C.UTF-8 is always present on Debian/Ubuntu.
+    # UTF-8 locale so ${_s:i:1} slices on character boundaries (multibyte
+    # zh-TW); C.UTF-8 is always present on Debian/Ubuntu and in the kcov image.
     local LC_ALL=C.UTF-8
-    if (( ${#_s} > _max )); then
-        printf '%s…\n' "${_s:0:_max-1}"
-    else
+    if (( $(_tui_disp_width "${_s}") <= _max )); then
         printf '%s\n' "${_s}"
+        return
     fi
+    # Reserve 1 column for the ellipsis; accumulate whole glyphs up to the budget.
+    local _budget=$(( _max - 1 )) _out="" _w=0 _i _ch _cw
+    for (( _i = 0; _i < ${#_s}; _i++ )); do
+        _ch="${_s:_i:1}"
+        _cw=$(_tui_disp_width "${_ch}")
+        (( _w + _cw > _budget )) && break
+        _out+="${_ch}"
+        _w=$(( _w + _cw ))
+    done
+    printf '%s…\n' "${_out}"
 }
 
 # _tui_disp_width <string> → terminal display COLUMNS on stdout. Counts
@@ -261,10 +270,11 @@ _tui_pad_label() {
 #   budget = TUI_WIDTH - longest-name - TUI_CHECKLIST_CHROME  (floored to MIN)
 # Pure (no globals beyond the TUI_* knobs, no I/O) — directly unit-testable.
 _tui_clip_budget() {
-    local LC_ALL=C.UTF-8  # char-accurate widths for the budget math (see _tui_clip)
-    local _name _longest=0
+    local LC_ALL=C.UTF-8  # display-width math (see _tui_clip / _tui_disp_width)
+    local _name _longest=0 _w
     for _name in "$@"; do
-        (( ${#_name} > _longest )) && _longest=${#_name}
+        _w=$(_tui_disp_width "${_name}")
+        (( _w > _longest )) && _longest=${_w}
     done
     local _budget=$(( TUI_WIDTH - _longest - TUI_CHECKLIST_CHROME ))
     (( _budget < TUI_CHECKLIST_MIN )) && _budget=${TUI_CHECKLIST_MIN}

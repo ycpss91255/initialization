@@ -285,17 +285,26 @@ _bats_unit() {
     # exist on a fresh checkout ("kcov: error: Can't write helper").
     mkdir -p "${_out}"
     _info "kcov shard output: ${_out}"
-    kcov \
+    # Bound the kcov run: a test that hangs under kcov ptrace (deep fork trees
+    # can deadlock) must fail FAST with the last-run TAP line visible, not stall
+    # the CI job for the full GitHub timeout. Tunable via KCOV_BATS_TIMEOUT.
+    local _kcov_timeout="${KCOV_BATS_TIMEOUT:-900}"
+    local _kcov_rc=0
+    timeout "${_kcov_timeout}" kcov \
         --include-path="${REPO_ROOT}" \
         --exclude-path="$(_kcov_exclude_path)" \
         --exclude-region='kcov-exclude-start:kcov-exclude-end' \
         "${_out}" \
-        bats "$@"
+        bats "$@" || _kcov_rc=$?
     # kcov leaves absolute-path convenience symlinks (e.g. bats →
     # /source/coverage/...) that dangle outside the container and can
     # break the per-shard artifact upload — prune them. `kcov --merge`
     # reads the real bats.<hash>/ data dirs, not the symlinks.
     find "${_out}" -maxdepth 1 -type l -delete
+    if (( _kcov_rc == 124 )); then
+        _die "kcov bats run exceeded ${_kcov_timeout}s — a test is hanging under kcov (see the TAP output above for the last test before the stall)."
+    fi
+    return "${_kcov_rc}"
 }
 
 # Scope: honors MODULE_FILTER (set via --module; issue #31, PRD M10):

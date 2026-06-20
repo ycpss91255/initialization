@@ -983,8 +983,11 @@ _tui_checklist_gum() {
 
 # _tui_msgbox_gum <title> <text> → render + single-key continue.
 _tui_msgbox_gum() {
+    # `--` ends flag parsing: forked content (e.g. `detect` output starting
+    # with "------ ...") must not be misread as a gum flag, or gum aborts with
+    # "unknown flag" (System Info crash).
     "${TUI_BACKEND:?TUI_BACKEND not set}" style --border rounded --padding "1 2" \
-        "$1" "" "$2"
+        -- "$1" "" "$2"
     i18n_t TUI_BACKEND_I18N press_enter >&2
     read -r REPLY || true
 }
@@ -995,7 +998,7 @@ _tui_yesno_gum() {
     local -a _flags=()
     [[ -n "${TUI_YES_LABEL:-}" ]] && _flags+=(--affirmative "${TUI_YES_LABEL}")
     [[ -n "${TUI_NO_LABEL:-}" ]] && _flags+=(--negative "${TUI_NO_LABEL}")
-    "${TUI_BACKEND:?TUI_BACKEND not set}" confirm "${_flags[@]}" "$1: $2"
+    "${TUI_BACKEND:?TUI_BACKEND not set}" confirm "${_flags[@]}" -- "$1: $2"
 }
 
 # ── Public dispatchers (stable contract) ─────────────────────────────────────

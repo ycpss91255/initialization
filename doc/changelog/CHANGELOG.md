@@ -22,6 +22,13 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **System Info (and any gum msgbox/yesno) crashed when content started with
+  `-`**: `gum style` / `gum confirm` parsed forked text beginning with
+  `------ init_ubuntu environment ------` (the `detect` banner) as a flag and
+  aborted with `unknown flag`. `_tui_msgbox_gum` / `_tui_yesno_gum` now pass a
+  `--` guard before the positional text so arbitrary content can never be
+  misread as a flag. Regression test added.
+
 - **gum TUI screens did not show how to select or go back**: the gum menu /
   checklist relied on gum's native footer, which is easy to miss / can be
   clipped and never advertises `Esc`, while the passed-in help text described

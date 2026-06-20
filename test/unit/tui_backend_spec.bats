@@ -729,6 +729,18 @@ EOF
     assert_output --regexp "style|format"
 }
 
+@test "gum msgbox: content starting with -- is passed after a -- guard (System Info crash)" {
+    _make_mock_gum
+    # detect output starts with "------ init_ubuntu environment ------"; without
+    # a -- guard gum parses it as a flag and aborts ("unknown flag").
+    run tui_render_msgbox "System Info" "------ env ------
+os.id: ubuntu"
+    assert_success
+    run cat "${MOCK_GUM_LOG}"
+    assert_output --partial "--"
+    assert_output --partial "------ env ------"
+}
+
 @test "gum menu: does not double-apply _tui_clip (gum manages its own width)" {
     _make_mock_gum
     # A very long item passes through to gum unclipped (no ellipsis injected

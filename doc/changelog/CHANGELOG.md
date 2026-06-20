@@ -20,6 +20,25 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Added
+
+- **TUI Manage Secrets is now a real sub-menu** (#202): `Manage Secrets`
+  previously forked bare `setup_secrets`, which just printed usage and exited
+  rc2. It now opens a sub-menu (design §4) whose entries each fork a
+  `setup_secrets` subcommand (G4 — the TUI sources no engine lib): list
+  existing secrets (read-only overview combining `list` + `gpg list` +
+  `ssh-key list`; never secret/private contents), generate SSH key (ed25519 /
+  ecdsa / rsa type menu), load SSH key to agent, copy SSH public key to remote
+  (input user@host), set token (input name only — the value is prompted by
+  `setup_secrets` on its own no-echo tty, never via the TUI; AC-20), generate
+  GPG key, import GPG (input file path), and delete (category menu Token / SSH
+  key with danger tiers: token = single yes/no confirm, SSH key =
+  type-to-confirm). Every op now shows a plain-text result box (`OK` /
+  `FAILED (rc=N)`) instead of the raw `[setup_secrets exited N]` dump.
+  `token get` is excluded (it would print the secret on screen) and GPG key
+  deletion is deferred (no `setup_secrets` gpg-delete capability yet). Consistent
+  across gum and whiptail; en + zh-TW strings added.
+
 ### Changed
 
 - **Removed the main-menu section separators** (#216): the `------` divider

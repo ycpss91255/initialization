@@ -174,9 +174,83 @@ declare -gA TUI_I18N=(
     [en.manage_list_help]="Module / Version / Installed at — pick one to manage:"
     [zh-TW.manage_list_help]="模組 / 版本 / 安裝時間 — 選一項進行管理:"
 
-    # Manage Secrets (_tui_screen_secrets).
-    [en.secrets_return]=$'\n[setup_secrets exited {0}] Press Enter to return to the menu...'
-    [zh-TW.secrets_return]=$'\n[setup_secrets 結束,代碼 {0}] 按 Enter 返回選單...'
+    # Manage Secrets sub-menu (_tui_screen_secrets, #202 / design §4).
+    [en.secrets_title]="Manage Secrets"
+    [zh-TW.secrets_title]="管理密鑰"
+    [en.secrets_help]="Pick a secrets action (forks setup_secrets — G4):"
+    [zh-TW.secrets_help]="選擇密鑰動作 (fork setup_secrets — G4):"
+    [en.secrets_list]="List existing secrets (overview)"
+    [zh-TW.secrets_list]="列出已存密鑰 (總覽)"
+    [en.secrets_ssh_gen]="Generate SSH key"
+    [zh-TW.secrets_ssh_gen]="產生 SSH 金鑰"
+    [en.secrets_ssh_load]="Load SSH key to agent"
+    [zh-TW.secrets_ssh_load]="載入 SSH 金鑰到 agent"
+    [en.secrets_ssh_copy]="Copy SSH public key to remote"
+    [zh-TW.secrets_ssh_copy]="複製 SSH 公鑰到遠端"
+    [en.secrets_token_set]="Set token"
+    [zh-TW.secrets_token_set]="設定 token"
+    [en.secrets_gpg_gen]="Generate GPG key"
+    [zh-TW.secrets_gpg_gen]="產生 GPG 金鑰"
+    [en.secrets_gpg_import]="Import GPG key"
+    [zh-TW.secrets_gpg_import]="匯入 GPG 金鑰"
+    [en.secrets_delete]="Delete..."
+    [zh-TW.secrets_delete]="刪除…"
+
+    # Result feedback (every op; plain text, NO emoji).
+    [en.secrets_result_ok]="{0}: OK"
+    [zh-TW.secrets_result_ok]="{0}:成功"
+    [en.secrets_result_fail]="{0}: FAILED (rc={1})"
+    [zh-TW.secrets_result_fail]="{0}:失敗 (rc={1})"
+    [en.secrets_overview_title]="Secrets overview"
+    [zh-TW.secrets_overview_title]="密鑰總覽"
+
+    # SSH key type menu (Generate SSH key).
+    [en.secrets_ssh_type_title]="SSH key type"
+    [zh-TW.secrets_ssh_type_title]="SSH 金鑰類型"
+    [en.secrets_ssh_type_help]="Pick a key type (advanced flags stay CLI-only):"
+    [zh-TW.secrets_ssh_type_help]="選擇金鑰類型 (進階選項僅限 CLI):"
+    [en.secrets_ssh_type_ed25519]="ed25519 (recommended)"
+    [zh-TW.secrets_ssh_type_ed25519]="ed25519 (建議)"
+    [en.secrets_ssh_type_ecdsa]="ecdsa"
+    [zh-TW.secrets_ssh_type_ecdsa]="ecdsa"
+    [en.secrets_ssh_type_rsa]="rsa"
+    [zh-TW.secrets_ssh_type_rsa]="rsa"
+
+    # Input prompts (non-secret args only — never the value, AC-20).
+    [en.secrets_copy_prompt]="Remote target (user@host):"
+    [zh-TW.secrets_copy_prompt]="遠端目標 (user@host):"
+    [en.secrets_token_prompt]="Token name (the value is prompted securely next):"
+    [zh-TW.secrets_token_prompt]="Token 名稱 (稍後會安全地提示輸入值):"
+    [en.secrets_gpg_import_prompt]="Path to the GPG key file to import:"
+    [zh-TW.secrets_gpg_import_prompt]="要匯入的 GPG 金鑰檔路徑:"
+
+    # Delete category menu + danger tiers.
+    [en.secrets_delete_title]="Delete a secret"
+    [zh-TW.secrets_delete_title]="刪除密鑰"
+    [en.secrets_delete_help]="Pick what to delete (GPG key deletion is not yet supported):"
+    [zh-TW.secrets_delete_help]="選擇要刪除的項目 (尚未支援刪除 GPG 金鑰):"
+    [en.secrets_delete_token]="Delete Token"
+    [zh-TW.secrets_delete_token]="刪除 Token"
+    [en.secrets_delete_ssh]="Delete SSH key"
+    [zh-TW.secrets_delete_ssh]="刪除 SSH 金鑰"
+    [en.secrets_pick_token_title]="Delete Token"
+    [zh-TW.secrets_pick_token_title]="刪除 Token"
+    [en.secrets_pick_ssh_title]="Delete SSH key"
+    [zh-TW.secrets_pick_ssh_title]="刪除 SSH 金鑰"
+    [en.secrets_pick_help]="Pick the target to delete:"
+    [zh-TW.secrets_pick_help]="選擇要刪除的目標:"
+    [en.secrets_none_tokens]="No stored tokens to delete."
+    [zh-TW.secrets_none_tokens]="沒有可刪除的已存 token。"
+    [en.secrets_none_ssh]="No SSH keys found to delete."
+    [zh-TW.secrets_none_ssh]="找不到可刪除的 SSH 金鑰。"
+    [en.secrets_list_failed]="ERROR: could not list secrets ({0})."
+    [zh-TW.secrets_list_failed]="錯誤:無法列出密鑰 ({0})。"
+    [en.secrets_confirm_token]="Delete token '{0}'? This cannot be undone."
+    [zh-TW.secrets_confirm_token]="刪除 token '{0}'?此操作無法復原。"
+    [en.secrets_ssh_confirm_title]="Delete SSH key '{0}'"
+    [zh-TW.secrets_ssh_confirm_title]="刪除 SSH 金鑰 '{0}'"
+    [en.secrets_ssh_confirm_prompt]="IRREVERSIBLE. Type the key name '{0}' to confirm:"
+    [zh-TW.secrets_ssh_confirm_prompt]="此操作無法復原。請輸入金鑰名稱 '{0}' 以確認:"
 
     # Main menu loop (_tui_main_loop).
     [en.main_title]="init_ubuntu v{0}"
@@ -649,19 +723,199 @@ _tui_screen_manage() {
     done
 }
 
-# ── Manage Secrets (#72, §8.1 item 6) ────────────────────────────────────────
+# ── Manage Secrets sub-menu (#202, design §4) ────────────────────────────────
+# A sub-menu instead of forking bare setup_secrets (which printed usage + rc2).
+# Each flow forks `setup_secrets <subcommand>` (G4 — the TUI never sources the
+# engine). Secret VALUES + passphrases are ALWAYS prompted by setup_secrets on
+# its own no-echo tty (AC-20): the input widget only collects non-secret args
+# (name / user@host / file path), never the value itself.
 
-# Fork setup_secrets (a standalone interactive sub-tool — it owns the
-# terminal and all sensitive prompts, AC-20) and come back to the main
-# menu afterwards. Unlike install/manage actions the TUI does NOT exit:
-# secrets management is a side trip, not a pipeline handoff.
-_tui_screen_secrets() {
+# Fork a setup_secrets subcommand, then show a plain-text OK / FAILED result
+# msgbox (design §4 Q10; NO emoji — repo hard rule). The terminal is cleared so
+# the forked tool owns it for its own prompts; we return to the sub-menu after.
+#   _tui_secrets_run <result-label> <setup_secrets args...>
+_tui_secrets_run() {
+    local _label="$1"
+    shift
     clear 2>/dev/null || printf '\033c'
-    "${TUI_SECRETS}"
+    "${TUI_SECRETS}" "$@"
     local _rc=$?
-    i18n_t TUI_I18N secrets_return "${_rc}"
-    read -r REPLY || true
-    return 0
+    if [[ "${_rc}" -eq 0 ]]; then
+        tui_render_msgbox "${_label}" "$(i18n_t TUI_I18N secrets_result_ok "${_label}")"
+    else
+        tui_render_msgbox "${_label}" \
+            "$(i18n_t TUI_I18N secrets_result_fail "${_label}" "${_rc}")"
+    fi
+}
+
+# 1. Read-only overview: combine `list` + `gpg list` + `ssh-key list` into one
+# msgbox. NEVER private/secret content (the subcommands only emit names / public
+# material by design). Each fork's failure is folded into the text, not fatal.
+_tui_secrets_overview() {
+    local _text=""
+    _text+="# tokens"$'\n'"$("${TUI_SECRETS}" list 2>&1)"$'\n\n'
+    _text+="# gpg"$'\n'"$("${TUI_SECRETS}" gpg list 2>&1)"$'\n\n'
+    _text+="# ssh-key"$'\n'"$("${TUI_SECRETS}" ssh-key list 2>&1)"
+    tui_render_msgbox "$(i18n_t TUI_I18N secrets_overview_title)" "${_text}"
+}
+
+# 2. Generate SSH key: type menu (ed25519 default / ecdsa / rsa) → fork
+# `ssh-key generate --type <type>` (ssh-keygen prompts the passphrase itself).
+# Cancel on the type menu forks nothing.
+_tui_secrets_ssh_generate() {
+    local _type
+    _type="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
+        "$(i18n_t TUI_I18N secrets_ssh_type_title)" \
+        "$(i18n_t TUI_I18N secrets_ssh_type_help)" \
+        "ed25519" "$(i18n_t TUI_I18N secrets_ssh_type_ed25519)" \
+        "ecdsa"   "$(i18n_t TUI_I18N secrets_ssh_type_ecdsa)" \
+        "rsa"     "$(i18n_t TUI_I18N secrets_ssh_type_rsa)")" || return 0
+    _tui_secrets_run "$(i18n_t TUI_I18N secrets_ssh_gen)" \
+        ssh-key generate --type "${_type}"
+}
+
+# 4 / 5 / 7. input(non-secret arg) → fork the subcommand. Cancel / empty submit
+# (tui_render_input contract) forks nothing.
+#   _tui_secrets_input_then <label> <prompt-key> <setup_secrets args...> <arg-placeholder>
+# The collected value is appended as the LAST setup_secrets argument.
+_tui_secrets_ssh_copy() {
+    local _target
+    _target="$(tui_render_input "$(i18n_t TUI_I18N secrets_ssh_copy)" \
+        "$(i18n_t TUI_I18N secrets_copy_prompt)")" || return 0
+    _tui_secrets_run "$(i18n_t TUI_I18N secrets_ssh_copy)" \
+        ssh-key copy "${_target}"
+}
+
+_tui_secrets_token_set() {
+    local _name
+    _name="$(tui_render_input "$(i18n_t TUI_I18N secrets_token_set)" \
+        "$(i18n_t TUI_I18N secrets_token_prompt)")" || return 0
+    # Only the NAME reaches argv; setup_secrets prompts the value (AC-20).
+    _tui_secrets_run "$(i18n_t TUI_I18N secrets_token_set)" \
+        token set "${_name}"
+}
+
+_tui_secrets_gpg_import() {
+    local _path
+    _path="$(tui_render_input "$(i18n_t TUI_I18N secrets_gpg_import)" \
+        "$(i18n_t TUI_I18N secrets_gpg_import_prompt)")" || return 0
+    _tui_secrets_run "$(i18n_t TUI_I18N secrets_gpg_import)" \
+        gpg import "${_path}"
+}
+
+# Build a pick-menu from one-name-per-line list output. Prints the chosen name
+# on stdout (rc 0); rc 1 when the list is empty (caller shows the empty msgbox)
+# or the user cancels. <names> is newline-separated.
+_tui_secrets_pick() {
+    local _title="$1" _name_lines="$2"
+    local -a _rows=()
+    local _n
+    while IFS= read -r _n; do
+        [[ -n "${_n}" ]] && _rows+=("${_n}" "${_n}")
+    done <<<"${_name_lines}"
+    [[ "${#_rows[@]}" -eq 0 ]] && return 1
+    TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
+        "${_title}" "$(i18n_t TUI_I18N secrets_pick_help)" "${_rows[@]}"
+}
+
+# 8a. Delete Token: pick from `list` → single yesno → fork `remove <name>`
+# (setup_secrets has no `token remove`; the canonical token delete is the
+# top-level `remove <name>`). Token is the lower danger tier (yesno only).
+_tui_secrets_delete_token() {
+    local _names _name
+    if ! _names="$("${TUI_SECRETS}" list 2>/dev/null)"; then
+        tui_render_msgbox "$(i18n_t TUI_I18N secrets_delete_token)" \
+            "$(i18n_t TUI_I18N secrets_list_failed list)"
+        return 0
+    fi
+    _name="$(_tui_secrets_pick "$(i18n_t TUI_I18N secrets_pick_token_title)" \
+        "${_names}")" || {
+        [[ -n "${_names}" ]] || tui_render_msgbox \
+            "$(i18n_t TUI_I18N secrets_delete_token)" \
+            "$(i18n_t TUI_I18N secrets_none_tokens)"
+        return 0
+    }
+    tui_render_yesno "$(i18n_t TUI_I18N secrets_delete_token)" \
+        "$(i18n_t TUI_I18N secrets_confirm_token "${_name}")" || return 0
+    _tui_secrets_run "$(i18n_t TUI_I18N secrets_delete_token)" remove "${_name}"
+}
+
+# 8b. Delete SSH key: pick from the `ssh-key list` public-key basenames →
+# TYPE-TO-CONFIRM (the user must type the exact name; irreversible) → fork
+# `ssh-key remove <name> --yes`. SSH key is the higher danger tier.
+_tui_secrets_delete_ssh() {
+    local _names _name _typed
+    _names="$(_tui_secrets_ssh_names)"
+    _name="$(_tui_secrets_pick "$(i18n_t TUI_I18N secrets_pick_ssh_title)" \
+        "${_names}")" || {
+        [[ -n "${_names}" ]] || tui_render_msgbox \
+            "$(i18n_t TUI_I18N secrets_delete_ssh)" \
+            "$(i18n_t TUI_I18N secrets_none_ssh)"
+        return 0
+    }
+    _typed="$(tui_render_input \
+        "$(i18n_t TUI_I18N secrets_ssh_confirm_title "${_name}")" \
+        "$(i18n_t TUI_I18N secrets_ssh_confirm_prompt "${_name}")")" || return 0
+    [[ "${_typed}" == "${_name}" ]] || return 0
+    _tui_secrets_run "$(i18n_t TUI_I18N secrets_delete_ssh)" \
+        ssh-key remove "${_name}" --yes
+}
+
+# SSH key names = the basenames of ~/.ssh/*.pub as reported by `ssh-key list`
+# ("<path>.pub: <key line>"); the agent-identity section is skipped. One per
+# line on stdout. The TUI re-parses the read-only list rather than touching ~.
+_tui_secrets_ssh_names() {
+    "${TUI_SECRETS}" ssh-key list 2>/dev/null | awk '
+        /^agent identities:/ { exit }
+        /\.pub: / {
+            n = $1; sub(/:$/, "", n); sub(/.*\//, "", n); sub(/\.pub$/, "", n)
+            print n
+        }'
+}
+
+# 8. Delete... category menu: only Token + SSH key (GPG deletion is deferred —
+# setup_secrets has no gpg-delete; design §4 / §10).
+_tui_secrets_delete_menu() {
+    local _cat
+    _cat="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
+        "$(i18n_t TUI_I18N secrets_delete_title)" \
+        "$(i18n_t TUI_I18N secrets_delete_help)" \
+        "del-token" "$(i18n_t TUI_I18N secrets_delete_token)" \
+        "del-ssh"   "$(i18n_t TUI_I18N secrets_delete_ssh)")" || return 0
+    case "${_cat}" in
+        del-token) _tui_secrets_delete_token ;;
+        del-ssh)   _tui_secrets_delete_ssh ;;
+    esac
+}
+
+# Secrets sub-menu loop. Back / ESC on the sub-menu returns to the main menu;
+# every leaf flow returns here. Unlike install/manage this never exits the TUI
+# (secrets management is a side trip, not a pipeline handoff).
+_tui_screen_secrets() {
+    while :; do
+        local _choice
+        _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
+            "$(i18n_t TUI_I18N secrets_title)" \
+            "$(i18n_t TUI_I18N secrets_help)" \
+            "list"       "$(i18n_t TUI_I18N secrets_list)" \
+            "ssh-gen"    "$(i18n_t TUI_I18N secrets_ssh_gen)" \
+            "ssh-load"   "$(i18n_t TUI_I18N secrets_ssh_load)" \
+            "ssh-copy"   "$(i18n_t TUI_I18N secrets_ssh_copy)" \
+            "token-set"  "$(i18n_t TUI_I18N secrets_token_set)" \
+            "gpg-gen"    "$(i18n_t TUI_I18N secrets_gpg_gen)" \
+            "gpg-import" "$(i18n_t TUI_I18N secrets_gpg_import)" \
+            "delete"     "$(i18n_t TUI_I18N secrets_delete)")" || return 0
+        case "${_choice}" in
+            list)       _tui_secrets_overview ;;
+            ssh-gen)    _tui_secrets_ssh_generate ;;
+            ssh-load)   _tui_secrets_run "$(i18n_t TUI_I18N secrets_ssh_load)" ssh-key load ;;
+            ssh-copy)   _tui_secrets_ssh_copy ;;
+            token-set)  _tui_secrets_token_set ;;
+            gpg-gen)    _tui_secrets_run "$(i18n_t TUI_I18N secrets_gpg_gen)" gpg generate ;;
+            gpg-import) _tui_secrets_gpg_import ;;
+            delete)     _tui_secrets_delete_menu ;;
+        esac
+    done
 }
 
 # ── Menu action dispatch ─────────────────────────────────────────────────────

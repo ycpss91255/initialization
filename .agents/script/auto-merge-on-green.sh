@@ -31,6 +31,13 @@
 #                          or failed check, e.g. a required review, or a repo
 #                          with no CI that never merges) before bailing.
 #                          Default 90. 0 disables the grace bail.
+#   --retrigger-grace <s>  How long to tolerate ci=none (no workflow run on the
+#                          head SHA — e.g. a push that lost a concurrency race
+#                          and created no run) before re-triggering CI by
+#                          pushing an empty commit via the git API. Fires at
+#                          most once per run. Default 180. 0 = fire on first
+#                          observation (used by tests).
+#   --no-retrigger         Disable the ci=none re-trigger entirely.
 #   --max-iterations <N>   Iteration cap (default 0 = unlimited; for tests)
 #   -h, --help             Show this help
 #
@@ -60,9 +67,34 @@ err() {
   printf '[auto-merge] ERROR: %s\n' "$*" >&2
 }
 
+# Re-trigger CI when the head SHA has no workflow run at all. Pushes an empty
+# commit (same tree, parent = current head) via the git API so a `synchronize`
+# event fires — no local checkout needed, so it works from a detached Monitor.
+# Best-effort: every step is guarded; returns non-zero on any failure so the
+# caller can keep polling rather than abort.
+_retrigger_ci() {
+  local repo="$1" pr="$2"
+  local pull head_sha branch commit tree_sha new_sha
+  pull=$(gh api "repos/${repo}/pulls/${pr}" 2>/dev/null || echo '')
+  head_sha=$(jq -r '.head.sha // empty' <<< "${pull}" 2>/dev/null)
+  branch=$(jq -r '.head.ref // empty' <<< "${pull}" 2>/dev/null)
+  [[ -n "${head_sha}" && -n "${branch}" ]] || { err "re-trigger: cannot read PR head"; return 1; }
+  commit=$(gh api "repos/${repo}/git/commits/${head_sha}" 2>/dev/null || echo '')
+  tree_sha=$(jq -r '.tree.sha // empty' <<< "${commit}" 2>/dev/null)
+  [[ -n "${tree_sha}" ]] || { err "re-trigger: cannot read head tree"; return 1; }
+  new_sha=$(gh api "repos/${repo}/git/commits" \
+              -f "message=ci: re-trigger (no workflow run on head)" \
+              -f "tree=${tree_sha}" -f "parents[]=${head_sha}" 2>/dev/null \
+            | jq -r '.sha // empty' 2>/dev/null)
+  [[ -n "${new_sha}" ]] || { err "re-trigger: cannot create empty commit"; return 1; }
+  gh api "repos/${repo}/git/refs/heads/${branch}" -X PATCH -f "sha=${new_sha}" >/dev/null 2>&1 \
+    || { err "re-trigger: cannot move branch ref"; return 1; }
+  return 0
+}
+
 main() {
   local repo="" pr="" merge_method="squash" delete_branch=1 arm=1
-  local interval=30 grace=90 max_iter=0
+  local interval=30 grace=90 max_iter=0 retrigger=1 retrigger_grace=180
 
   while (( $# > 0 )); do
     case "$1" in
@@ -74,6 +106,8 @@ main() {
       --no-arm) arm=0; shift ;;
       --interval) interval="$2"; shift 2 ;;
       --grace) grace="$2"; shift 2 ;;
+      --retrigger-grace) retrigger_grace="$2"; shift 2 ;;
+      --no-retrigger) retrigger=0; shift ;;
       --max-iterations) max_iter="$2"; shift 2 ;;
       *) err "unknown arg: $1"; usage; exit 2 ;;
     esac
@@ -83,6 +117,7 @@ main() {
   [[ "${pr}" =~ ^[0-9]+$ ]] || { err "--pr must be a number (got: ${pr:-})"; exit 2; }
   case "${merge_method}" in squash|merge|rebase) : ;; *) err "--merge-method must be squash|merge|rebase"; exit 2 ;; esac
   [[ "${grace}" =~ ^[0-9]+$ ]] || { err "--grace must be a non-negative integer"; exit 2; }
+  [[ "${retrigger_grace}" =~ ^[0-9]+$ ]] || { err "--retrigger-grace must be a non-negative integer"; exit 2; }
 
   # Arm GitHub native auto-merge. Non-fatal on error: the PR may already be
   # armed, or already mergeable (GitHub merges immediately) — the poll loop
@@ -95,7 +130,7 @@ main() {
     fi
   fi
 
-  local prev="" iter=0 blocked_since=0 now
+  local prev="" iter=0 blocked_since=0 noci_since=0 retriggered=0 now
   while true; do
     iter=$((iter + 1))
 
@@ -154,6 +189,28 @@ main() {
     # nudge it. Re-triggers CI; next polls re-evaluate the new head.
     if [[ "${mss}" == "BEHIND" ]]; then
       gh pr update-branch "${pr}" --repo "${repo}" >/dev/null 2>&1 || true
+    fi
+
+    # No workflow run on the head at all (ci=none) — e.g. a push that lost a
+    # concurrency race created no run, so auto-merge would wait forever. After
+    # retrigger_grace seconds, push an empty commit to force a run. Once per
+    # run (retriggered guard) so we don't spam the branch. BEHIND/DIRTY are
+    # handled above; only act on an otherwise-OPEN, run-less head.
+    if (( retrigger )) && [[ "${ci}" == "none" && "${mss}" != "BEHIND" && "${mss}" != "DIRTY" ]]; then
+      now=$(date -u +%s)
+      if (( noci_since == 0 )); then noci_since=${now}; fi
+      if (( ! retriggered && now - noci_since >= retrigger_grace )); then
+        printf 'PR%s: no CI run on head for >=%ss — re-triggering via empty commit\n---\n' "${pr}" "${retrigger_grace}"
+        if _retrigger_ci "${repo}" "${pr}"; then
+          printf '[retrigger] pushed an empty commit to force a CI run\n'
+        else
+          printf '[retrigger] re-trigger failed; will keep polling\n'
+        fi
+        retriggered=1
+        noci_since=0
+      fi
+    else
+      noci_since=0
     fi
 
     # Grace bail: BLOCKED with nothing pending and no failed check means

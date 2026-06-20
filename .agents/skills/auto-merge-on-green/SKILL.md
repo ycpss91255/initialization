@@ -37,6 +37,7 @@ The script:
 | `mergeStateStatus=DIRTY` | exit 1 — merge conflict, rebase needed |
 | required check failed (`ci=fail` + `BLOCKED`) | exit 1, report — **auto-merge left armed**, so a fix-push merges automatically |
 | `CLEAN`/`UNSTABLE`/pending | keep waiting for `MERGED` |
+| `ci=none` (no workflow run on the head) past `--retrigger-grace` (default 180s) | push an empty commit via the git API to force a CI run — fires at most once per run; `--no-retrigger` disables. Closes the "pushed but no CI triggered" gap (a push that lost the concurrency race) without a local checkout |
 | `BLOCKED` with nothing pending/failed past `--grace` (default 90s) | exit 1 — blocked by a non-CI gate (e.g. required review) or a repo whose requirements never clear |
 | no PR / empty view | exit 1 — nothing to merge |
 

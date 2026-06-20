@@ -1075,19 +1075,48 @@ EOF
     assert_output "install eza -y"
 }
 
-@test "e2e: Exit drops in-memory selections with zero file writes (fs snapshot)" {
+@test "e2e: Exit with pending selections asks the guard, then drops them (#206)" {
     tui_e2e_make_harness
+    # optional → check eza+zoxide (accumulator now has 2) → main-menu Exit →
+    # guard yesno → confirm leave (rc 0 = Yes).
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
 0|eza\nzoxide\n
 1|
+0|
 EOF
     tui_e2e_run
     assert_success
-    # Selections lived ONLY in TUI process memory: nothing under $HOME...
+    # Q43 holds: selections lived only in TUI memory, nothing under $HOME...
     run find "${E2E_HOME}" -mindepth 1
     assert_output ""
-    # ...and no install was ever forked.
+    # ...and no install was ever forked (confirming Exit, not Proceed).
     run grep -c "^install" "${E2E_CLI_LOG}"
     assert_failure
+}
+
+@test "e2e: Exit guard decline keeps the menu open; second confirm exits (#206)" {
+    tui_e2e_make_harness
+    # optional → check eza → Exit → guard NO (rc 1 = stay) → Exit again →
+    # guard YES (rc 0 = leave). Still zero writes / no fork.
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|optional
+0|eza\n
+1|
+1|
+1|
+0|
+EOF
+    tui_e2e_run
+    assert_success
+    run find "${E2E_HOME}" -mindepth 1
+    assert_output ""
+    run grep -c "^install" "${E2E_CLI_LOG}"
+    assert_failure
+}
+
+@test "main installs a SIGINT trap that restores the cursor and exits 130 (#206)" {
+    run grep -nE "trap 'printf .* exit 130' INT" \
+        "${REPO_ROOT}/setup_ubuntu_tui.sh"
+    assert_success
 }

@@ -130,10 +130,15 @@ EOF
 
 @test "AC-10 (whiptail): Exit drops selections — exit 0, zero file writes, no fork" {
     tui_e2e_make_harness whiptail
+    # optional → check eza+zoxide → main-menu Exit (rc 1) → exit guard yesno
+    # (rc 0 = Yes, confirm leave). The 4th response is required since #206 added
+    # the guard to BOTH backends; without it the TUI blocks on the guard prompt
+    # (this is what deadlocked the core-2 kcov shard with no per-test timeout).
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
 0|eza\nzoxide\n
 1|
+0|
 EOF
     tui_e2e_run
     assert_success

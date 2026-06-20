@@ -177,11 +177,6 @@ TUI_CATEGORY_ORDER='["base","recommended","optional","experimental"]'
 : "${TUI_WIDTH:=72}"
 : "${TUI_MENU_HEIGHT:=10}"
 
-# Sentinel tag for a non-selectable main-menu separator row (#169). The
-# dispatch loop ignores it; both dialog and whiptail render arbitrary
-# tag/item rows, so a divider row works identically on both backends.
-: "${TUI_MENU_SEPARATOR:=-}"
-
 # Checklist chrome (#168): dialog/whiptail render a --checklist row as
 # "[status] <tag>   <item>". The fixed overhead is the checkbox + its gutter
 # plus the gutter between the tag column and the item — empirically 8 cols on
@@ -782,23 +777,15 @@ _tui_category_entry() {
     esac
 }
 
-# #169 non-selectable divider row: sentinel tag + a box-drawing rule in the
-# label column, empty description. The main loop's _tui_dispatch ignores the
-# sentinel tag, so landing on it is a harmless no-op on both backends.
-_tui_menu_separator() {
-    printf '%s\t──────────────\t\n' "${TUI_MENU_SEPARATOR}"
-}
-
 # Full §8.1 main-menu rows ("tag<TAB>label<TAB>description" per line).
 # Category rows are derived from the live payload, so empty categories
 # disappear and future non-empty ones appear without a spec change (Q44).
 tui_main_menu_entries() {
     local _json="$1" _cat
 
-    # #169: three logical groups, divided by non-selectable separator rows
-    # (sentinel tag TUI_MENU_SEPARATOR). A divider row renders identically on
-    # dialog and whiptail (both accept arbitrary tag/item rows); the main loop
-    # treats the sentinel as a no-op so it never dispatches an action.
+    # Three logical groups, in order (no separator rows: gum/whiptail have no
+    # non-selectable row, so a divider could be landed on and was confusing —
+    # #216 removed them; ordering conveys the grouping):
     #   Group 1 — build the pick: quick-setup + category browse rows
     #   Group 2 — manage / info:  manage, secrets, sysinfo
     #   Group 3 — action:         run (the only batch execution point, Q43)
@@ -808,7 +795,6 @@ tui_main_menu_entries() {
     while IFS= read -r _cat; do
         _tui_category_entry "${_json}" "${_cat}"
     done < <(tui_categories "${_json}")
-    _tui_menu_separator
     printf 'manage\t%s\t%s\n' \
         "$(i18n_t TUI_BACKEND_I18N menu_manage_label)" \
         "$(i18n_t TUI_BACKEND_I18N menu_manage_desc)"
@@ -818,7 +804,6 @@ tui_main_menu_entries() {
     printf 'sysinfo\t%s\t%s\n' \
         "$(i18n_t TUI_BACKEND_I18N menu_sysinfo_label)" \
         "$(i18n_t TUI_BACKEND_I18N menu_sysinfo_desc)"
-    _tui_menu_separator
     # §8.1 < Run > — the ONLY batch execution point (Q43). Rendered as the
     # last menu row because a second action button next to OK exists only
     # on dialog (--extra-button), not whiptail; a row keeps both backends

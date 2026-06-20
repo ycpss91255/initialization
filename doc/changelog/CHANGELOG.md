@@ -113,8 +113,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
-- **`setup_ubuntu_tui.sh --lang <code>` forces the UI language** (en|zh-TW|
-  zh-CN|ja) for the session, overriding the source-time resolution (env >
+- **TUI exit guard** (#206): pressing Exit on the main menu with unsent
+  selections now asks to confirm before discarding them (empty selection
+  leaves immediately; Q43 still holds — zero file writes either way). The
+  clean-Ctrl+C SIGINT trap originally bundled here is deferred to a follow-up:
+  a signal trap inside the TUI subprocess deadlocks kcov ptrace in the coverage
+  unit shard, so it needs a kcov-safe reimplementation.
+
+- **`setup_ubuntu_tui.sh --lang <code>` forces the UI language** (en|zh-TW)
+  for the session, overriding the source-time resolution (env >
   config `ui.lang` > `$LANG`). `just tui --lang=zh-TW` now renders the TUI in
   zh-TW without touching `$LANG` or config. An invalid value is not a usage
   error — `i18n_sanitize_lang` downgrades it to `en` with a bilingual warning,

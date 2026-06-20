@@ -40,6 +40,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **`setup_apt_mirror` no-op detection was dead code** (#152, via #172): a brace
+  typo `cmp -s "{$_file}"` (instead of `"${_file}"`) made `cmp` open a literal
+  `{/path` that never exists, so it always reported "differ" — the branch that
+  detects "the mirror rewrite changed nothing" never fired, silently treating a
+  no-op as success. Fixed both occurrences in `lib/general.sh`. Added a
+  regression test for the no-op path (the existing apt-mirror tests only
+  exercised the positive rewrite, where the typo is invisible). Thanks to
+  @Jah-yee for the fix.
+
 - **whiptail multi-select descriptions truncated at the wrong boundary under
   zh-TW / ja**: `_tui_clip` / `_tui_clip_budget` measured by character count, so
   double-width CJK glyphs over-ran the whiptail box and the clip cut at the wrong

@@ -482,7 +482,7 @@ function setup_apt_mirror() {
                     fi
 
                     exec_cmd "sed -E -i.bak 's|${_origin_url}|${_mirror_url}|g' ${_file}"
-                    if cmp -s "{$_file}" "${_file}.bak"; then
+                    if cmp -s "${_file}" "${_file}.bak"; then
                         log_warn "Failed to setup APT source mirror in file: ${_file}, ${_origin_url} -> ${_mirror_url}"
                     else
                         log_debug "Successfully setup APT source mirror in file: ${_file}, ${_origin_url} -> ${_mirror_url}"
@@ -502,7 +502,7 @@ function setup_apt_mirror() {
             fi
 
             exec_cmd "sed -E -i.bak 's|${_origin_url}|${_mirror_url}|g' ${_file}"
-            if cmp -s "{$_file}" "${_file}.bak"; then
+            if cmp -s "${_file}" "${_file}.bak"; then
                 log_error "Failed to setup APT source mirror in file: ${_file}, ${_origin_url} -> ${_mirror_url}"
                 return 0
             fi

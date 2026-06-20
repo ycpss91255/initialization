@@ -25,12 +25,17 @@ module/config/fish/fish_variables*
 # Project-wide config (hooks, enabled plugins) lives in tracked .claude/settings.json.
 .claude/settings.local.json
 .claude/cache/
+# Claude Code agent/workflow git worktrees — transient per-task checkouts it
+# creates here at runtime (auto-cleaned). Runtime scratch, never vendored.
+.claude/worktrees/
 
-# Claude Code session state: ignore everything under projects/ EXCEPT memory/.
-# JSONL transcripts and session sidecar dirs are large + contain privacy data.
+# Claude Code session state: ignore everything under projects/ (JSONL
+# transcripts + session sidecar dirs are large + contain privacy data). Memory
+# now lives canonically under .agents/memory/ (tool-agnostic, shareable);
+# .claude/projects/memory is a compat symlink into it so Claude's HOME-side
+# projects symlink keeps resolving. Track the symlink (no trailing slash).
 .claude/projects/*
-!.claude/projects/memory/
-!.claude/projects/memory/**
+!.claude/projects/memory
 
 # Other agent CLIs' local state
 skills-lock.json
@@ -45,6 +50,8 @@ skills-lock.json
 # ignored, so .agents is ignored at the contents level (/*) with layer-by-layer
 # negations. The .claude/skills symlink itself is tracked (no rule ignores it).
 .agents/*
+!.agents/memory
+!.agents/memory/**
 !.agents/skills
 .agents/skills/*
 !.agents/skills/auto-merge-on-green

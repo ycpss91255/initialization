@@ -426,6 +426,24 @@ teardown() {
     assert_output "origin.example.com"
 }
 
+@test "setup_apt_mirror reports a no-op when the origin URL is absent (regression #152)" {
+    # The {\$_file} typo (#152) made cmp open a literal '{/path' that never
+    # exists, so cmp always reported "differ" and the no-op branch (post-sed
+    # file identical to its .bak) was dead code: a run that changes nothing was
+    # silently treated as success. This is the ONLY branch the typo affected —
+    # the positive / directory / dry-run tests above all pass even WITH the bug,
+    # which is why it slipped through. A no-op must be detected and reported.
+    local _f="${INIT_UBUNTU_TEST_SCRATCH}/noop.list"
+    printf 'deb http://archive.ubuntu.com/ubuntu noble main\n' > "${_f}"
+    run bash -c "
+        export EXEC_CMD_NO_PRINT=true
+        source '${LIB_DIR}/general.sh'
+        setup_apt_mirror --path '${_f}' -- 'mirror.example.com' 'not-present.example.com'
+    "
+    assert_success
+    assert_output --partial "Failed to setup APT source mirror"
+}
+
 # ── apt_pkg_manager (sudo / apt-get / dpkg-query stubbed — never real) ───────
 
 @test "apt_pkg_manager rejects --no-update outside the install action" {

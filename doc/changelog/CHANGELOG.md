@@ -22,6 +22,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **gum TUI screens did not show how to select or go back**: the gum menu /
+  checklist relied on gum's native footer, which is easy to miss / can be
+  clipped and never advertises `Esc`, while the passed-in help text described
+  whiptail's `< OK >` / `< Back >` buttons (which gum has no equivalent for).
+  Added localized keybind hints to the gum header (`gum_keys_menu` /
+  `gum_keys_checklist` in `TUI_BACKEND_I18N`) plus an explicit `--show-help`,
+  so every gum screen shows `space/x: toggle · enter: confirm · esc: back`
+  (menus: `enter: select · esc: back`). gum-only — whiptail renders the
+  buttons natively. (gum toggles a multi-select row with space or x.) 2 new
+  unit cases.
+
 - **TUI main-menu description column was ragged under zh-TW / ja** (CJK
   alignment): `_tui_main_loop` padded the menu label with `printf '%-22s'`,
   which counts characters, not terminal columns — East-Asian Wide labels

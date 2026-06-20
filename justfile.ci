@@ -32,6 +32,16 @@
 # (env_var_or_default mirrors the Makefile `ifeq origin undefined`).
 export TEST_TOOLS_IMAGE := env_var_or_default('TEST_TOOLS_IMAGE', `./script/ci/resolve_test_tools_tag.sh`)
 
+# ── Content-keyed kcov-tools image tag (issue #226) ──────────────────────────
+# The coverage path runs in a baked kcov image (kcov/kcov + the bats
+# toolchain — dockerfile/Dockerfile.kcov-tools) so per-shard kcov jobs skip
+# the ~20-30s runtime apt-install. Same content-keyed scheme as test-tools:
+# kcov-tools:<sha256(Dockerfile.kcov-tools) first 12>, resolved by
+# script/ci/resolve_kcov_tools_tag.sh and exported so compose.yaml
+# (${KCOV_TOOLS_IMAGE:-kcov/kcov}) and ci.sh see the same value. An explicit
+# KCOV_TOOLS_IMAGE=<ref> wins (CI prebuilt path / manual pinning).
+export KCOV_TOOLS_IMAGE := env_var_or_default('KCOV_TOOLS_IMAGE', `./script/ci/resolve_kcov_tools_tag.sh`)
+
 # ── Help ─────────────────────────────────────────────────────────────────────
 
 # Show available recipes (replaces the Makefile `help` target).
@@ -52,6 +62,14 @@ default:
 # `build-test-tools` exactly like the old prerequisite.
 _ensure-image:
     @[ "${TEST_TOOLS_PREBUILT:-}" = "1" ] || just -f justfile.ci build-test-tools
+
+# Coverage counterpart of _ensure-image (issue #226): the kcov path runs in
+# the baked kcov-tools image. compose.yaml resolves ${KCOV_TOOLS_IMAGE} to a
+# content-keyed local tag, so it must exist before the coverage service
+# runs. Build it locally unless CI prebuilt + loaded it (KCOV_TOOLS_PREBUILT=1,
+# parallel to TEST_TOOLS_PREBUILT for the test-tools image).
+_ensure-kcov-image:
+    @[ "${KCOV_TOOLS_PREBUILT:-}" = "1" ] || just -f justfile.ci build-kcov-tools
 
 # ── Development ──────────────────────────────────────────────────────────────
 
@@ -84,7 +102,7 @@ lint: _ensure-image
     ./script/ci/ci.sh --lint-only
 
 # Run ShellCheck + Bats + kcov coverage report.
-coverage: _ensure-image
+coverage: _ensure-kcov-image
     ./script/ci/ci.sh --coverage
 
 # ── Per-shard coverage + merge (CI; issue #28) ───────────────────────────────
@@ -99,12 +117,12 @@ coverage: _ensure-image
 # it report-only ($COVERAGE_ENFORCE=false — see ci.sh / ci.yaml).
 # Local dev keeps `coverage` (full kcov run, unit + integration).
 
-# Run unit bats once under kcov (optional MODULE=<name>|core) → coverage/shard-*.
-coverage-unit module="": _ensure-image
+# Run unit bats once under kcov (optional MODULE=<name>|core|core-<N>) → coverage/shard-*.
+coverage-unit module="": _ensure-kcov-image
     ./script/ci/ci.sh --unit-only --kcov {{ if module != "" { "--module " + module } else { "" } }}
 
 # Merge coverage/*shard-* + assert coverage gate (>= $COVERAGE_MIN, default 80; AC-17) on merged result.
-coverage-merge: _ensure-image
+coverage-merge: _ensure-kcov-image
     ./script/ci/ci.sh --merge-coverage
 
 # ── Image build ──────────────────────────────────────────────────────────────
@@ -121,6 +139,20 @@ build-test-tools:
         exit 1; }
     docker build -t "${TEST_TOOLS_IMAGE}" -f dockerfile/Dockerfile.test-tools .
     docker tag "${TEST_TOOLS_IMAGE}" test-tools:local
+
+# Builds the content-keyed kcov-tools tag (issue #226) and re-points the
+# legacy `kcov-tools:local` alias at it. The coverage service uses this
+# baked image (kcov/kcov + bats toolchain) so per-shard kcov jobs skip the
+# runtime apt-install.
+#
+# Build the content-keyed kcov-tools image (+ kcov-tools:local alias).
+build-kcov-tools:
+    @test -n "${KCOV_TOOLS_IMAGE}" || { \
+        echo "ERROR: could not resolve kcov-tools image tag" \
+             "(script/ci/resolve_kcov_tools_tag.sh failed — see stderr above)" >&2; \
+        exit 1; }
+    docker build -t "${KCOV_TOOLS_IMAGE}" -f dockerfile/Dockerfile.kcov-tools .
+    docker tag "${KCOV_TOOLS_IMAGE}" kcov-tools:local
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 

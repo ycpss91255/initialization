@@ -121,7 +121,12 @@ Unit-scope filter (combine with --unit-only / --ci-unit; issue #31):
                         (missing spec = skip, exits 0 — per-module CI
                         matrix includes modules without specs yet)
   --module core         Only run the non-module unit specs (engine/lib/
-                        hook/script/template specs)
+                        hook/script/template specs) as a single shard
+  --module core-<N>     Only run the Nth (0-based) round-robin sub-shard
+                        of the core specs out of $CORE_SHARD_COUNT
+                        (default 4); the CI core matrix runs these in
+                        parallel like the per-module matrix (issue #226).
+                        Shard output: coverage/shard-core-<N>
 
   -h, --help            Show this help
 EOF
@@ -221,16 +226,24 @@ _run_fish_syntax() {
 # ── Hadolint ─────────────────────────────────────────────────────────────────
 
 _run_hadolint() {
-    if [[ ! -f "${REPO_ROOT}/dockerfile/Dockerfile.test-tools" ]]; then
-        _info "Hadolint: no Dockerfile.test-tools — skipping"
-        return 0
-    fi
     if ! command -v hadolint >/dev/null 2>&1; then
         _info "Hadolint: hadolint not in PATH — skipping"
         return 0
     fi
-    _info "Running Hadolint on dockerfile/Dockerfile.test-tools"
-    hadolint "${REPO_ROOT}/dockerfile/Dockerfile.test-tools"
+    # Lint every repo Dockerfile (test-tools + kcov-tools, issue #226); a
+    # missing file is skipped rather than failing (bootstrap-friendly).
+    local _df _checked=0
+    for _df in "${REPO_ROOT}/dockerfile/Dockerfile.test-tools" \
+               "${REPO_ROOT}/dockerfile/Dockerfile.kcov-tools"; do
+        [[ -f "${_df}" ]] || continue
+        _info "Running Hadolint on ${_df#"${REPO_ROOT}/"}"
+        hadolint "${_df}"
+        _checked=$((_checked + 1))
+    done
+    if [[ "${_checked}" -eq 0 ]]; then
+        _info "Hadolint: no Dockerfile to check — skipping"
+        return 0
+    fi
     _info "Hadolint OK"
 }
 
@@ -285,27 +298,73 @@ _bats_unit() {
     # exist on a fresh checkout ("kcov: error: Can't write helper").
     mkdir -p "${_out}"
     _info "kcov shard output: ${_out}"
-    kcov \
+    # Bound the kcov run: a test that hangs under kcov ptrace (deep fork trees
+    # can deadlock) must fail FAST with the last-run TAP line visible, not stall
+    # the CI job for the full GitHub timeout. Tunable via KCOV_BATS_TIMEOUT.
+    local _kcov_timeout="${KCOV_BATS_TIMEOUT:-900}"
+    local _kcov_rc=0
+    timeout "${_kcov_timeout}" kcov \
         --include-path="${REPO_ROOT}" \
         --exclude-path="$(_kcov_exclude_path)" \
         --exclude-region='kcov-exclude-start:kcov-exclude-end' \
         "${_out}" \
-        bats "$@"
+        bats "$@" || _kcov_rc=$?
     # kcov leaves absolute-path convenience symlinks (e.g. bats →
     # /source/coverage/...) that dangle outside the container and can
     # break the per-shard artifact upload — prune them. `kcov --merge`
     # reads the real bats.<hash>/ data dirs, not the symlinks.
     find "${_out}" -maxdepth 1 -type l -delete
+    if (( _kcov_rc == 124 )); then
+        _die "kcov bats run exceeded ${_kcov_timeout}s — a test is hanging under kcov (see the TAP output above for the last test before the stall)."
+    fi
+    return "${_kcov_rc}"
+}
+
+# Enumerate the non-module ("core") unit specs in a deterministic order.
+# Populates the caller-named array (nameref) with the sorted spec paths so
+# every shard splits the SAME ordered list — gaps/overlap impossible.
+# find ... -print0 | sort -z makes the order stable across runs and hosts.
+_find_core_specs_sorted() {
+    local -n _out_arr="$1"
+    _out_arr=()
+    local _f
+    while IFS= read -r -d '' _f; do
+        _out_arr+=("${_f}")
+    done < <(find "${REPO_ROOT}/test/unit" -type f -name '*.bats' \
+                 ! -path "${REPO_ROOT}/test/unit/module/*" -print0 \
+             | sort -z)
+}
+
+# Deterministic round-robin partition of the sorted core specs: shard <idx>
+# (0-based) gets every spec whose position in the sorted list is congruent
+# to <idx> modulo <count>. Round-robin (vs contiguous slices) keeps the
+# per-shard spec count balanced to within 1 even when a few specs dominate
+# the runtime, and the union of all <count> shards is exactly the full set
+# with no overlap. Populates the caller-named array (nameref).
+_partition_core_specs_for_shard() {
+    local -n _dst_arr="$1"
+    local _idx="$2" _count="$3"
+    local -a _all=()
+    _find_core_specs_sorted _all
+    _dst_arr=()
+    local _i
+    for ((_i = _idx; _i < ${#_all[@]}; _i += _count)); do
+        _dst_arr+=("${_all[_i]}")
+    done
 }
 
 # Scope: honors MODULE_FILTER (set via --module; issue #31, PRD M10):
-#   ""      — full unit tree (default; unchanged behaviour)
-#   core    — every unit spec EXCEPT test/unit/module/ (engine/lib/hook/
-#             script/template specs); the per-module CI matrix runs these
-#             in a single `test-unit (core)` job
-#   <name>  — only test/unit/module/<name>_spec.bats; a missing spec is a
-#             skip (exit 0) so matrix jobs for not-yet-specced modules
-#             stay green instead of failing the shard
+#   ""        — full unit tree (default; unchanged behaviour)
+#   core      — every unit spec EXCEPT test/unit/module/ (engine/lib/hook/
+#               script/template specs) as ONE shard; the legacy single
+#               `test-unit (core)` job (kept for local dev + back-compat)
+#   core-<N>  — the Nth (0-based) round-robin sub-shard of the core specs
+#               out of CORE_SHARD_COUNT (default 4); the CI core matrix
+#               runs these in parallel like the per-module matrix (#226).
+#               Shard output: coverage/shard-core-<N>
+#   <name>    — only test/unit/module/<name>_spec.bats; a missing spec is a
+#               skip (exit 0) so matrix jobs for not-yet-specced modules
+#               stay green instead of failing the shard
 _run_unit() {
     if [[ ! -d "${REPO_ROOT}/test/unit" ]]; then
         _info "test/unit/ does not exist yet — skipping (Phase 1 bootstrap)"
@@ -320,14 +379,31 @@ _run_unit() {
         core)
             _info "Running Bats unit tests (core: non-module specs)"
             local -a _specs=()
-            local _f
-            while IFS= read -r -d '' _f; do
-                _specs+=("${_f}")
-            done < <(find "${REPO_ROOT}/test/unit" -type f -name '*.bats' \
-                         ! -path "${REPO_ROOT}/test/unit/module/*" -print0 \
-                     | sort -z)
+            _find_core_specs_sorted _specs
             if [[ "${#_specs[@]}" -eq 0 ]]; then
                 _info "  no core unit specs found — skipping"
+                return 0
+            fi
+            _bats_unit "${BATS_ARGS_ARR[@]}" "${_specs[@]}"
+            ;;
+        core-*)
+            # core-<N>: one round-robin sub-shard of the core specs (#226).
+            local _shard_idx="${MODULE_FILTER#core-}"
+            local _shard_count="${CORE_SHARD_COUNT:-4}"
+            if [[ ! "${_shard_idx}" =~ ^[0-9]+$ ]]; then
+                _die "Invalid core shard index in --module ${MODULE_FILTER} (expected core-<N>, N a non-negative integer)"
+            fi
+            if [[ ! "${_shard_count}" =~ ^[1-9][0-9]*$ ]]; then
+                _die "Invalid CORE_SHARD_COUNT='${_shard_count}' (expected a positive integer)"
+            fi
+            if (( _shard_idx >= _shard_count )); then
+                _die "core shard index ${_shard_idx} out of range for CORE_SHARD_COUNT=${_shard_count} (valid: 0..$((_shard_count - 1)))"
+            fi
+            _info "Running Bats unit tests (core shard ${_shard_idx}/${_shard_count}: round-robin non-module specs)"
+            local -a _specs=()
+            _partition_core_specs_for_shard _specs "${_shard_idx}" "${_shard_count}"
+            if [[ "${#_specs[@]}" -eq 0 ]]; then
+                _info "  no core unit specs in shard ${_shard_idx} — skipping"
                 return 0
             fi
             _bats_unit "${BATS_ARGS_ARR[@]}" "${_specs[@]}"
@@ -489,6 +565,17 @@ _run_in_container() {
             || _die "failed to resolve content-keyed test-tools image tag (issue #113)"
     fi
     export TEST_TOOLS_IMAGE
+    # The coverage service runs the baked kcov-tools image (issue #226) so
+    # the per-shard kcov jobs skip the runtime apt-install. Resolve its
+    # content-keyed tag (or honor a pre-set KCOV_TOOLS_IMAGE: CI prebuilt
+    # path / manual override) and export it for compose's
+    # ${KCOV_TOOLS_IMAGE:-kcov/kcov} substitution. Fallback stays kcov/kcov
+    # (ci.sh then apt-installs the toolchain on demand).
+    if [[ "${_service}" == "coverage" && -z "${KCOV_TOOLS_IMAGE:-}" ]]; then
+        KCOV_TOOLS_IMAGE="$("${SCRIPT_DIR}/resolve_kcov_tools_tag.sh")" \
+            || _die "failed to resolve content-keyed kcov-tools image tag (issue #226)"
+    fi
+    export KCOV_TOOLS_IMAGE="${KCOV_TOOLS_IMAGE:-}"
     docker compose -f "${REPO_ROOT}/compose.yaml" run --rm \
         -e HOST_UID="$(id -u)" \
         -e HOST_GID="$(id -g)" \
@@ -496,6 +583,7 @@ _run_in_container() {
         -e SYNC_E2E="${SYNC_E2E:-0}" \
         -e COVERAGE_MIN="${COVERAGE_MIN:-}" \
         -e COVERAGE_ENFORCE="${COVERAGE_ENFORCE:-}" \
+        -e CORE_SHARD_COUNT="${CORE_SHARD_COUNT:-}" \
         -e INIT_UBUNTU_TEST_IMAGE="${INIT_UBUNTU_TEST_IMAGE:-}" \
         "${_service}" \
         -c "./script/ci/ci.sh ${_container_flag}"

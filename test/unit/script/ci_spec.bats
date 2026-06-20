@@ -35,6 +35,14 @@ setup() {
     printf 'FROM alpine:3.20\n' \
         > "${FIXTURE_ROOT}/dockerfile/Dockerfile.test-tools"
 
+    # The coverage compose route resolves the content-keyed kcov-tools tag
+    # (issue #226) from a sibling helper + dockerfile/Dockerfile.kcov-tools —
+    # mirror both into the fixture too.
+    cp "${REPO_ROOT}/script/ci/resolve_kcov_tools_tag.sh" \
+       "${FIXTURE_ROOT}/script/ci/resolve_kcov_tools_tag.sh"
+    printf 'FROM kcov/kcov\n' \
+        > "${FIXTURE_ROOT}/dockerfile/Dockerfile.kcov-tools"
+
     # Fixture unit specs (content never executed — bats is stubbed).
     printf '#!/usr/bin/env bats\n' \
         > "${FIXTURE_ROOT}/test/unit/module/alpha_spec.bats"
@@ -291,4 +299,104 @@ EOF
     run cat "${STUB_CALL_LOG}/docker.calls"
     assert_success
     assert_output --partial "TEST_TOOLS_IMAGE=test-tools:pinned"
+}
+
+# ── kcov-tools image resolution (issue #226) ─────────────────────────────────
+
+@test "coverage route exports the content-keyed KCOV_TOOLS_IMAGE to compose (issue #226)" {
+    cat > "${FIXTURE_ROOT}/bin/docker" <<'EOF'
+#!/usr/bin/env bash
+printf 'KCOV_TOOLS_IMAGE=%s\n' "${KCOV_TOOLS_IMAGE:-<unset>}" \
+    >> "${STUB_CALL_LOG}/docker.calls"
+EOF
+    chmod +x "${FIXTURE_ROOT}/bin/docker"
+
+    local _expected
+    _expected="kcov-tools:$(sha256sum \
+        "${FIXTURE_ROOT}/dockerfile/Dockerfile.kcov-tools" | cut -c1-12)"
+
+    KCOV_TOOLS_IMAGE='' run "${CI_SH}" --unit-only --kcov --module core
+    assert_success
+
+    run cat "${STUB_CALL_LOG}/docker.calls"
+    assert_success
+    assert_output --partial "KCOV_TOOLS_IMAGE=${_expected}"
+}
+
+@test "coverage route honors a pre-set KCOV_TOOLS_IMAGE override (issue #226)" {
+    cat > "${FIXTURE_ROOT}/bin/docker" <<'EOF'
+#!/usr/bin/env bash
+printf 'KCOV_TOOLS_IMAGE=%s\n' "${KCOV_TOOLS_IMAGE:-<unset>}" \
+    >> "${STUB_CALL_LOG}/docker.calls"
+EOF
+    chmod +x "${FIXTURE_ROOT}/bin/docker"
+
+    KCOV_TOOLS_IMAGE="kcov-tools:pinned" run "${CI_SH}" \
+        --unit-only --kcov --module core
+    assert_success
+
+    run cat "${STUB_CALL_LOG}/docker.calls"
+    assert_success
+    assert_output --partial "KCOV_TOOLS_IMAGE=kcov-tools:pinned"
+}
+
+# ── Core sub-shard partitioning (issue #226) ─────────────────────────────────
+# Round-robin split of the sorted non-module specs into CORE_SHARD_COUNT
+# shards; the union of all shards is exactly the full set, pairwise-disjoint.
+
+@test "--ci-unit --module core-<N> --kcov writes coverage/shard-core-<N>" {
+    # Add a few more core specs so the round-robin split is observable.
+    printf '#!/usr/bin/env bats\n' \
+        > "${FIXTURE_ROOT}/test/unit/aaa_spec.bats"
+    printf '#!/usr/bin/env bats\n' \
+        > "${FIXTURE_ROOT}/test/unit/bbb_spec.bats"
+
+    CORE_SHARD_COUNT=4 run "${CI_SH}" --ci-unit --module core-0 --kcov
+    assert_success
+
+    run cat "${STUB_CALL_LOG}/kcov.calls"
+    assert_success
+    assert_output --partial "${FIXTURE_ROOT}/coverage/shard-core-0 bats"
+    [[ -d "${FIXTURE_ROOT}/coverage/shard-core-0" ]]
+}
+
+@test "core-<N> round-robin shards partition the core specs with no gap/overlap" {
+    # Five sorted core specs: aaa, bbb, ccc, ddd, core_thing.
+    printf '#!/usr/bin/env bats\n' > "${FIXTURE_ROOT}/test/unit/aaa_spec.bats"
+    printf '#!/usr/bin/env bats\n' > "${FIXTURE_ROOT}/test/unit/bbb_spec.bats"
+    printf '#!/usr/bin/env bats\n' > "${FIXTURE_ROOT}/test/unit/ccc_spec.bats"
+    printf '#!/usr/bin/env bats\n' > "${FIXTURE_ROOT}/test/unit/ddd_spec.bats"
+
+    local _shard
+    for _shard in 0 1 2 3; do
+        CORE_SHARD_COUNT=4 run "${CI_SH}" \
+            --ci-unit --module "core-${_shard}" --kcov
+        assert_success
+    done
+
+    # Every core spec must appear exactly once across the 4 shards' kcov runs.
+    local _spec
+    for _spec in aaa bbb ccc ddd core_thing; do
+        run grep -c "${_spec}_spec.bats" "${STUB_CALL_LOG}/kcov.calls"
+        assert_success
+        assert_output "1"
+    done
+}
+
+@test "--ci-unit --module core-99 --kcov out of range fails fast" {
+    CORE_SHARD_COUNT=4 run "${CI_SH}" --ci-unit --module core-99 --kcov
+    assert_failure
+    assert_output --partial "out of range"
+}
+
+@test "--ci-unit --module core-x --kcov rejects a non-numeric shard index" {
+    CORE_SHARD_COUNT=4 run "${CI_SH}" --ci-unit --module core-x --kcov
+    assert_failure
+    assert_output --partial "Invalid core shard index"
+}
+
+@test "--ci-unit --module core-0 --kcov rejects a non-positive CORE_SHARD_COUNT" {
+    CORE_SHARD_COUNT=0 run "${CI_SH}" --ci-unit --module core-0 --kcov
+    assert_failure
+    assert_output --partial "Invalid CORE_SHARD_COUNT"
 }

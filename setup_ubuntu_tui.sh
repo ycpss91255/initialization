@@ -215,7 +215,7 @@ Flags:
   --backend gum|whiptail Force the rendering backend (skips detection and
                          the install prompt). Invalid value → exit 2.
   --lang <code>          Force the UI language for this session
-                         (en|zh-TW|zh-CN|ja); overrides $LANG / config.
+                         (en|zh-TW); overrides $LANG / config.
                          Invalid value → falls back to en with a warning.
 
 Requirements:
@@ -707,9 +707,6 @@ _tui_main_loop() {
         _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_exit)" tui_render_menu \
             "$(i18n_t TUI_I18N main_title "${INIT_UBUNTU_VERSION}")" \
             "$(i18n_t TUI_I18N main_system "${_summary}")" "${_menu_args[@]}")" || return 0
-        # #169: landing on a non-selectable section separator is a no-op —
-        # re-loop without dispatching any action.
-        [[ "${_choice}" == "${TUI_MENU_SEPARATOR:--}" ]] && continue
         _tui_dispatch "${_choice}" "${_list_json}" "${_detect_json}"
     done
 }

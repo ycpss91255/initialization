@@ -20,7 +20,32 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Changed
+
+- **Removed the main-menu section separators** (#216): the `------` divider
+  rows confused navigation — gum / whiptail have no non-selectable row, so a
+  divider could be landed on and pressing it re-rendered the menu with the
+  cursor reset to the top (it looked like a jump to Quick Setup). The three
+  logical groups are now conveyed by row ordering alone; every visible row is a
+  real, selectable action. Dropped `TUI_MENU_SEPARATOR` / `_tui_menu_separator`
+  and the main-loop sentinel guard.
+
+- **i18n officially supports en + zh-TW only for 0.1.0** (#205): `--lang` and
+  `$LANG` auto-detection previously accepted `zh-CN` / `ja` but rendered English
+  (claimed support, delivered en). `i18n_detect_lang` now resolves unsupported
+  locales to `en` silently, and `i18n_sanitize_lang` rejects `zh-CN` / `ja` →
+  `en` with a warning (the warning fires only on an explicit unsupported
+  `--lang`, not on auto-detect). zh-CN / ja translations are deferred to 0.2.0
+  (#208). `--lang` help and the supported set now read `en | zh-TW`.
+
 ### Fixed
+
+- **whiptail multi-select descriptions truncated at the wrong boundary under
+  zh-TW / ja**: `_tui_clip` / `_tui_clip_budget` measured by character count, so
+  double-width CJK glyphs over-ran the whiptail box and the clip cut at the wrong
+  visual column. Both now measure by display width (via `_tui_disp_width`):
+  `_tui_clip` reserves one column for the `…`, never splits a wide glyph, and the
+  per-page budget sizes the tag column by display width. 5 new unit cases. (#204)
 
 - **System Info (and any gum msgbox/yesno) crashed when content started with
   `-`**: `gum style` / `gum confirm` parsed forked text beginning with

@@ -177,11 +177,6 @@ TUI_CATEGORY_ORDER='["base","recommended","optional","experimental"]'
 : "${TUI_WIDTH:=72}"
 : "${TUI_MENU_HEIGHT:=10}"
 
-# Sentinel tag for a non-selectable main-menu separator row (#169). The
-# dispatch loop ignores it; both dialog and whiptail render arbitrary
-# tag/item rows, so a divider row works identically on both backends.
-: "${TUI_MENU_SEPARATOR:=-}"
-
 # Checklist chrome (#168): dialog/whiptail render a --checklist row as
 # "[status] <tag>   <item>". The fixed overhead is the checkbox + its gutter
 # plus the gutter between the tag column and the item — empirically 8 cols on
@@ -193,21 +188,30 @@ TUI_CATEGORY_ORDER='["base","recommended","optional","experimental"]'
 
 # ── Pure display helpers ─────────────────────────────────────────────────────
 
-# _tui_clip <string> <max> → <string> clipped to <max> chars with a trailing
-# single-char ellipsis "…" when it would exceed <max>, unchanged otherwise.
-# Pure (no globals, no I/O) so it is directly unit-testable.
+# _tui_clip <string> <max> → <string> clipped to <max> DISPLAY COLUMNS with a
+# trailing single-column ellipsis "…" when it would exceed <max>, unchanged
+# otherwise. Display-width aware (via _tui_disp_width): a zh-TW/ja glyph is 2
+# columns, so a char-count clip truncated at the wrong visual boundary and
+# over-ran whiptail's box. Never splits a wide glyph. Pure (no globals, no I/O).
 _tui_clip() {
     local _s="$1" _max="$2"
-    # UTF-8 locale so ${#_s} counts characters (not bytes) and ${_s:0:n}
-    # slices on character boundaries — module descriptions carry zh-TW
-    # (multibyte), and CI's kcov image runs under C/POSIX where byte-vs-char
-    # would mis-truncate. C.UTF-8 is always present on Debian/Ubuntu.
+    # UTF-8 locale so ${_s:i:1} slices on character boundaries (multibyte
+    # zh-TW); C.UTF-8 is always present on Debian/Ubuntu and in the kcov image.
     local LC_ALL=C.UTF-8
-    if (( ${#_s} > _max )); then
-        printf '%s…\n' "${_s:0:_max-1}"
-    else
+    if (( $(_tui_disp_width "${_s}") <= _max )); then
         printf '%s\n' "${_s}"
+        return
     fi
+    # Reserve 1 column for the ellipsis; accumulate whole glyphs up to the budget.
+    local _budget=$(( _max - 1 )) _out="" _w=0 _i _ch _cw
+    for (( _i = 0; _i < ${#_s}; _i++ )); do
+        _ch="${_s:_i:1}"
+        _cw=$(_tui_disp_width "${_ch}")
+        (( _w + _cw > _budget )) && break
+        _out+="${_ch}"
+        _w=$(( _w + _cw ))
+    done
+    printf '%s…\n' "${_out}"
 }
 
 # _tui_disp_width <string> → terminal display COLUMNS on stdout. Counts
@@ -261,10 +265,11 @@ _tui_pad_label() {
 #   budget = TUI_WIDTH - longest-name - TUI_CHECKLIST_CHROME  (floored to MIN)
 # Pure (no globals beyond the TUI_* knobs, no I/O) — directly unit-testable.
 _tui_clip_budget() {
-    local LC_ALL=C.UTF-8  # char-accurate widths for the budget math (see _tui_clip)
-    local _name _longest=0
+    local LC_ALL=C.UTF-8  # display-width math (see _tui_clip / _tui_disp_width)
+    local _name _longest=0 _w
     for _name in "$@"; do
-        (( ${#_name} > _longest )) && _longest=${#_name}
+        _w=$(_tui_disp_width "${_name}")
+        (( _w > _longest )) && _longest=${_w}
     done
     local _budget=$(( TUI_WIDTH - _longest - TUI_CHECKLIST_CHROME ))
     (( _budget < TUI_CHECKLIST_MIN )) && _budget=${TUI_CHECKLIST_MIN}
@@ -772,23 +777,15 @@ _tui_category_entry() {
     esac
 }
 
-# #169 non-selectable divider row: sentinel tag + a box-drawing rule in the
-# label column, empty description. The main loop's _tui_dispatch ignores the
-# sentinel tag, so landing on it is a harmless no-op on both backends.
-_tui_menu_separator() {
-    printf '%s\t──────────────\t\n' "${TUI_MENU_SEPARATOR}"
-}
-
 # Full §8.1 main-menu rows ("tag<TAB>label<TAB>description" per line).
 # Category rows are derived from the live payload, so empty categories
 # disappear and future non-empty ones appear without a spec change (Q44).
 tui_main_menu_entries() {
     local _json="$1" _cat
 
-    # #169: three logical groups, divided by non-selectable separator rows
-    # (sentinel tag TUI_MENU_SEPARATOR). A divider row renders identically on
-    # dialog and whiptail (both accept arbitrary tag/item rows); the main loop
-    # treats the sentinel as a no-op so it never dispatches an action.
+    # Three logical groups, in order (no separator rows: gum/whiptail have no
+    # non-selectable row, so a divider could be landed on and was confusing —
+    # #216 removed them; ordering conveys the grouping):
     #   Group 1 — build the pick: quick-setup + category browse rows
     #   Group 2 — manage / info:  manage, secrets, sysinfo
     #   Group 3 — action:         run (the only batch execution point, Q43)
@@ -798,7 +795,6 @@ tui_main_menu_entries() {
     while IFS= read -r _cat; do
         _tui_category_entry "${_json}" "${_cat}"
     done < <(tui_categories "${_json}")
-    _tui_menu_separator
     printf 'manage\t%s\t%s\n' \
         "$(i18n_t TUI_BACKEND_I18N menu_manage_label)" \
         "$(i18n_t TUI_BACKEND_I18N menu_manage_desc)"
@@ -808,7 +804,6 @@ tui_main_menu_entries() {
     printf 'sysinfo\t%s\t%s\n' \
         "$(i18n_t TUI_BACKEND_I18N menu_sysinfo_label)" \
         "$(i18n_t TUI_BACKEND_I18N menu_sysinfo_desc)"
-    _tui_menu_separator
     # §8.1 < Run > — the ONLY batch execution point (Q43). Rendered as the
     # last menu row because a second action button next to OK exists only
     # on dialog (--extra-button), not whiptail; a row keeps both backends

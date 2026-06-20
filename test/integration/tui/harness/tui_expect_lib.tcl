@@ -73,6 +73,7 @@ proc tui_expect_re {re what} {
 # keypad-application mode, which dialog/ncurses enables; newt/slang
 # accepts it too — one spelling drives both backends.
 proc tui_key_down  {} { send -- "\x1bOB" }
+proc tui_key_up    {} { send -- "\x1bOA" }
 proc tui_key_enter {} { send -- "\r" }
 proc tui_key_space {} { send -- " " }
 proc tui_key_tab   {} { send -- "\t" }

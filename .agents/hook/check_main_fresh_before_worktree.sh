@@ -15,10 +15,12 @@
 #   - Local main is already even with or ahead of origin/main
 #   - The repo has no origin/main yet (fresh clone before first fetch)
 #
-# Why: doc/process/worktree.md ("Lifecycle > Cleanup")明文「主 checkout
-# 永遠停在 origin/main」— 意指 ff-tracking origin/main HEAD,不是凍結。
-# PR #89 那次正是因為從 stale base 起 worktree、後來才被迫 rebase。
-# Hook 層補上預防,不再依賴 agent 記得先 pull。
+# Why: doc/process/worktree.md ("Lifecycle > Cleanup") states the main
+# checkout must always stay at origin/main — meaning it ff-tracks the
+# origin/main HEAD, not that it stays frozen. PR #89 was bitten exactly
+# because a worktree was started from a stale base and later had to be
+# rebased. This hook adds prevention at the hook layer instead of relying
+# on the agent to remember to pull first.
 #
 # Implementation:
 #   1. Match `git worktree add` in command (with optional `git -C <dir>`).

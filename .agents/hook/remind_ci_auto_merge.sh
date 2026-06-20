@@ -29,13 +29,18 @@ main() {
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
   [[ -z "${cmd}" ]] && return 0
 
+  # Dual-watch reminder: a hook can only REMIND — the agent still arms both,
+  # because the notifying watchers (Monitor / background Bash) are agent tools a
+  # short-lived hook cannot invoke. Appended to the PR / auto-merge reminders.
+  local watchdog=" Second safety (dual-watch): besides the auto-merge Monitor, arm an INDEPENDENT watchdog via a run_in_background Bash that polls this PR's state (exits on MERGED/CLOSED or a ~28-min timeout), so a silently-dead primary Monitor never strands the loop. The two are independent."
+
   if [[ "${cmd}" =~ gh[[:space:]]+pr[[:space:]]+create ]]; then
-    msg="PR open 提醒：別 sleep 輪詢。開完跑 auto-merge-on-green skill（.claude/skills/auto-merge-on-green/SKILL.md）—— 它掛上 GitHub 原生 auto-merge（--auto --squash --delete-branch）並用一個 Monitor 包 .claude/script/auto-merge-on-green.sh：CI 綠由 GitHub 伺服器端自動合,BEHIND 自動 update-branch,CI 失敗只回報且 auto 保留掛著。"
+    msg="PR opened — do NOT sleep-poll. Run the auto-merge-on-green skill (.claude/skills/auto-merge-on-green/SKILL.md): it arms GitHub-native auto-merge (--auto --squash --delete-branch) and Monitor-wraps .claude/script/auto-merge-on-green.sh — a green CI merges server-side, BEHIND auto-updates the branch, a CI failure is reported with auto-merge left armed.${watchdog}"
   elif [[ "${cmd}" =~ git[[:space:]]+push ]]; then
     if [[ "${cmd}" =~ (--tags|refs/tags/|[[:space:]]v[0-9]) ]]; then
-      msg="push 可能觸發 release CI：用 wait-pr-ci skill 的 tag 流程（.claude/script/wait-tag-ci.sh）以 Monitor 監控,別 sleep 輪詢。tag 無 PR,不 auto-merge。"
+      msg="This push may trigger release CI — watch it via the wait-pr-ci skill's tag flow (.claude/script/wait-tag-ci.sh) with a Monitor, do NOT sleep-poll. A tag has no PR, so no auto-merge."
     else
-      msg="push 可能觸發/重跑 CI：若該分支已有對應 PR,跑 auto-merge-on-green skill（處理 auto-merge + BEHIND）;否則用 wait-pr-ci skill 以 Monitor 監控。別 sleep 輪詢。"
+      msg="This push may (re)trigger CI — if the branch has a PR, run the auto-merge-on-green skill (handles auto-merge + BEHIND); otherwise watch via the wait-pr-ci skill with a Monitor. Do NOT sleep-poll.${watchdog}"
     fi
   else
     return 0

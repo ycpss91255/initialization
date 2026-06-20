@@ -10,19 +10,23 @@
 #   - With --auto: merge is queued; remind to pull after CI passes
 #   - Without --auto: merge is immediate; remind to pull right after
 #
-# Why: doc/process/worktree.md ("Lifecycle > Cleanup")要求主 checkout
-# 永遠停在 origin/main HEAD — 意思是「持續 ff-tracking」不是「凍結在
-# 某個 commit」。PR #89 那次踩到正是因為 local main 落後好幾個 PR,
-# 從 stale base 起 worktree branch,後來才被迫 rebase。
+# Why: doc/process/worktree.md ("Lifecycle > Cleanup") requires the main
+# checkout to always stay at origin/main HEAD — meaning it keeps
+# ff-tracking, not that it freezes at some commit. PR #89 was bitten
+# exactly because local main had fallen several PRs behind and a worktree
+# branch was started from that stale base, then later had to be rebased.
 #
-# Trigger pattern: `gh pr merge` 出現在 command 作為實際子指令,不算
-# quoted string 內 substring(避免 `git commit -m "...gh pr merge..."`
-# 之類的 commit message 觸發 false positive)。實作:
-#   1. 用 sed 砍掉雙引號 / 單引號區段(unnested 簡單情況)
-#   2. 在 cleaned 字串上跑 trigger regex
-#   3. 加 command-boundary anchor (^ 或 ; & | $( 之後),`gh pr merge`
-#      必須是 actual subcommand 才 match
-# 不限定 `--squash` / `--merge` / `--rebase`,任何 merge mode 都觸發。
+# Trigger pattern: `gh pr merge` must appear in the command as an actual
+# subcommand, not as a substring inside a quoted string (to avoid a
+# commit message like `git commit -m "...gh pr merge..."` triggering a
+# false positive). Implementation:
+#   1. Use sed to strip double-quoted / single-quoted regions (simple
+#      unnested cases).
+#   2. Run the trigger regex on the cleaned string.
+#   3. Add a command-boundary anchor (start of string, or after ; & | $();
+#      `gh pr merge` must be an actual subcommand to match.
+# Not restricted to `--squash` / `--merge` / `--rebase`; any merge mode
+# triggers it.
 # Skip read-only `gh pr view` / `gh pr checks` etc.
 
 set -uo pipefail

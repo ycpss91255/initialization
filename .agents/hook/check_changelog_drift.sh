@@ -6,10 +6,12 @@
 # `doc/changelog/CHANGELOG.md`. On drift, emit a JSON systemMessage.
 # Non-blocking — exit 0.
 #
-# Why: doc/process/release.md第 1 條與「文件對齊原則」要求
-# 使用者可見的行為變更必須在 CHANGELOG.md `[Unreleased]` 加條目。
-# 過去常見漏 — feature commit 沒帶 CHANGELOG，要等 release 才補；
-# dependabot bot PR 也不會自己改 CHANGELOG。
+# Why: doc/process/release.md item 1 and the "doc-alignment principle"
+# require that user-visible behavior changes add an entry under
+# CHANGELOG.md `[Unreleased]`. This was commonly missed — a feature
+# commit would ship without a CHANGELOG entry and only get backfilled at
+# release time; dependabot bot PRs also never update the CHANGELOG
+# themselves.
 #
 # Detection:
 #   1. Resolve work dir from command (`git -C <dir>` / `cd <dir> &&` / cwd).
@@ -68,7 +70,7 @@ main() {
 
   (( has_code == 1 && has_changelog == 0 )) || return 0
 
-  msg="$(printf 'CHANGELOG drift in %s:\n  staged code/config files but doc/changelog/CHANGELOG.md not in the commit.\n  doc/process/release.md (CHANGELOG section): 使用者可見的變更必須在 [Unreleased] section 加條目。\n  Staged files:\n%s' \
+  msg="$(printf 'CHANGELOG drift in %s:\n  staged code/config files but doc/changelog/CHANGELOG.md not in the commit.\n  doc/process/release.md (CHANGELOG section): user-visible changes must add an entry to the [Unreleased] section.\n  Staged files:\n%s' \
     "${repo_root}" "$(printf '%s' "${staged}" | sed 's/^/    /')")"
 
   jq -n --arg m "${msg}" '{

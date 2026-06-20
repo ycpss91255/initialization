@@ -47,6 +47,19 @@ _timeout="$(_json_field '.tool_input.timeout')"
 # Safety 2: an explicit positive Bash timeout param is set.
 [[ "${_timeout}" =~ ^[0-9]+$ && "${_timeout}" -gt 0 ]] && exit 0
 
+# Safety 3: the command self-wraps in `timeout`/`gtimeout <duration>` at a
+# command position (start, or after ; | && || ( or `$(`). This must be a GLOBAL
+# check, not per-sub-command: the per-line quote-strip below does not remove a
+# MULTI-LINE quoted argument (e.g. `docker run ... -c '<newline> kcov ...'`), so
+# the inner long pattern leaks onto its own line as a pseudo-sub-command while
+# the `timeout` prefix sits on the launcher's line — they never line up, and a
+# correctly-bounded command was being blocked anyway. If the author bounded any
+# launcher with timeout(1), honor it. (Contract: "self-wrapping with timeout(1)
+# also passes.")
+if [[ "${_cmd}" =~ (^|[[:space:]]|[\;\|\&\(]|\$\()[[:space:]]*g?timeout[[:space:]]+(-[A-Za-z][A-Za-z-]*[[:space:]]+|--[A-Za-z][A-Za-z-]*([[:space:]]+|=)[^[:space:]]+[[:space:]]+)*[0-9] ]]; then
+    exit 0
+fi
+
 # ── Known-long foreground command patterns ───────────────────────────────────
 # Curated: full suites / coverage / kcov / whole-tree lint / image builds /
 # compose service runs. Targeted single-spec runs (one *_spec.bats path) are

@@ -1,6 +1,9 @@
 # ADR-0023: gum is the preferred TUI backend (gum > whiptail; dialog dropped)
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0024 (2026-06-21). gum is dropped entirely;
+  the rich tier is fzf (a two-pane navigator), whiptail stays the fallback,
+  and text input / confirmation move to the forked CLI (ADR-0025). The
+  reasoning below is retained for history.
 - **Date:** 2026-06-19
 - **Relates to:** PRD G4 (TUI = CLI frontend), ADR-0019 (`list --json`
   schema the TUI reads), ADR-0017 (user-home install path)

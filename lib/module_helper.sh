@@ -399,9 +399,8 @@ module_default_github_release_remove() {
     local _sudo=""
     [[ "${_use_sudo}" == "true" ]] && _sudo="sudo"
     module_dryrun_guard remove "rm ${INSTALL_DIR:-?} + ${_bin_link}" && return 0
-    # Idempotent no-op on a clean system (also avoids a needless sudo call when
-    # nothing is installed — matters on sudo-less test/CI hosts).
-    module_skip_if_not_installed && return 0
+    # No is_installed gate: rm -rf / rm -f are already idempotent, and a partial
+    # install (dirs present, Sidecar absent) must still be cleaned up.
     [[ -n "${INSTALL_DIR:-}" && -e "${INSTALL_DIR}" ]] && ${_sudo} rm -rf "${INSTALL_DIR}"
     ${_sudo} rm -f "${_bin_link}"
 }

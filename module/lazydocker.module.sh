@@ -73,12 +73,23 @@ CONFIG_PATHS=("${HOME}/.config/lazydocker")
 : "${GITHUB_ASSET_PATTERN}" "${BIN_PATH_IN_TAR}" "${STRIP_COMPONENTS}" "${USE_SUDO}"
 module_use_github_release_archetype
 
+# remove override: a no-op "nothing to do" when not installed (idempotent;
+# avoids a needless sudo call on a clean box). The shared github-release default
+# deletes unconditionally -- it must clean a Sidecar-less partial install (e.g.
+# fzf) -- so the skip lives here, not in the default. The phase-invocation
+# wrapper still removes the Sidecar.
+remove() {
+    module_dryrun_guard remove "rm ${INSTALL_DIR} + ${BIN_LINK}" && return 0
+    module_skip_if_not_installed && return 0
+    module_default_github_release_remove
+}
+
 # Overrides: upstream asset names embed the version, so the archetype's
 # stable-URL fetch does not apply. install/upgrade use the version-aware
 # fetch below; the phase-invocation wrapper writes the Sidecar via
 # module_provided_version (ADR-0001), reading MODULE_GH_RESOLVED_VERSION set
-# inside _lazydocker_fetch_and_install. remove/purge inherit the macro
-# defaults (the wrapper removes the Sidecar).
+# inside _lazydocker_fetch_and_install. purge inherits the macro default
+# (the wrapper removes the Sidecar).
 install() {
     module_dryrun_guard install \
         "fetch ${GITHUB_REPO} latest -> ${INSTALL_DIR}, symlink ${BIN_LINK}" \

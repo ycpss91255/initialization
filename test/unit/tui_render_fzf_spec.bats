@@ -327,9 +327,11 @@ EOF
 
 # ── --backend tier parsing (ADR-0024) ────────────────────────────────────────
 
-@test "--backend fzf|whiptail are accepted; gum is rejected with exit 2" {
-    # gum is no longer a valid tier (ADR-0024) → usage error.
-    run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend gum
+@test "--backend fzf|whiptail|gum are accepted; an unknown tier is rejected with exit 2" {
+    # fzf selects the Rich tier; whiptail and gum select the legacy dialog loop
+    # (gum stays accepted until the phase-6 gum removal — the AC-10/AC-11
+    # dual-backend smoke still drives it). An unknown value is a usage error.
+    run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend dialog
     assert_failure 2
-    assert_output --partial "fzf|whiptail"
+    assert_output --partial "fzf|whiptail|gum"
 }

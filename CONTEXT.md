@@ -49,6 +49,26 @@ at startup; exposes lookup by name / category / tag.
 
 **Resolver** (`lib/resolver.sh`): topo-sorts DEPENDS_ON graph; rejects cycles.
 
+### Frontend
+
+**Frontend**: a user-facing entry point that collects intent and forks the
+Engine — never sources engine libs, never writes State (PRD G4). Three exist:
+CLI (`setup_ubuntu`), TUI (`setup_ubuntu_tui.sh`), secrets (`setup_secrets`).
+_Avoid_: backend (reserved historical term — see Tier).
+
+**Tier**: which renderer the TUI uses (ADR-0024, supersedes the old "backend"
+term). Two Tiers: the **Rich tier** (fzf) and the **Fallback tier** (whiptail).
+A Tier is chosen at launch (fzf present → Rich; else offer install or Fallback);
+`--backend fzf|whiptail` forces it. The two Tiers **share one data layer**
+(CLI-fork JSON, selection accumulator, i18n) and diverge only in rendering +
+navigation. _Avoid_: backend, mode.
+
+**Two-pane navigator**: the Rich-tier interaction model (ADR-0024). Every
+navigable level (main menu → category → sub-category → modules) is one fzf
+screen: left pane = current level, right **Preview pane** = live detail of the
+cursor's row (a Module's full detail, or the contents/counts one level down).
+_Avoid_: dialog, widget, wizard (Quick Setup is still a wizard; the navigator is not).
+
 ### State
 
 **State**: machine-written runtime facts (XDG_STATE_HOME). What's installed,

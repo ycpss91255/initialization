@@ -22,6 +22,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **fish shell completions** for the CLIs and the `just` wrappers
+  (`module/config/fish/completions/{setup_ubuntu,setup_ubuntu_tui,setup_secrets,just}.fish`).
+  Tab now offers subcommands, flags, and fixed-value sets: `setup_ubuntu`
+  subcommands + per-subcommand flags (module-name values for
+  install/remove/purge/upgrade/verify/show via a cheap `module/*.module.sh`
+  glob, no engine fork); `setup_ubuntu_tui.sh` `--backend fzf|whiptail|gum` and
+  `--lang en|zh-TW`; `setup_secrets` ssh-key/token/gpg sub-actions and
+  `--type ed25519|ecdsa|rsa`; and `just tui` / `just secrets` recipe-arg
+  completion scoped via `__fish_seen_subcommand_from`. Installed by the existing
+  fish module config-drop. Covered by `test/unit/fish_completions_spec.bats`
+  (`fish -n` + `complete -C` smoke), which also fills the lint gap since the CI
+  `fish -n` sweep prunes `module/config`. The completion files are allow-listed
+  in `.gitignore` (the dir is otherwise ignored for auto-generated completions).
+
 - **fzf two-pane navigator (Rich tier)** for the install-pick flow (ADR-0024,
   ADR-0025): every navigable level (main menu -> category -> sub-category ->
   module leaf) is one fzf two-pane screen — left pane is the current level, the

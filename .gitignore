@@ -16,10 +16,6 @@ module/config/yazi/flavors/
 module/config/fish/completions/*
 !module/config/fish/completions/tmuxp-ssh.fish
 !module/config/fish/completions/claude-rm.fish
-!module/config/fish/completions/setup_ubuntu.fish
-!module/config/fish/completions/setup_ubuntu_tui.fish
-!module/config/fish/completions/setup_secrets.fish
-!module/config/fish/completions/just.fish
 
 # Fish runtime state (per-machine)
 module/config/fish/fish_history

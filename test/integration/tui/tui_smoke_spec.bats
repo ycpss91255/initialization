@@ -81,6 +81,29 @@ _run_smoke_gum() {
         expect "${BATS_TEST_DIRNAME}/harness/smoke_flow_gum.exp"
 }
 
+# The fzf Rich tier (ADR-0024) needs TWO real binaries in the sealed farm: fzf
+# (the navigator) AND whiptail (the screens the navigator DELEGATES to — Quick
+# Setup / System Info / Review / msgbox, which still render via tui_render_*).
+# _make_smoke_env symlinks exactly one backend, so build the fzf env on top of
+# the whiptail env (whiptail already in the farm) and add the real fzf.
+_make_smoke_env_fzf() {
+    _make_smoke_env whiptail
+    local _real_fzf
+    if ! _real_fzf="$(command -v fzf)"; then
+        fail "fzf not found in the test-tools image"
+    fi
+    ln -sf "${_real_fzf}" "${SMOKE_BIN}/fzf"
+}
+
+# The fzf flow forces the Rich tier via `--backend fzf` (set inside
+# smoke_flow_fzf.exp's tui_spawn). Same sealed env + mock CLI as the others.
+_run_smoke_fzf() {
+    run env "TUI_ENTRY=${REPO_ROOT}/setup_ubuntu_tui.sh" \
+        "TUI_FARM=${SMOKE_BIN}" "TUI_HOME=${SMOKE_HOME}" \
+        "TUI_CLI_MOCK=${SMOKE_BIN}/setup_ubuntu" \
+        expect "${BATS_TEST_DIRNAME}/harness/smoke_flow_fzf.exp"
+}
+
 # Shared post-flow assertions (the in-flow screen assertions live in
 # smoke_flow.exp and fail with rc 99 + a TUI-HARNESS FAIL diagnostic).
 _assert_smoke_green() {
@@ -117,6 +140,23 @@ _assert_smoke_green() {
     fi
     _make_smoke_env gum
     _run_smoke_gum
+    _assert_smoke_green
+}
+
+# ADR-0024: the fzf Rich tier on the LIVE fzf binary. The navigator drives fzf
+# directly (TUI_FZF_BIN) but DELEGATES Quick Setup / System Info / Review /
+# msgbox to the whiptail dialog screens (tui_render_*). This flow ENTERS those
+# delegated screens — the regression guard for the fzf-tier TUI_BACKEND fix
+# (5a3d4a7): before the fix TUI_BACKEND was unset in the fzf tier, so every
+# delegated screen aborted on `${TUI_BACKEND:?TUI_BACKEND not set}` ("cannot
+# enter Quick Setup / screens flash"). Requires fzf in the test-tools image —
+# skip cleanly when absent so single-backend images still pass.
+@test "AC-10 smoke (fzf): main menu → Quick Setup (delegated whiptail) → back → Exit" {
+    if ! command -v fzf >/dev/null 2>&1; then
+        skip "fzf not in the test-tools image — fzf Rich-tier live smoke deferred"
+    fi
+    _make_smoke_env_fzf
+    _run_smoke_fzf
     _assert_smoke_green
 }
 

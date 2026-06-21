@@ -1,0 +1,75 @@
+#!/usr/bin/env expect
+# smoke_flow_fzf.exp — AC-10 layer 2, fzf Rich tier (ADR-0024): the literal
+# §8.1 navigator flow on the LIVE fzf binary under a pseudo-tty, PLUS the
+# delegated whiptail dialog screen it hands off to.
+#
+# REGRESSION GUARD (fix 5a3d4a7): in the fzf Rich tier the navigator delegates
+# Quick Setup / Manage / Secrets / System Info / Review / msgbox to the
+# existing tui_render_* dialog screens. Those screens abort on the
+# `${TUI_BACKEND:?TUI_BACKEND not set}` guard if TUI_BACKEND is unset. Before
+# the fix the fzf tier left TUI_BACKEND unset, so entering Quick Setup (and the
+# other delegated screens) died — user-visible "cannot enter Quick Setup" /
+# "other screens flash". The fix defaults TUI_BACKEND=whiptail when unpinned
+# and drives fzf via TUI_FZF_BIN. This flow ENTERS Quick Setup and asserts the
+# delegated whiptail Step-1 screen renders — which is exactly what fails on the
+# unfixed code (it times out on "Confirm platform").
+#
+# fzf differs from the dialog backends: it is a full-screen curses app, not a
+# button widget. The navigator left pane is the §8.1 rows (first row = Quick
+# Setup); Enter activates the highlighted row, Esc (fzf exit 130) exits the
+# main menu (→ clean TUI rc 0, Q43 drop). The delegated whiptail screen is a
+# standard button widget: Esc / Cancel backs out of it.
+#
+# The TUI is forced onto the fzf tier with `--backend fzf` (skips detection +
+# the fzf-install prompt). The sealed farm carries BOTH the real fzf (the
+# navigator) AND the real whiptail (the delegated dialog screen). Exit codes:
+# 0 = green; 99 = harness assertion; else = the TUI's own rc.
+
+source [file join [file dirname [file normalize [info script]]] tui_expect_lib.tcl]
+
+tui_spawn --backend fzf
+
+# fzf is a full-screen curses app; give it a beat to paint the first frame
+# before asserting (the pty has no real terminal pacing).
+tui_settle
+
+# 1. Main menu visible: the fzf two-pane navigator drew the §8.1 rows. The
+#    first row is Quick Setup; Optional is one of the category rows. (Both are
+#    left-pane labels emitted by tui_fzf_menu_rows.)
+tui_expect_text "Quick Setup"
+tui_expect_text "Optional"
+
+# 2. Enter Quick Setup. fzf highlight starts on the FIRST row (Quick Setup),
+#    so a bare Enter activates it → _tui_screen_quick_setup, which DELEGATES
+#    Step 1 to the whiptail dialog screen (tui_render_menu).
+tui_key_enter
+
+# 3. REGRESSION ASSERTION: the delegated whiptail Step-1 screen renders. On the
+#    unfixed code TUI_BACKEND is unset here, tui_render_menu aborts on the
+#    `${TUI_BACKEND:?TUI_BACKEND not set}` guard, this screen never draws, and
+#    this expect times out (harness rc 99). title_qs_step1 =
+#    "Quick Setup — Step 1/4: Confirm platform"; assert the stable tail.
+tui_expect_text "Confirm platform"
+# The detected platform line proves the delegated screen got its forked detect
+# data too (a second witness the screen really ran, not just printed a title).
+tui_expect_text "Form factor: desktop"
+
+# 4. Back out of the delegated whiptail Step-1 menu. whiptail's Tab walks
+#    listbox → OK → Cancel; press Cancel (Esc is flaky under a pty for some
+#    whiptail builds, so use the deterministic Cancel-button traversal the
+#    shared helper already encodes). Cancel → _tui_screen_quick_setup returns
+#    → back to the fzf main menu.
+tui_press_exit whiptail
+tui_settle
+
+# 5. Back on the fzf main menu (the navigator repainted its rows). Re-asserting
+#    Quick Setup proves the round trip into the delegated screen and back did
+#    not wedge the navigator.
+tui_expect_text "Quick Setup"
+
+# 6. Esc on the fzf main menu exits the navigator (fzf rc 130 → the main loop
+#    drops the empty selection and returns rc 0 — Q43, zero file writes).
+send -- "\x1b"
+set rc [tui_wait_exit_rc]
+if {$rc != 0} { tui_die "TUI exited rc=$rc (want 0) on fzf tier" }
+exit 0

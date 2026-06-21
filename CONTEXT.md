@@ -88,6 +88,17 @@ _Avoid_: dialog, widget, wizard (Quick Setup is still a wizard; the navigator is
 what version, when. Not user-edited.
 _Avoid_: status, info.
 
+> **State is one module, presented through `lib/state.sh`.** Forward-only
+> migration (`lib/state_migrate.sh`) and cross-machine import/export
+> (`lib/state_io.sh`) are **internal seams**: they are sourced alongside
+> `state.sh` but reached only through the external State interface
+> (`state_init`, the `record_*` writers, the field accessors, and the
+> io export/import functions). Migration is folded into `state_init` — on
+> startup `state_init` runs the validate → migrate → ready chain internally
+> (a failed migration is fatal; ADR-0008), so the Engine never calls
+> `state_migrate_run` directly. The three files stay physically separate
+> (combined > 800 lines) but converge on a single interface.
+
 **Config**: user-written preferences (XDG_CONFIG_HOME). Language, install
 target, defaults. User edits via `setup_ubuntu config set …`.
 _Avoid_: settings (overloaded).

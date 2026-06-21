@@ -10,7 +10,20 @@
 #
 #   state_init
 #     Ensure state.json exists with the minimum {"version":"0.1.0","installed":{}}
-#     skeleton. Idempotent. Creates parent dirs.
+#     skeleton, then bring it up to the current STATE_SCHEMA_VERSION by running
+#     the forward-only migration chain internally (validate -> migrate -> ready;
+#     ADR-0008). Idempotent. Creates parent dirs. A failed migration is FATAL:
+#     state_init returns non-zero, leaving the original file + its .bak
+#     untouched, so the engine aborts before any read path touches stale data.
+#
+# Module shape (architecture deepening #1): the State module is presented
+# through this one file. lib/state_migrate.sh (forward-only migration) and
+# lib/state_io.sh (cross-machine import/export) are INTERNAL SEAMS — sourced
+# alongside this file but reached only through the State interface here.
+# state_init folds migration in; the engine never calls state_migrate_run
+# directly. The external State interface is: state_init, the record_* writers,
+# the field accessors (state_get_field / state_list_installed / state_is_recorded
+# / state_get_synced), state_set_synced, and the io export/import functions.
 #
 #   state_record_install <name> [<manual=true|false>] [<version_provided>] [<depends_on_csv>]
 #     Set installed[<name>].synced = { manual, depends_on, version_provided,
@@ -142,6 +155,46 @@ state_init() {
     if [[ ! -f "${_path}" ]]; then
         printf '{"version":"%s","installed":{}}\n' "${STATE_SCHEMA_VERSION}" > "${_path}"
     fi
+
+    # Forward-only schema migration (ADR-0008) folded into init: bring an older
+    # on-disk state.json up to STATE_SCHEMA_VERSION before any read/write path
+    # touches it. Migration is an INTERNAL SEAM (lib/state_migrate.sh), reached
+    # only through here — the engine never calls state_migrate_run directly.
+    #
+    # A failed migration is FATAL: return non-zero so the caller (and the
+    # engine entry point) aborts, leaving the original file + its .bak untouched
+    # per ADR-0008. Idempotent + cheap on an already-current file: _state_run_migration
+    # short-circuits after the first successful pass in this process, and the
+    # underlying runner is a jq-version-check no-op when version == current.
+    _state_run_migration || return 1
+}
+
+# _state_run_migration
+#   Internal helper: run the forward-only migration chain exactly once per
+#   process via the lib/state_migrate.sh seam. state_init calls this; nothing
+#   else does. Returns 0 on success / no-op / already-run, 1 on a failed
+#   migration (fatal — ADR-0008). The seam is loaded by the engine entry point
+#   (and by tests that source state_migrate.sh); when it is genuinely absent
+#   (a State-only consumer that never sourced the migration seam) there is no
+#   chain to replay, so a fresh skeleton is by-definition current and we treat
+#   the missing seam as a no-op rather than a hard error.
+_state_run_migration() {
+    # Guard: one successful pass per process is enough — an already-current file
+    # stays current, and re-checking on every locked write is wasteful.
+    [[ "${_STATE_MIGRATION_DONE:-0}" == "1" ]] && return 0
+
+    if ! declare -F state_migrate_run >/dev/null 2>&1; then
+        # No migration seam loaded: nothing to replay. Mark done so we do not
+        # re-probe on every write.
+        _STATE_MIGRATION_DONE=1
+        return 0
+    fi
+
+    if ! state_migrate_run; then
+        return 1
+    fi
+    _STATE_MIGRATION_DONE=1
+    return 0
 }
 
 # ── lock helper ─────────────────────────────────────────────────────────────

@@ -93,11 +93,13 @@ preflight_self_deps "$@" || exit $?
 platform_export_env "" || true
 
 # ── Initialize state.json + config.ini (both idempotent) ──────────────────
-state_init || true
-# Forward-only schema migration (ADR-0008): bring an older state.json up to
-# the current STATE_SCHEMA_VERSION before any read path touches it. A failed
-# migration is fatal (it leaves the original file + a .bak untouched).
-state_migrate_run || exit 1
+# state_init now folds the forward-only schema migration (ADR-0008) in: it
+# brings an older state.json up to STATE_SCHEMA_VERSION via the internal
+# lib/state_migrate.sh seam before any read path touches it. A failed migration
+# is FATAL — state_init returns non-zero and we abort, leaving the original file
+# + its .bak untouched. (The separate state_migrate_run call was removed when
+# migration became an internal State seam; architecture deepening #1.)
+state_init || exit 1
 config_init || true
 
 # ── Resolve INIT_UBUNTU_LANG (env > config.ini > auto-detect from $LANG) ────

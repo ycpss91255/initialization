@@ -6,18 +6,19 @@
 MODULE_STANDALONE="true"
 [[ "${BASH_SOURCE[0]:-}" != "${0:-}" ]] && MODULE_STANDALONE="false"
 if [[ "${MODULE_STANDALONE}" == "true" ]]; then
-    set -euo pipefail
-    shopt -s inherit_errexit 2>/dev/null || true
-    MODULE_DIR="${MODULE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")" && pwd -P)}"
-    REPO_ROOT="${REPO_ROOT:-$(cd -- "${MODULE_DIR}/.." && pwd -P)}"
-    LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
-    # shellcheck source=../lib/logger.sh
-    source "${LIB_DIR}/logger.sh"
-    # shellcheck source=../lib/general.sh
-    source "${LIB_DIR}/general.sh"
-    # shellcheck source=../lib/module_helper.sh
-    source "${LIB_DIR}/module_helper.sh"
+    # shellcheck source=../lib/module_bootstrap.sh
+    source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../lib" && pwd -P)}/module_bootstrap.sh"
+    module_bootstrap
 fi
+# Static-analysis hint (never executed: the guard is always false; wrapped in
+# kcov-exclude so the dead line is not counted against coverage). module_bootstrap
+# sources the lib helpers at runtime, but shellcheck cannot trace that 2-level
+# dynamic source — this guarded line lets `shellcheck -x` follow module_helper.sh
+# so it sees the metadata + archetype vars below are used externally (avoids SC2034).
+# kcov-exclude-start
+# shellcheck source=../lib/module_helper.sh
+[[ -n "${__module_lint_hint:-}" ]] && source "${LIB_DIR}/module_helper.sh"
+# kcov-exclude-end
 
 # ── Metadata ────────────────────────────────────────────────────────────────
 NAME="tmux"

@@ -122,6 +122,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Extracted the repeated dual-mode module header into one
+  `lib/module_bootstrap.sh`** (architecture deepening #3): every
+  `module/*.module.sh` used to carry ~17 identical lines (set
+  `MODULE_STANDALONE` from the BASH_SOURCE-vs-`$0` test, then in standalone
+  mode `set -euo pipefail; shopt -s inherit_errexit`, resolve `MODULE_DIR` /
+  `REPO_ROOT` / `LIB_DIR`, and source `logger.sh` + `general.sh` +
+  `module_helper.sh`). That boilerplate now lives in a single `module_bootstrap`
+  function; each module's header collapses to a ~4-line stub that sources the
+  bootstrap and calls `module_bootstrap`. The bootstrap self-locates from its
+  OWN path (it lives in `lib/`), so it does not depend on the caller's
+  `BASH_SOURCE`; it keeps the exact same set options + the same three libs
+  sourced in the same order, so behavior is byte-identical. Engine mode is a
+  no-op (`module_bootstrap` returns early when `MODULE_STANDALONE != true`; the
+  runner already pre-sourced the libs and set strict mode in the sub-shell) —
+  ADR-0001's standalone/engine boundary and the G4 dual-mode behavior are
+  unchanged. The 4 `template/module-*.template.sh` headers adopt the same stub.
+  New `test/unit/module/module_bootstrap_spec.bats` pins the contract.
+
 - **Merged `lib/detect.sh` + `lib/platform.sh` into one deep `lib/environment.sh`
   (Environment module)**: internally layered — private `_probe_*` (I/O) under a
   private `_classify` (pure form_factor logic) — behind a small surface,

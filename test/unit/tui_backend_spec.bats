@@ -1184,9 +1184,17 @@ EOF
 }
 
 @test "--backend with an invalid value exits 2 with usage" {
-    run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend gum
+    run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend dialog
     assert_failure 2
     assert_output --partial "Usage:"
+}
+
+@test "--backend gum is accepted (legacy dialog backend, pending phase-6 removal)" {
+    # gum stays a valid --backend value until the dedicated gum-removal phase,
+    # so the AC-10/AC-11 dual-backend smoke keeps exercising it. It must NOT be
+    # rejected as a usage error.
+    run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend gum --help
+    assert_success
 }
 
 @test "--backend with no value exits 2 with usage" {

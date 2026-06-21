@@ -1406,17 +1406,20 @@ main() {
                 printf 'init_ubuntu %s\n' "${INIT_UBUNTU_VERSION}"
                 return 0
                 ;;
-            # --backend forces the TIER (ADR-0024): fzf (Rich) or whiptail
-            # (Fallback). It skips detection AND the install prompt; an invalid
-            # value is a usage error (exit 2). gum is dropped from the set.
+            # --backend forces the rendering path, skipping detection AND the
+            # install prompt; an invalid value is a usage error (exit 2).
+            # `fzf` selects the Rich two-pane navigator (ADR-0024); `whiptail`
+            # and `gum` select the legacy dialog loop with that backend binary.
+            # gum is accepted but legacy (dormant pending the phase-6 removal) —
+            # the AC-10/AC-11 dual-backend smoke still exercises it.
             --backend)
                 case "${2:-}" in
-                    fzf | whiptail)
+                    fzf | whiptail | gum)
                         _forced_tier="$2"
                         shift 2
                         ;;
                     *)
-                        printf 'ERROR: --backend requires fzf|whiptail (got %s)\n\n' \
+                        printf 'ERROR: --backend requires fzf|whiptail|gum (got %s)\n\n' \
                             "${2:-<missing>}" >&2
                         _tui_usage >&2
                         return 2
@@ -1425,12 +1428,12 @@ main() {
                 ;;
             --backend=*)
                 case "${1#--backend=}" in
-                    fzf | whiptail)
+                    fzf | whiptail | gum)
                         _forced_tier="${1#--backend=}"
                         shift
                         ;;
                     *)
-                        printf 'ERROR: --backend requires fzf|whiptail (got %s)\n\n' \
+                        printf 'ERROR: --backend requires fzf|whiptail|gum (got %s)\n\n' \
                             "${1#--backend=}" >&2
                         _tui_usage >&2
                         return 2
@@ -1476,7 +1479,13 @@ main() {
     #                                 whiptail Fallback
     local _tier=""
     if [[ -n "${_forced_tier}" ]]; then
-        _tier="${_forced_tier}"
+        if [[ "${_forced_tier}" == "fzf" ]]; then
+            _tier="fzf"
+        else
+            # gum / whiptail force the legacy dialog loop with that backend.
+            _tier="whiptail"
+            TUI_BACKEND="${_forced_tier}"
+        fi
     elif [[ -n "${TUI_BACKEND:-}" ]]; then
         _tier="whiptail"  # env-pinned widget (harness / CI) → fallback render
     else

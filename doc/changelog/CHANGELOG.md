@@ -33,7 +33,9 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   pre-selected on first entry into the recommended category. Tier resolution
   prefers `fzf` (offering `setup_ubuntu install fzf` when absent + interactive,
   per G4) and falls back to the existing whiptail screens; `--backend
-  fzf|whiptail` forces the tier. No TUI text-input/confirm widget — the forked
+  fzf|whiptail|gum` forces the path (`gum` stays a legacy dialog backend until
+  the phase-6 gum removal, so the AC-10/AC-11 dual-backend smoke still covers
+  it). No TUI text-input/confirm widget — the forked
   CLI owns the install go-ahead (ADR-0025). Manage / Secrets / System Info /
   Help still route to the existing screens this phase.
 

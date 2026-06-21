@@ -83,38 +83,26 @@ _BATCAT_ALIAS_LINES=(
     "command -v batcat >/dev/null 2>&1 && alias bat='batcat'  # init_ubuntu:batcat"
 )
 
-# Override install: archetype apt-installs, then drop aliases + Sidecar.
+# Override install: archetype apt-installs, then drop aliases. The Sidecar
+# is written by the phase-invocation wrapper after a successful install.
 install() {
     module_default_apt_install || return $?
-    module_dryrun_guard install "append cat/bat aliases to shell rc files + write sidecar" \
+    module_dryrun_guard install "append cat/bat aliases to shell rc files" \
         && return 0
     _batcat_add_aliases
-    module_sidecar_write "${NAME}" "$(_batcat_pkg_version)"
 }
 
-# Override upgrade: archetype upgrades, then refresh the Sidecar version.
-upgrade() {
-    module_default_apt_upgrade || return $?
-    module_dryrun_guard upgrade "refresh sidecar version" && return 0
-    module_sidecar_write "${NAME}" "$(_batcat_pkg_version)"
-}
+# upgrade: inherits module_default_apt_upgrade (Sidecar refreshed by wrapper).
 
-# Override remove: apt-remove keeps user config (alias lines stay — they
-# are guarded by `command -v batcat`), but the Sidecar is state, not
-# config, so it goes (doc/module-spec.md §4.7.4).
-remove() {
-    module_default_apt_remove || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    module_sidecar_remove "${NAME}"
-}
+# remove: inherits module_default_apt_remove (alias lines stay — they are
+# guarded by `command -v batcat`; the Sidecar is removed by the wrapper).
 
 # Override purge: archetype purges pkg + CONFIG_PATHS, then strip the
-# alias lines and drop the Sidecar.
+# alias lines (Sidecar removed by the wrapper).
 purge() {
     module_default_apt_purge || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _batcat_remove_aliases
-    module_sidecar_remove "${NAME}"
 }
 
 detect() {
@@ -125,34 +113,9 @@ is_recommended() {
     ! is_installed
 }
 
-# doctor: health check — package installed, binary runnable, Sidecar present.
-doctor() {
-    if ! is_installed; then
-        log_warn "[${NAME}] doctor: bat package is not installed"
-        return 1
-    fi
-    if ! command -v batcat >/dev/null 2>&1; then
-        log_warn "[${NAME}] doctor: batcat binary not found on PATH"
-        return 1
-    fi
-    if ! batcat --version >/dev/null 2>&1; then
-        log_warn "[${NAME}] doctor: batcat --version failed"
-        return 1
-    fi
-    [[ -f "$(module_sidecar_path "${NAME}")" ]] \
-        || log_warn "[${NAME}] doctor: sidecar missing (installed outside init_ubuntu?)"
-    return 0
-}
+# doctor: inherits module_default_doctor (is_installed + warn).
 
 # ── Private helpers ─────────────────────────────────────────────────────────
-
-# Installed package version from dpkg; falls back to the metadata default
-# when dpkg has no record (e.g. mocked install in tests).
-_batcat_pkg_version() {
-    local _ver
-    _ver="$(dpkg-query -W -f='${Version}' bat 2>/dev/null || true)"
-    printf '%s' "${_ver:-apt-managed}"
-}
 
 # Append the guarded alias lines to every EXISTING shell rc file; never
 # creates rc files, never duplicates lines (idempotent).

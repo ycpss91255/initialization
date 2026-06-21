@@ -73,42 +73,36 @@ CONFIG_PATHS=("${HOME}/.config/lazydocker")
 : "${GITHUB_ASSET_PATTERN}" "${BIN_PATH_IN_TAR}" "${STRIP_COMPONENTS}" "${USE_SUDO}"
 module_use_github_release_archetype
 
+# remove override: a no-op "nothing to do" when not installed (idempotent;
+# avoids a needless sudo call on a clean box). The shared github-release default
+# deletes unconditionally -- it must clean a Sidecar-less partial install (e.g.
+# fzf) -- so the skip lives here, not in the default. The phase-invocation
+# wrapper still removes the Sidecar.
+remove() {
+    module_dryrun_guard remove "rm ${INSTALL_DIR} + ${BIN_LINK}" && return 0
+    module_skip_if_not_installed && return 0
+    module_default_github_release_remove
+}
+
 # Overrides: upstream asset names embed the version, so the archetype's
 # stable-URL fetch does not apply. install/upgrade use the version-aware
-# fetch below and maintain the Sidecar (ADR-0001); remove/purge chain to
-# the archetype defaults, then drop the Sidecar.
+# fetch below; the phase-invocation wrapper writes the Sidecar via
+# module_provided_version (ADR-0001), reading MODULE_GH_RESOLVED_VERSION set
+# inside _lazydocker_fetch_and_install. purge inherits the macro default
+# (the wrapper removes the Sidecar).
 install() {
     module_dryrun_guard install \
-        "fetch ${GITHUB_REPO} latest -> ${INSTALL_DIR}, symlink ${BIN_LINK}, write sidecar" \
+        "fetch ${GITHUB_REPO} latest -> ${INSTALL_DIR}, symlink ${BIN_LINK}" \
         && return 0
     module_skip_if_installed && return 0
     _lazydocker_fetch_and_install || return $?
-    module_sidecar_write "${NAME}" "${LAZYDOCKER_RESOLVED_VERSION:-latest}"
 }
 
 upgrade() {
     module_dryrun_guard upgrade \
-        "re-download ${GITHUB_REPO} latest + refresh sidecar" \
+        "re-download ${GITHUB_REPO} latest" \
         && return 0
     _lazydocker_fetch_and_install || return $?
-    module_sidecar_write "${NAME}" "${LAZYDOCKER_RESOLVED_VERSION:-latest}"
-}
-
-remove() {
-    module_dryrun_guard remove \
-        "rm ${INSTALL_DIR} + ${BIN_LINK} + sidecar" \
-        && return 0
-    module_skip_if_not_installed && return 0
-    module_default_github_release_remove || return $?
-    module_sidecar_remove "${NAME}"
-}
-
-purge() {
-    module_dryrun_guard purge \
-        "rm ${INSTALL_DIR} + ${BIN_LINK} + CONFIG_PATHS + sidecar" \
-        && return 0
-    module_default_github_release_purge || return $?
-    module_sidecar_remove "${NAME}"
 }
 
 # ── Hand-written hooks ──────────────────────────────────────────────────────
@@ -162,7 +156,8 @@ _lazydocker_asset_arch() {
 }
 
 # Resolve latest release, download the versioned tarball, extract to
-# INSTALL_DIR, symlink BIN_LINK. Sets LAZYDOCKER_RESOLVED_VERSION on success.
+# INSTALL_DIR, symlink BIN_LINK. Sets MODULE_GH_RESOLVED_VERSION on success
+# (read by the phase-invocation wrapper via module_provided_version).
 _lazydocker_fetch_and_install() {
     have_sudo_access 2>/dev/null \
         || { log_error "[${NAME}] sudo required to install to ${INSTALL_DIR}"; return 1; }
@@ -205,7 +200,8 @@ _lazydocker_fetch_and_install() {
     rm -f "${_tmp}"
     sudo ln -sfn "${INSTALL_DIR}/${BIN_PATH_IN_TAR}" "${BIN_LINK}"
 
-    LAZYDOCKER_RESOLVED_VERSION="${_ver}"
+    # Feed the resolved tag to the phase-invocation wrapper (module_provided_version).
+    MODULE_GH_RESOLVED_VERSION="${_ver}"
     log_info "[${NAME}] installed ${BIN_NAME} v${_ver} -> ${BIN_LINK}"
 }
 

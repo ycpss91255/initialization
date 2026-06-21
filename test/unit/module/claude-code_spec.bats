@@ -254,7 +254,7 @@ EOF
     _mock_version
     MOCK_IS_INSTALLED_RC=1
     _mock_is_installed
-    install
+    module_standalone_main install
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/claude-code" ]]
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/claude-code")" == "9.9.9" ]]
 }
@@ -268,7 +268,7 @@ EOF
     _mock_version
     MOCK_IS_INSTALLED_RC=1
     _mock_is_installed
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
@@ -278,7 +278,7 @@ EOF
     _mock_installer
     MOCK_IS_INSTALLED_RC=1
     _mock_is_installed
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code" ]]
 }
@@ -291,7 +291,7 @@ EOF
     _mock_version
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/claude-code")" == "9.9.9" ]]
 }
 
@@ -301,7 +301,7 @@ EOF
     CLAUDE_DATA_DIR="${INIT_UBUNTU_TEST_SCRATCH}/share/claude"
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/claude-code"
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code" ]]
 }
 
@@ -312,7 +312,7 @@ EOF
     CONFIG_PATHS=("${INIT_UBUNTU_TEST_SCRATCH}/dot-claude")
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/claude-code"
-    purge
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code" ]]
 }
 
@@ -474,7 +474,7 @@ EOF
     _mock_is_installed
     MOCK_SELF_UPDATE_RC=1
     _mock_self_update
-    run upgrade
+    run module_standalone_main upgrade
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code" ]]
 }

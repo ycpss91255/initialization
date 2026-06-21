@@ -13,7 +13,11 @@ _Avoid_: package, plugin, script, recipe.
 
 **Archetype**: a pre-defined pattern for how a Module installs. Four archetypes
 exist: A=apt-only, B=GitHub-release tarball, C=config-drop, D=custom hand-written.
-A/B/C have helper macros that wire up lifecycle functions; D writes them all.
+A/B/C have helper macros (`module_use_*_archetype`) that wire up the full
+Lifecycle — all 10 functions plus the `module_provided_version` Sidecar hook
+(ADR-0027, refines ADR-0002); only `detect` + `is_recommended` stay
+module-defined. D writes them all. Any macro-emitted function can be overridden
+after the macro (bash late-binding).
 _Avoid_: type, kind, flavor.
 
 **Lifecycle**: the 10 contract functions a Module must implement (or inherit
@@ -105,9 +109,14 @@ _Avoid_: settings (overloaded).
 
 **Sidecar**: `${XDG_STATE_HOME}/init_ubuntu/versions/<name>` file recording the
 installed version of one Module. Single source of truth for "what version did
-we install?", consulted by `is_outdated`. Written by both Engine and Standalone.
-Deleted on `remove` / `purge` (both modes) — invariant: `is_installed()==false`
-↔ Sidecar absent.
+we install?", consulted by `is_outdated`. Written by both Engine and Standalone
+— at the **phase-invocation layer**, not inside the Module's `install()`
+(ADR-0027, refines ADR-0001 on *where*): one shared
+`_module_sidecar_after_phase` runs after a successful phase from BOTH invokers
+(Engine `lib/runner.sh`, Standalone `module_standalone_main`), recording the
+version returned by the Module's `module_provided_version` hook. Deleted on
+`remove` / `purge` (both modes) — invariant: `is_installed()==false` ↔ Sidecar
+absent (now enforced at the invoker layer).
 
 **Manual flag**: `state.json.installed.<m>.synced.manual` field on each
 installed Module. `true` = user explicitly named it on CLI / TUI;
@@ -156,10 +165,14 @@ avoid name collision with the Engine-level `setup_ubuntu update` (registry resca
 
 > **Dev:** "When the user runs `setup_ubuntu install neovim`, what writes the
 > **Sidecar** — the **Engine** or the **Module**?"
-> **Author:** "The **Module**'s `install()` writes it, via the Archetype B
-> helper. Both **Engine Mode** and **Standalone Mode** hit the same code path.
-> The difference is only that **Engine Mode** also writes `state.json` (with
-> the **Manual flag**), while **Standalone Mode** leaves `state.json` untouched."
+> **Author:** "The **invoker** writes it, not the **Module**'s `install()`
+> (ADR-0027). After `install()` succeeds, the phase-invocation wrapper
+> (`_module_sidecar_after_phase`) records the Sidecar using the version from
+> the Module's `module_provided_version` hook. Both **Engine Mode** (in the
+> runner) and **Standalone Mode** (in `module_standalone_main`) call that same
+> wrapper. The difference is only that **Engine Mode** also writes `state.json`
+> (with the **Manual flag**), while **Standalone Mode** leaves `state.json`
+> untouched."
 
 > **Dev:** "Is `verify` a **Phase** or a **Lifecycle** function?"
 > **Author:** "Both. Every **Lifecycle** function is exposed as a **Phase** via

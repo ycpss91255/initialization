@@ -88,31 +88,18 @@ install() {
         && return 0
     module_skip_if_installed && return 0
     _vscode_setup_apt_repo || return 1
-    module_default_apt_install || return $?
-    module_sidecar_write "${NAME}" "$(_vscode_pkg_version)"
+    module_default_apt_install
 }
 
-upgrade() {
-    module_default_apt_upgrade || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    module_sidecar_write "${NAME}" "$(_vscode_pkg_version)"
-}
-
-# Override remove/purge: apt default handles packages/config, then drop the
-# Sidecar. The Microsoft repo files survive remove (re-install stays cheap)
-# and are wiped only on purge.
-remove() {
-    module_default_apt_remove || return $?
-    module_sidecar_remove "${NAME}"
-}
-
+# upgrade / remove use the apt archetype defaults; the Sidecar is handled at
+# the phase-invocation layer (ADR-0001 refinement). The Microsoft repo files
+# survive remove (re-install stays cheap) and are wiped only on purge.
 purge() {
     module_dryrun_guard purge \
         "apt-purge ${APT_PKGS[*]} + rm ${VSCODE_APT_SOURCE} ${VSCODE_APT_KEYRING} + CONFIG_PATHS" \
         && return 0
     module_default_apt_purge || return $?
     _vscode_remove_apt_repo
-    module_sidecar_remove "${NAME}"
 }
 
 detect() {
@@ -123,25 +110,8 @@ is_recommended() {
     ! is_installed
 }
 
-# doctor: health check — package installed, binary runnable, Sidecar present.
-doctor() {
-    if ! is_installed; then
-        log_warn "[${NAME}] doctor: code is not installed"
-        return 1
-    fi
-    local _bin
-    _bin="$(command -v code 2>/dev/null)" || {
-        log_warn "[${NAME}] doctor: code binary not found on PATH"
-        return 1
-    }
-    if ! "${_bin}" --version >/dev/null 2>&1; then
-        log_warn "[${NAME}] doctor: ${_bin} --version failed"
-        return 1
-    fi
-    module_sidecar_get_version "${NAME}" >/dev/null 2>&1 \
-        || log_warn "[${NAME}] doctor: sidecar missing (installed outside init_ubuntu?)"
-    return 0
-}
+# doctor: inherits module_default_doctor (is_installed + warn); the binary
+# --version check is covered by verify (TEST_VERIFY_CMD).
 
 # ── Private helpers ─────────────────────────────────────────────────────────
 
@@ -179,14 +149,6 @@ _vscode_setup_apt_repo() {
 # Drop the vendor repo files (purge only).
 _vscode_remove_apt_repo() {
     sudo rm -f "${VSCODE_APT_SOURCE}" "${VSCODE_APT_KEYRING}" || true
-}
-
-# Version string for the Sidecar: dpkg-reported package version, falling
-# back to the literal "apt-managed" when dpkg has no answer.
-_vscode_pkg_version() {
-    local _ver=""
-    _ver="$(dpkg-query -W -f='${Version}' code 2>/dev/null)" || _ver=""
-    printf '%s' "${_ver:-apt-managed}"
 }
 
 # ── Standalone footer ───────────────────────────────────────────────────────

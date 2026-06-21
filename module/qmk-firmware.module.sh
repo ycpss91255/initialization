@@ -69,6 +69,10 @@ TEST_VERIFY_CMD="command -v qmk && qmk --version"
 : "${DESCRIPTION[*]:-}" "${POST_INSTALL_MESSAGE[*]:-}" "${WARN_MESSAGE[*]:-}" \
     "${SUPPORTS_USER_HOME}" "${INSTALL_TARGET_DEFAULT}"
 
+# Version recorded in the Sidecar by the phase-invocation wrapper after a
+# successful install/upgrade (overrides the generic VERSION_PROVIDED default).
+module_provided_version() { _qmk_installed_version; }
+
 # ── Archetype D — custom data ───────────────────────────────────────────────
 # build-essential is deliberately repeated here even though it is a
 # DEPENDS_ON module (ADR-0026): standalone mode does not resolve DEPENDS_ON,
@@ -107,11 +111,10 @@ install() {
     _qmk_pipx_install || return 1
     _qmk_setup || return 1
     _qmk_deploy_keymaps || log_warn "[${NAME}] keymap overlay failed (continuing)"
-    module_sidecar_write "${NAME}" "$(_qmk_installed_version)"
 }
 
 upgrade() {
-    module_dryrun_guard upgrade "pipx upgrade qmk + refresh keymap overlay + sidecar" && return 0
+    module_dryrun_guard upgrade "pipx upgrade qmk + refresh keymap overlay" && return 0
     if ! is_installed; then
         log_info "[${NAME}] not installed yet — running install instead"
         install
@@ -119,7 +122,6 @@ upgrade() {
     fi
     _qmk_pipx_upgrade || return 1
     _qmk_deploy_keymaps || log_warn "[${NAME}] keymap overlay failed (continuing)"
-    module_sidecar_write "${NAME}" "$(_qmk_installed_version)"
 }
 
 remove() {
@@ -128,7 +130,6 @@ remove() {
         _qmk_pipx_uninstall \
             || log_warn "[${NAME}] pipx uninstall qmk failed (continuing)"
     fi
-    module_sidecar_remove "${NAME}"
 }
 
 purge() {
@@ -143,7 +144,6 @@ purge() {
         [[ -n "${_p}" ]] || continue
         rm -rf "${_p}"
     done
-    module_sidecar_remove "${NAME}"
 }
 
 verify() {

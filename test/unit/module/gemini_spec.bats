@@ -315,7 +315,7 @@ EOF
     _mock_version
     MOCK_IS_INSTALLED_RC=1
     _mock_is_installed
-    install
+    module_standalone_main install
     [[ -f "$(_sidecar_file)" ]]
     [[ "$(cat "$(_sidecar_file)")" == "9.9.9" ]]
 }
@@ -329,7 +329,7 @@ EOF
     _mock_version
     MOCK_IS_INSTALLED_RC=1
     _mock_is_installed
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
@@ -362,7 +362,7 @@ EOF
     _mock_pkg_install
     MOCK_IS_INSTALLED_RC=1
     _mock_is_installed
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "$(_sidecar_file)" ]]
 }
@@ -375,7 +375,7 @@ EOF
     _mock_version
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "$(_sidecar_file)")" == "9.9.9" ]]
 }
 
@@ -396,7 +396,7 @@ EOF
     _mock_pkg_install
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
-    run upgrade
+    run module_standalone_main upgrade
     assert_failure
     [[ ! -e "$(_sidecar_file)" ]]
 }
@@ -408,7 +408,7 @@ EOF
     _mock_pkg_uninstall
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
-    remove
+    module_standalone_main remove
     [[ ! -e "$(_sidecar_file)" ]]
 }
 
@@ -432,7 +432,7 @@ EOF
     _mock_pkg_uninstall
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
-    purge
+    module_standalone_main purge
     [[ ! -e "${CONFIG_PATHS[0]}" ]]
     [[ ! -e "$(_sidecar_file)" ]]
 }
@@ -488,7 +488,7 @@ EOF
     _mock_is_installed
     mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/empty-bin"
     PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-bin:/usr/bin:/bin" \
-        run install
+        run module_standalone_main install
     assert_failure
     assert_output --partial "fnm"
     [[ ! -e "$(_sidecar_file)" ]]
@@ -585,7 +585,7 @@ EOF
     _mock_version
     MOCK_IS_INSTALLED_RC=1
     _mock_is_installed
-    install
+    module_standalone_main install
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
     run doctor

@@ -76,10 +76,9 @@ ANYDESK_KEYRING="/etc/apt/keyrings/anydesk.gpg"
 ANYDESK_APT_LIST="/etc/apt/sources.list.d/anydesk.list"
 module_use_apt_archetype
 
-# Override install (super-call pattern, archetype-cookbook §A hybrid):
-# wire the vendor key + source first, then chain to the apt default and
-# record the version Sidecar (ADR-0001; module_sidecar_* helpers are
-# dry-run-safe, the explicit guard just skips the pointless dpkg-query).
+# Override install (super-call pattern, archetype-cookbook §A hybrid): wire
+# the vendor key + source first, then chain to the apt default. The Sidecar is
+# written by the phase-invocation wrapper (ADR-0001 refinement), not here.
 install() {
     module_dryrun_guard install \
         "anydesk vendor apt repo (${ANYDESK_REPO_URL}) + apt-install ${APT_PKGS[*]}" \
@@ -88,28 +87,14 @@ install() {
     have_sudo_access 2>/dev/null \
         || { log_error "[${NAME}] sudo required for anydesk install"; return 1; }
     _anydesk_setup_apt_repo || return $?
-    module_default_apt_install || return $?
-    module_sidecar_write "${NAME}" "$(_anydesk_pkg_version)"
+    module_default_apt_install
 }
 
-upgrade() {
-    module_default_apt_upgrade || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    module_sidecar_write "${NAME}" "$(_anydesk_pkg_version)"
-}
-
-# Override remove/purge: apt default handles packages/config, then drop
-# the Sidecar — "what version is installed" is state, not user config.
-# remove keeps the vendor repo wiring (re-install stays cheap); purge
-# also unhooks the apt source + keyring.
-remove() {
-    module_default_apt_remove || return $?
-    module_sidecar_remove "${NAME}"
-}
-
+# upgrade / remove use the apt archetype defaults (no override needed now that
+# the Sidecar lives at the invocation layer). purge also unhooks the vendor
+# apt source + keyring.
 purge() {
     module_default_apt_purge || return $?
-    module_sidecar_remove "${NAME}"
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _anydesk_remove_apt_repo
 }
@@ -131,25 +116,8 @@ is_recommended() {
     esac
 }
 
-# doctor: health check — package installed, binary runnable, Sidecar present.
-doctor() {
-    if ! is_installed; then
-        log_warn "[${NAME}] doctor: anydesk is not installed"
-        return 1
-    fi
-    local _bin
-    _bin="$(command -v anydesk 2>/dev/null)" || {
-        log_warn "[${NAME}] doctor: anydesk binary not found on PATH"
-        return 1
-    }
-    if ! "${_bin}" --version >/dev/null 2>&1; then
-        log_warn "[${NAME}] doctor: ${_bin} --version failed"
-        return 1
-    fi
-    module_sidecar_get_version "${NAME}" >/dev/null 2>&1 \
-        || log_warn "[${NAME}] doctor: sidecar missing (installed outside init_ubuntu?)"
-    return 0
-}
+# doctor: inherits module_default_doctor from the archetype macro (is_installed
+# + warn). The binary --version check is covered by verify (TEST_VERIFY_CMD).
 
 # ── Private helpers ─────────────────────────────────────────────────────────
 
@@ -186,14 +154,6 @@ _anydesk_remove_apt_repo() {
     fi
     log_info "[${NAME}] removing AnyDesk apt source + keyring"
     sudo rm -f "${ANYDESK_APT_LIST}" "${ANYDESK_KEYRING}"
-}
-
-# Version string for the Sidecar: dpkg-reported package version, falling
-# back to the literal "apt-managed" when dpkg has no answer.
-_anydesk_pkg_version() {
-    local _ver=""
-    _ver="$(dpkg-query -W -f='${Version}' anydesk 2>/dev/null)" || _ver=""
-    printf '%s' "${_ver:-apt-managed}"
 }
 
 # ── Standalone footer ───────────────────────────────────────────────────────

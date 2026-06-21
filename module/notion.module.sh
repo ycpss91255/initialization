@@ -81,7 +81,6 @@ install() {
     module_skip_if_installed && return 0
     _notion_resolve_asset_pattern || return $?
     _notion_fetch_and_install_deb || return $?
-    module_sidecar_write "${NAME}" "${_NOTION_TARGET_VERSION:-unknown}"
 }
 
 upgrade() {
@@ -90,20 +89,18 @@ upgrade() {
         && return 0
     _notion_resolve_asset_pattern || return $?
     _notion_fetch_and_install_deb || return $?
-    module_sidecar_write "${NAME}" "${_NOTION_TARGET_VERSION:-unknown}"
 }
 
 remove() {
     module_dryrun_guard remove \
-        "apt-get remove ${NOTION_DEB_PKG} + Sidecar" \
+        "apt-get remove ${NOTION_DEB_PKG}" \
         && return 0
     _notion_pkg_remove remove || return $?
-    module_sidecar_remove "${NAME}"
 }
 
 purge() {
     module_dryrun_guard purge \
-        "apt-get purge ${NOTION_DEB_PKG} + Sidecar + CONFIG_PATHS" \
+        "apt-get purge ${NOTION_DEB_PKG} + CONFIG_PATHS" \
         && return 0
     _notion_pkg_remove purge || return $?
     local _p
@@ -111,7 +108,6 @@ purge() {
         [[ -n "${_p}" ]] || continue
         rm -rf "${_p}"
     done
-    module_sidecar_remove "${NAME}"
 }
 
 detect() {
@@ -201,6 +197,8 @@ _notion_resolve_asset_pattern() {
     fi
     GITHUB_ASSET_PATTERN="Notion_Electron-${_ver}-${_arch}.deb"
     _NOTION_TARGET_VERSION="${_ver}"
+    # Feed the resolved tag to the phase-invocation wrapper (module_provided_version).
+    MODULE_GH_RESOLVED_VERSION="${_ver}"
 }
 
 # Download the resolved .deb asset and apt-install it. apt (not dpkg -i)

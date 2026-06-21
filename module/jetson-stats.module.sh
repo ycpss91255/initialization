@@ -67,6 +67,10 @@ TEST_VERIFY_CMD="command -v jtop && jtop --version"
 : "${DESCRIPTION[*]:-}" "${POST_INSTALL_MESSAGE[*]:-}" "${WARN_MESSAGE[*]:-}" \
     "${SUPPORTS_USER_HOME}" "${INSTALL_TARGET_DEFAULT}"
 
+# Version recorded in the Sidecar by the phase-invocation wrapper after a
+# successful install/upgrade (overrides the generic VERSION_PROVIDED default).
+module_provided_version() { _jetson_stats_version; }
+
 # ── Archetype D — custom (pip install, pipx fallback on PEP 668) ────────────
 PIP_PKG="jetson-stats"
 # jtop's post-install drops a root systemd unit; pip uninstall does not
@@ -85,19 +89,17 @@ is_installed() {
 }
 
 # install: pick the installer (pip vs pipx per PEP 668), run it under sudo
-# (jtop.service must be a root service), then record the version Sidecar
-# (ADR-0001; module_sidecar_* helpers are dry-run-safe).
+# (jtop.service must be a root service).
 install() {
     module_dryrun_guard install \
         "sudo pip3 install -U ${PIP_PKG} (PEP 668 env -> sudo pipx install) + jtop.service" \
         && return 0
     module_skip_if_installed && return 0
     _jetson_stats_pkg_install || return $?
-    module_sidecar_write "${NAME}" "$(_jetson_stats_version)"
 }
 
-# upgrade: same installer split (pip -U / pipx upgrade), then refresh the
-# Sidecar. Falls through to install when nothing is installed yet.
+# upgrade: same installer split (pip -U / pipx upgrade). Falls through to
+# install when nothing is installed yet.
 upgrade() {
     module_dryrun_guard upgrade \
         "sudo pip3 install -U ${PIP_PKG} (PEP 668 env -> sudo pipx upgrade)" \
@@ -108,19 +110,16 @@ upgrade() {
         return $?
     fi
     _jetson_stats_pkg_upgrade || return $?
-    module_sidecar_write "${NAME}" "$(_jetson_stats_version)"
 }
 
 # remove: uninstall the package (whichever of pip/pipx owns it) but KEEP the
-# leftover jtop.service unit (remove vs purge semantics), then drop the
-# Sidecar — installed-version is state, not config.
+# leftover jtop.service unit (remove vs purge semantics).
 remove() {
     module_dryrun_guard remove \
         "sudo pip3/pipx uninstall ${PIP_PKG} (jtop.service unit kept: ${JTOP_SERVICE_UNIT})" \
         && return 0
     module_skip_if_not_installed && return 0
     _jetson_stats_pkg_uninstall || return $?
-    module_sidecar_remove "${NAME}"
 }
 
 # purge: remove + stop/disable jtop.service and delete the leftover unit
@@ -134,7 +133,6 @@ purge() {
     fi
     sudo systemctl disable --now jtop.service 2>/dev/null || true
     sudo rm -f "${JTOP_SERVICE_UNIT}"
-    module_sidecar_remove "${NAME}"
 }
 
 verify() {

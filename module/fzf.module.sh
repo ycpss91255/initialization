@@ -76,35 +76,25 @@ CONFIG_PATHS=("${HOME}/.fzf")  # legacy v1 git-clone install dir
 module_use_github_release_archetype
 
 # Override install/upgrade: resolve latest tag, download the versioned
-# asset, then record the Sidecar (ADR-0001) on success.
+# asset. The phase-invocation wrapper writes the Sidecar via
+# module_provided_version (ADR-0001); _fzf_fetch_and_install sets
+# MODULE_GH_RESOLVED_VERSION so the wrapper records the resolved tag.
 install() {
     module_dryrun_guard install \
-        "fetch ${GITHUB_REPO} latest -> ${INSTALL_DIR}, symlink ${BIN_LINK}, write sidecar" \
+        "fetch ${GITHUB_REPO} latest -> ${INSTALL_DIR}, symlink ${BIN_LINK}" \
         && return 0
     module_skip_if_installed && return 0
     _fzf_fetch_and_install || return $?
-    _fzf_sidecar_write "${FZF_RESOLVED_VERSION:-unknown}"
 }
 
 upgrade() {
-    module_dryrun_guard upgrade "re-download ${GITHUB_REPO} latest, refresh sidecar" \
+    module_dryrun_guard upgrade "re-download ${GITHUB_REPO} latest" \
         && return 0
     _fzf_fetch_and_install || return $?
-    _fzf_sidecar_write "${FZF_RESOLVED_VERSION:-unknown}"
 }
 
-# Override remove/purge: archetype handles files, then drop the Sidecar.
-remove() {
-    module_default_github_release_remove || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    _fzf_sidecar_remove
-}
-
-purge() {
-    module_default_github_release_purge || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    _fzf_sidecar_remove
-}
+# remove/purge: inherit macro defaults (module_default_github_release_*); the
+# wrapper removes the Sidecar.
 
 detect() {
     _fzf_arch >/dev/null 2>&1
@@ -168,22 +158,10 @@ _fzf_sidecar_path() {
     printf '%s/versions/%s' "${_dir}" "${NAME}"
 }
 
-_fzf_sidecar_write() {
-    local _ver="${1:-unknown}"
-    local _path; _path="$(_fzf_sidecar_path)"
-    mkdir -p "${_path%/*}"
-    printf '%s\n' "${_ver}" > "${_path}"
-    log_info "[${NAME}] sidecar: ${_path} = ${_ver}"
-}
-
-_fzf_sidecar_remove() {
-    rm -f "$(_fzf_sidecar_path)"
-    return 0
-}
-
 # Resolve the latest release tag, download the versioned tarball, extract
 # the single binary to INSTALL_DIR and symlink BIN_LINK. Exports the
-# resolved version via FZF_RESOLVED_VERSION for the Sidecar write.
+# resolved version via FZF_RESOLVED_VERSION + MODULE_GH_RESOLVED_VERSION for
+# the wrapper's Sidecar write.
 _fzf_fetch_and_install() {
     local _arch _ver _tmp _url
     _arch="$(_fzf_arch)" || {
@@ -230,6 +208,8 @@ _fzf_fetch_and_install() {
     rm -f "${_tmp}"
     ${_sudo} ln -sfn "${INSTALL_DIR}/${BIN_PATH_IN_TAR}" "${BIN_LINK}"
     FZF_RESOLVED_VERSION="${_ver}"
+    # Feed the resolved tag to the phase-invocation wrapper (module_provided_version).
+    MODULE_GH_RESOLVED_VERSION="${_ver}"
     log_info "[${NAME}] installed fzf v${_ver} -> ${BIN_LINK}"
 }
 

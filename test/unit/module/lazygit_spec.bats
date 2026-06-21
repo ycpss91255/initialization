@@ -308,7 +308,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote "0.99.0"
-    install
+    module_standalone_main install
     [[ -f "$(_sidecar_file)" ]]
     [[ "$(cat "$(_sidecar_file)")" == "0.99.0" ]]
 }
@@ -317,7 +317,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    install
+    module_standalone_main install
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/state.json" ]]
 }
 
@@ -345,7 +345,7 @@ _mock_remote() {
     _sandbox_paths
     _mock_remote
     eval '_module_github_release_fetch_and_install() { return 1; }'
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "$(_sidecar_file)" ]]
 }
@@ -355,7 +355,7 @@ _mock_remote() {
     _sandbox_paths
     _mock_remote
     eval 'get_github_pkg_latest_version() { return 1; }'
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "$(_sidecar_file)" ]]
 }
@@ -364,9 +364,9 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote "0.99.0"
-    install
+    module_standalone_main install
     _mock_remote "1.0.0"
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "$(_sidecar_file)")" == "1.0.0" ]]
 }
 
@@ -374,8 +374,8 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    install
-    remove
+    module_standalone_main install
+    module_standalone_main remove
     [[ ! -e "${INSTALL_DIR}" ]]
     [[ ! -e "${BIN_LINK}" ]]
     [[ ! -e "$(_sidecar_file)" ]]
@@ -394,10 +394,10 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    install
+    module_standalone_main install
     mkdir -p "${CONFIG_PATHS[0]}"
     : > "${CONFIG_PATHS[0]}/config.yml"
-    purge
+    module_standalone_main purge
     [[ ! -e "$(_sidecar_file)" ]]
     [[ ! -e "${CONFIG_PATHS[0]}" ]]
 }
@@ -423,7 +423,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote "0.99.0"
-    install
+    module_standalone_main install
     run is_outdated
     assert_failure
 }
@@ -432,7 +432,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote "0.99.0"
-    install
+    module_standalone_main install
     eval 'get_github_pkg_latest_version() { local -n _out="${1}"; _out="1.0.0"; }'
     run is_outdated
     assert_success
@@ -442,7 +442,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote "0.99.0"
-    install
+    module_standalone_main install
     eval 'get_github_pkg_latest_version() { return 1; }'
     run is_outdated
     assert_failure
@@ -461,7 +461,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    install
+    module_standalone_main install
     run doctor
     assert_success
 }
@@ -470,7 +470,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    install
+    module_standalone_main install
     rm -f "$(_sidecar_file)"
     run doctor
     assert_failure

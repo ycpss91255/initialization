@@ -69,6 +69,10 @@ TEST_VERIFY_CMD="command -v gemini && gemini --version"
 : "${DESCRIPTION[*]:-}" "${POST_INSTALL_MESSAGE[*]:-}" "${WARN_MESSAGE[*]:-}" \
     "${SUPPORTS_USER_HOME}" "${INSTALL_TARGET_DEFAULT}"
 
+# Version recorded in the Sidecar by the phase-invocation wrapper after a
+# successful install/upgrade (overrides the generic VERSION_PROVIDED default).
+module_provided_version() { _gemini_version; }
+
 # ── Archetype D data — npm package via fnm-managed Node.js ──────────────────
 GEMINI_NPM_PKG="@google/gemini-cli"
 GEMINI_BIN_NAME="gemini"
@@ -92,18 +96,17 @@ is_installed() {
 
 install() {
     module_dryrun_guard install \
-        "npm install -g ${GEMINI_NPM_PKG}@latest (fnm-managed Node.js) + Sidecar" \
+        "npm install -g ${GEMINI_NPM_PKG}@latest (fnm-managed Node.js)" \
         && return 0
     module_skip_if_installed && return 0
     _gemini_pkg_install || return $?
-    module_sidecar_write "${NAME}" "$(_gemini_version)"
 }
 
 # upgrade: npm install -g <pkg>@latest doubles as the upgrade path; falls
 # through to install when nothing is installed yet.
 upgrade() {
     module_dryrun_guard upgrade \
-        "npm install -g ${GEMINI_NPM_PKG}@latest (refresh) + Sidecar" \
+        "npm install -g ${GEMINI_NPM_PKG}@latest (refresh)" \
         && return 0
     if ! is_installed; then
         log_info "[${NAME}] not installed yet — running install instead"
@@ -111,23 +114,21 @@ upgrade() {
         return $?
     fi
     _gemini_pkg_install || return $?
-    module_sidecar_write "${NAME}" "$(_gemini_version)"
 }
 
-# remove: npm uninstall the package + drop the Sidecar; user config
-# (~/.gemini) is kept — purge wipes it.
+# remove: npm uninstall the package; user config (~/.gemini) is kept —
+# purge wipes it.
 remove() {
     module_dryrun_guard remove \
-        "npm uninstall -g ${GEMINI_NPM_PKG} + Sidecar (config kept: ${CONFIG_PATHS[*]})" \
+        "npm uninstall -g ${GEMINI_NPM_PKG} (config kept: ${CONFIG_PATHS[*]})" \
         && return 0
     module_skip_if_not_installed && return 0
     _gemini_pkg_uninstall || return $?
-    module_sidecar_remove "${NAME}"
 }
 
 purge() {
     module_dryrun_guard purge \
-        "npm uninstall -g ${GEMINI_NPM_PKG} + rm ${CONFIG_PATHS[*]} + Sidecar" \
+        "npm uninstall -g ${GEMINI_NPM_PKG} + rm ${CONFIG_PATHS[*]}" \
         && return 0
     if is_installed; then
         _gemini_pkg_uninstall || return $?
@@ -136,7 +137,6 @@ purge() {
     for _p in "${CONFIG_PATHS[@]}"; do
         rm -rf "${_p}"
     done
-    module_sidecar_remove "${NAME}"
 }
 
 verify() {

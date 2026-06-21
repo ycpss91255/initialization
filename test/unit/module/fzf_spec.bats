@@ -37,10 +37,10 @@ _standalone_module() {
 # Stub a successful release fetch: records the resolved version without
 # touching the network or the filesystem.
 _mock_fetch_ok() {
-    _fzf_fetch_and_install() {
-        FZF_RESOLVED_VERSION="9.9.9"
-        return 0
-    }
+    # Mirror production: the fetch helper publishes the resolved tag via
+    # MODULE_GH_RESOLVED_VERSION, which the phase-invocation wrapper reads to
+    # write the Sidecar. eval so the assignment isn't flagged SC2034.
+    eval '_fzf_fetch_and_install() { MODULE_GH_RESOLVED_VERSION="9.9.9"; return 0; }'
 }
 
 # ── Smoke ────────────────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ _mock_fetch_ok() {
     _load_module
     _mock_fetch_ok
     is_installed() { return 1; }
-    install
+    module_standalone_main install
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/fzf" ]]
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/fzf")" == "9.9.9" ]]
 }
@@ -297,7 +297,7 @@ _mock_fetch_ok() {
     local _before; _before="$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")"
     _mock_fetch_ok
     is_installed() { return 1; }
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
@@ -305,7 +305,7 @@ _mock_fetch_ok() {
     _load_module
     _fzf_fetch_and_install() { return 1; }
     is_installed() { return 1; }
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/fzf" ]]
 }
@@ -315,7 +315,7 @@ _mock_fetch_ok() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/fzf"
     _mock_fetch_ok
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/fzf")" == "9.9.9" ]]
 }
 
@@ -324,7 +324,7 @@ _mock_fetch_ok() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/fzf"
     module_default_github_release_remove() { return 0; }
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/fzf" ]]
 }
 
@@ -333,7 +333,7 @@ _mock_fetch_ok() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/fzf"
     module_default_github_release_purge() { return 0; }
-    purge
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/fzf" ]]
 }
 

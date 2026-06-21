@@ -340,9 +340,8 @@ _seed_managed_config() {
     _load_module
     module_default_apt_install() { return 0; }
     module_default_apt_install
-    _ranger_pkg_version() { printf '1.9.3-1'; }
-    [[ "$(_ranger_pkg_version)" == "1.9.3-1" ]]
-    install
+    dpkg-query() { printf '1.9.3-1'; }
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/ranger")" == "1.9.3-1" ]]
 }
 
@@ -351,7 +350,7 @@ _seed_managed_config() {
     printf '{"sentinel":true}\n' > "${INIT_UBUNTU_STATE_DIR}/state.json"
     module_default_apt_install() { return 0; }
     module_default_apt_install
-    run install
+    run module_standalone_main install
     assert_success
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == '{"sentinel":true}' ]]
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/ranger" ]]
@@ -361,7 +360,7 @@ _seed_managed_config() {
     _load_module
     module_default_apt_install() { return 1; }
     module_default_apt_install || true
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ranger" ]]
     [[ ! -e "${HOME}/.config/ranger/rifle.conf" ]]
@@ -373,7 +372,7 @@ _seed_managed_config() {
     module_default_apt_install
     module_default_config_install() { return 1; }
     module_default_config_install || true
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ranger" ]]
 }
@@ -383,9 +382,8 @@ _seed_managed_config() {
     module_sidecar_write "ranger" "1.8.0"
     module_default_apt_upgrade() { return 0; }
     module_default_apt_upgrade
-    _ranger_pkg_version() { printf '9.9.9'; }
-    [[ "$(_ranger_pkg_version)" == "9.9.9" ]]
-    upgrade
+    dpkg-query() { printf '9.9.9'; }
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/ranger")" == "9.9.9" ]]
 }
 
@@ -394,7 +392,7 @@ _seed_managed_config() {
     module_sidecar_write "ranger" "1.9.3"
     module_default_apt_remove() { return 0; }
     module_default_apt_remove
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ranger" ]]
 }
 
@@ -403,7 +401,7 @@ _seed_managed_config() {
     module_sidecar_write "ranger" "1.9.3"
     module_default_apt_purge() { return 0; }
     module_default_apt_purge
-    purge
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ranger" ]]
 }
 
@@ -506,12 +504,14 @@ _seed_managed_config() {
     assert_success
 }
 
-@test "doctor fails when ranger binary is missing from PATH" {
+@test "doctor (inherited default) tracks is_installed only, not the binary" {
+    # ranger now inherits module_default_doctor (is_installed + warn); the
+    # ranger --version probe moved to verify (TEST_VERIFY_CMD), so an empty
+    # PATH no longer fails doctor as long as is_installed succeeds.
     _load_module
-    is_installed() { return 0; }
-    is_installed
+    eval 'is_installed() { return 0; }'
     PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-path" run doctor
-    assert_failure
+    assert_success
 }
 
 @test "is_outdated returns zero when apt lists ranger as upgradable" {

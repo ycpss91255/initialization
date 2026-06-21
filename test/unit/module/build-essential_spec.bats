@@ -238,7 +238,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     MOCK_PKG_VERSION="12.9ubuntu3"
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/build-essential" ]]
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/build-essential")" == "12.9ubuntu3" ]]
 }
@@ -248,7 +248,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     MOCK_PKG_VERSION=""
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/build-essential")" == "apt-managed" ]]
 }
 
@@ -260,7 +260,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     MOCK_PKG_VERSION="12.9ubuntu3"
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
@@ -268,7 +268,7 @@ _mock_apt_list() {
     _load_module
     MOCK_APT_INSTALL_RC=1
     _mock_apt_defaults
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/build-essential" ]]
 }
@@ -280,7 +280,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     MOCK_PKG_VERSION="12.9ubuntu3"
     _mock_dpkg_query
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/build-essential")" == "12.9ubuntu3" ]]
 }
 
@@ -289,7 +289,7 @@ _mock_apt_list() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '12.9\n' > "${INIT_UBUNTU_STATE_DIR}/versions/build-essential"
     _mock_apt_defaults
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/build-essential" ]]
 }
 
@@ -298,7 +298,7 @@ _mock_apt_list() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '12.9\n' > "${INIT_UBUNTU_STATE_DIR}/versions/build-essential"
     _mock_apt_defaults
-    purge
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/build-essential" ]]
 }
 
@@ -376,13 +376,19 @@ _mock_apt_list() {
     assert_success
 }
 
-@test "doctor fails when gcc is missing even if marked installed" {
+@test "doctor (inherited default) tracks is_installed only" {
+    # build-essential now inherits module_default_doctor (is_installed + warn);
+    # the gcc --version probe moved to verify (TEST_VERIFY_CMD).
     _load_module
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
-    mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/empty-bin"
-    PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-bin" run doctor
+    run doctor
+    assert_success
+    MOCK_IS_INSTALLED_RC=1
+    _mock_is_installed
+    run doctor
     assert_failure
+    assert_output --partial "not installed"
 }
 
 @test "is_outdated returns zero when apt reports build-essential upgradable" {

@@ -86,14 +86,13 @@ CLAUDE_CONFIG_FILES=("settings.json" "run-statusline.sh" "settings.statusline.js
 
 # ── Overrides (super-call pattern, archetype-cookbook §C) ────────────────────
 # Chain to the config-drop default, then drop the companion files with
-# $HOME localization and record the Sidecar (ADR-0001; module_sidecar_*
-# helpers are dry-run-safe).
+# $HOME localization. The Sidecar is written/removed by the phase-invocation
+# wrapper around install/upgrade/remove.
 
 install() {
     module_default_config_install || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _claude_config_drop_files || return $?
-    module_sidecar_write "${NAME}" "${VERSION_PROVIDED}"
 }
 
 upgrade() {
@@ -105,7 +104,6 @@ upgrade() {
     module_default_config_upgrade || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _claude_config_drop_files || return $?
-    module_sidecar_write "${NAME}" "${VERSION_PROVIDED}"
 }
 
 remove() {
@@ -113,7 +111,6 @@ remove() {
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     rm -f "${CONFIG_DEST%/*}/run-statusline.sh" \
           "${CONFIG_DEST%/*}/settings.statusline.json"
-    module_sidecar_remove "${NAME}"
 }
 
 purge() {
@@ -150,7 +147,7 @@ is_outdated() {
 }
 
 # doctor: health check — files present, launcher executable + syntactically
-# valid, Sidecar present (warn-only).
+# valid.
 doctor() {
     if ! is_installed; then
         log_warn "[${NAME}] doctor: ~/.claude/settings.json not managed by init_ubuntu"
@@ -165,6 +162,8 @@ doctor() {
         log_warn "[${NAME}] doctor: ${_launcher} has bash syntax errors"
         return 1
     fi
+    # Read-only Sidecar advisory: the wrapper writes the Sidecar at the
+    # invocation layer; a missing one means an out-of-band install (warn only).
     module_sidecar_get_version "${NAME}" >/dev/null 2>&1 \
         || log_warn "[${NAME}] doctor: sidecar missing (installed outside init_ubuntu?)"
     return 0

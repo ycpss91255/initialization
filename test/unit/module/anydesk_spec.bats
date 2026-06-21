@@ -83,14 +83,17 @@ _mock_apt_list() {
 # against scratch paths: pass-through sudo, fake curl (MOCK_CURL_BODY,
 # optional call log at MOCK_CURL_LOG), gpg that passes stdin through
 # (the module pipes `gpg --dearmor` into `sudo tee`).
+# eval the mock defs so shellcheck does not run reachability analysis on them
+# (these collaborators are dispatched indirectly via module_standalone_main /
+# the module's install path — SC2317 false positives otherwise).
 _mock_repo_tools() {
-    sudo() { "$@"; }
-    have_sudo_access() { return 0; }
-    curl() {
-        [[ -n "${MOCK_CURL_LOG:-}" ]] && printf 'curl %s\n' "$*" >> "${MOCK_CURL_LOG}"
-        printf '%s' "${MOCK_CURL_BODY:-FAKE-ARMORED-KEY}"
-    }
-    gpg() { cat; }
+    eval 'sudo() { "$@"; }'
+    eval 'have_sudo_access() { return 0; }'
+    eval 'curl() {
+        [[ -n "${MOCK_CURL_LOG:-}" ]] && printf "curl %s\n" "$*" >> "${MOCK_CURL_LOG}"
+        printf "%s" "${MOCK_CURL_BODY:-FAKE-ARMORED-KEY}"
+    }'
+    eval 'gpg() { cat; }'
 }
 
 # Point the vendor repo file paths into the per-test scratch dir.
@@ -340,7 +343,7 @@ _scratch_repo_paths() {
     _load_module
     _mock_apt_defaults
     MOCK_REPO_SETUP_RC=1
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/anydesk" ]]
 }
@@ -403,7 +406,7 @@ _scratch_repo_paths() {
     _mock_apt_defaults
     MOCK_PKG_VERSION="6.4.0"
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/anydesk" ]]
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/anydesk")" == "6.4.0" ]]
 }
@@ -413,7 +416,7 @@ _scratch_repo_paths() {
     _mock_apt_defaults
     MOCK_PKG_VERSION=""
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/anydesk")" == "apt-managed" ]]
 }
 
@@ -425,7 +428,7 @@ _scratch_repo_paths() {
     _mock_apt_defaults
     MOCK_PKG_VERSION="6.4.0"
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
@@ -433,7 +436,7 @@ _scratch_repo_paths() {
     _load_module
     MOCK_APT_INSTALL_RC=1
     _mock_apt_defaults
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/anydesk" ]]
 }
@@ -445,7 +448,7 @@ _scratch_repo_paths() {
     _mock_apt_defaults
     MOCK_PKG_VERSION="6.4.0"
     _mock_dpkg_query
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/anydesk")" == "6.4.0" ]]
 }
 
@@ -454,7 +457,7 @@ _scratch_repo_paths() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '6.4.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/anydesk"
     _mock_apt_defaults
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/anydesk" ]]
 }
 
@@ -465,7 +468,7 @@ _scratch_repo_paths() {
     printf '6.4.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/anydesk"
     _mock_apt_defaults
     _mock_repo_tools
-    purge
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/anydesk" ]]
 }
 

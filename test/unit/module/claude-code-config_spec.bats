@@ -214,7 +214,7 @@ _fake_claude_on_path() {
 
 @test "dry-run remove leaves dropped files and sidecar in place" {
     _load_module
-    install
+    module_standalone_main install
     INIT_UBUNTU_DRY_RUN=true run remove
     assert_success
     [[ -f "${HOME}/.claude/settings.json" ]]
@@ -331,7 +331,7 @@ TMUX
 
 @test "install writes the sidecar with VERSION_PROVIDED" {
     _load_module
-    install
+    module_standalone_main install
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config")" == "${VERSION_PROVIDED}" ]]
 }
@@ -341,14 +341,14 @@ TMUX
     printf '{"schema_version":"0.1.0","installed":{}}\n' \
         > "${INIT_UBUNTU_STATE_DIR}/state.json"
     local _before; _before="$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")"
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
 @test "failed drop leaves no sidecar behind (ADR-0015)" {
     _load_module
     _claude_config_drop_files() { return 1; }
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
 }
@@ -357,21 +357,21 @@ TMUX
     _load_module
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '0.9\n' > "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config"
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config")" == "${VERSION_PROVIDED}" ]]
 }
 
 @test "remove deletes the sidecar" {
     _load_module
-    install
-    remove
+    module_standalone_main install
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
 }
 
 @test "purge deletes the sidecar" {
     _load_module
-    install
-    purge
+    module_standalone_main install
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
 }
 
@@ -498,14 +498,14 @@ TMUX
 
 @test "doctor passes after a real install" {
     _load_module
-    install
+    module_standalone_main install
     run doctor
     assert_success
 }
 
 @test "doctor fails when run-statusline.sh lost its executable bit" {
     _load_module
-    install
+    module_standalone_main install
     chmod 644 "${HOME}/.claude/run-statusline.sh"
     run doctor
     assert_failure
@@ -513,7 +513,7 @@ TMUX
 
 @test "doctor warns (but passes) when the sidecar is missing" {
     _load_module
-    install
+    module_standalone_main install
     rm -f "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config"
     run doctor
     assert_success

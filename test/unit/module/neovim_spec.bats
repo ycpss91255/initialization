@@ -624,18 +624,19 @@ _standalone() {
     refute_output --partial "not implemented"
 }
 
-@test "standalone is-outdated degrades gracefully (optional phase, exit 2)" {
-    # neovim implements no is_outdated(); module_standalone_main reports
-    # the optional phase as not implemented with exit 2 (doc/module-spec.md).
+@test "standalone is-outdated is implemented via the github archetype (exit != 2)" {
+    # The github-release macro now wires is_outdated
+    # (module_default_github_release_is_outdated); never the old exit-2 gap.
     _standalone is-outdated
-    [[ "${status}" -eq 2 ]]
-    assert_output --partial "not implemented"
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }
 
-@test "standalone doctor degrades gracefully (optional phase, exit 2)" {
+@test "standalone doctor is implemented via the github archetype (exit != 2)" {
+    # doctor is the archetype default (module_default_doctor).
     _standalone doctor
-    [[ "${status}" -eq 2 ]]
-    assert_output --partial "not implemented"
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }
 
 @test "standalone --dry-run install leaves a fresh HOME empty" {

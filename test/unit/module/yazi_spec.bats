@@ -254,7 +254,7 @@ _sandbox_fetch_paths() {
     _load_module
     _sandbox_module
     printf '# rc\n' > "${TEST_HOME}/.bashrc"
-    install
+    module_standalone_main install
     INIT_UBUNTU_DRY_RUN=true run purge
     assert_success
     [[ -f "$(_sidecar_path)" ]]
@@ -387,7 +387,7 @@ _sandbox_fetch_paths() {
 @test "install writes the Sidecar under \${INIT_UBUNTU_STATE_DIR}/versions/" {
     _load_module
     _sandbox_module
-    run install
+    run module_standalone_main install
     assert_success
     [[ -f "$(_sidecar_path)" ]]
 }
@@ -395,14 +395,14 @@ _sandbox_fetch_paths() {
 @test "install records the binary-reported version in the Sidecar" {
     _load_module
     _sandbox_module
-    install
+    module_standalone_main install
     [[ "$(cat "$(_sidecar_path)")" == "25.5.31" ]]
 }
 
 @test "upgrade (re)writes the Sidecar" {
     _load_module
     _sandbox_module
-    run upgrade
+    run module_standalone_main upgrade
     assert_success
     [[ -f "$(_sidecar_path)" ]]
 }
@@ -410,17 +410,17 @@ _sandbox_fetch_paths() {
 @test "remove deletes the Sidecar" {
     _load_module
     _sandbox_module
-    install
+    module_standalone_main install
     [[ -f "$(_sidecar_path)" ]]
-    remove
+    module_standalone_main remove
     [[ ! -e "$(_sidecar_path)" ]]
 }
 
 @test "purge deletes the Sidecar" {
     _load_module
     _sandbox_module
-    install
-    purge
+    module_standalone_main install
+    module_standalone_main purge
     [[ ! -e "$(_sidecar_path)" ]]
 }
 
@@ -428,7 +428,7 @@ _sandbox_fetch_paths() {
     _load_module
     _sandbox_module
     printf '{"version":"0.1.0","installed":{}}\n' > "${INIT_UBUNTU_STATE_DIR}/state.json"
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == '{"version":"0.1.0","installed":{}}' ]]
 }
 
@@ -530,14 +530,17 @@ _sandbox_fetch_paths() {
     assert_failure
 }
 
-@test "doctor passes and heals a missing Sidecar when yazi runs" {
+@test "doctor passes and warns (read-only) when the Sidecar is missing" {
+    # Sidecar is written at the phase-invocation layer (refines ADR-0001), so
+    # doctor is read-only: warns about a missing Sidecar, does NOT heal it.
     _load_module
     eval 'is_installed() { return 0; }'
     eval 'yazi() { printf "Yazi 25.5.31 (f5a1cf0 2025-05-31)\n"; }'
     [[ ! -e "$(_sidecar_path)" ]]
     run doctor
     assert_success
-    [[ -f "$(_sidecar_path)" ]]
+    assert_output --partial "Sidecar missing"
+    [[ ! -e "$(_sidecar_path)" ]]
 }
 
 # ── Engine discovery (registry scan) ─────────────────────────────────────────

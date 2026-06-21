@@ -315,7 +315,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote "1.38.0"
-    install
+    module_standalone_main install
     [[ -f "$(_sidecar_file)" ]]
     [[ "$(cat "$(_sidecar_file)")" == "1.38.0" ]]
 }
@@ -352,7 +352,7 @@ _mock_remote() {
     _sandbox_paths
     _mock_remote
     eval '_fnm_fetch_and_install() { return 1; }'
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "$(_sidecar_file)" ]]
 }
@@ -361,9 +361,9 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote "1.38.0"
-    install
+    module_standalone_main install
     _mock_remote "1.39.0"
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "$(_sidecar_file)")" == "1.39.0" ]]
 }
 
@@ -371,8 +371,8 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    install
-    remove
+    module_standalone_main install
+    module_standalone_main remove
     [[ ! -e "${FNM_INSTALL_DIR}/fnm" ]]
     [[ ! -e "$(_sidecar_file)" ]]
 }
@@ -401,9 +401,9 @@ _mock_remote() {
     _sandbox_paths
     _mock_remote
     printf '# user bashrc\n' > "${FNM_BASH_RC}"
-    install
+    module_standalone_main install
     mkdir -p "${FNM_INSTALL_DIR}/node-versions/v22.0.0"
-    purge
+    module_standalone_main purge
     [[ ! -e "${FNM_INSTALL_DIR}" ]]
     [[ ! -e "${FNM_FISH_CONF}" ]]
     run grep -Fq "${FNM_BASH_BLOCK_BEGIN}" "${FNM_BASH_RC}"
@@ -526,7 +526,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote "1.38.0"
-    install
+    module_standalone_main install
     run is_outdated
     assert_failure
 }
@@ -535,7 +535,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote "1.38.0"
-    install
+    module_standalone_main install
     eval 'get_github_pkg_latest_version() { local -n _out="${1}"; _out="1.39.0"; }'
     run is_outdated
     assert_success
@@ -545,7 +545,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote "1.38.0"
-    install
+    module_standalone_main install
     eval 'get_github_pkg_latest_version() { return 1; }'
     run is_outdated
     assert_failure
@@ -564,7 +564,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    install
+    module_standalone_main install
     run doctor
     assert_success
 }
@@ -573,7 +573,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    install
+    module_standalone_main install
     rm -f "$(_sidecar_file)"
     run doctor
     assert_failure
@@ -592,7 +592,7 @@ _mock_remote() {
     _load_module
     _sandbox_paths
     _mock_remote
-    install
+    module_standalone_main install
     printf '#!/usr/bin/env bash\nexit 1\n' > "${FNM_INSTALL_DIR}/fnm"
     chmod +x "${FNM_INSTALL_DIR}/fnm"
     run doctor

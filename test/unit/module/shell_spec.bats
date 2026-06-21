@@ -95,19 +95,17 @@ _mock_have_sudo_access() {
     [[ "${MODULE_STANDALONE}" == "false" ]]
 }
 
-@test "shell module defines 9 lifecycle functions (doctor not implemented)" {
+@test "shell module defines all 10 lifecycle functions (ADR-0002)" {
     _load_module
     local _fn
     for _fn in detect is_recommended is_installed install upgrade \
-               remove purge verify is_outdated; do
+               remove purge verify is_outdated doctor; do
         declare -F "${_fn}" >/dev/null || {
             printf 'missing lifecycle function: %s\n' "${_fn}" >&2
             return 1
         }
     done
-    # doctor is intentionally absent: the apt archetype provides no default
-    # and shell does not hand-write one; standalone reports "not implemented".
-    run ! declare -F doctor
+    # doctor is now wired by the apt archetype macro (module_default_doctor).
 }
 
 # ── Metadata sanity ──────────────────────────────────────────────────────────
@@ -598,9 +596,10 @@ _mock_have_sudo_access() {
     refute_output --partial "not implemented"
 }
 
-@test "standalone: doctor reports not implemented (exit 2) — known gap" {
-    # shell ships no doctor(); module_standalone_main degrades gracefully.
+@test "standalone: doctor is implemented (default = is_installed; exit != 2)" {
+    # doctor is now the apt archetype default (module_default_doctor); shell is
+    # not installed in the test env, so it returns 1, never the old exit-2 gap.
     run _standalone_module doctor
-    assert_failure 2
-    assert_output --partial "not implemented"
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }

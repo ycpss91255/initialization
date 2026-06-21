@@ -37,7 +37,7 @@ _sidecar_file() {
 # Mock helpers (top-level so indirect dispatch is visible to shellcheck).
 _mock_installed()     { eval 'is_installed() { return 0; }'; }
 _mock_not_installed() { eval 'is_installed() { return 1; }'; }
-_mock_fetch_ok()      { eval '_lazydocker_fetch_and_install() { LAZYDOCKER_RESOLVED_VERSION="9.9.9"; }'; }
+_mock_fetch_ok()      { eval '_lazydocker_fetch_and_install() { LAZYDOCKER_RESOLVED_VERSION="9.9.9"; MODULE_GH_RESOLVED_VERSION="9.9.9"; }'; }
 _mock_fetch_fail()    { eval '_lazydocker_fetch_and_install() { return 1; }'; }
 _mock_latest_2_0_0()  { eval 'get_github_pkg_latest_version() { local -n _out="${1}"; _out="2.0.0"; }'; }
 _mock_docker_cli()    { eval 'docker() { return 0; }'; }
@@ -195,7 +195,7 @@ _mock_uname_m()       { eval "uname() { [[ \"\${1:-}\" == \"-m\" ]] && { printf 
     _load_module
     _mock_not_installed
     _mock_fetch_ok
-    install
+    module_standalone_main install
     [[ -f "$(_sidecar_file)" ]]
     [[ "$(cat "$(_sidecar_file)")" == "9.9.9" ]]
 }
@@ -203,7 +203,7 @@ _mock_uname_m()       { eval "uname() { [[ \"\${1:-}\" == \"-m\" ]] && { printf 
 @test "upgrade refreshes the sidecar on success" {
     _load_module
     _mock_fetch_ok
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "$(_sidecar_file)")" == "9.9.9" ]]
 }
 
@@ -211,7 +211,7 @@ _mock_uname_m()       { eval "uname() { [[ \"\${1:-}\" == \"-m\" ]] && { printf 
     _load_module
     _mock_not_installed
     _mock_fetch_fail
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "$(_sidecar_file)" ]]
 }
@@ -222,7 +222,7 @@ _mock_uname_m()       { eval "uname() { [[ \"\${1:-}\" == \"-m\" ]] && { printf 
     printf '1.0.0\n' > "$(_sidecar_file)"
     _mock_installed
     eval 'module_default_github_release_remove() { return 0; }'
-    remove
+    module_standalone_main remove
     [[ ! -e "$(_sidecar_file)" ]]
 }
 
@@ -231,7 +231,7 @@ _mock_uname_m()       { eval "uname() { [[ \"\${1:-}\" == \"-m\" ]] && { printf 
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '1.0.0\n' > "$(_sidecar_file)"
     eval 'module_default_github_release_purge() { return 0; }'
-    purge
+    module_standalone_main purge
     [[ ! -e "$(_sidecar_file)" ]]
 }
 
@@ -239,7 +239,7 @@ _mock_uname_m()       { eval "uname() { [[ \"\${1:-}\" == \"-m\" ]] && { printf 
     _load_module
     _mock_not_installed
     _mock_fetch_ok
-    install
+    module_standalone_main install
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/state.json" ]]
 }
 

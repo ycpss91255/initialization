@@ -66,66 +66,13 @@ APT_PPA=""
 CONFIG_PATHS=()
 module_use_apt_archetype
 
-# Override install/upgrade (super-call pattern, archetype-cookbook §A):
-# chain to the apt default, then record the version Sidecar (ADR-0001).
-install() {
-    module_default_apt_install || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    module_sidecar_write "${NAME}" "$(_htop_pkg_version)"
-}
-
-upgrade() {
-    module_default_apt_upgrade || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    module_sidecar_write "${NAME}" "$(_htop_pkg_version)"
-}
-
-remove() {
-    module_default_apt_remove || return $?
-    module_sidecar_remove "${NAME}"
-}
-
-purge() {
-    module_default_apt_purge || return $?
-    module_sidecar_remove "${NAME}"
-}
-
+# ── Required hooks (detect + is_recommended stay module-specific) ────────────
 detect() {
     command -v apt-get >/dev/null 2>&1
 }
 
 is_recommended() {
     ! is_installed
-}
-
-# doctor: health check — package installed, binary runnable, Sidecar present.
-doctor() {
-    if ! is_installed; then
-        log_warn "[${NAME}] doctor: htop is not installed"
-        return 1
-    fi
-    local _bin
-    _bin="$(command -v htop 2>/dev/null)" || {
-        log_warn "[${NAME}] doctor: htop binary not found on PATH"
-        return 1
-    }
-    if ! "${_bin}" --version >/dev/null 2>&1; then
-        log_warn "[${NAME}] doctor: ${_bin} --version failed"
-        return 1
-    fi
-    module_sidecar_get_version "${NAME}" >/dev/null 2>&1 \
-        || log_warn "[${NAME}] doctor: sidecar missing (installed outside init_ubuntu?)"
-    return 0
-}
-
-# ── Private helpers ─────────────────────────────────────────────────────────
-
-# Version string for the Sidecar: dpkg-reported package version, falling
-# back to the literal "apt-managed" when dpkg has no answer.
-_htop_pkg_version() {
-    local _ver=""
-    _ver="$(dpkg-query -W -f='${Version}' htop 2>/dev/null)" || _ver=""
-    printf '%s' "${_ver:-apt-managed}"
 }
 
 # ── Standalone footer ───────────────────────────────────────────────────────

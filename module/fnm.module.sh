@@ -74,6 +74,10 @@ TEST_VERIFY_CMD="command -v fnm && fnm --version"
 export DESCRIPTION POST_INSTALL_MESSAGE WARN_MESSAGE \
        SUPPORTS_USER_HOME INSTALL_TARGET_DEFAULT
 
+# Version recorded in the Sidecar by the phase-invocation wrapper after a
+# successful install/upgrade (overrides the generic VERSION_PROVIDED default).
+module_provided_version() { _fnm_installed_version; }
+
 # ── Archetype D data — upstream install script + user-home dirs ─────────────
 GITHUB_REPO="Schniz/fnm"                          # version queries only
 FNM_INSTALL_SCRIPT_URL="https://fnm.vercel.app/install"
@@ -94,41 +98,37 @@ is_installed() {
 
 install() {
     module_dryrun_guard install \
-        "curl ${FNM_INSTALL_SCRIPT_URL} | bash -s -- --install-dir ${FNM_INSTALL_DIR} --skip-shell; shell hooks (fish/bash); default Node ${FNM_DEFAULT_NODE_VERSION}; Sidecar" \
+        "curl ${FNM_INSTALL_SCRIPT_URL} | bash -s -- --install-dir ${FNM_INSTALL_DIR} --skip-shell; shell hooks (fish/bash); default Node ${FNM_DEFAULT_NODE_VERSION}" \
         && return 0
     module_skip_if_installed && return 0
     _fnm_fetch_and_install || return $?
     _fnm_shell_init || return $?
     _fnm_install_default_node
-    module_sidecar_write "${NAME}" "$(_fnm_installed_version)"
 }
 
 upgrade() {
     module_dryrun_guard upgrade \
-        "re-run upstream install script (latest) + refresh shell hooks + Sidecar" \
+        "re-run upstream install script (latest) + refresh shell hooks" \
         && return 0
     _fnm_fetch_and_install || return $?
     _fnm_shell_init || return $?
-    module_sidecar_write "${NAME}" "$(_fnm_installed_version)"
 }
 
-# remove: drop the fnm binary + Sidecar, keep downloaded Node versions and
-# shell hooks (both are inert without the binary; purge wipes them).
+# remove: drop the fnm binary, keep downloaded Node versions and shell hooks
+# (both are inert without the binary; purge wipes them).
 remove() {
     module_dryrun_guard remove \
-        "rm ${FNM_INSTALL_DIR}/fnm + Sidecar (keep Node versions + shell hooks)" \
+        "rm ${FNM_INSTALL_DIR}/fnm (keep Node versions + shell hooks)" \
         && return 0
     rm -f "${FNM_INSTALL_DIR}/fnm"
-    module_sidecar_remove "${NAME}"
 }
 
 purge() {
     module_dryrun_guard purge \
-        "rm ${FNM_INSTALL_DIR} (incl. Node versions) + fish/bash shell hooks + Sidecar" \
+        "rm ${FNM_INSTALL_DIR} (incl. Node versions) + fish/bash shell hooks" \
         && return 0
     rm -rf "${FNM_INSTALL_DIR}"
     _fnm_shell_cleanup
-    module_sidecar_remove "${NAME}"
 }
 
 verify() {

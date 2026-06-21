@@ -301,7 +301,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     MOCK_REPO_RC=1
     _mock_repo_setup
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/vscode" ]]
 }
@@ -352,7 +352,7 @@ _mock_apt_list() {
     _mock_repo_setup
     MOCK_PKG_VERSION="1.100.0"
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/vscode" ]]
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/vscode")" == "1.100.0" ]]
 }
@@ -363,7 +363,7 @@ _mock_apt_list() {
     _mock_repo_setup
     MOCK_PKG_VERSION=""
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/vscode")" == "apt-managed" ]]
 }
 
@@ -376,7 +376,7 @@ _mock_apt_list() {
     _mock_repo_setup
     MOCK_PKG_VERSION="1.100.0"
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
@@ -385,7 +385,7 @@ _mock_apt_list() {
     MOCK_APT_INSTALL_RC=1
     _mock_apt_defaults
     _mock_repo_setup
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/vscode" ]]
 }
@@ -397,7 +397,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     MOCK_PKG_VERSION="1.100.0"
     _mock_dpkg_query
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/vscode")" == "1.100.0" ]]
 }
 
@@ -406,7 +406,7 @@ _mock_apt_list() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '1.90.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/vscode"
     _mock_apt_defaults
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/vscode" ]]
 }
 
@@ -418,7 +418,7 @@ _mock_apt_list() {
     _mock_sudo_passthrough
     VSCODE_APT_SOURCE="${INIT_UBUNTU_TEST_SCRATCH}/vscode.sources"
     VSCODE_APT_KEYRING="${INIT_UBUNTU_TEST_SCRATCH}/microsoft.gpg"
-    purge
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/vscode" ]]
 }
 
@@ -497,13 +497,16 @@ _mock_apt_list() {
     assert_success
 }
 
-@test "doctor fails when the code binary is missing from PATH" {
+@test "doctor (inherited default) tracks is_installed only, not the binary" {
+    # vscode now inherits module_default_doctor (is_installed + warn); the
+    # code --version probe moved to verify (TEST_VERIFY_CMD), so an empty PATH
+    # no longer fails doctor while is_installed succeeds.
     _load_module
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
     mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/empty-bin"
     PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-bin" run doctor
-    assert_failure
+    assert_success
 }
 
 @test "is_outdated returns zero when apt reports code upgradable" {

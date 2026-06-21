@@ -304,6 +304,123 @@ EOF
     assert_output --partial "No modules"
 }
 
+# ── Sidecar at the phase-invocation layer (refines ADR-0001) ────────────────
+#
+# The runner — not the module's install()/remove() — writes/removes the
+# Sidecar after a successful Action-class phase, via _module_sidecar_after_phase
+# inside the module sub-shell. These specs need module_helper.sh sourced so the
+# wrapper + module_provided_version default are in scope.
+
+_load_engine_with_helper() {
+    # shellcheck source=../../lib/module_helper.sh
+    source "${LIB_DIR}/module_helper.sh"
+    _load_engine
+}
+
+@test "runner writes the Sidecar after a successful install (engine layer)" {
+    _load_engine_with_helper
+    cat > "${FAKE_MODULE_DIR}/sc-mod.module.sh" <<'EOF'
+NAME="sc-mod"
+VERSION_PROVIDED="3.1.4"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    runner_install sc-mod >/dev/null 2>&1
+    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/sc-mod" ]]
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/sc-mod")" == "3.1.4" ]]
+}
+
+@test "runner records module_provided_version when the module overrides it" {
+    _load_engine_with_helper
+    cat > "${FAKE_MODULE_DIR}/scv-mod.module.sh" <<'EOF'
+NAME="scv-mod"
+VERSION_PROVIDED="latest"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+module_provided_version() { printf '7.7.7'; }
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    runner_install scv-mod >/dev/null 2>&1
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/scv-mod")" == "7.7.7" ]]
+}
+
+@test "runner removes the Sidecar after a successful remove (engine layer)" {
+    _load_engine_with_helper
+    cat > "${FAKE_MODULE_DIR}/sc-mod.module.sh" <<'EOF'
+NAME="sc-mod"
+VERSION_PROVIDED="1.0"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
+    printf '1.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/sc-mod"
+    runner_remove sc-mod >/dev/null 2>&1
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/sc-mod" ]]
+}
+
+@test "runner writes no Sidecar on dry-run install" {
+    _load_engine_with_helper
+    cat > "${FAKE_MODULE_DIR}/sc-mod.module.sh" <<'EOF'
+NAME="sc-mod"
+VERSION_PROVIDED="1.0"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    INIT_UBUNTU_DRY_RUN=true runner_install sc-mod >/dev/null 2>&1
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/sc-mod" ]]
+}
+
+@test "runner writes no Sidecar when install fails (ADR-0015)" {
+    _load_engine_with_helper
+    cat > "${FAKE_MODULE_DIR}/scf-mod.module.sh" <<'EOF'
+NAME="scf-mod"
+VERSION_PROVIDED="1.0"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 1; }
+remove()  { return 0; }
+purge()   { return 0; }
+EOF
+    registry_load_all "${FAKE_MODULE_DIR}"
+    runner_install scf-mod >/dev/null 2>&1 || true
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/scf-mod" ]]
+}
+
 # ── i18n: user-facing strings render zh-TW (issue #185 Phase 2) ─────────────
 
 @test "progress lines render zh-TW under INIT_UBUNTU_LANG=zh-TW (#185)" {

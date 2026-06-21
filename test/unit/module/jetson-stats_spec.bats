@@ -415,7 +415,7 @@ _mock_jtop_bin() {
     MOCK_PIP_SHOW_RC=0 MOCK_PIP_VERSION="4.3.2"
     _mock_pip3
     _mock_sudo
-    install
+    module_standalone_main install
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/jetson-stats" ]]
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/jetson-stats")" == "4.3.2" ]]
 }
@@ -429,7 +429,7 @@ _mock_jtop_bin() {
     MOCK_PIP_SHOW_RC=1
     _mock_pip3
     _mock_sudo
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/jetson-stats")" == "pip-managed" ]]
 }
 
@@ -445,7 +445,7 @@ _mock_jtop_bin() {
     MOCK_PIP_SHOW_RC=0 MOCK_PIP_VERSION="4.3.2"
     _mock_pip3
     _mock_sudo
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
@@ -457,7 +457,7 @@ _mock_jtop_bin() {
     _mock_pep668
     _mock_sudo
     MOCK_SUDO_RC=1
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/jetson-stats" ]]
 }
@@ -473,7 +473,7 @@ _mock_jtop_bin() {
     MOCK_PIP_SHOW_RC=0 MOCK_PIP_VERSION="4.3.2"
     _mock_pip3
     _mock_sudo
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/jetson-stats")" == "4.3.2" ]]
 }
 
@@ -486,7 +486,7 @@ _mock_jtop_bin() {
     MOCK_PIP_SHOW_RC=0 MOCK_PIP_VERSION="4.3.2"
     _mock_pip3
     _mock_sudo
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/jetson-stats" ]]
 }
 
@@ -499,7 +499,7 @@ _mock_jtop_bin() {
     MOCK_PIP_SHOW_RC=0 MOCK_PIP_VERSION="4.3.2"
     _mock_pip3
     _mock_sudo
-    purge
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/jetson-stats" ]]
     grep -q "rm -f ${JTOP_SERVICE_UNIT}" "${MOCK_SUDO_LOG}"
 }

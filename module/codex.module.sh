@@ -71,7 +71,9 @@ CONFIG_PATHS=(
 module_use_github_release_archetype
 
 # Override install/upgrade: the asset URL is version-independent, so the
-# latest-tag lookup is best-effort, only feeding the Sidecar (ADR-0001).
+# latest-tag lookup is best-effort. The phase-invocation wrapper writes the
+# Sidecar via module_provided_version (ADR-0001); _codex_resolve_target_version
+# sets MODULE_GH_RESOLVED_VERSION so the wrapper records the resolved tag.
 install() {
     module_dryrun_guard install \
         "fetch ${GITHUB_REPO} latest -> ${INSTALL_DIR}, symlink ${BIN_LINK}" \
@@ -79,7 +81,6 @@ install() {
     module_skip_if_installed && return 0
     _codex_resolve_target_version
     _module_github_release_fetch_and_install || return $?
-    module_sidecar_write "${NAME}" "${_CODEX_TARGET_VERSION:-unknown}"
 }
 
 upgrade() {
@@ -87,23 +88,17 @@ upgrade() {
         && return 0
     _codex_resolve_target_version
     _module_github_release_fetch_and_install || return $?
-    module_sidecar_write "${NAME}" "${_CODEX_TARGET_VERSION:-unknown}"
 }
 
-remove() {
-    module_dryrun_guard remove \
-        "rm ${INSTALL_DIR} + ${BIN_LINK} + Sidecar" \
-        && return 0
-    module_default_github_release_remove || return $?
-    module_sidecar_remove "${NAME}"
-}
+# remove/purge: inherit macro defaults (module_default_github_release_*); the
+# wrapper removes the Sidecar.
 
-purge() {
-    module_dryrun_guard purge \
-        "rm ${INSTALL_DIR} + ${BIN_LINK} + Sidecar + CONFIG_PATHS" \
-        && return 0
-    module_default_github_release_purge || return $?
-    module_sidecar_remove "${NAME}"
+# Sidecar version for the phase-invocation wrapper: the resolved tag, or
+# literal "unknown" when resolution failed (codex downloads via the stable
+# /releases/latest/download asset URL, so a failed tag lookup is non-fatal —
+# the install still succeeds, the Sidecar just records "unknown").
+module_provided_version() {
+    printf '%s' "${_CODEX_TARGET_VERSION:-unknown}"
 }
 
 detect() {
@@ -175,6 +170,8 @@ _codex_resolve_target_version() {
             || _ver=""
     fi
     _CODEX_TARGET_VERSION="$(_codex_normalize_version "${_ver}")"
+    # Feed the resolved tag to the phase-invocation wrapper (module_provided_version).
+    MODULE_GH_RESOLVED_VERSION="${_CODEX_TARGET_VERSION}"
     [[ -n "${_CODEX_TARGET_VERSION}" ]] \
         || log_warn "[${NAME}] could not resolve latest ${GITHUB_REPO} tag (Sidecar will record 'unknown')"
     return 0

@@ -229,6 +229,16 @@ _runner_run_phase() {
         # emit block below must not overwrite the subshell's exit status.
         _phase_rc=0
         "${_phase}" || _phase_rc=$?
+        # Sidecar at the phase-invocation layer (refines ADR-0001: WHERE the
+        # write happens). After a successful Action-class phase, the wrapper —
+        # not the module's install()/remove() — records/removes the Sidecar via
+        # module_provided_version. Runs inside the module sub-shell so the
+        # module's archetype defaults / overrides are in scope. Co-located with
+        # the action_required emit below; no-op on dry-run + read-only phases.
+        if [[ "${_phase_rc}" -eq 0 ]] \
+            && declare -F _module_sidecar_after_phase >/dev/null 2>&1; then
+            _module_sidecar_after_phase "${_phase}" "${_name}"
+        fi
         # After a successful install, emit action_required events (PRD
         # §7.7.2 / module-spec §4.10) while the module arrays are in scope.
         # The session-end "Action required" block is derived from these.

@@ -11,3 +11,4 @@
 - [Release tag ceremony](project-release-tag-ceremony.md) — release-tag.sh semver rules; Y/X bumps need a green RC first; .version must match tag; 0.1.0 = milestone (not label)
 - [Autonomous test-gap remediation](feedback-autonomous-test-gap-remediation.md) — don't ask to fix bugs / close test gaps; drive via workflow; only ask on product/scope forks (e.g. cutting a release tag)
 - [kcov merge exclude-region](project-kcov-merge-exclude-region.md) — --exclude-region must be on `kcov --merge` too (not just shards) or the AC-17 gate ignores it; i18n declare-gA tables count as uncovered, wrap with kcov-exclude markers
+- [CI lint covers bats](project-ci-lint-covers-bats.md) — lint runs shellcheck -x on *.bats too (info severity); validate bats files with shellcheck before PR, prefer `VAR=val run ...` over a standalone `export` in @test bodies

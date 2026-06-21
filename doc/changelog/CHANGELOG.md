@@ -22,6 +22,23 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **fzf two-pane navigator (Rich tier)** for the install-pick flow (ADR-0024,
+  ADR-0025): every navigable level (main menu -> category -> sub-category ->
+  module leaf) is one fzf two-pane screen — left pane is the current level, the
+  right Preview pane live-renders the cursor row (children + counts on a branch
+  row, full module detail on a module row) via a pure `--preview <token>` mode
+  the script re-invokes (token kinds `menu:`/`cat:`/`sub:`/`mod:`). Live
+  multi-select (space toggles the cursor row), main-menu category count is now
+  SELECTED/total (not installed/total), and `is_recommended` modules are
+  pre-selected on first entry into the recommended category. Tier resolution
+  prefers `fzf` (offering `setup_ubuntu install fzf` when absent + interactive,
+  per G4) and falls back to the existing whiptail screens; `--backend
+  fzf|whiptail|gum` forces the path (`gum` stays a legacy dialog backend until
+  the phase-6 gum removal, so the AC-10/AC-11 dual-backend smoke still covers
+  it). No TUI text-input/confirm widget — the forked
+  CLI owns the install go-ahead (ADR-0025). Manage / Secrets / System Info /
+  Help still route to the existing screens this phase.
+
 - **8 per-tool base modules split from `apt-essentials`** (ADR-0026): `git`,
   `vim`, `curl`, `wget`, `jq`, `build-essential`, `htop`, `unzip` — each
   `CATEGORY=base`, archetype-A apt (exactly one apt package), `DEPENDS_ON=()`,

@@ -1100,6 +1100,12 @@ os.id: ubuntu"
     assert_failure
 }
 
+@test "G4 gate: lib/tui_render_fzf.sh sources no engine lib" {
+    run grep -nE 'source.*lib/(registry|runner|resolver|state)' \
+        "${LIB_DIR}/tui_render_fzf.sh"
+    assert_failure
+}
+
 @test "G4 gate: TUI entrypoint exists and is executable" {
     [ -x "${REPO_ROOT}/setup_ubuntu_tui.sh" ]
 }
@@ -1139,9 +1145,11 @@ _make_flag_env() {
 exec "${@:1}"
 EOF
     chmod +x "${FLAG_BIN}/sudo"
-    # A widget mock that records which backend basename was invoked then exits
-    # nonzero (Cancel) so the main loop returns immediately.
-    for _w in whiptail gum; do
+    # A widget mock that records which backend/tier basename was invoked then
+    # exits nonzero (Cancel/ESC) so the main loop returns immediately. fzf is
+    # the Rich tier; whiptail the Fallback; gum is dropped (ADR-0024) but kept
+    # here so a stray gum call would still be observable in the log.
+    for _w in whiptail gum fzf; do
         cat >"${FLAG_BIN}/${_w}" <<EOF
 #!/usr/bin/env bash
 printf 'BACKEND=%s ARGS=%s\n' "${_w}" "\$*" >>"${FLAG_LOG}"
@@ -1151,31 +1159,42 @@ EOF
     done
 }
 
-@test "--backend whiptail forces TUI_BACKEND, skips detection (gum present)" {
+@test "--backend whiptail forces the Fallback tier, skips detection (fzf present)" {
     _make_flag_env
     run env "PATH=${FLAG_BIN}" "HOME=${FLAG_DIR}/home" \
         "TUI_CLI=${FLAG_BIN}/setup_ubuntu" \
         "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend whiptail
-    # Main loop unwinds on the first Cancel; the forced backend was whiptail
-    # even though gum was on PATH (detection skipped).
+    # Main loop unwinds on the first Cancel; the forced tier was whiptail
+    # even though fzf was on PATH (detection skipped). The fzf navigator is
+    # never invoked, so no fzf widget call is logged.
     run cat "${FLAG_LOG}"
     assert_output --partial "BACKEND=whiptail"
-    refute_output --partial "BACKEND=gum"
+    refute_output --partial "BACKEND=fzf"
 }
 
-@test "--backend gum forces TUI_BACKEND even when whiptail would win detection" {
+@test "--backend fzf forces the Rich tier even when whiptail would win detection" {
     _make_flag_env
     run env "PATH=${FLAG_BIN}" "HOME=${FLAG_DIR}/home" \
         "TUI_CLI=${FLAG_BIN}/setup_ubuntu" \
-        "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend gum
+        "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend fzf
+    # The forced fzf tier runs the navigator → the first fzf widget call is
+    # logged (the mock fzf exits nonzero, unwinding the loop immediately).
     run cat "${FLAG_LOG}"
-    assert_output --partial "BACKEND=gum"
+    assert_output --partial "BACKEND=fzf"
 }
 
 @test "--backend with an invalid value exits 2 with usage" {
     run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend dialog
     assert_failure 2
     assert_output --partial "Usage:"
+}
+
+@test "--backend gum is accepted (legacy dialog backend, pending phase-6 removal)" {
+    # gum stays a valid --backend value until the dedicated gum-removal phase,
+    # so the AC-10/AC-11 dual-backend smoke keeps exercising it. It must NOT be
+    # rejected as a usage error.
+    run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend gum --help
+    assert_success
 }
 
 @test "--backend with no value exits 2 with usage" {

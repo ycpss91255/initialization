@@ -24,6 +24,11 @@ set -uo pipefail
 # ── Path resolution ──────────────────────────────────────────────────────────
 SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="${SCRIPT_PATH}"
+# Absolute path to THIS script — the fzf navigator's --preview / --toggle
+# binds re-invoke it (ADR-0024). Env-overridable so the AC-10 fzf smoke
+# harness can point fzf at a recording wrapper.
+TUI_SELF="${TUI_SELF:-${REPO_ROOT}/setup_ubuntu_tui.sh}"
+export TUI_SELF
 # Env-overridable so the bats e2e harness can substitute a recording mock
 # CLI; real sessions never set it and fork the sibling setup_ubuntu.sh.
 TUI_CLI="${TUI_CLI:-${REPO_ROOT}/setup_ubuntu.sh}"
@@ -34,10 +39,15 @@ export TUI_SECRETS
 
 : "${INIT_UBUNTU_VERSION:=0.1.0-draft}"
 
-# G4: the ONLY library the TUI sources is its own presentation helper.
-# (tui_backend.sh sources lib/i18n.sh itself, so i18n_t is available here too.)
+# G4: the ONLY libraries the TUI sources are its own presentation helpers.
+# tui_backend.sh = the shared data layer + the whiptail fallback tier;
+# tui_render_fzf.sh = the fzf Rich tier (two-pane navigator, ADR-0024). Both
+# source lib/i18n.sh themselves, so i18n_t is available here too. Neither
+# sources an engine lib — the G4 grep gate covers all three files.
 # shellcheck source=lib/tui_backend.sh
 source "${REPO_ROOT}/lib/tui_backend.sh"
+# shellcheck source=lib/tui_render_fzf.sh
+source "${REPO_ROOT}/lib/tui_render_fzf.sh"
 
 # Resolve the UI language once (env > config ui.lang > $LANG, sanitized). The
 # TUI never sources the engine, so config_get is absent here and resolution
@@ -308,23 +318,23 @@ _tui_usage() {
     cat <<'EOF'
 Usage: setup_ubuntu_tui.sh [flags]
 
-Interactive TUI frontend for setup_ubuntu. Renders menus with gum
-(preferred, modern) or whiptail (Ubuntu default fallback) and forks
-`setup_ubuntu` subprocesses for all data and actions.
+Interactive TUI frontend for setup_ubuntu. The rich tier is an fzf two-pane
+navigator (ADR-0024); whiptail is the zero-dependency fallback. All data and
+actions fork `setup_ubuntu` subprocesses (G4).
 
 Flags:
   -h / --help            Show this help
   --version              Show tool version
-  --backend gum|whiptail Force the rendering backend (skips detection and
-                         the install prompt). Invalid value → exit 2.
+  --backend fzf|whiptail Force the rendering tier (skips detection and the
+                         install prompt). Invalid value → exit 2.
   --lang <code>          Force the UI language for this session
                          (en|zh-TW); overrides $LANG / config.
                          Invalid value → falls back to en with a warning.
 
 Requirements:
-  - `gum` or `whiptail` on PATH. gum absent + interactive → you are offered
-    `setup_ubuntu install gum`; otherwise whiptail (no auto-install — the
-    TUI forks the CLI; see PRD §8.5).
+  - `fzf` (rich tier) or `whiptail` (fallback) on PATH. fzf absent +
+    interactive → you are offered `setup_ubuntu install fzf`; otherwise
+    whiptail (no auto-install — the TUI forks the CLI; see ADR-0024).
   - sudo available (otherwise exit 4 — use the CLI instead:
     `setup_ubuntu install <module>`)
 
@@ -1060,6 +1070,204 @@ _tui_screen_help() {
         "$(tui_help_text "$(_tui_backend_family)")"
 }
 
+# ── fzf two-pane navigator (Rich tier, ADR-0024) ─────────────────────────────
+# Every navigable level is one fzf screen: the left pane is the level's rows
+# (token<TAB>label), the right Preview pane re-invokes THIS script as
+# `--preview <token>` (a pure function of token + the forked list JSON + the
+# selection-state file). Selection is mutated LIVE — space toggles the cursor
+# row's module in the selstate file and refreshes the preview in place (fzf has
+# no native multi pre-selection, ADR-0024 #4). Enter descends / activates; ESC
+# (exit 130) goes up one level.
+#
+# The selection-state file is TUI session memory (NOT State, Q43): it is a
+# mktemp wiped on exit, the fzf-tier analogue of TUI_SELECTION.
+
+# Run one fzf level. <rows-tsv> is "token<TAB>label" lines; <header> is the
+# top caption; <selstate> the selection file; <multi> "1" enables the live
+# space-toggle bind (module leaves only). Prints the chosen TOKEN on stdout;
+# rc 130 = ESC (caller treats as "up one level"), other nonzero = no choice.
+#   _tui_fzf_run <rows-tsv> <header> <selstate> <multi>
+_tui_fzf_run() {
+    local _rows_tsv="$1" _header="$2" _selstate="$3" _multi="$4"
+    # The preview command re-invokes this very script in --preview mode. fzf
+    # passes the highlighted line's FIRST field ({1}) as the token (rows are
+    # tab-delimited, so --with-nth hides the token column from the visible
+    # list while --delimiter keeps {1} addressable).
+    local -a _bind=()
+    if [[ "${_multi}" == "1" ]]; then
+        # space: toggle the cursor row's module in the selstate, then refresh
+        # the Preview pane so the selection state (● SELECTED / ○ not, the live
+        # counts) updates immediately (ADR-0024 #4). NOTE: the LEFT-pane row
+        # glyph is re-derived only on the next level redraw (reload would need
+        # a stateful --rows re-invocation carrying the level context); the
+        # authoritative live signal is the right pane. Re-entering the level
+        # repaints the left glyphs. (A later phase can add the reload.)
+        _bind=(--bind "space:execute-silent(${TUI_SELF} --toggle {1} ${_selstate})+refresh-preview")
+    fi
+    "${TUI_BACKEND:-fzf}" \
+        --ansi --delimiter $'\t' --with-nth=2.. \
+        --header "${_header}" \
+        --preview "${TUI_SELF} --preview {1} ${_selstate}" \
+        --preview-window 'right,55%,wrap' \
+        "${_bind[@]}" \
+        <<<"${_rows_tsv}" | cut -f1
+    return "${PIPESTATUS[0]}"
+}
+
+# The module leaf level: list the (category, subtag) modules + a synthetic
+# "Install selected (N)" row, multi-select live. Enter on a module is a no-op
+# (space toggles); Enter on the run row → Review → fork install.
+#   _tui_nav_leaf <list_json> <category> <subtag> <selstate>
+_tui_nav_leaf() {
+    local _json="$1" _cat="$2" _subtag="$3" _selstate="$4"
+    while :; do
+        local _rows _header _token
+        _rows="$(tui_fzf_sub_rows "${_json}" "${_cat}" "${_subtag}" "${_selstate}")"
+        _rows+=$'\n'"menu:run"$'\t'"$(i18n_t TUI_FZF_I18N row_install_selected "$(tui_fzf_sel_count "${_selstate}")")"
+        _header="$(i18n_t TUI_FZF_I18N nav_header_modules "${_subtag}")"$'\n'"$(i18n_t TUI_FZF_I18N legend)"
+        _token="$(_tui_fzf_run "${_rows}" "${_header}" "${_selstate}" 1)" || return 0
+        case "${_token}" in
+            menu:run) _tui_nav_run "${_json}" "${_selstate}"; return 0 ;;
+            *)        : ;;  # Enter on a module is a no-op (space toggles)
+        esac
+    done
+}
+
+# A category level: either sub-category branches (>1 TAGS[0] bucket) or — when
+# a single bucket — straight to the module leaf. Recommended pre-selection
+# (PRD D4) fires on first entry into the recommended category.
+#   _tui_nav_category <list_json> <detect_json> <category> <selstate>
+_tui_nav_category() {
+    local _json="$1" _detect="$2" _cat="$3" _selstate="$4"
+    if [[ "${_cat}" == "recommended" && -z "${TUI_RECO_PRESELECTED:-}" ]]; then
+        local _form; _form="$(tui_effective_form_factor "${_detect}" "${TUI_PLATFORM_OVERRIDE}")"
+        tui_fzf_recommended_preselect "${_json}" "${_selstate}" "${_form}"
+        TUI_RECO_PRESELECTED=1
+    fi
+    local _nsub; _nsub="$(tui_fzf_subtag_count "${_json}" "${_cat}")"
+    if (( _nsub <= 1 )); then
+        local _only; _only="$(tui_fzf_subtags "${_json}" "${_cat}" | head -n1)"
+        [[ -n "${_only}" ]] && _tui_nav_leaf "${_json}" "${_cat}" "${_only}" "${_selstate}"
+        return 0
+    fi
+    while :; do
+        local _rows _header _token
+        _rows="$(tui_fzf_cat_rows "${_json}" "${_cat}" "${_selstate}")"
+        _header="$(i18n_t TUI_FZF_I18N nav_header_branch "${_cat}")"
+        _token="$(_tui_fzf_run "${_rows}" "${_header}" "${_selstate}" 0)" || return 0
+        case "${_token}" in
+            sub:*) local _rest="${_token#sub:}"
+                   _tui_nav_leaf "${_json}" "${_rest%%:*}" "${_rest#*:}" "${_selstate}" ;;
+        esac
+    done
+}
+
+# Review the live selection, then fork the install pipeline (reuses the shared
+# whiptail Review screen + _tui_exec_install — same single CLI path, G4).
+#   _tui_nav_run <list_json> <selstate>
+_tui_nav_run() {
+    local _json="$1" _selstate="$2"
+    local -a _sel=()
+    mapfile -t _sel < <(tui_fzf_sel_list "${_selstate}")
+    if [[ "${#_sel[@]}" -eq 0 ]]; then
+        tui_render_msgbox "$(i18n_t TUI_I18N title_review)" \
+            "$(i18n_t TUI_I18N nothing_selected)"
+        return 0
+    fi
+    # ADR-0025: confirmation belongs to the forked CLI; the Review screen here
+    # is the navigator's read-only plan view, then _tui_exec_install forks the
+    # one CLI pipeline (which owns the go-ahead).
+    _tui_screen_review "${_json}" "${_sel[@]}" || return 0
+    _tui_exec_install "${_sel[@]}"  # never returns
+}
+
+# The main-menu level + the navigator loop. Manage / Secrets / System Info /
+# Help still route to the EXISTING whiptail screens for THIS phase (folded into
+# the navigator later) — but their main-menu preview shows a sensible summary.
+#   _tui_nav_main <list_json> <detect_json> <selstate>
+_tui_nav_main() {
+    local _json="$1" _detect="$2" _selstate="$3"
+    while :; do
+        local _rows _header _token
+        _rows="$(tui_fzf_menu_rows "${_json}" "${_selstate}")"
+        _header="$(i18n_t TUI_I18N main_title "${INIT_UBUNTU_VERSION}")"$'\n'"$(i18n_t TUI_I18N main_system "$(tui_system_summary "${_detect}")")"
+        _token="$(_tui_fzf_run "${_rows}" "${_header}" "${_selstate}" 0)" || {
+            # ESC on the main menu: exit (selections are dropped — Q43). No
+            # disk write either way; the selstate temp dies with the process.
+            return 0
+        }
+        case "${_token}" in
+            menu:quick-setup) _tui_screen_quick_setup "${_json}" "${_detect}" ;;
+            menu:base | menu:recommended | menu:optional | menu:experimental)
+                _tui_nav_category "${_json}" "${_detect}" "${_token#menu:}" "${_selstate}" ;;
+            menu:manage)  _tui_screen_manage "${_json}" ;;
+            menu:secrets) _tui_screen_secrets ;;
+            menu:sysinfo) _tui_screen_system_info ;;
+            menu:help)    _tui_screen_help ;;
+            menu:run)     _tui_nav_run "${_json}" "${_selstate}" ;;
+        esac
+    done
+}
+
+# Tier resolution (ADR-0024 #6). Prints "fzf" | "whiptail" on stdout; rc 1 +
+# the §8.5 fatal guidance only when NO tier is possible (neither fzf nor
+# whiptail). Mirrors the old gum prelaunch shape (so the same consent rule
+# applies — G4: the TUI forks `setup_ubuntu install fzf`, never installs
+# inline). Flow:
+#   fzf present                      → fzf (no prompt)
+#   fzf absent + interactive (-t 0)  → plain stdin read prompt (default Yes)
+#       yes → fork `setup_ubuntu install fzf`, re-check; success → fzf, else
+#             warn + whiptail
+#       no  → whiptail
+#   fzf absent + non-interactive     → whiptail silently
+#   fzf absent + no whiptail         → §8.5 fatal (rc 1)
+_tui_resolve_tier() {
+    if tui_fzf_available; then
+        printf 'fzf\n'
+        return 0
+    fi
+    if ! _tui_has_cmd whiptail; then
+        tui_backend_init >/dev/null  # reuse the §8.5 fatal guidance + rc 1
+        return 1
+    fi
+    if ! _tui_stdin_is_tty; then
+        printf 'whiptail\n'  # non-interactive: no prompt
+        return 0
+    fi
+    i18n_t TUI_FZF_I18N prompt_install_fzf >&2
+    local _ans=""
+    read -r _ans || _ans=""
+    case "${_ans}" in
+        [Nn] | [Nn][Oo]) printf 'whiptail\n'; return 0 ;;
+    esac
+    # Yes (default): fork the CLI to install fzf (G4 — never install here).
+    # The fork's stdout is redirected to stderr so command-substitution callers
+    # capture ONLY the resolved tier name.
+    if "${TUI_CLI:?TUI_CLI not set}" install fzf >&2 && tui_fzf_available; then
+        printf 'fzf\n'
+        return 0
+    fi
+    printf 'WARN: fzf install failed — falling back to whiptail.\n' >&2
+    printf 'whiptail\n'
+}
+
+# fzf-tier entry: fork the two JSON payloads once, allocate the selstate temp,
+# run the navigator, then wipe the temp (Q43 — TUI memory only; it never
+# becomes State). The only path that does NOT return here is the install
+# Proceed leg (_tui_exec_install `exit`s the process); that exit reclaims the
+# whole process, so the leftover mktemp is swept by the OS tmp lifecycle —
+# acceptable, and it keeps the cleanup statically reachable (no trap).
+_tui_fzf_main_loop() {
+    local _json _detect _selstate _rc
+    _detect="$(tui_cli_detect_json)" || return 1
+    _json="$(tui_cli_list_json)" || return 1
+    _selstate="$(mktemp)"
+    _tui_nav_main "${_json}" "${_detect}" "${_selstate}"
+    _rc=$?
+    rm -f -- "${_selstate}"
+    return "${_rc}"
+}
+
 # ── Menu action dispatch ─────────────────────────────────────────────────────
 
 _tui_dispatch() {
@@ -1156,13 +1364,38 @@ _tui_read_hints() {
 # ── Entry ────────────────────────────────────────────────────────────────────
 
 main() {
+    # fzf re-invocation modes (ADR-0024). These run BEFORE everything else
+    # (no sudo gate, no tier resolution, no screen draw): fzf forks the script
+    # purely to render a preview pane or to toggle a selection. They print and
+    # exit, so they must short-circuit the normal launch path.
+    #   --preview <token> <selstate>  → print the Preview pane text for <token>
+    #   --toggle  <name>  <selstate>  → flip <name> in the selstate (live pick)
+    #   --rows           <selstate>  → re-emit the current level's rows (reload)
+    case "${1:-}" in
+        --preview)
+            local _pv_json
+            _pv_json="$(tui_cli_list_json)" || return 1
+            tui_fzf_preview "${2:-}" "${_pv_json}" "${3:-}"
+            return 0
+            ;;
+        --toggle)
+            # The bind passes the row TOKEN ({1}); only module-leaf rows
+            # (mod:<name>) are togglable — strip the prefix to the bare module
+            # name and ignore any non-mod token (defensive: branch rows have no
+            # space bind, so this should never fire on them).
+            local _tg="${2:-}"
+            [[ "${_tg}" == mod:* ]] && tui_fzf_sel_toggle "${3:-}" "${_tg#mod:}"
+            return 0
+            ;;
+    esac
+
     # (Ctrl+C SIGINT trap deferred: a signal trap inside the TUI subprocess
     # deadlocks kcov ptrace in the coverage unit shard, so it is reimplemented
     # kcov-safe in a #206 follow-up. The exit guard below stays.)
     # --backend is parsed BEFORE detection (#171): a valid value forces
     # TUI_BACKEND and skips BOTH detection and the gum install prompt; an
     # invalid value is a usage error (exit 2).
-    local _forced_backend=""
+    local _forced_tier=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h | --help)
@@ -1173,14 +1406,20 @@ main() {
                 printf 'init_ubuntu %s\n' "${INIT_UBUNTU_VERSION}"
                 return 0
                 ;;
+            # --backend forces the rendering path, skipping detection AND the
+            # install prompt; an invalid value is a usage error (exit 2).
+            # `fzf` selects the Rich two-pane navigator (ADR-0024); `whiptail`
+            # and `gum` select the legacy dialog loop with that backend binary.
+            # gum is accepted but legacy (dormant pending the phase-6 removal) —
+            # the AC-10/AC-11 dual-backend smoke still exercises it.
             --backend)
                 case "${2:-}" in
-                    gum | whiptail)
-                        _forced_backend="$2"
+                    fzf | whiptail | gum)
+                        _forced_tier="$2"
                         shift 2
                         ;;
                     *)
-                        printf 'ERROR: --backend requires gum|whiptail (got %s)\n\n' \
+                        printf 'ERROR: --backend requires fzf|whiptail|gum (got %s)\n\n' \
                             "${2:-<missing>}" >&2
                         _tui_usage >&2
                         return 2
@@ -1189,12 +1428,12 @@ main() {
                 ;;
             --backend=*)
                 case "${1#--backend=}" in
-                    gum | whiptail)
-                        _forced_backend="${1#--backend=}"
+                    fzf | whiptail | gum)
+                        _forced_tier="${1#--backend=}"
                         shift
                         ;;
                     *)
-                        printf 'ERROR: --backend requires gum|whiptail (got %s)\n\n' \
+                        printf 'ERROR: --backend requires fzf|whiptail|gum (got %s)\n\n' \
                             "${1#--backend=}" >&2
                         _tui_usage >&2
                         return 2
@@ -1228,15 +1467,37 @@ main() {
 
     tui_require_sudo || return $?
 
-    # Backend resolution (#171). Precedence:
-    #   1. --backend flag      → force + skip detection AND the install prompt
-    #   2. pre-set TUI_BACKEND  → honor the env override (CI / harness lever)
-    #   3. otherwise            → pre-launch flow (gum present, interactive
-    #                             gum-install offer, or whiptail fallback)
-    if [[ -n "${_forced_backend}" ]]; then
-        TUI_BACKEND="${_forced_backend}"
-    elif [[ -z "${TUI_BACKEND:-}" ]]; then
-        TUI_BACKEND="$(_tui_prelaunch_backend)" || return $?
+    # Tier resolution (ADR-0024 #6, supersedes the #171 gum>whiptail flow).
+    # Precedence:
+    #   1. --backend fzf|whiptail  → force the tier, skip detection + prompt
+    #   2. pre-set TUI_BACKEND      → env override → whiptail tier (the AC-10
+    #                                 harness pins a widget path here; the fzf
+    #                                 tier is selected by name/presence, never
+    #                                 by a bare TUI_BACKEND value)
+    #   3. otherwise                → fzf present → Rich; else offer to install
+    #                                 fzf (interactive, G4 fork) → Rich; else
+    #                                 whiptail Fallback
+    local _tier=""
+    if [[ -n "${_forced_tier}" ]]; then
+        if [[ "${_forced_tier}" == "fzf" ]]; then
+            _tier="fzf"
+        else
+            # gum / whiptail force the legacy dialog loop with that backend.
+            _tier="whiptail"
+            TUI_BACKEND="${_forced_tier}"
+        fi
+    elif [[ -n "${TUI_BACKEND:-}" ]]; then
+        _tier="whiptail"  # env-pinned widget (harness / CI) → fallback render
+    else
+        _tier="$(_tui_resolve_tier)" || return $?
+    fi
+
+    # The whiptail Fallback tier needs a concrete backend binary; the fzf Rich
+    # tier needs none here (its navigator invokes fzf directly). When the env
+    # already pinned TUI_BACKEND (harness), honor it; otherwise the fallback
+    # binary is literally `whiptail`.
+    if [[ "${_tier}" == "whiptail" && -z "${TUI_BACKEND:-}" ]]; then
+        TUI_BACKEND="whiptail"
     fi
     export TUI_BACKEND
 
@@ -1252,7 +1513,11 @@ main() {
     # #203: resolve ui.tui_hints once (single fork), before any screen draws.
     _tui_read_hints
 
-    _tui_main_loop
+    if [[ "${_tier}" == "fzf" ]]; then
+        _tui_fzf_main_loop
+    else
+        _tui_main_loop
+    fi
 }
 
 main "$@"

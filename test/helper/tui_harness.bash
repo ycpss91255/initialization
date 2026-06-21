@@ -86,7 +86,10 @@ export FIXTURE_DETECT_JSON
 # (everything else is bash builtins); `bash` itself is required because
 # `#!/usr/bin/env bash` resolves bash through the sealed PATH.
 
-TUI_HARNESS_FARM_CMDS=(bash dirname jq awk sort tr cat sed head grep)
+# cut/mktemp/mv/rm are added for the fzf Rich tier (ADR-0024): the navigator
+# slices the token column with `cut`, allocates the selection-state file with
+# `mktemp`, and the selstate accessors rewrite it via `mv`/`rm`.
+TUI_HARNESS_FARM_CMDS=(bash dirname jq awk sort tr cat sed head grep cut mktemp mv rm)
 
 tui_harness_farm() {
     local _bindir="$1" _cmd _path

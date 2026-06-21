@@ -1266,9 +1266,18 @@ _tui_fzf_main_loop() {
     _detect="$(tui_cli_detect_json)" || return 1
     _json="$(tui_cli_list_json)" || return 1
     _selstate="$(mktemp)"
+    # Cache the list JSON to a temp file ONCE and export its path so the fzf
+    # --preview re-invocation reads the cached payload instead of re-forking
+    # `setup_ubuntu list --json` on every cursor move (which would re-source the
+    # engine and rescan every module per keystroke — the preview lag). The
+    # navigator already holds it in ${_json}; the preview subprocess cannot see
+    # that var, so it crosses the seam as a file (the fzf-tier analogue of how
+    # ${_selstate} is shared).
+    TUI_LIST_CACHE="$(mktemp)"; export TUI_LIST_CACHE
+    printf '%s' "${_json}" >"${TUI_LIST_CACHE}"
     _tui_nav_main "${_json}" "${_detect}" "${_selstate}"
     _rc=$?
-    rm -f -- "${_selstate}"
+    rm -f -- "${_selstate}" "${TUI_LIST_CACHE}"
     return "${_rc}"
 }
 
@@ -1378,7 +1387,15 @@ main() {
     case "${1:-}" in
         --preview)
             local _pv_json
-            _pv_json="$(tui_cli_list_json)" || return 1
+            # Read the session list cache the navigator exported (avoids
+            # re-forking `setup_ubuntu list --json` on every cursor move). Fall
+            # back to a fork when the cache is absent (a direct --preview call,
+            # e.g. in unit tests).
+            if [[ -n "${TUI_LIST_CACHE:-}" && -r "${TUI_LIST_CACHE}" ]]; then
+                _pv_json="$(cat -- "${TUI_LIST_CACHE}")"
+            else
+                _pv_json="$(tui_cli_list_json)" || return 1
+            fi
             tui_fzf_preview "${2:-}" "${_pv_json}" "${3:-}"
             return 0
             ;;

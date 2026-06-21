@@ -30,32 +30,30 @@
 # ── BEGIN: shared-bootstrap ─────────────────────────────────────────────────
 # Dual-mode entry detection.
 # When invoked directly (`bash module/<x>.module.sh ...`), MODULE_STANDALONE
-# becomes "true": we bootstrap env + source lib helpers, then the footer
-# below dispatches to module_standalone_main "$@".
+# becomes "true": module_bootstrap flips on strict mode, resolves
+# MODULE_DIR / REPO_ROOT / LIB_DIR, and sources the lib helpers; the footer
+# below then dispatches to module_standalone_main "$@".
 # When source'd by lib/runner.sh into its sub-shell, MODULE_STANDALONE is
-# "false": runner already sourced lib helpers, so we skip the bootstrap.
+# "false": runner already sourced lib helpers + set strict mode, so the stub
+# never sources the bootstrap and module_bootstrap would be a no-op anyway.
+# All the shared boilerplate lives in lib/module_bootstrap.sh.
 
 MODULE_STANDALONE="true"
 [[ "${BASH_SOURCE[0]:-}" != "${0:-}" ]] && MODULE_STANDALONE="false"
-
 if [[ "${MODULE_STANDALONE}" == "true" ]]; then
-    set -euo pipefail
-    shopt -s inherit_errexit 2>/dev/null || true
-
-    # Resolve paths. Env vars take precedence so tests + relocations work:
-    # `LIB_DIR=/path/to/lib bash module/foo.module.sh install` is honored.
-    MODULE_DIR="${MODULE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")" && pwd -P)}"
-    REPO_ROOT="${REPO_ROOT:-$(cd -- "${MODULE_DIR}/.." && pwd -P)}"
-    LIB_DIR="${LIB_DIR:-${REPO_ROOT}/lib}"
-    export MODULE_DIR REPO_ROOT LIB_DIR
-
-    # shellcheck source=/dev/null  # template — source path resolved per-module-instance
-    source "${LIB_DIR}/logger.sh"
-    # shellcheck source=/dev/null  # template — source path resolved per-module-instance
-    source "${LIB_DIR}/general.sh"
-    # shellcheck source=/dev/null  # template — source path resolved per-module-instance
-    source "${LIB_DIR}/module_helper.sh"
+    # shellcheck source=../lib/module_bootstrap.sh
+    source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../lib" && pwd -P)}/module_bootstrap.sh"
+    module_bootstrap
 fi
+# Static-analysis hint (never executed: the guard is always false; wrapped in
+# kcov-exclude so the dead line is not counted against coverage). module_bootstrap
+# sources the lib helpers at runtime, but shellcheck cannot trace that 2-level
+# dynamic source — this guarded line lets `shellcheck -x` follow module_helper.sh
+# so it sees the metadata + archetype vars below are used externally (avoids SC2034).
+# kcov-exclude-start
+# shellcheck source=../lib/module_helper.sh
+[[ -n "${__module_lint_hint:-}" ]] && source "${LIB_DIR}/module_helper.sh"
+# kcov-exclude-end
 # ── END: shared-bootstrap ───────────────────────────────────────────────────
 
 # ── BEGIN: shared-metadata ──────────────────────────────────────────────────

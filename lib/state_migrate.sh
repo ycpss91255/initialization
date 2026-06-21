@@ -114,9 +114,14 @@ migrate_0_1_0_to_0_2_0() {
             | (($old.synced.installed_by) // null) as $by
             # Drop the bundle entry.
             | del(.installed["apt-essentials"])
-            # Add a per-tool entry for each split package (idempotent: an
-            # existing manual entry for a tool is overwritten with the same
-            # forward-only shape — only synced is rebuilt, local is preserved).
+            # Add a per-tool entry for each split package. The machine-specific
+            # `local` sub-object is rebuilt EMPTY (the function docstring above /
+            # ADR-0008 synced-vs-local split): `local` holds host-specific facts
+            # (resolved install targets, last_verified_at) that must NOT
+            # forward-carry — they are re-derived on the next run on whatever
+            # host reads the file. Idempotent: an existing entry for a tool is
+            # overwritten with
+            # the same forward-only shape (synced rebuilt, local wiped to {}).
             | reduce $split[] as $tool (.;
                 .installed[$tool] = {
                     synced: {
@@ -126,7 +131,7 @@ migrate_0_1_0_to_0_2_0() {
                         installed_at: $at,
                         installed_by: $by
                     },
-                    local: ((.installed[$tool].local) // {})
+                    local: {}
                 }
               )
           else

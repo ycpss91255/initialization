@@ -163,6 +163,48 @@ JSON
     assert_output "init_ubuntu@0.1.0"
 }
 
+@test "migration rebuilds each split tool's local sub-object EMPTY" {
+    # ADR-0008 synced-vs-local split: the machine-specific `local` object holds
+    # host-derived facts (resolved targets, last_verified_at) that must NOT
+    # forward-carry. Every split tool entry must land with local == {} so stale
+    # machine state from an earlier (separately-tracked) entry is not preserved.
+    _load_migrate
+    _write_v010_with_bundle
+    state_migrate_run
+    local _tool
+    for _tool in git vim curl wget jq; do
+        run jq -e --arg t "${_tool}" '.installed[$t].local == {}' "$(_state_path)"
+        assert_success
+    done
+}
+
+@test "migration does NOT preserve a pre-existing split tool's stale local" {
+    # A 0.1.0 file that already tracked one of the split tools separately (with
+    # machine-specific local paths) must have that local wiped on migration —
+    # the forward-only shape rebuilds local empty, never carrying poisoned
+    # host paths to a new machine.
+    _load_migrate
+    cat > "$(_state_path)" <<'JSON'
+{
+  "version": "0.1.0",
+  "installed": {
+    "apt-essentials": {
+      "synced": {"manual": true, "depends_on": [], "version_provided": "apt-managed",
+                 "installed_at": "t", "installed_by": "b"},
+      "local": {}
+    },
+    "curl": {
+      "synced": {"manual": true, "depends_on": [], "version_provided": "apt-managed"},
+      "local": {"install_target_resolved": "/old/machine/path"}
+    }
+  }
+}
+JSON
+    state_migrate_run
+    run jq -e '.installed.curl.local == {}' "$(_state_path)"
+    assert_success
+}
+
 @test "migration leaves unrelated entries (docker) intact" {
     _load_migrate
     _write_v010_with_bundle

@@ -1104,7 +1104,11 @@ _tui_fzf_run() {
         # repaints the left glyphs. (A later phase can add the reload.)
         _bind=(--bind "space:execute-silent(${TUI_SELF} --toggle {1} ${_selstate})+refresh-preview")
     fi
-    "${TUI_BACKEND:-fzf}" \
+    # The navigator ALWAYS drives fzf (a dedicated seam, TUI_FZF_BIN, so tests
+    # can stub it). It must NOT key off TUI_BACKEND — in the fzf tier that holds
+    # `whiptail` for the delegated dialog screens (Quick Setup / Manage /
+    # Secrets / System Info / Review), which still render via tui_render_*.
+    "${TUI_FZF_BIN:-fzf}" \
         --ansi --delimiter $'\t' --with-nth=2.. \
         --header "${_header}" \
         --preview "${TUI_SELF} --preview {1} ${_selstate}" \
@@ -1492,11 +1496,15 @@ main() {
         _tier="$(_tui_resolve_tier)" || return $?
     fi
 
-    # The whiptail Fallback tier needs a concrete backend binary; the fzf Rich
-    # tier needs none here (its navigator invokes fzf directly). When the env
-    # already pinned TUI_BACKEND (harness), honor it; otherwise the fallback
-    # binary is literally `whiptail`.
-    if [[ "${_tier}" == "whiptail" && -z "${TUI_BACKEND:-}" ]]; then
+    # Both tiers need a concrete dialog backend binary in TUI_BACKEND: the
+    # whiptail Fallback tier renders everything through it, and the fzf Rich
+    # tier still DELEGATES Quick Setup / Manage / Secrets / System Info / Review
+    # / msgbox to the same tui_render_* dialog screens (the navigator itself
+    # drives fzf via TUI_FZF_BIN, independent of this). So when nothing pinned
+    # it, default to `whiptail` regardless of tier — otherwise those delegated
+    # screens abort on the `${TUI_BACKEND:?}` guard (the fzf-tier "can't enter
+    # Quick Setup / screens flash" bug).
+    if [[ -z "${TUI_BACKEND:-}" ]]; then
         TUI_BACKEND="whiptail"
     fi
     export TUI_BACKEND

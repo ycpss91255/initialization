@@ -134,6 +134,22 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `platform_export_env` are kept. `detect_spec.bats` + `platform_spec.bats`
   folded into `environment_spec.bats`. New glossary term **Environment** in
   `CONTEXT.md` (avoid the bare term *platform*, now an internal classify step).
+- **State presented as ONE module through `lib/state.sh`** (architecture
+  deepening #1): `lib/state_migrate.sh` (forward-only migration) and
+  `lib/state_io.sh` (cross-machine import/export) are now INTERNAL SEAMS reached
+  only through the external State interface (`state_init`, the `record_*`
+  writers, the field accessors, the io export/import functions). The
+  forward-only migration chain (ADR-0008) is folded into `state_init`: on
+  startup `state_init` runs validate → migrate → ready internally, so the engine
+  no longer calls `state_migrate_run` directly (the separate
+  `state_migrate_run || exit 1` call in `setup_ubuntu.sh` was removed; a failed
+  migration is still fatal and `state_init` surfaces the non-zero path, leaving
+  the original file + its `.bak` untouched). The three files stay physically
+  separate (combined > 800 lines) but converge on a single interface; migration
+  is replayed at most once per process. New end-to-end interface test
+  (`test/unit/state_interface_spec.bats`) drives init(old-version file) →
+  migrate → record → export through the interface; the seam specs
+  (`state_migrate_spec.bats` / `state_io_spec.bats`) keep covering the internals.
 
 - **Dependent modules rewired from the `apt-essentials` bundle to specific tool
   deps** (ADR-0026): `docker`→`curl`; `anydesk`→`curl`; `fish`→`curl`,`shell`;

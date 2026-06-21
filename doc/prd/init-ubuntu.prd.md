@@ -212,7 +212,7 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 
 #### 推薦策略(自動 + 互動雙模式)
 
-- **自動偵測**:由 `lib/detect.sh` + `lib/platform.sh` 偵測 form factor(`desktop` / `server` / `rpi-4` / `rpi-5` / `jetson-orin` / `wsl` / `container` / `vm`),`is_recommended()` 依此回應
+- **自動偵測**:由 `lib/environment.sh`(probe + form_factor 分類)偵測 form factor(`desktop` / `server` / `rpi-4` / `rpi-5` / `jetson-orin` / `wsl` / `container` / `vm`),`is_recommended()` 依此回應
 - **使用者互動覆寫**:
   - CLI:`--profile=server|desktop|jetson` 強制覆寫
   - TUI:System Info 畫面顯示偵測結果並**詢問是否同意**
@@ -1052,7 +1052,7 @@ backend = auto                         # auto | pass | gnome-keyring | encrypted
 | M0 - Discovery | `doc/prd/` + `doc/architecture.md` + `doc/module-spec.md` + `CONTEXT.md` + `doc/adr/` |
 | M1 - Test harness | 借用 base 的 `Dockerfile.test-tools` + `justfile.ci`(原借自 `Makefile.ci`,`make`→`just` 遷移見 ADR-0022)+ `script/ci/ci.sh`(bats + bats-assert + bats-mock) |
 | M2 - Engine core | `lib/dispatcher.sh` + `lib/registry.sh` + `lib/runner.sh` + `lib/resolver.sh` + `lib/module_helper.sh` + 10 v2 modules |
-| M3 - Detect engine | `lib/detect.sh` + `lib/platform.sh` + `setup_ubuntu detect` |
+| M3 - Detect engine | `lib/environment.sh`(probe + form_factor 分類)+ `setup_ubuntu detect` |
 | M4 - State + log | `lib/state.sh` + `lib/state_io.sh` + `lib/logger.sh`(JSONL + 30 天/100 檔保留,AC-33)+ flock concurrency |
 | M5 - CLI | `setup_ubuntu.sh` subcommands(含 `upgrade` / `verify` / `doctor` 入口 + `list` 各 flag + `--verbose/--quiet/--color` wire) |
 | M6 - TUI | `setup_ubuntu_tui.sh` + `lib/tui_backend.sh`(含 tag 分組 / Quick Setup 多 step / dep 鏈折疊顯示)。TUI = CLI 前端(G4):讀 `--json`、寫 fork `setup_ubuntu`;測試 = backend mock 單元 + expect 煙霧(AC-10) |
@@ -1333,7 +1333,7 @@ setup_ubuntu_tui                      # 互動式管理
 | (無) | `module/notion.module.sh` | 新建(github-release archetype,notion-electron `.deb`;Q50 / #35) |
 | (無) | `module/jetson-stats.module.sh` | 新建(pip 安裝 `jtop`,jetson-orin only;Q51 / #37) |
 | `module/function/logger.sh` | `lib/logger.sh` | 整理(可能拆 file logging 出去) |
-| `module/function/general.sh` | `lib/general.sh` + `lib/detect.sh` + `lib/platform.sh` | 拆分(平台分類抽到獨立檔) |
+| `module/function/general.sh` | `lib/general.sh` + `lib/environment.sh`(probe + form_factor 分類) | 拆分(環境偵測 + 平台分類合併為單一 Environment 模組) |
 | `module/function/test/test_*.sh` | `test/unit/logger_spec.bats` 與 `general_spec.bats` | 重寫為 bats |
 | `tool/*`(整個目錄) | **搬遷到 repo 根目錄 `tool/`** | v0.1 不處理,僅搬遷;v0.2+ 個別決定 |
 | └ `tool/remove/*.sh` | (隨上面整個目錄搬遷) | v0.1 不處理(改寫 remove/purge 邏輯延後) |

@@ -122,6 +122,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Merged `lib/detect.sh` + `lib/platform.sh` into one deep `lib/environment.sh`
+  (Environment module)**: internally layered — private `_probe_*` (I/O) under a
+  private `_classify` (pure form_factor logic) — behind a small surface,
+  `environment_snapshot()` (full `{os, arch, gpu, …, form_factor}` JSON) plus
+  `environment_field <path>`. Callers (dispatcher `detect`, runner) now fetch
+  the snapshot once instead of calling detect + classify separately. The
+  `setup_ubuntu detect` output (human and `--json`) is byte-identical
+  (ADR-0019-adjacent contract; pinned by a golden test). Backward-compat
+  aliases `detect_environment` / `detect_get_field` / `platform_classify` /
+  `platform_export_env` are kept. `detect_spec.bats` + `platform_spec.bats`
+  folded into `environment_spec.bats`. New glossary term **Environment** in
+  `CONTEXT.md` (avoid the bare term *platform*, now an internal classify step).
+
 - **Dependent modules rewired from the `apt-essentials` bundle to specific tool
   deps** (ADR-0026): `docker`→`curl`; `anydesk`→`curl`; `fish`→`curl`,`shell`;
   `font`→`curl`,`unzip`; `fzf`→`curl`; `lazygit`→`curl`,`git`;

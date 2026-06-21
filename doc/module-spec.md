@@ -283,7 +283,7 @@ install() {
 
 #### `SUPPORTED_PLATFORMS` (string[], optional)
 
-- 列出此 module 可裝的 form factor(對應 `lib/platform.sh` 輸出)
+- 列出此 module 可裝的 form factor(對應 `lib/environment.sh` 的 form_factor 分類輸出)
 - 合法值:`desktop` / `server` / `rpi-4` / `rpi-5` / `jetson-orin` / `wsl` / `container` / `vm`
 - 空陣列 = 不限制(視同支援全部)
 - 範例:`SUPPORTED_PLATFORMS=("desktop" "server")` — 不支援 SBC

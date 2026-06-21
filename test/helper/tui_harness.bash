@@ -72,7 +72,7 @@ EOF
 )"
 export FIXTURE_LIST_JSON
 
-# `detect --json` fixture (lib/detect.sh shape + form_factor splice).
+# `detect --json` fixture (environment_snapshot shape: probe + form_factor).
 FIXTURE_DETECT_JSON="$(cat <<'EOF'
 {"os":{"id":"ubuntu","version":"24.04","codename":"noble"},"arch":"x86_64","cpu":{"vendor":"GenuineIntel"},"gpu":{"vendor":"nvidia","model":"NVIDIA RTX 4090"},"desktop":"GNOME","session_type":"x11","virt":{"container":false,"vm":false},"wsl":false,"board":null,"form_factor":"desktop"}
 EOF

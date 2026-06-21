@@ -785,38 +785,39 @@ _dispatcher_detect() {
         esac
     done
 
-    if ! declare -F detect_environment >/dev/null 2>&1; then
-        printf "[dispatcher] ERROR: detect_environment not loaded\n" >&2
+    if ! declare -F environment_snapshot >/dev/null 2>&1; then
+        printf "[dispatcher] ERROR: environment_snapshot not loaded\n" >&2
         return 1
     fi
 
-    local _env_json _form
-    _env_json="$(detect_environment)"
-    _form="$(platform_classify "${_env_json}")"
+    # Fetch the snapshot ONCE (probe + classify behind one call) and read
+    # every field off it, instead of probing per field.
+    local _snap
+    _snap="$(environment_snapshot)"
 
     if [[ "${_json_only}" == "true" ]]; then
-        # Splice form_factor into the JSON by replacing the closing '}'.
-        # This keeps lib/detect.sh free of any platform.sh coupling.
-        printf '%s,"form_factor":"%s"}\n' "${_env_json%\}}" "${_form}"
+        # The snapshot already carries form_factor in the contract-stable
+        # wire shape (probe JSON with `,"form_factor":"X"` before the '}').
+        printf '%s\n' "${_snap}"
         return 0
     fi
 
     # Human-readable: "<dotted key>: <value>" per line.
     printf '%s\n' "----- init_ubuntu environment ------"
-    printf 'os.id:           %s\n' "$(detect_get_field os.id)"
-    printf 'os.version:      %s\n' "$(detect_get_field os.version)"
-    printf 'os.codename:     %s\n' "$(detect_get_field os.codename)"
-    printf 'arch:            %s\n' "$(detect_get_field arch)"
-    printf 'cpu.vendor:      %s\n' "$(detect_get_field cpu.vendor)"
-    printf 'gpu.vendor:      %s\n' "$(detect_get_field gpu.vendor)"
-    printf 'gpu.model:       %s\n' "$(detect_get_field gpu.model)"
-    printf 'desktop:         %s\n' "$(detect_get_field desktop)"
-    printf 'session_type:    %s\n' "$(detect_get_field session_type)"
-    printf 'virt.container:  %s\n' "$(detect_get_field virt.container)"
-    printf 'virt.vm:         %s\n' "$(detect_get_field virt.vm)"
-    printf 'wsl:             %s\n' "$(detect_get_field wsl)"
-    printf 'board:           %s\n' "$(detect_get_field board)"
-    printf 'form_factor:     %s\n' "${_form}"
+    printf 'os.id:           %s\n' "$(environment_field os.id "${_snap}")"
+    printf 'os.version:      %s\n' "$(environment_field os.version "${_snap}")"
+    printf 'os.codename:     %s\n' "$(environment_field os.codename "${_snap}")"
+    printf 'arch:            %s\n' "$(environment_field arch "${_snap}")"
+    printf 'cpu.vendor:      %s\n' "$(environment_field cpu.vendor "${_snap}")"
+    printf 'gpu.vendor:      %s\n' "$(environment_field gpu.vendor "${_snap}")"
+    printf 'gpu.model:       %s\n' "$(environment_field gpu.model "${_snap}")"
+    printf 'desktop:         %s\n' "$(environment_field desktop "${_snap}")"
+    printf 'session_type:    %s\n' "$(environment_field session_type "${_snap}")"
+    printf 'virt.container:  %s\n' "$(environment_field virt.container "${_snap}")"
+    printf 'virt.vm:         %s\n' "$(environment_field virt.vm "${_snap}")"
+    printf 'wsl:             %s\n' "$(environment_field wsl "${_snap}")"
+    printf 'board:           %s\n' "$(environment_field board "${_snap}")"
+    printf 'form_factor:     %s\n' "$(environment_field form_factor "${_snap}")"
 }
 
 # ── upgrade / search / doctor / config / sync ───────────────────────────────

@@ -128,9 +128,10 @@ _mock_have_sudo_access() {
     [[ " ${TAGS[*]} " == *" core "* ]]
 }
 
-@test "shell module depends on apt-essentials" {
+@test "shell module depends on git + curl" {
     _load_module
-    [[ " ${DEPENDS_ON[*]} " == *" apt-essentials "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" git "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" curl "* ]]
 }
 
 @test "shell module CONFLICTS_WITH is empty" {
@@ -520,7 +521,7 @@ _mock_have_sudo_access() {
     assert_success
     assert_output --partial "name:        shell"
     assert_output --partial "category:    recommended"
-    assert_output --partial "depends_on:  apt-essentials"
+    assert_output --partial "depends_on:  git curl"
 }
 
 @test "standalone: info --lang=zh-TW prints localized description" {

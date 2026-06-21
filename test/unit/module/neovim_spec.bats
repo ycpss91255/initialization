@@ -115,10 +115,10 @@ _mock_remote() {
     [[ " ${TAGS[*]} " == *" cli "* ]]
 }
 
-@test "DEPENDS_ON is exactly apt-essentials + git-config (Q39)" {
+@test "DEPENDS_ON is exactly curl + git-config (Q39)" {
     _load_module
     [[ "${#DEPENDS_ON[@]}" -eq 2 ]]
-    [[ " ${DEPENDS_ON[*]} " == *" apt-essentials "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" curl "* ]]
     [[ " ${DEPENDS_ON[*]} " == *" git-config "* ]]
 }
 

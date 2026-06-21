@@ -666,8 +666,8 @@ tui_modules_in_category() {
 # only under its first tag). Groups AND the items inside them are ordered
 # BASIC-FIRST (issue #212, decision on #212): a module that OTHERS depend on
 # ranks earlier. "Basic-ness" is the transitive REVERSE-dependency count
-# derived from the whole payload's depends_on graph — apt-essentials, which
-# many modules depend_on, sorts before its dependents. A group inherits the
+# derived from the whole payload's depends_on graph — a base module like
+# curl, which many modules depend_on, sorts before its dependents. A group inherits the
 # max rank of its members, so the sub-category holding the most-depended-on
 # module renders first. Alphabetical (TAGS[0] then name) is the stable
 # fallback for ties — no new metadata field is introduced. Dep chains stay

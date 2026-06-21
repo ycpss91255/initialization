@@ -7,9 +7,9 @@
 # and installs the toolchain) + personal keymap overlay, so none of the
 # apt / github-release / config macros fit.
 #
-# Q39: the PRD §6.3.3 dep column lists build-essential, which is a *package*
-# inside the apt-essentials module, not a module — DEPENDS_ON carries module
-# names only and install() guarantees the package via _QMK_APT_PREREQS.
+# Per ADR-0026, build-essential is now its own base module, so DEPENDS_ON
+# carries it directly (alongside git). install() still re-lists build-essential
+# in _QMK_APT_PREREQS because standalone mode does not resolve DEPENDS_ON.
 #
 # Standalone usage:
 #   bash module/qmk-firmware.module.sh install [--dry-run]
@@ -55,7 +55,7 @@ declare -gA POST_INSTALL_MESSAGE=(
 declare -gA WARN_MESSAGE=()
 SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")
 SUPPORTED_PLATFORMS=("desktop" "server" "vm")
-DEPENDS_ON=("apt-essentials")
+DEPENDS_ON=("git" "build-essential")
 CONFLICTS_WITH=()
 SUPPORTS_USER_HOME=false
 RISK_LEVEL="low"
@@ -70,9 +70,9 @@ TEST_VERIFY_CMD="command -v qmk && qmk --version"
     "${SUPPORTS_USER_HOME}" "${INSTALL_TARGET_DEFAULT}"
 
 # ── Archetype D — custom data ───────────────────────────────────────────────
-# build-essential is deliberately repeated here even though apt-essentials
-# ships it (Q39): standalone mode does not resolve DEPENDS_ON, and the QMK
-# toolchain cannot compile without it.
+# build-essential is deliberately repeated here even though it is a
+# DEPENDS_ON module (ADR-0026): standalone mode does not resolve DEPENDS_ON,
+# and the QMK toolchain cannot compile without it.
 _QMK_APT_PREREQS=("git" "python3" "python3-pip" "pipx" "build-essential")
 _QMK_HOME="${QMK_HOME:-${HOME}/qmk_firmware}"
 _QMK_KEYMAP_SRC="${MODULE_DIR:-${BASH_SOURCE[0]%/*}}/config/qmk_firmware/keyboards"

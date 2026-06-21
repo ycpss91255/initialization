@@ -111,10 +111,10 @@ _mock_remote() {
     [[ " ${TAGS[*]} " == *" notes "* ]]
 }
 
-@test "DEPENDS_ON is exactly apt-essentials (module names only, Q39)" {
+@test "DEPENDS_ON is exactly curl (module names only, Q39)" {
     _load_module
     [[ "${#DEPENDS_ON[@]}" -eq 1 ]]
-    [[ "${DEPENDS_ON[0]}" == "apt-essentials" ]]
+    [[ "${DEPENDS_ON[0]}" == "curl" ]]
 }
 
 @test "DESCRIPTION is associative with en + zh-TW entries" {

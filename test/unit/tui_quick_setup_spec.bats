@@ -58,7 +58,7 @@ FIXTURE_QS_LIST_JSON="$(cat <<'EOF'
   "scope": "available",
   "filters": {"category": null, "tag": null},
   "items": [
-    {"name": "apt-essentials", "category": "base", "tags": ["core"],
+    {"name": "curl", "category": "base", "tags": ["core"],
      "description": "Foundation apt packages", "version_provided": "apt-managed",
      "installed": true, "outdated": false, "manual": false, "depends_on": [],
      "supports_user_home": false, "supported_platforms": ["desktop", "server", "wsl"],
@@ -252,7 +252,7 @@ FIXTURE_QS_DETECT_JSON='{"os":{"id":"ubuntu","version":"24.04","codename":"noble
 @test "tui_qs_recommended_entries never leaks other categories" {
     run tui_qs_recommended_entries "${FIXTURE_QS_LIST_JSON}" desktop
     assert_success
-    refute_output --partial "apt-essentials"
+    refute_output --partial "curl"
     refute_output --partial "eza"
     refute_output --partial "claude-code"
 }

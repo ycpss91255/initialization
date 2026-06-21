@@ -123,7 +123,14 @@ initialization/
 │   ├── general.sh                      # 從 module/function/general.sh 遷移
 │   └── logger.sh                       # 從 module/function/logger.sh 遷移
 ├── module/
-│   ├── apt-essentials.module.sh        # base (依平台動態挑套件 [N9])
+│   ├── git.module.sh                   # base (拆自 apt-essentials,ADR-0026)
+│   ├── vim.module.sh                   # base (拆自 apt-essentials,ADR-0026)
+│   ├── curl.module.sh                  # base (拆自 apt-essentials,ADR-0026)
+│   ├── wget.module.sh                  # base (拆自 apt-essentials,ADR-0026)
+│   ├── jq.module.sh                    # base (拆自 apt-essentials,ADR-0026)
+│   ├── build-essential.module.sh       # base (拆自 apt-essentials,ADR-0026)
+│   ├── htop.module.sh                  # base (拆自 apt-essentials,ADR-0026)
+│   ├── unzip.module.sh                 # base (拆自 apt-essentials,ADR-0026)
 │   ├── shell.module.sh                 # base
 │   ├── docker.module.sh                # recommended
 │   ├── nvidia-driver.module.sh         # recommended (含 dual-check + 失敗回復 [N17])
@@ -775,41 +782,11 @@ SUPPORTS_USER_HOME=true   # 或 false
 
 `false` 的 module(如 `docker`、`nvidia-driver`):無 sudo 時跳過整個 module + 警告。
 
-### 10.3 `apt-essentials` 的特殊處理(見 §18.1 Q-A12)
+### 10.3 base 層 per-tool module(ADR-0026;supersedes §18.1 Q-A12 的 bundle 處理)
 
-`apt-essentials` 是 base 層,內含一組 apt 套件(`git` / `vim` / `curl` / `wget` / ...)。無 sudo 時的處理**不採用「整個 module 跳過」**,而是**逐套件檢查**:
+舊版此節描述 `apt-essentials` bundle 的「逐套件、盡力而為、缺套件不 fail」安裝邏輯。**ADR-0026 已將該 bundle 拆為 8 個獨立 base module**(`git` / `vim` / `curl` / `wget` / `jq` / `build-essential` / `htop` / `unzip`),各自為普通的 **archetype-A apt module**(恰一個 apt 套件,標準 `is_installed` 走 `dpkg`、標準 install/remove/purge)。
 
-```bash
-# module/apt-essentials.module.sh (節選邏輯)
-install() {
-    local _failed=() _skipped=() _ok=()
-    for pkg in "${APT_PKGS[@]}"; do
-        if _pkg_installed_with_min_version "${pkg}"; then
-            _ok+=("${pkg}")            # 已裝且版本 OK → 略過
-        elif [[ "${INIT_UBUNTU_INSTALL_TARGET}" == "sudo" ]]; then
-            if sudo apt-get install -y "${pkg}"; then
-                _ok+=("${pkg}")
-            else
-                _failed+=("${pkg}")    # 裝失敗
-            fi
-        else
-            _skipped+=("${pkg}")       # 無 sudo + 無法裝 → 跳過該套件
-        fi
-    done
-
-    # 結尾彙報
-    log_info "apt-essentials summary: ok=${#_ok[@]}, skipped=${#_skipped[@]}, failed=${#_failed[@]}"
-    [[ ${#_skipped[@]} -gt 0 ]] && log_warn "Skipped (please install manually): ${_skipped[*]}"
-    [[ ${#_failed[@]} -gt 0 ]] && log_error "Failed: ${_failed[*]}"
-}
-```
-
-- **已裝 + 版本 OK** → 略過此套件,繼續其他
-- **沒裝且可 sudo** → 嘗試 `apt install`
-- **沒裝且無 sudo** → 跳過該**套件**(不是整個 module fail),警告使用者手動裝
-- **install 結束時彙報**:哪些套件 ok / 跳過 / 失敗(進 log + stdout)
-
-其他 base / recommended module 可選擇繼續嘗試或 fail-fast,視 module 自身策略;`apt-essentials` 因為是「最低基線」所以採盡力而為的策略。
+因此舊的「同一個 module 內逐套件 best-effort、缺套件繼續」行為**不再適用**:每個 tool 自成一個 module,各自獨立成功或失敗;批次安裝多個 base module 時的部分失敗由 engine 統一處理(ADR-0015 partial-failure 語意),而非由單一 bundle module 內部吞掉。無 sudo 時的處理回歸 §10.2 通則(`SUPPORTS_USER_HOME=false` 的 module 無 sudo 即跳過整個 module + 警告)。
 
 ---
 
@@ -948,7 +925,7 @@ Engine 啟動時:
 
 | Module | 在 desktop | 在 server | 在 jetson-orin | 在 wsl |
 |---|---|---|---|---|
-| `apt-essentials` | + GUI 相關套件 | 純 CLI 套件 | Jetson SDK 加套件 | 純 CLI |
+| `apt-essentials`(superseded by ADR-0026:已拆為 per-tool base module) | + GUI 相關套件 | 純 CLI 套件 | Jetson SDK 加套件 | 純 CLI |
 | `nvidia-driver` | 推薦(若有卡) | 推薦(若有卡) | **不裝**(Jetson 已內建) | 不推薦 |
 | `font` | 推薦 | 不裝 | 不裝 | 不裝 |
 | `docker` | 推薦 | 推薦 | 推薦(NVIDIA Container Toolkit 變體) | 推薦(用 Docker Desktop integration) |
@@ -1062,7 +1039,7 @@ v0.1+ 一律序列。`dpkg` lock + sudo 互斥讓 apt module 無法並行;非 ap
 | Q-A9 [N9] | RPi / Jetson 是 allowlist 還是 is_recommended? | **allowlist**:`SUPPORTED_PLATFORMS` 為硬限制;沒列就視為不支援(可 `--force` 強裝)。**支援與否的依據**:做 CI 測試 / 看官方資訊確認;沒有官方資訊的就用 CI 測試 |
 | Q-A10 [N3] | 並行安裝預設啟用嗎? | **不做**(2026-06-06 PRD 定稿):移入 PRD §5.3 Backlog;`PARALLEL_GROUP` metadata 已砍(PRD Q34) |
 | Q-A11 [N17] | 高風險 module 自動回復的「snapshot」要做到多深? | **預設記前三層**(`lsmod` + `apt-mark showmanual` + 關鍵 config `/etc/X11`、`/etc/modprobe.d`)。**使用者在 install 確認對話框內可勾選是否額外做全機 snapshot**(BTRFS / timeshift),預設不做,需明確選擇 |
-| Q-A12 [N6] | Non-sudo 模式下 `apt-essentials` 怎麼辦? | **檢查每個套件是否已裝且符合最低版本**:已裝 + 版本 OK → 略過此套件繼續其他安裝;沒裝且無法 `apt install` → **跳過該套件**(不是整個 module fail)。**結尾彙報**:哪些套件成功 / 跳過 / 失敗 |
+| Q-A12 [N6] | Non-sudo 模式下 `apt-essentials` 怎麼辦? | **檢查每個套件是否已裝且符合最低版本**:已裝 + 版本 OK → 略過此套件繼續其他安裝;沒裝且無法 `apt install` → **跳過該套件**(不是整個 module fail)。**結尾彙報**:哪些套件成功 / 跳過 / 失敗。**(superseded by ADR-0026:apt-essentials bundle 已拆為 8 個 per-tool base module,各自獨立成功/失敗;non-sudo 回歸 §10.2 通則,部分失敗由 engine 處理 [ADR-0015])** |
 
 ### 18.2 設計階段傾向(已全數收斂,2026-06-06 PRD 定稿)
 

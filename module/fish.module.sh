@@ -39,7 +39,7 @@ declare -gA WARN_MESSAGE=(
 )
 SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")
 SUPPORTED_PLATFORMS=("desktop" "server" "wsl")
-DEPENDS_ON=("apt-essentials" "shell")
+DEPENDS_ON=("curl" "shell")
 CONFLICTS_WITH=()
 SUPPORTS_USER_HOME=false
 RISK_LEVEL="medium"

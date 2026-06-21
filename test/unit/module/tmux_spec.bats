@@ -135,9 +135,10 @@ _mock_apt_list() {
     [[ " ${TAGS[*]} " == *" multiplexer "* ]]
 }
 
-@test "tmux module DEPENDS_ON contains apt-essentials" {
+@test "tmux module DEPENDS_ON contains git + curl" {
     _load_module
-    [[ " ${DEPENDS_ON[*]} " == *" apt-essentials "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" git "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" curl "* ]]
 }
 
 @test "tmux DESCRIPTION is associative with en + zh-TW entries" {
@@ -538,7 +539,7 @@ _mock_apt_list() {
     assert_output --partial "name:        tmux"
     assert_output --partial "category:    recommended"
     assert_output --partial "multiplexer"
-    assert_output --partial "apt-essentials"
+    assert_output --partial "git"
 }
 
 @test "standalone: info --lang=zh-TW prints localized description" {

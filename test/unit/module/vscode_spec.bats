@@ -130,10 +130,10 @@ _mock_apt_list() {
     [[ " ${TAGS[*]} " == *" editor "* ]]
 }
 
-@test "vscode module DEPENDS_ON contains only apt-essentials (Q39)" {
+@test "vscode module DEPENDS_ON contains only curl (Q39)" {
     _load_module
     [[ "${#DEPENDS_ON[@]}" -eq 1 ]]
-    [[ "${DEPENDS_ON[0]}" == "apt-essentials" ]]
+    [[ "${DEPENDS_ON[0]}" == "curl" ]]
 }
 
 @test "vscode DESCRIPTION is associative with en + zh-TW entries" {
@@ -599,7 +599,7 @@ _mock_apt_list() {
     assert_output --partial "name:        vscode"
     assert_output --partial "category:    optional"
     assert_output --partial "editor"
-    assert_output --partial "apt-essentials"
+    assert_output --partial "curl"
 }
 
 @test "standalone: info --lang=zh-TW prints localized description" {

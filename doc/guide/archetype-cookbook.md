@@ -17,7 +17,7 @@ when the macro is *mostly* right.
 Does the upstream provide an apt package (in main / universe /
 multiverse / a 3rd-party repo)?
 ├── Yes → archetype A (apt)
-│         e.g. apt-essentials, fish, tmux, shell
+│         e.g. git, curl, fish, tmux, shell
 │         If the install also needs custom steps (add repo+key, add
 │         user to a group, write a config snippet), use the
 │         super-call override pattern below.
@@ -50,12 +50,12 @@ D instead. The macros are convenience, not a contract.
 
 ### Pure apt
 
-`module/apt-essentials.module.sh` — installs a list of packages,
+`module/shell.module.sh` — installs a list of packages,
 no extra work:
 
 ```bash
 # Archetype A: APT packages
-APT_PKGS=(curl ssh keychain ...)
+APT_PKGS=(ssh keychain xclip ...)
 APT_PPA=""             # (optional) e.g. "ppa:fish-shell/release-4"
 CONFIG_PATHS=()        # dirs to rm on purge
 module_use_apt_archetype

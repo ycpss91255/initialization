@@ -34,7 +34,7 @@ _load_state() {
     [[ -f "${_p}" ]]
     run jq -r '.version' "${_p}"
     assert_success
-    assert_output --partial "0.1.0"
+    assert_output --partial "0.2.0"
     run jq -r '.installed | length' "${_p}"
     assert_success
     assert_output "0"
@@ -159,11 +159,11 @@ _load_state() {
 
 @test "state_get_synced prints the synced JSON object" {
     _load_state
-    state_record_install docker true v27 "apt-essentials"
+    state_record_install docker true v27 "curl"
     run state_get_synced docker
     assert_success
     echo "${output}" | jq -e '.manual == true and .version_provided == "v27"
-        and .depends_on == ["apt-essentials"]' > /dev/null
+        and .depends_on == ["curl"]' > /dev/null
 }
 
 @test "state_get_synced on missing module prints nothing" {

@@ -158,7 +158,7 @@ teardown() {
     assert_success
 
     # --no-deps: scope the removal to gum so the dependency closure
-    # (apt-essentials) isn't dragged in — it can't be removed on the
+    # (curl) isn't dragged in — it can't be removed on the
     # apt-less alpine harness and isn't what this test asserts.
     engine_lt_run "INIT_UBUNTU_TEST_GH_FIXTURE_DIR=${ENGINE_LT_FIXTURE}" remove gum --no-deps -y
     assert_success

@@ -23,7 +23,7 @@
 #      --strip-components extract → symlink → Sidecar) on the RECEIVING side
 #      of a sync, alongside the config archetype (repo `ssh-config`). The
 #      module carries no apt dependency, so import's dep resolver never drags
-#      apt-essentials (uninstallable on this alpine image).
+#      curl (uninstallable on this alpine image).
 #   4. Exposes `setup_ubuntu` on sshd's default PATH via a /usr/bin wrapper
 #      (sync's remote tool check + import/export need it, PRD §16.3). The
 #      wrapper exports the github-release fixture seam so the wrapped real
@@ -94,7 +94,7 @@ EOF
 # `e2e-ghr` uses the github-release archetype macro exactly like a shipped
 # module (gum/eza/…), but is user-home + sudo-free + dependency-free so it
 # installs as syncuser on this apt-less alpine image without dragging
-# apt-essentials. The fetch boundary is stubbed by the #175 seam
+# curl. The fetch boundary is stubbed by the #175 seam
 # (INIT_UBUNTU_TEST_GH_FIXTURE_DIR, exported from the wrapper below); the
 # whole downstream chain — gzip sniff, tar --strip-components extract,
 # symlink, Sidecar — runs for real inside the wrapped import lifecycle.

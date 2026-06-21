@@ -41,7 +41,7 @@ FIXTURE_SHOW_JSON="$(cat <<'EOF'
   "category": "recommended",
   "description": "Docker Engine and CLI",
   "tags": ["container", "devops"],
-  "depends_on": ["apt-essentials"],
+  "depends_on": ["curl"],
   "conflicts": ["podman"],
   "supported_ubuntu": ["22.04", "24.04"],
   "supported_platforms": ["desktop", "server"]
@@ -73,7 +73,7 @@ FIXTURE_STATE_JSON="$(cat <<'EOF'
   "version": "0.1.0",
   "installed": {
     "docker": {
-      "synced": {"manual": true, "depends_on": ["apt-essentials"], "version_provided": "27.4.0",
+      "synced": {"manual": true, "depends_on": ["curl"], "version_provided": "27.4.0",
                  "installed_at": "2026-05-13T14:22:00+08:00", "installed_by": "cli"},
       "local": {}
     },
@@ -96,7 +96,7 @@ FIXTURE_LIST_JSON="$(cat <<'EOF'
     {"name": "docker", "category": "recommended", "tags": ["container"],
      "description": "Docker Engine", "version_provided": "apt-managed",
      "installed": true, "outdated": false, "manual": true,
-     "depends_on": ["apt-essentials"], "supports_user_home": false,
+     "depends_on": ["curl"], "supports_user_home": false,
      "supported_platforms": ["desktop", "server"], "supported_ubuntu": ["24.04"],
      "risk_level": "low", "reboot_required": false, "homepage": null},
     {"name": "neovim", "category": "recommended", "tags": ["editor"],
@@ -158,7 +158,7 @@ EOF
     assert_output --partial "recommended"
     assert_output --partial "Docker Engine and CLI"
     assert_output --partial "container, devops"
-    assert_output --partial "apt-essentials"
+    assert_output --partial "curl"
     assert_output --partial "podman"
     assert_output --partial "22.04, 24.04"
     assert_output --partial "desktop, server"

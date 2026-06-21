@@ -75,7 +75,7 @@ _set_fake_catalog() {
 
 @test "state_io_export carries each module's synced section (ADR-0018)" {
     _load_state_io
-    state_record_install docker true apt-managed "apt-essentials"
+    state_record_install docker true apt-managed "curl"
     local _out="${INIT_UBUNTU_TEST_SCRATCH}/payload.json"
     state_io_export "${_out}"
 
@@ -90,7 +90,7 @@ _set_fake_catalog() {
     assert_output "apt-managed"
     run jq -cr '.modules[0].synced.depends_on' "${_out}"
     assert_success
-    assert_output '["apt-essentials"]'
+    assert_output '["curl"]'
 }
 
 @test "state_io_export payload never carries local sections (AC, issue #43)" {

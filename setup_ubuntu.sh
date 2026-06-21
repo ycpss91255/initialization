@@ -58,6 +58,8 @@ source "${LIB_DIR}/detect.sh"
 source "${LIB_DIR}/platform.sh"
 # shellcheck source=lib/state.sh
 source "${LIB_DIR}/state.sh"
+# shellcheck source=lib/state_migrate.sh
+source "${LIB_DIR}/state_migrate.sh"
 # shellcheck source=lib/state_io.sh
 source "${LIB_DIR}/state_io.sh"
 # shellcheck source=lib/config.sh
@@ -94,6 +96,10 @@ platform_export_env || true
 
 # ── Initialize state.json + config.ini (both idempotent) ──────────────────
 state_init || true
+# Forward-only schema migration (ADR-0008): bring an older state.json up to
+# the current STATE_SCHEMA_VERSION before any read path touches it. A failed
+# migration is fatal (it leaves the original file + a .bak untouched).
+state_migrate_run || exit 1
 config_init || true
 
 # ── Resolve INIT_UBUNTU_LANG (env > config.ini > auto-detect from $LANG) ────

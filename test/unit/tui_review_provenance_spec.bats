@@ -25,13 +25,13 @@ teardown() {
     teardown_test_env
 }
 
-# Fixture where docker depends_on apt-essentials, so picking docker genuinely
-# pulls apt-essentials — the provenance must attribute it to docker.
+# Fixture where docker depends_on curl, so picking docker genuinely
+# pulls curl — the provenance must attribute it to docker.
 _PROV_FIXTURE_LIST='{
   "schema_version": "1", "scope": "available",
   "filters": {"category": null, "tag": null},
   "items": [
-    {"name": "apt-essentials", "category": "base", "tags": ["core"],
+    {"name": "curl", "category": "base", "tags": ["core"],
      "description": "Foundation apt packages", "version_provided": "apt-managed",
      "installed": false, "outdated": null, "manual": null, "depends_on": [],
      "supports_user_home": false, "supported_platforms": ["desktop","server"],
@@ -40,7 +40,7 @@ _PROV_FIXTURE_LIST='{
     {"name": "docker", "category": "recommended", "tags": ["container"],
      "description": "Docker Engine", "version_provided": "apt-managed",
      "installed": false, "outdated": null, "manual": null,
-     "depends_on": ["apt-essentials"], "supports_user_home": false,
+     "depends_on": ["curl"], "supports_user_home": false,
      "supported_platforms": ["desktop","server"], "supported_ubuntu": ["24.04"],
      "risk_level": "low", "reboot_required": false, "homepage": null,
      "recommended": true}
@@ -50,7 +50,7 @@ _PROV_FIXTURE_LIST='{
 _PROV_FIXTURE_DETECT='{"os":{"id":"ubuntu","version":"24.04","codename":"noble"},"arch":"x86_64","cpu":{"vendor":"GenuineIntel"},"gpu":{"vendor":"nvidia","model":"x"},"desktop":"GNOME","session_type":"x11","virt":{"container":false,"vm":false},"wsl":false,"board":null,"form_factor":"desktop"}'
 
 # Scripted widget + recording mock CLI. The dry-run emits the resolver order
-# (apt-essentials before docker), mirroring docker's depends_on.
+# (curl before docker), mirroring docker's depends_on.
 _make_prov_harness() {
     local _dir="${INIT_UBUNTU_TEST_SCRATCH}/prov"
     mkdir -p "${_dir}/bin" "${_dir}/home"
@@ -83,7 +83,7 @@ case "\$*" in
     "config set "*)  : ;;
     "install --dry-run "*)
         printf '[dispatcher] DRY-RUN: would install in this order:\n'
-        printf '  - apt-essentials\n  - docker\n'
+        printf '  - curl\n  - docker\n'
         ;;
     "install "*) printf 'CLI pipeline output\n' ;;
 esac
@@ -115,7 +115,7 @@ EOF
     # provenance — these strings only ever come from the Review screen.
     run cat "${E2E_WIDGET_LOG}"
     assert_output --partial "docker (your selection)"
-    assert_output --partial "apt-essentials (required by docker)"
+    assert_output --partial "curl (required by docker)"
     # #214: the Review menu line itself replaced the flat "+N deps" count with
     # the per-item listing (the category-checklist row's own hint is a separate
     # screen and out of scope here; tui_review_text's unit test guards the body).
@@ -135,7 +135,7 @@ EOF
     assert_success
     assert_output --partial "CLI pipeline output"
     # The display changed; the argv did NOT — only the user-picked module is
-    # named (apt-essentials stays an engine-pulled dep, never on argv).
+    # named (curl stays an engine-pulled dep, never on argv).
     run tail -n1 "${E2E_CLI_LOG}"
     assert_output "install docker -y"
 }
@@ -161,7 +161,7 @@ EOF
     run cat "${E2E_WIDGET_LOG}"
     assert_output --partial "Pre-install Summary"
     assert_output --partial "docker (your selection)"
-    assert_output --partial "apt-essentials (required by docker)"
+    assert_output --partial "curl (required by docker)"
 }
 
 @test "e2e qs summary: decline at the summary forks no install (pure cancel)" {

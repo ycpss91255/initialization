@@ -148,7 +148,7 @@ _wipe_state() {
     #
     # Exit-code note (documented, same alpine limit as the #176 apt archetype):
     # the exported payload carries gum's depends_on closure, which the import
-    # pipeline re-resolves — pulling in apt-essentials (apt archetype). On the
+    # pipeline re-resolves — pulling in curl (apt archetype). On the
     # alpine test-tools image apt cannot run, so that ONE dependency install
     # fails and the dispatcher reports partial-failure (exit 6, PRD §7.4). That
     # is by design (hard rule #2 / ADR-0004: no host package installs in tests)

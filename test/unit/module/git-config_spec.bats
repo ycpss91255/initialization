@@ -89,12 +89,15 @@ _in_home() {
     done
 }
 
-@test "git-config leaves is_outdated and doctor unimplemented (optional, §4.1)" {
+@test "git-config inherits is_outdated and doctor from the config macro (ADR-0002)" {
     _load_module
-    # Pure config-drop archetype: these two optional hooks are not wired —
-    # the standalone CLI exits 2 "not implemented" for them (AC-25 below).
-    run ! declare -F is_outdated
-    run ! declare -F doctor
+    # The macros now emit the full lifecycle: is_outdated
+    # (module_default_config_is_outdated, returns 1 = not outdated) and doctor
+    # (module_default_doctor).
+    run declare -F is_outdated
+    assert_success
+    run declare -F doctor
+    assert_success
 }
 
 # ── Metadata sanity ──────────────────────────────────────────────────────────
@@ -303,12 +306,22 @@ _in_home() {
 
 # ── Sidecar / state semantics (ADR-0001 / AC-23) ─────────────────────────────
 
-@test "install records no sidecar (pure archetype — no module_sidecar_write)" {
+@test "install via the invoker records the sidecar with VERSION_PROVIDED" {
+    _load_module
+    # New design (ADR-0001 refinement): install() drops ~/.gitconfig but does
+    # NOT write the sidecar; the invoker module_standalone_main records it from
+    # module_provided_version (config archetype → VERSION_PROVIDED).
+    module_standalone_main install
+    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/git-config" ]]
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/git-config")" == "${VERSION_PROVIDED}" ]]
+}
+
+@test "bare install() drops the config but writes no sidecar (invoker owns it)" {
     _load_module
     install
-    # Current behavior: git-config does not override install to chain
-    # module_sidecar_write (unlike claude-code-config). The marker inside
-    # ~/.gitconfig is the install ground truth.
+    # A bare install() mutates the system (drops ~/.gitconfig) but leaves the
+    # versions/ dir untouched — only the invoker writes the sidecar.
+    [[ -f "${HOME}/.gitconfig" ]]
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/git-config" ]]
 }
 
@@ -317,14 +330,16 @@ _in_home() {
     printf '{"schema_version":"0.1.0","installed":{}}\n' \
         > "${INIT_UBUNTU_STATE_DIR}/state.json"
     local _before; _before="$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")"
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
-@test "standalone: install -> remove cycle never creates state.json or sidecar" {
+@test "standalone: install writes a sidecar; remove clears it, never state.json" {
     run _standalone_module install
     assert_success
     [[ -f "${TEST_HOME}/.gitconfig" ]]
+    # The invoker (module_standalone_main install) records the sidecar.
+    [[ -f "${TEST_HOME}/.local/state/init_ubuntu/versions/git-config" ]]
     run _standalone_module remove
     assert_success
     [[ ! -e "${TEST_HOME}/.gitconfig" ]]
@@ -527,11 +542,12 @@ _in_home() {
     assert_output --partial "設定"
 }
 
-@test "standalone: status reports installed + (no is_outdated)" {
+@test "standalone: status reports installed + outdated fields" {
+    # is_outdated is now wired (config default returns 1 = not outdated).
     run _standalone_module status
     assert_success
     assert_output --partial "installed:   no"
-    assert_output --partial "(no is_outdated)"
+    assert_output --partial "outdated:    no"
 }
 
 @test "standalone: install -> verify -> remove full cycle" {
@@ -595,14 +611,14 @@ _in_home() {
     refute_output --partial "not implemented"
 }
 
-@test "standalone: is-outdated exits 2 not-implemented (optional hook, §4.1)" {
+@test "standalone: is-outdated is implemented (config default; exit != 2)" {
     run _standalone_module is-outdated
-    assert_failure 2
-    assert_output --partial "not implemented"
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }
 
-@test "standalone: doctor exits 2 not-implemented (optional hook, §4.1)" {
+@test "standalone: doctor is implemented (default = is_installed; exit != 2)" {
     run _standalone_module doctor
-    assert_failure 2
-    assert_output --partial "not implemented"
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }

@@ -87,46 +87,49 @@ verify() {
     module_default_verify
 }
 
-# install: apt package, then deploy the config bundle, then record the
-# version Sidecar (ADR-0001; module_sidecar_* helpers are dry-run-safe).
+# Sidecar version for the phase-invocation wrapper: the apt-reported package
+# version of APT_PKGS[0] (lnav), VERSION_PROVIDED fallback. Archetype D, so
+# this hand-written module wires the apt default itself.
+module_provided_version() {
+    module_default_apt_provided_version
+}
+
+# install: apt package, then deploy the config bundle. The Sidecar is
+# written by the phase-invocation wrapper after a successful install.
 install() {
     module_dryrun_guard install \
         "apt-install ${APT_PKGS[*]} + deploy lnav_pkg config bundle -> ${LNAV_CONFIG_DEST}" \
         && return 0
     module_default_apt_install || return $?
     _lnav_deploy_config || return $?
-    module_sidecar_write "${NAME}" "$(_lnav_pkg_version)"
 }
 
 # upgrade: apt --only-upgrade, then re-deploy the bundle so config changes
-# shipped with the repo reach ~/.config/lnav, then refresh the Sidecar.
+# shipped with the repo reach ~/.config/lnav.
 upgrade() {
     module_dryrun_guard upgrade \
         "apt-upgrade ${APT_PKGS[*]} + re-deploy lnav_pkg config bundle" \
         && return 0
     module_default_apt_upgrade || return $?
     _lnav_deploy_config || return $?
-    module_sidecar_write "${NAME}" "$(_lnav_pkg_version)"
 }
 
 # remove: drop the package but KEEP ~/.config/lnav (remove vs purge
-# semantics), then drop the Sidecar — installed-version is state, not config.
+# semantics). The Sidecar is removed by the phase-invocation wrapper.
 remove() {
     module_dryrun_guard remove \
         "apt-remove ${APT_PKGS[*]} (config bundle kept: ${LNAV_CONFIG_DEST})" \
         && return 0
     module_default_apt_remove || return $?
-    module_sidecar_remove "${NAME}"
 }
 
-# purge: package + the deployed config bundle + Sidecar.
+# purge: package + the deployed config bundle (Sidecar removed by the wrapper).
 purge() {
     module_dryrun_guard purge \
         "apt-purge ${APT_PKGS[*]} + rm -rf ${LNAV_CONFIG_DEST}" \
         && return 0
     module_default_apt_purge || return $?
     rm -rf "${LNAV_CONFIG_DEST}"
-    module_sidecar_remove "${NAME}"
 }
 
 detect() {
@@ -138,7 +141,7 @@ is_recommended() {
 }
 
 # doctor: health check — package installed, binary runnable, config bundle
-# and Sidecar present (the latter two warn-only).
+# present (warn-only).
 doctor() {
     if ! is_installed; then
         log_warn "[${NAME}] doctor: lnav is not installed"
@@ -155,8 +158,6 @@ doctor() {
     fi
     [[ -f "${LNAV_CONFIG_DEST}/config.json" ]] \
         || log_warn "[${NAME}] doctor: config bundle missing at ${LNAV_CONFIG_DEST} (run install/upgrade to deploy)"
-    module_sidecar_get_version "${NAME}" >/dev/null 2>&1 \
-        || log_warn "[${NAME}] doctor: sidecar missing (installed outside init_ubuntu?)"
     return 0
 }
 
@@ -178,14 +179,6 @@ _lnav_deploy_config() {
         return 1
     }
     log_info "[${NAME}] config bundle deployed -> ${LNAV_CONFIG_DEST}"
-}
-
-# Version string for the Sidecar: dpkg-reported package version, falling
-# back to the literal "apt-managed" when dpkg has no answer.
-_lnav_pkg_version() {
-    local _ver=""
-    _ver="$(dpkg-query -W -f='${Version}' lnav 2>/dev/null)" || _ver=""
-    printf '%s' "${_ver:-apt-managed}"
 }
 
 # ── Standalone footer ───────────────────────────────────────────────────────

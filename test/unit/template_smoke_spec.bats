@@ -161,19 +161,18 @@ _assert_phase_dry_run_all() {
 }
 
 @test "template smoke: is-outdated has archetype-appropriate exit code" {
-    # apt provides is_outdated via macro (returns 1 with empty APT_PKGS).
-    # github-release / config / custom leave is_outdated commented out in
-    # the template (return 2 = not implemented).
+    # apt / github-release / config provide is_outdated via the macro (ADR-0002:
+    # the macros now emit the full lifecycle); on a not-installed smoke fixture
+    # the archetype default returns 1 (not outdated). The custom template leaves
+    # is_outdated commented out → standalone CLI returns 2 (not implemented).
     local _arch
     for _arch in "${ARCHETYPES[@]}"; do
         run bash "$(_smoke "${_arch}")" is-outdated
         case "${_arch}" in
-            apt)
-                # macro-provided: empty APT_PKGS → return 1 (not outdated)
+            apt|github-release|config)
                 [[ "${status}" -eq 1 ]] || { printf 'archetype=%s is-outdated exit=%s (want 1)\n' "${_arch}" "${status}" >&2; return 1; }
                 ;;
-            *)
-                # not implemented (commented stub) → standalone CLI returns 2
+            custom)
                 [[ "${status}" -eq 2 ]] || { printf 'archetype=%s is-outdated exit=%s (want 2)\n' "${_arch}" "${status}" >&2; return 1; }
                 [[ "${output}" == *"is_outdated"* ]] || { printf 'archetype=%s missing is_outdated msg\n' "${_arch}" >&2; return 1; }
                 ;;
@@ -181,11 +180,21 @@ _assert_phase_dry_run_all() {
     done
 }
 
-@test "template smoke: doctor returns exit 2 (optional, not implemented) (all archetypes)" {
+@test "template smoke: doctor has archetype-appropriate exit code" {
+    # apt / github-release / config inherit module_default_doctor via the macro
+    # (is_installed + warn); on a not-installed smoke fixture it returns 1. The
+    # custom template leaves doctor commented out → CLI returns 2.
     local _arch
     for _arch in "${ARCHETYPES[@]}"; do
         run bash "$(_smoke "${_arch}")" doctor
-        [[ "${status}" -eq 2 ]] || { printf 'archetype=%s doctor exit=%s\n' "${_arch}" "${status}" >&2; return 1; }
+        case "${_arch}" in
+            apt|github-release|config)
+                [[ "${status}" -eq 1 ]] || { printf 'archetype=%s doctor exit=%s (want 1)\n' "${_arch}" "${status}" >&2; return 1; }
+                ;;
+            custom)
+                [[ "${status}" -eq 2 ]] || { printf 'archetype=%s doctor exit=%s (want 2)\n' "${_arch}" "${status}" >&2; return 1; }
+                ;;
+        esac
     done
 }
 

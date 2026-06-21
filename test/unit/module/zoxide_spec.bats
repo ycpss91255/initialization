@@ -189,11 +189,11 @@ _fake_installed() {
 @test "standalone-style install never touches state.json (ADR-0001 / AC-23)" {
     _load_module
     printf '{"sentinel":true}\n' > "${INIT_UBUNTU_STATE_DIR}/state.json"
-    _zoxide_resolve_asset_pattern() { ZOXIDE_RESOLVED_VERSION="9.9.9"; }
+    eval '_zoxide_resolve_asset_pattern() { MODULE_GH_RESOLVED_VERSION="9.9.9"; }'
     _zoxide_resolve_asset_pattern
     module_default_github_release_install() { :; }
     module_default_github_release_install
-    run install
+    run module_standalone_main install
     assert_success
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == '{"sentinel":true}' ]]
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/zoxide" ]]
@@ -254,11 +254,11 @@ _fake_installed() {
 
 @test "install writes the sidecar with the resolved version" {
     _load_module
-    _zoxide_resolve_asset_pattern() { ZOXIDE_RESOLVED_VERSION="9.9.9"; }
+    eval '_zoxide_resolve_asset_pattern() { MODULE_GH_RESOLVED_VERSION="9.9.9"; }'
     _zoxide_resolve_asset_pattern
     module_default_github_release_install() { :; }
     module_default_github_release_install
-    run install
+    run module_standalone_main install
     assert_success
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/zoxide")" == "9.9.9" ]]
 }
@@ -268,7 +268,7 @@ _fake_installed() {
     module_sidecar_write "zoxide" "1.0.0"
     module_default_github_release_remove() { :; }
     module_default_github_release_remove
-    run remove
+    run module_standalone_main remove
     assert_success
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/zoxide" ]]
 }
@@ -279,7 +279,7 @@ _fake_installed() {
     printf '# keep me\n%s\n' "eval \"\$(zoxide init bash)\"" > "${HOME}/.bashrc"
     module_default_github_release_purge() { :; }
     module_default_github_release_purge
-    run purge
+    run module_standalone_main purge
     assert_success
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/zoxide" ]]
     run grep -F "zoxide init" "${HOME}/.bashrc"
@@ -403,14 +403,17 @@ _fake_installed() {
     assert_failure
 }
 
-@test "doctor heals a missing sidecar when zoxide is installed" {
+@test "doctor passes and warns (read-only) when the sidecar is missing" {
+    # Sidecar is written at the phase-invocation layer (refines ADR-0001), so
+    # doctor is read-only: warns about a missing Sidecar, does NOT heal it.
     _load_module
     _fake_installed
     PATH="${INIT_UBUNTU_TEST_SCRATCH}/bin:${PATH}"
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/zoxide" ]]
     run doctor
     assert_success
-    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/zoxide" ]]
+    assert_output --partial "Sidecar missing"
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/zoxide" ]]
 }
 
 # ── Standalone CLI ───────────────────────────────────────────────────────────

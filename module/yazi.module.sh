@@ -89,7 +89,11 @@ module_use_github_release_archetype
 
 # Override install/upgrade: the archetype fetch only understands gzip
 # tarballs, while yazi ships a zip — swap in the zip-aware fetch, then add
-# the legacy `alias yz='yazi'` drop + Sidecar write (ADR-0001).
+# the legacy `alias yz='yazi'` drop. The phase-invocation wrapper writes the
+# Sidecar via module_provided_version (overridden below to report the parsed
+# binary version, since yazi's zip asset is version-less).
+module_provided_version() { _yazi_local_version; }
+
 install() {
     module_dryrun_guard install \
         "fetch ${GITHUB_REPO} latest zip -> ${INSTALL_DIR}, symlink ${BIN_LINK}, append yz alias" \
@@ -97,7 +101,6 @@ install() {
     module_skip_if_installed && return 0
     _yazi_fetch_and_install || return $?
     _yazi_add_alias
-    module_sidecar_write "${NAME}" "$(_yazi_local_version)"
 }
 
 upgrade() {
@@ -105,21 +108,16 @@ upgrade() {
         && return 0
     _yazi_fetch_and_install || return $?
     _yazi_add_alias
-    module_sidecar_write "${NAME}" "$(_yazi_local_version)"
 }
 
-# remove keeps user config (the rc alias survives a remove; spec §4.1).
-remove() {
-    module_default_github_release_remove || return $?
-    module_sidecar_remove "${NAME}"
-}
+# remove keeps user config (the rc alias survives a remove; spec §4.1);
+# inherit the macro default (the wrapper removes the Sidecar).
 
 # purge also strips the alias lines from ~/.bashrc / ~/.zshrc.
 purge() {
     module_default_github_release_purge || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _yazi_remove_alias
-    module_sidecar_remove "${NAME}"
 }
 
 # detect: only the x86_64 gnu zip is wired.
@@ -154,8 +152,7 @@ doctor() {
         return 1
     fi
     if ! module_sidecar_get_version "${NAME}" >/dev/null 2>&1; then
-        log_warn "[${NAME}] doctor: Sidecar missing — rewriting it"
-        module_sidecar_write "${NAME}" "$(_yazi_local_version)"
+        log_warn "[${NAME}] doctor: Sidecar missing (ADR-0001 drift; re-run install/upgrade to heal)"
     fi
     return 0
 }

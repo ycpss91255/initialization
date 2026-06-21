@@ -74,51 +74,11 @@ module_skip_if_not_installed() {
 
 # ─── 3b. Sidecar (ADR-0001) ─────────────────────────────────────────────────
 #
-# The Sidecar is a one-line version file at
-#   ${INIT_UBUNTU_STATE_DIR}/versions/<name>
-# written by BOTH Standalone and Engine modes (same code path — ADR-0001).
-# Standalone never touches state.json; only the engine does.
-
-module_sidecar_dir() {
-    printf '%s/versions' \
-        "${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu}"
-}
-
-module_sidecar_path() {
-    local _name="${1:-${NAME:?module_sidecar_path needs <name>}}"
-    printf '%s/%s' "$(module_sidecar_dir)" "${_name}"
-}
-
-# module_sidecar_write <name> [version] — record the installed version.
-# No-op under --dry-run (defense in depth; callers should guard earlier).
-module_sidecar_write() {
-    local _name="${1:-${NAME:?module_sidecar_write needs <name>}}"
-    local _version="${2:-${VERSION_PROVIDED:-unknown}}"
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    local _dir
-    _dir="$(module_sidecar_dir)"
-    mkdir -p "${_dir}" || {
-        log_warn "[${_name}] cannot create sidecar dir ${_dir}"
-        return 1
-    }
-    printf '%s\n' "${_version}" > "${_dir}/${_name}"
-}
-
-# module_sidecar_remove <name> — drop the version record (remove/purge).
-module_sidecar_remove() {
-    local _name="${1:-${NAME:?module_sidecar_remove needs <name>}}"
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    rm -f "$(module_sidecar_path "${_name}")"
-}
-
-# module_sidecar_get_version <name> — print recorded version, 1 if absent.
-module_sidecar_get_version() {
-    local _name="${1:-${NAME:?module_sidecar_get_version needs <name>}}"
-    local _f
-    _f="$(module_sidecar_path "${_name}")"
-    [[ -f "${_f}" ]] || return 1
-    cat "${_f}"
-}
+# The Sidecar version file (${INIT_UBUNTU_STATE_DIR}/versions/<name>) and its
+# write/remove/get helpers live in §6.5 below (single definition — they were
+# historically duplicated here). The phase-invocation wrapper
+# (_module_sidecar_after_phase, §6.5) is the single write site for BOTH
+# Standalone and Engine modes (refines ADR-0001: WHERE, not WHETHER).
 
 # ─── 4. APT archetype ───────────────────────────────────────────────────────
 #
@@ -206,6 +166,71 @@ module_default_verify() {
     fi
 }
 
+# Default doctor (ADR-0002 / ADR-0009): baseline runtime health = is_installed,
+# log_warn on failure. ~20 archetype modules hand-wrote exactly this pattern;
+# the macros now wire it by default. Modules with a runtime surface (daemon,
+# group requirement, metadata self-check, Sidecar-drift detection) MUST still
+# override doctor() after the archetype macro — late-binding lets them.
+module_default_doctor() {
+    if ! is_installed 2>/dev/null; then
+        log_warn "[${NAME:-?}] doctor: not installed"
+        return 1
+    fi
+    return 0
+}
+
+# ─── module_provided_version (phase-invocation Sidecar hook) ────────────────
+#
+# The Sidecar version string the phase-invocation wrapper records on a
+# successful install/upgrade (see _module_sidecar_after_phase below). It is
+# archetype-defaulted and per-module overridable. The wrapper — not the
+# module's install() — calls this and writes the Sidecar, so both Engine and
+# Standalone modes share one write site (refines ADR-0001: WHERE, not WHETHER).
+
+# Generic default: the declared VERSION_PROVIDED. Hand-written (archetype D)
+# modules work without defining anything; they override when they have a real
+# runtime-resolved version.
+module_default_provided_version() {
+    printf '%s' "${VERSION_PROVIDED:-unknown}"
+}
+
+# apt archetype: dpkg-reported version of APT_PKGS[0], falling back to
+# VERSION_PROVIDED (the logic the per-module _xxx_pkg_version helpers
+# duplicated). No dpkg / empty answer -> VERSION_PROVIDED.
+module_default_apt_provided_version() {
+    local _pkg="" _ver=""
+    if declare -p APT_PKGS >/dev/null 2>&1 && [[ "${#APT_PKGS[@]}" -gt 0 ]]; then
+        _pkg="${APT_PKGS[0]}"
+    fi
+    if [[ -n "${_pkg}" ]]; then
+        _ver="$(dpkg-query -W -f='${Version}' "${_pkg}" 2>/dev/null)" || _ver=""
+    fi
+    printf '%s' "${_ver:-${VERSION_PROVIDED:-apt-managed}}"
+}
+
+# github-release archetype: the release tag the B-archetype resolved during the
+# fetch. The archetype fetch and every module-specific resolver set
+# MODULE_GH_RESOLVED_VERSION. When unset — e.g. an idempotent re-install that
+# short-circuited via module_skip_if_installed without re-resolving — preserve
+# the EXISTING Sidecar version rather than clobbering it with the
+# VERSION_PROVIDED fallback (AC-5/6: a no-op re-install must not downgrade the
+# recorded version). Final fallback is VERSION_PROVIDED.
+module_default_github_release_provided_version() {
+    if [[ -n "${MODULE_GH_RESOLVED_VERSION:-}" ]]; then
+        printf '%s' "${MODULE_GH_RESOLVED_VERSION}"
+        return 0
+    fi
+    local _existing=""
+    _existing="$(module_sidecar_get_version "${NAME}" 2>/dev/null)" || _existing=""
+    printf '%s' "${_existing:-${VERSION_PROVIDED:-unknown}}"
+}
+
+# config archetype: the declared VERSION_PROVIDED (config drops are versioned
+# by the template, not a package manager).
+module_default_config_provided_version() {
+    printf '%s' "${VERSION_PROVIDED:-unknown}"
+}
+
 # module_default_apt_is_outdated — `apt list --upgradable` query.
 #   Returns 0 (= outdated) if any package in APT_PKGS appears in the
 #   apt-managed upgradable list, 1 otherwise. No sudo required;
@@ -223,16 +248,22 @@ module_default_apt_is_outdated() {
     return 1
 }
 
-# Wire 7 lifecycle functions in one call (6 mutation + is_outdated read).
-# Module can still override any of them by re-declaring after the macro.
+# Wire the full lifecycle in one call. ADR-0002: the macro emits ALL the
+# archetype-defaultable functions — the 6 mutation phases plus is_installed,
+# is_outdated, verify, doctor, and the module_provided_version Sidecar hook.
+# Only detect() + is_recommended() stay module-defined (genuinely
+# module-specific). A module can still override any of these by re-declaring
+# after the macro (bash late-binding).
 module_use_apt_archetype() {
-    is_installed() { module_default_apt_is_installed; }
-    is_outdated()  { module_default_apt_is_outdated; }
-    install()      { module_default_apt_install; }
-    upgrade()      { module_default_apt_upgrade; }
-    remove()       { module_default_apt_remove; }
-    purge()        { module_default_apt_purge; }
-    verify()       { module_default_verify; }
+    is_installed()            { module_default_apt_is_installed; }
+    is_outdated()             { module_default_apt_is_outdated; }
+    install()                 { module_default_apt_install; }
+    upgrade()                 { module_default_apt_upgrade; }
+    remove()                  { module_default_apt_remove; }
+    purge()                   { module_default_apt_purge; }
+    verify()                  { module_default_verify; }
+    doctor()                  { module_default_doctor; }
+    module_provided_version() { module_default_apt_provided_version; }
 }
 
 # ─── 5. GitHub-release archetype ────────────────────────────────────────────
@@ -299,6 +330,10 @@ _module_github_release_fetch_and_install() {
             || log_warn "[${NAME}] could not detect latest version (continuing)"
     fi
     [[ -n "${_ver}" ]] && log_info "[${NAME}] target: ${GITHUB_REPO} v${_ver}"
+    # Publish the resolved tag for module_provided_version (Sidecar hook). A
+    # module-specific resolver may already have set this to a concrete tag
+    # before super-calling us; only overwrite when we actually resolved one.
+    [[ -n "${_ver}" ]] && MODULE_GH_RESOLVED_VERSION="${_ver}"
 
     _url="https://github.com/${GITHUB_REPO}/releases/latest/download/${GITHUB_ASSET_PATTERN}"
     _tmp="$(mktemp 2>/dev/null || printf '/tmp/%s-%s' "${NAME}" "$$")"
@@ -364,6 +399,9 @@ module_default_github_release_remove() {
     local _sudo=""
     [[ "${_use_sudo}" == "true" ]] && _sudo="sudo"
     module_dryrun_guard remove "rm ${INSTALL_DIR:-?} + ${_bin_link}" && return 0
+    # Idempotent no-op on a clean system (also avoids a needless sudo call when
+    # nothing is installed — matters on sudo-less test/CI hosts).
+    module_skip_if_not_installed && return 0
     [[ -n "${INSTALL_DIR:-}" && -e "${INSTALL_DIR}" ]] && ${_sudo} rm -rf "${INSTALL_DIR}"
     ${_sudo} rm -f "${_bin_link}"
 }
@@ -378,13 +416,35 @@ module_default_github_release_purge() {
     done
 }
 
+# Default github-release is_outdated: compare the Sidecar version against the
+# latest release tag. Not installed / no Sidecar / no remote answer = not
+# outdated (return 1). This is the pattern gum/lazygit/codex hand-wrote;
+# modules with a special version shape (notion .deb, eza/yazi binary parse)
+# still override after the macro.
+module_default_github_release_is_outdated() {
+    is_installed 2>/dev/null || return 1
+    local _local="" _remote=""
+    _local="$(module_sidecar_get_version "${NAME}" 2>/dev/null)" || _local=""
+    [[ -n "${_local}" ]] || return 1
+    if declare -F get_github_pkg_latest_version >/dev/null 2>&1; then
+        get_github_pkg_latest_version _remote "${GITHUB_REPO}" 2>/dev/null || _remote=""
+    fi
+    [[ -n "${_remote}" && "${_local}" != "${_remote}" ]]
+}
+
+# Wire the full lifecycle (ADR-0002). detect()/is_recommended() stay
+# module-defined; everything else (incl. is_outdated, doctor, and the
+# module_provided_version Sidecar hook) is archetype-defaulted + overridable.
 module_use_github_release_archetype() {
-    is_installed() { module_default_github_release_is_installed; }
-    install()      { module_default_github_release_install; }
-    upgrade()       { module_default_github_release_upgrade; }
-    remove()       { module_default_github_release_remove; }
-    purge()        { module_default_github_release_purge; }
-    verify()       { module_default_verify; }
+    is_installed()            { module_default_github_release_is_installed; }
+    is_outdated()             { module_default_github_release_is_outdated; }
+    install()                 { module_default_github_release_install; }
+    upgrade()                 { module_default_github_release_upgrade; }
+    remove()                  { module_default_github_release_remove; }
+    purge()                   { module_default_github_release_purge; }
+    verify()                  { module_default_verify; }
+    doctor()                  { module_default_doctor; }
+    module_provided_version() { module_default_github_release_provided_version; }
 }
 
 # ─── 6. Config-drop archetype ───────────────────────────────────────────────
@@ -449,13 +509,27 @@ module_default_config_purge() {
     module_default_config_remove
 }
 
+# Default config is_outdated: a config drop has no upstream version channel, so
+# the baseline answer is "not outdated" (return 1). Modules that can detect
+# drift from the shipped template (e.g. claude-code-config) override after the
+# macro.
+module_default_config_is_outdated() {
+    return 1
+}
+
+# Wire the full lifecycle (ADR-0002). detect()/is_recommended() stay
+# module-defined; everything else (incl. is_outdated, doctor, and the
+# module_provided_version Sidecar hook) is archetype-defaulted + overridable.
 module_use_config_archetype() {
-    is_installed() { module_default_config_is_installed; }
-    install()      { module_default_config_install; }
-    upgrade()       { module_default_config_upgrade; }
-    remove()       { module_default_config_remove; }
-    purge()        { module_default_config_purge; }
-    verify()       { module_default_verify; }
+    is_installed()            { module_default_config_is_installed; }
+    is_outdated()             { module_default_config_is_outdated; }
+    install()                 { module_default_config_install; }
+    upgrade()                 { module_default_config_upgrade; }
+    remove()                  { module_default_config_remove; }
+    purge()                   { module_default_config_purge; }
+    verify()                  { module_default_verify; }
+    doctor()                  { module_default_doctor; }
+    module_provided_version() { module_default_config_provided_version; }
 }
 
 # ─── 6.5 Sidecar helpers (ADR-0001 / module-spec §4.7.4) ────────────────────
@@ -501,6 +575,39 @@ module_sidecar_get_version() {
     local _path; _path="$(module_sidecar_path "${_name}")" || return 1
     [[ -f "${_path}" ]] || return 1
     cat "${_path}"
+}
+
+# _module_sidecar_after_phase <phase> <name>
+#   The phase-invocation Sidecar wrapper (refines ADR-0001: the Sidecar
+#   write/remove now lives at the invocation layer, shared by BOTH modes).
+#   Called by lib/runner.sh (Engine) and module_standalone_main (Standalone)
+#   AFTER a phase succeeds — NOT by the module's install()/upgrade()/etc.:
+#     install / upgrade -> module_sidecar_write <name> "$(module_provided_version)"
+#     remove  / purge   -> module_sidecar_remove <name>
+#   No-op on dry-run (the sidecar_* helpers also guard, defense in depth) and
+#   for read-only / diagnostic phases. module_provided_version is archetype-
+#   defaulted (module_default_*_provided_version) and per-module overridable;
+#   it falls back to VERSION_PROVIDED when a module defines nothing.
+_module_sidecar_after_phase() {
+    local _phase="${1:?_module_sidecar_after_phase needs <phase>}"
+    local _name="${2:-${NAME:-}}"
+    [[ -n "${_name}" ]] || return 0
+    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
+    case "${_phase}" in
+        install|upgrade)
+            local _ver="unknown"
+            if declare -F module_provided_version >/dev/null 2>&1; then
+                _ver="$(module_provided_version)" || _ver="${VERSION_PROVIDED:-unknown}"
+            else
+                _ver="${VERSION_PROVIDED:-unknown}"
+            fi
+            module_sidecar_write "${_name}" "${_ver}"
+            ;;
+        remove|purge)
+            module_sidecar_remove "${_name}"
+            ;;
+        *) return 0 ;;
+    esac
 }
 
 # ─── 7. Standalone CLI entry ────────────────────────────────────────────────
@@ -615,7 +722,18 @@ module_standalone_main() {
                 return 2 ;;
         esac
     fi
-    "${_phase}"
+
+    # Run the lifecycle function, then — for Action-class phases — drive the
+    # Sidecar at this invocation layer (refines ADR-0001). install()/upgrade()
+    # etc. mutate the system; the wrapper records/removes the Sidecar so
+    # Standalone and Engine share one write site. Read-only / diagnostic
+    # phases fall through _module_sidecar_after_phase's no-op branch.
+    local _rc=0
+    "${_phase}" || _rc=$?
+    if [[ "${_rc}" -eq 0 ]]; then
+        _module_sidecar_after_phase "${_phase}" "${NAME:-}"
+    fi
+    return "${_rc}"
 }
 
 # ─── 8. Engine-side aggregators ─────────────────────────────────────────────

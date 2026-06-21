@@ -283,7 +283,7 @@ _install_fake_qmk_bin() {
     _mock_install_steps
     MOCK_QMK_CLI_VERSION="1.1.5"
     _mock_cli_version
-    install
+    module_standalone_main install
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware" ]]
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware")" == "1.1.5" ]]
 }
@@ -293,7 +293,7 @@ _install_fake_qmk_bin() {
     _mock_install_steps
     MOCK_QMK_CLI_VERSION=""
     _mock_cli_version
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware")" == "pipx-managed" ]]
 }
 
@@ -305,7 +305,7 @@ _install_fake_qmk_bin() {
     _mock_install_steps
     MOCK_QMK_CLI_VERSION="1.1.5"
     _mock_cli_version
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
@@ -313,7 +313,7 @@ _install_fake_qmk_bin() {
     _load_module
     MOCK_APT_PREREQS_RC=1
     _mock_install_steps
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware" ]]
 }
@@ -322,7 +322,7 @@ _install_fake_qmk_bin() {
     _load_module
     MOCK_PIPX_INSTALL_RC=1
     _mock_install_steps
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware" ]]
 }
@@ -331,7 +331,7 @@ _install_fake_qmk_bin() {
     _load_module
     MOCK_QMK_SETUP_RC=1
     _mock_install_steps
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware" ]]
 }
@@ -345,7 +345,7 @@ _install_fake_qmk_bin() {
     _mock_install_steps
     MOCK_QMK_CLI_VERSION="1.1.5"
     _mock_cli_version
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware")" == "1.1.5" ]]
 }
 
@@ -368,7 +368,7 @@ _install_fake_qmk_bin() {
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
     _mock_install_steps
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware" ]]
 }
 
@@ -378,7 +378,7 @@ _install_fake_qmk_bin() {
     printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware"
     MOCK_IS_INSTALLED_RC=1
     _mock_is_installed
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware" ]]
 }
 
@@ -393,7 +393,7 @@ _install_fake_qmk_bin() {
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
     _mock_install_steps
-    purge
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/qmk-firmware" ]]
     [[ ! -e "${_cfg}" ]]
     [[ ! -e "${_fw}" ]]

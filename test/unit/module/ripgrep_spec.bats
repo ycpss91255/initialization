@@ -261,7 +261,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     MOCK_PKG_VERSION="14.1.0-1"
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/ripgrep" ]]
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/ripgrep")" == "14.1.0-1" ]]
 }
@@ -271,7 +271,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     MOCK_PKG_VERSION=""
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/ripgrep")" == "apt-managed" ]]
 }
 
@@ -283,7 +283,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     MOCK_PKG_VERSION="14.1.0-1"
     _mock_dpkg_query
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
@@ -291,7 +291,7 @@ _mock_apt_list() {
     _load_module
     MOCK_APT_INSTALL_RC=1
     _mock_apt_defaults
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ripgrep" ]]
 }
@@ -303,7 +303,7 @@ _mock_apt_list() {
     _mock_apt_defaults
     MOCK_PKG_VERSION="14.1.0-1"
     _mock_dpkg_query
-    upgrade
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/ripgrep")" == "14.1.0-1" ]]
 }
 
@@ -312,7 +312,7 @@ _mock_apt_list() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/ripgrep"
     _mock_apt_defaults
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ripgrep" ]]
 }
 
@@ -321,7 +321,7 @@ _mock_apt_list() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/ripgrep"
     _mock_apt_defaults
-    purge
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ripgrep" ]]
 }
 

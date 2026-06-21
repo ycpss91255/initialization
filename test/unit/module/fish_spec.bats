@@ -141,9 +141,11 @@ _mock_fisher_and_chsh() {
     done
 }
 
-@test "fish module leaves optional doctor unimplemented (engine treats as optional)" {
+@test "fish module inherits doctor from the apt archetype macro (ADR-0002)" {
+    # The macros now emit the full lifecycle incl. doctor (module_default_doctor).
     _load_module
-    run ! declare -F doctor
+    run declare -F doctor
+    assert_success
 }
 
 @test "fish module ships its config payload at module/config/fish" {
@@ -788,10 +790,13 @@ _mock_fisher_and_chsh() {
     refute_output --partial "not implemented"
 }
 
-@test "standalone: doctor fails gracefully as not implemented (exit 2)" {
+@test "standalone: doctor is implemented (default = is_installed; exit != 2)" {
+    # doctor is now the archetype default (module_default_doctor): in the test
+    # env fish is not installed, so it returns 1 (not the old "exit 2 not
+    # implemented").
     run _standalone_module doctor
-    assert_failure 2
-    assert_output --partial "not implemented"
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }
 
 # ── Source mode never triggers the standalone footer ─────────────────────────

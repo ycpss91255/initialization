@@ -274,7 +274,7 @@ _sidecar_path() {
 @test "install writes the Sidecar under \${INIT_UBUNTU_STATE_DIR}/versions/" {
     _load_module
     _sandbox_module
-    run install
+    run module_standalone_main install
     assert_success
     [[ -f "$(_sidecar_path)" ]]
 }
@@ -282,7 +282,7 @@ _sidecar_path() {
 @test "upgrade (re)writes the Sidecar" {
     _load_module
     _sandbox_module
-    run upgrade
+    run module_standalone_main upgrade
     assert_success
     [[ -f "$(_sidecar_path)" ]]
 }
@@ -290,17 +290,17 @@ _sidecar_path() {
 @test "remove deletes the Sidecar" {
     _load_module
     _sandbox_module
-    install
+    module_standalone_main install
     [[ -f "$(_sidecar_path)" ]]
-    remove
+    module_standalone_main remove
     [[ ! -e "$(_sidecar_path)" ]]
 }
 
 @test "purge deletes the Sidecar" {
     _load_module
     _sandbox_module
-    install
-    purge
+    module_standalone_main install
+    module_standalone_main purge
     [[ ! -e "$(_sidecar_path)" ]]
 }
 
@@ -308,7 +308,7 @@ _sidecar_path() {
     _load_module
     _sandbox_module
     printf '{"version":"0.1.0","installed":{}}\n' > "${INIT_UBUNTU_STATE_DIR}/state.json"
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == '{"version":"0.1.0","installed":{}}' ]]
 }
 
@@ -374,14 +374,18 @@ _sidecar_path() {
     assert_failure
 }
 
-@test "doctor passes and heals a missing Sidecar when eza runs" {
+@test "doctor passes and warns (read-only) when the Sidecar is missing" {
+    # Sidecar is now written at the phase-invocation layer (refines ADR-0001),
+    # so doctor is read-only: it warns about a missing Sidecar but does NOT
+    # heal it (re-run install/upgrade to heal).
     _load_module
     is_installed() { return 0; }
     eza() { printf 'eza - A modern replacement for ls\nv0.18.0\n'; }
     [[ ! -e "$(_sidecar_path)" ]]
     run doctor
     assert_success
-    [[ -f "$(_sidecar_path)" ]]
+    assert_output --partial "Sidecar missing"
+    [[ ! -e "$(_sidecar_path)" ]]
 }
 
 # ── Standalone CLI (dual-mode footer) ────────────────────────────────────────

@@ -122,6 +122,27 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Sidecar write/remove moved to the phase-invocation layer + archetype macros
+  now emit all 10 Lifecycle functions** (architecture deepening #2 + #4;
+  ADR-0027, refines ADR-0001 on *where* and ADR-0002 on macro completeness). A
+  Module's `install()`/`upgrade()`/`remove()`/`purge()` no longer writes/removes
+  the Sidecar; one shared `_module_sidecar_after_phase` helper does it from BOTH
+  invokers — the Engine runner (`lib/runner.sh`) and Standalone
+  (`module_standalone_main`) — after a successful phase, recording the version
+  from the new archetype-defaulted, per-module-overridable `module_provided_version`
+  hook (apt -> `dpkg-query`; github-release -> resolved release tag via
+  `MODULE_GH_RESOLVED_VERSION`, preserving the existing Sidecar on an idempotent
+  re-install; config / generic -> `VERSION_PROVIDED`). The
+  `module_use_*_archetype` macros now wire `is_outdated` and `doctor`
+  (`module_default_doctor` = `is_installed` + warn) in addition to the mutation
+  phases; only `detect` + `is_recommended` stay module-defined. `doctor` is now
+  read-only (warns about a missing Sidecar, never heals it). The per-module
+  `module_sidecar_*` calls, `_xxx_pkg_version` helpers, and redundant
+  hand-written `is_outdated`/`doctor` stubs were removed across the module set;
+  genuine overrides (metadata self-check, Sidecar-drift detection,
+  version-compare `is_outdated`, daemon checks) stay. Module unit tests that
+  asserted a Sidecar after calling `install()` directly now route through the
+  invoker (`module_standalone_main`).
 - **Extracted the repeated dual-mode module header into one
   `lib/module_bootstrap.sh`** (architecture deepening #3): every
   `module/*.module.sh` used to carry ~17 identical lines (set

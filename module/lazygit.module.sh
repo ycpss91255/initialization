@@ -66,7 +66,9 @@ CONFIG_PATHS=(
 module_use_github_release_archetype
 
 # Override install/upgrade: resolve the versioned asset name first, then
-# super-call the archetype fetch; write the Sidecar on success (ADR-0001).
+# super-call the archetype fetch. The phase-invocation wrapper writes the
+# Sidecar via module_provided_version (ADR-0001); the resolver sets
+# MODULE_GH_RESOLVED_VERSION so the wrapper records the resolved tag.
 install() {
     module_dryrun_guard install \
         "fetch ${GITHUB_REPO} latest -> ${INSTALL_DIR}, symlink ${BIN_LINK}" \
@@ -74,7 +76,6 @@ install() {
     module_skip_if_installed && return 0
     _lazygit_resolve_asset_pattern || return $?
     _module_github_release_fetch_and_install || return $?
-    module_sidecar_write "${NAME}" "${_LAZYGIT_TARGET_VERSION:-unknown}"
 }
 
 upgrade() {
@@ -82,24 +83,10 @@ upgrade() {
         && return 0
     _lazygit_resolve_asset_pattern || return $?
     _module_github_release_fetch_and_install || return $?
-    module_sidecar_write "${NAME}" "${_LAZYGIT_TARGET_VERSION:-unknown}"
 }
 
-remove() {
-    module_dryrun_guard remove \
-        "rm ${INSTALL_DIR} + ${BIN_LINK} + Sidecar" \
-        && return 0
-    module_default_github_release_remove || return $?
-    module_sidecar_remove "${NAME}"
-}
-
-purge() {
-    module_dryrun_guard purge \
-        "rm ${INSTALL_DIR} + ${BIN_LINK} + Sidecar + CONFIG_PATHS" \
-        && return 0
-    module_default_github_release_purge || return $?
-    module_sidecar_remove "${NAME}"
-}
+# remove/purge: inherit macro defaults (module_default_github_release_*); the
+# wrapper removes the Sidecar.
 
 detect() {
     # Upstream only ships a Linux_x86_64 tarball we can consume.
@@ -162,6 +149,8 @@ _lazygit_resolve_asset_pattern() {
     fi
     GITHUB_ASSET_PATTERN="lazygit_${_ver}_Linux_x86_64.tar.gz"
     _LAZYGIT_TARGET_VERSION="${_ver}"
+    # Feed the resolved tag to the phase-invocation wrapper (module_provided_version).
+    MODULE_GH_RESOLVED_VERSION="${_ver}"
 }
 
 # Installed version: Sidecar first (fast, offline, module_sidecar_* shared

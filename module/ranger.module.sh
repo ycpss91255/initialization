@@ -89,39 +89,22 @@ is_installed() {
 }
 
 # Override install/upgrade (super-call pattern, archetype-cookbook §A):
-# chain apt default -> config-drop default, then record the version Sidecar
-# (ADR-0001; module_sidecar_* helpers are dry-run-safe, the explicit guard
-# just skips the pointless dpkg-query).
+# chain apt default -> config-drop default. The Sidecar is written by the
+# phase-invocation wrapper after a successful install/upgrade.
 install() {
     module_default_apt_install || return $?
     module_default_config_install || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    module_sidecar_write "${NAME}" "$(_ranger_pkg_version)"
 }
 
 upgrade() {
     module_default_apt_upgrade || return $?
     module_default_config_upgrade || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    module_sidecar_write "${NAME}" "$(_ranger_pkg_version)"
 }
 
-# Override remove: apt default removes the package but keeps user config
-# (rifle.conf stays, doc/module-spec.md §4.7.4); the Sidecar is state, not
-# config, so it goes.
-remove() {
-    module_default_apt_remove || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    module_sidecar_remove "${NAME}"
-}
-
-# Override purge: apt default purges the package AND rm -rf's CONFIG_PATHS
-# (~/.config/ranger, rifle.conf included), then drop the Sidecar.
-purge() {
-    module_default_apt_purge || return $?
-    [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    module_sidecar_remove "${NAME}"
-}
+# remove: inherits module_default_apt_remove (rifle.conf kept; Sidecar
+# removed by the wrapper).
+# purge: inherits module_default_apt_purge (pkg + CONFIG_PATHS; Sidecar
+# removed by the wrapper).
 
 detect() {
     command -v apt-get >/dev/null 2>&1
@@ -131,35 +114,7 @@ is_recommended() {
     ! is_installed
 }
 
-# doctor: health check — package + config installed, binary runnable,
-# Sidecar present (warn-only: may have been installed outside init_ubuntu).
-doctor() {
-    if ! is_installed; then
-        log_warn "[${NAME}] doctor: ranger package or managed rifle.conf missing"
-        return 1
-    fi
-    if ! command -v ranger >/dev/null 2>&1; then
-        log_warn "[${NAME}] doctor: ranger binary not found on PATH"
-        return 1
-    fi
-    if ! ranger --version >/dev/null 2>&1; then
-        log_warn "[${NAME}] doctor: ranger --version failed"
-        return 1
-    fi
-    module_sidecar_get_version "${NAME}" >/dev/null 2>&1 \
-        || log_warn "[${NAME}] doctor: sidecar missing (installed outside init_ubuntu?)"
-    return 0
-}
-
-# ── Private helpers ─────────────────────────────────────────────────────────
-
-# Version string for the Sidecar: dpkg-reported package version, falling
-# back to the literal "apt-managed" when dpkg has no answer.
-_ranger_pkg_version() {
-    local _ver=""
-    _ver="$(dpkg-query -W -f='${Version}' ranger 2>/dev/null)" || _ver=""
-    printf '%s' "${_ver:-apt-managed}"
-}
+# doctor: inherits module_default_doctor (is_installed + warn).
 
 # ── Standalone footer ───────────────────────────────────────────────────────
 if [[ "${MODULE_STANDALONE:-false}" == "true" ]]; then

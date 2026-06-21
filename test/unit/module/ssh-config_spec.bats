@@ -84,10 +84,14 @@ _use_backup_dir() {
     done
 }
 
-@test "ssh-config leaves the optional hooks doctor / is_outdated undefined" {
+@test "ssh-config inherits doctor / is_outdated from the config macro (ADR-0002)" {
+    # The macros now emit the full lifecycle: doctor (module_default_doctor)
+    # and is_outdated (module_default_config_is_outdated).
     _load_module
-    run ! declare -F doctor
-    run ! declare -F is_outdated
+    run declare -F doctor
+    assert_success
+    run declare -F is_outdated
+    assert_success
 }
 
 # ── Metadata sanity ──────────────────────────────────────────────────────────
@@ -285,24 +289,34 @@ _use_backup_dir() {
     printf '{"schema_version":"0.1.0","installed":{}}\n' \
         > "${INIT_UBUNTU_STATE_DIR}/state.json"
     local _before; _before="$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")"
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
-@test "plain config archetype writes no sidecar (current ssh-config behavior)" {
-    # ssh-config does not override install to chain module_sidecar_write
-    # (unlike claude-code-config); document that the archetype-level
-    # lifecycle leaves the versions/ dir untouched. If a sidecar write is
-    # added later (full ADR-0001 parity) flip this assertion.
+@test "install via the invoker records the sidecar with VERSION_PROVIDED" {
+    # New design (ADR-0001 refinement): install() drops ~/.ssh/config but does
+    # NOT write the sidecar; the invoker module_standalone_main records it from
+    # module_provided_version (config archetype → VERSION_PROVIDED).
+    _load_module
+    module_standalone_main install
+    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/ssh-config" ]]
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/ssh-config")" == "${VERSION_PROVIDED}" ]]
+}
+
+@test "bare install() drops the config but writes no sidecar (invoker owns it)" {
     _load_module
     install
+    # A bare install() mutates the system but leaves versions/ untouched —
+    # only the invoker writes the sidecar.
+    [[ -f "${HOME}/.ssh/config" ]]
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ssh-config" ]]
 }
 
-@test "remove leaves the state dir without a stray sidecar" {
+@test "invoker remove clears the sidecar it wrote at install" {
     _load_module
-    install
-    remove
+    module_standalone_main install
+    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/ssh-config" ]]
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/ssh-config" ]]
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/state.json" ]]
 }
@@ -505,10 +519,11 @@ _use_backup_dir() {
 }
 
 @test "standalone: status reports installed + outdated fields" {
+    # is_outdated is now wired (config default returns 1 = not outdated).
     run _standalone_module status
     assert_success
     assert_output --partial "installed:   no"
-    assert_output --partial "outdated:    (no is_outdated)"
+    assert_output --partial "outdated:    no"
 }
 
 # ── Standalone full cycle (AC-23: state.json never touched) ──────────────────
@@ -580,14 +595,14 @@ _use_backup_dir() {
     refute_output --partial "not implemented"
 }
 
-@test "standalone: is-outdated degrades gracefully (optional hook, exit 2)" {
+@test "standalone: is-outdated is implemented (config default; exit != 2)" {
     run _standalone_module is-outdated
-    assert_failure 2
-    assert_output --partial "not implemented"
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }
 
-@test "standalone: doctor degrades gracefully (optional hook, exit 2)" {
+@test "standalone: doctor is implemented (default = is_installed; exit != 2)" {
     run _standalone_module doctor
-    assert_failure 2
-    assert_output --partial "not implemented"
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }

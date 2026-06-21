@@ -616,11 +616,10 @@ _mock_apt_list() {
     refute_output --partial "not implemented"
 }
 
-@test "standalone: doctor is not yet implemented (Batch-A gap, graceful exit 2)" {
-    # Pins today's contract: tmux has no doctor(); the standalone CLI must
-    # degrade gracefully (exit 2 + explicit message), never crash. Flip this
-    # test when the Batch-A backfill adds doctor() to the module.
+@test "standalone: doctor is implemented (apt archetype default; exit != 2)" {
+    # doctor is now wired by the apt archetype macro (module_default_doctor);
+    # tmux is not installed in the test env, so it returns 1, never exit 2.
     run _standalone_module doctor
-    assert_failure 2
-    assert_output --partial "not implemented"
+    [[ "${status}" -ne 2 ]]
+    refute_output --partial "not implemented"
 }

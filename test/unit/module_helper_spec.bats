@@ -102,30 +102,45 @@ teardown() { teardown_test_env; }
     assert_output --partial "nothing to do"
 }
 
-# ── Archetype macros: 6 functions each ──────────────────────────────────────
+# ── Archetype macros: full lifecycle (ADR-0002 all-10) ──────────────────────
+#
+# After the deepening refactor the macros emit ALL the archetype-defaultable
+# functions — the 6 mutation phases plus is_installed, is_outdated, verify,
+# doctor, and the module_provided_version Sidecar hook. Only detect() and
+# is_recommended() stay module-defined.
 
-@test "module_use_apt_archetype defines 7 lifecycle functions" {
+@test "module_use_apt_archetype defines the full archetype-default lifecycle" {
     module_use_apt_archetype
     local _fn
-    for _fn in is_installed install upgrade remove purge verify is_outdated; do
+    for _fn in is_installed install upgrade remove purge verify is_outdated \
+               doctor module_provided_version; do
         declare -F "${_fn}" >/dev/null || { printf "missing %s\n" "${_fn}" >&2; return 1; }
     done
 }
 
-@test "module_use_github_release_archetype defines 6 lifecycle functions" {
+@test "module_use_github_release_archetype defines the full archetype-default lifecycle" {
     module_use_github_release_archetype
     local _fn
-    for _fn in is_installed install upgrade remove purge verify; do
+    for _fn in is_installed install upgrade remove purge verify is_outdated \
+               doctor module_provided_version; do
         declare -F "${_fn}" >/dev/null || { printf "missing %s\n" "${_fn}" >&2; return 1; }
     done
 }
 
-@test "module_use_config_archetype defines 6 lifecycle functions" {
+@test "module_use_config_archetype defines the full archetype-default lifecycle" {
     module_use_config_archetype
     local _fn
-    for _fn in is_installed install upgrade remove purge verify; do
+    for _fn in is_installed install upgrade remove purge verify is_outdated \
+               doctor module_provided_version; do
         declare -F "${_fn}" >/dev/null || { printf "missing %s\n" "${_fn}" >&2; return 1; }
     done
+}
+
+# detect() + is_recommended() stay module-defined (the macros do NOT emit them).
+@test "archetype macros do NOT emit detect or is_recommended" {
+    module_use_apt_archetype
+    run ! declare -F detect
+    run ! declare -F is_recommended
 }
 
 @test "archetype macros can be overridden after the call" {
@@ -277,6 +292,211 @@ EOF
     module_sidecar_write testmod v1
     INIT_UBUNTU_DRY_RUN=true module_sidecar_remove testmod
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+}
+
+# ── module_provided_version defaults (phase-invocation Sidecar hook) ─────────
+
+@test "module_default_provided_version returns VERSION_PROVIDED" {
+    VERSION_PROVIDED="9.9.9"
+    run module_default_provided_version
+    assert_success
+    assert_output "9.9.9"
+}
+
+@test "module_default_apt_provided_version returns the dpkg version of APT_PKGS[0]" {
+    APT_PKGS=(curl wget)
+    VERSION_PROVIDED="apt-managed"
+    dpkg-query() { printf '8.5.0-2ubuntu1'; }
+    run module_default_apt_provided_version
+    assert_success
+    assert_output "8.5.0-2ubuntu1"
+}
+
+@test "module_default_apt_provided_version falls back to VERSION_PROVIDED when dpkg is empty" {
+    APT_PKGS=(curl)
+    VERSION_PROVIDED="apt-managed"
+    dpkg-query() { return 1; }
+    run module_default_apt_provided_version
+    assert_success
+    assert_output "apt-managed"
+}
+
+@test "module_default_github_release_provided_version returns MODULE_GH_RESOLVED_VERSION" {
+    MODULE_GH_RESOLVED_VERSION="0.17.0"
+    VERSION_PROVIDED="latest"
+    run module_default_github_release_provided_version
+    assert_success
+    assert_output "0.17.0"
+}
+
+@test "module_default_github_release_provided_version preserves the existing Sidecar on idempotent re-install" {
+    # MODULE_GH_RESOLVED_VERSION unset (skip-if-installed short-circuit) — must
+    # NOT clobber the recorded version with the VERSION_PROVIDED fallback.
+    NAME="ghtest"
+    unset MODULE_GH_RESOLVED_VERSION
+    VERSION_PROVIDED="latest"
+    module_sidecar_write ghtest "0.16.2"
+    run module_default_github_release_provided_version
+    assert_success
+    assert_output "0.16.2"
+}
+
+@test "module_default_github_release_provided_version falls back to VERSION_PROVIDED when no Sidecar" {
+    NAME="ghtest-none"
+    unset MODULE_GH_RESOLVED_VERSION
+    VERSION_PROVIDED="latest"
+    run module_default_github_release_provided_version
+    assert_success
+    assert_output "latest"
+}
+
+@test "module_default_config_provided_version returns VERSION_PROVIDED" {
+    VERSION_PROVIDED="1.0"
+    run module_default_config_provided_version
+    assert_success
+    assert_output "1.0"
+}
+
+# ── module_default_github_release_is_outdated ───────────────────────────────
+
+@test "github is_outdated returns 1 when not installed" {
+    NAME="ghtest"
+    is_installed() { return 1; }
+    run module_default_github_release_is_outdated
+    assert_failure
+}
+
+@test "github is_outdated returns 1 when no Sidecar recorded" {
+    NAME="ghtest"
+    GITHUB_REPO="o/r"
+    is_installed() { return 0; }
+    get_github_pkg_latest_version() { local -n _o="${1}"; _o="2.0.0"; }
+    run module_default_github_release_is_outdated
+    assert_failure
+}
+
+@test "github is_outdated returns 0 when Sidecar differs from latest" {
+    NAME="ghtest"
+    GITHUB_REPO="o/r"
+    is_installed() { return 0; }
+    module_sidecar_write ghtest "1.0.0"
+    get_github_pkg_latest_version() { local -n _o="${1}"; _o="2.0.0"; }
+    run module_default_github_release_is_outdated
+    assert_success
+}
+
+@test "github is_outdated returns 1 when Sidecar matches latest" {
+    NAME="ghtest"
+    GITHUB_REPO="o/r"
+    is_installed() { return 0; }
+    module_sidecar_write ghtest "2.0.0"
+    get_github_pkg_latest_version() { local -n _o="${1}"; _o="2.0.0"; }
+    run module_default_github_release_is_outdated
+    assert_failure
+}
+
+# ── module_default_config_is_outdated ───────────────────────────────────────
+
+@test "config is_outdated always returns 1 (no upstream version channel)" {
+    run module_default_config_is_outdated
+    assert_failure
+}
+
+# ── module_default_doctor (baseline runtime health) ─────────────────────────
+
+@test "module_default_doctor passes when is_installed succeeds" {
+    is_installed() { return 0; }
+    run module_default_doctor
+    assert_success
+}
+
+@test "module_default_doctor fails and warns when not installed" {
+    is_installed() { return 1; }
+    run module_default_doctor
+    assert_failure
+    assert_output --partial "doctor: not installed"
+}
+
+# ── _module_sidecar_after_phase (the phase-invocation wrapper) ───────────────
+
+@test "_module_sidecar_after_phase install writes the sidecar via module_provided_version" {
+    module_provided_version() { printf 'v2.0.0'; }
+    _module_sidecar_after_phase install testmod
+    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/testmod")" == "v2.0.0" ]]
+}
+
+@test "_module_sidecar_after_phase upgrade refreshes the sidecar" {
+    mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
+    printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/testmod"
+    module_provided_version() { printf '2.0.0'; }
+    _module_sidecar_after_phase upgrade testmod
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/testmod")" == "2.0.0" ]]
+}
+
+@test "_module_sidecar_after_phase remove deletes the sidecar" {
+    mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
+    printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/testmod"
+    _module_sidecar_after_phase remove testmod
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+}
+
+@test "_module_sidecar_after_phase purge deletes the sidecar" {
+    mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
+    printf '1.0.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/testmod"
+    _module_sidecar_after_phase purge testmod
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+}
+
+@test "_module_sidecar_after_phase falls back to VERSION_PROVIDED when no override" {
+    VERSION_PROVIDED="fallback-ver"
+    # No module_provided_version defined in this test scope.
+    unset -f module_provided_version 2>/dev/null || true
+    _module_sidecar_after_phase install testmod
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/testmod")" == "fallback-ver" ]]
+}
+
+@test "_module_sidecar_after_phase is a no-op under dry-run" {
+    module_provided_version() { printf 'v2.0.0'; }
+    INIT_UBUNTU_DRY_RUN=true _module_sidecar_after_phase install testmod
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+}
+
+@test "_module_sidecar_after_phase is a no-op for read-only phases" {
+    module_provided_version() { printf 'v2.0.0'; }
+    _module_sidecar_after_phase verify testmod
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+    _module_sidecar_after_phase doctor testmod
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+}
+
+@test "module_standalone_main install writes the sidecar at the invocation layer" {
+    NAME="testmod"
+    VERSION_PROVIDED="1.2.3"
+    install() { return 0; }
+    run module_standalone_main install
+    assert_success
+    [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+    [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/testmod")" == "1.2.3" ]]
+}
+
+@test "module_standalone_main install does NOT write the sidecar when install fails" {
+    NAME="testmod"
+    VERSION_PROVIDED="1.2.3"
+    install() { return 1; }
+    run module_standalone_main install
+    assert_failure
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
+}
+
+@test "module_standalone_main remove clears the sidecar at the invocation layer" {
+    NAME="testmod"
+    mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
+    printf '1.2.3\n' > "${INIT_UBUNTU_STATE_DIR}/versions/testmod"
+    remove() { return 0; }
+    run module_standalone_main remove
+    assert_success
+    [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/testmod" ]]
 }
 
 # ── Standalone CLI entry: module_standalone_main ────────────────────────────

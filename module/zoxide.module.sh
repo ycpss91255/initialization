@@ -71,40 +71,37 @@ CONFIG_PATHS=("${HOME}/.local/share/zoxide")
 module_use_github_release_archetype
 
 # Override install: resolve versioned asset, super-call the archetype
-# default, then wire shell rc + Sidecar (ADR-0001).
+# default, then wire shell rc. The phase-invocation wrapper writes the
+# Sidecar via module_provided_version (ADR-0001); _zoxide_resolve_asset_pattern
+# sets MODULE_GH_RESOLVED_VERSION so the wrapper records the resolved tag.
 install() {
     module_dryrun_guard install \
-        "fetch ${GITHUB_REPO} latest -> ${INSTALL_DIR}, symlink ${BIN_LINK}, shell-rc init, Sidecar" \
+        "fetch ${GITHUB_REPO} latest -> ${INSTALL_DIR}, symlink ${BIN_LINK}, shell-rc init" \
         && return 0
     module_skip_if_installed && return 0
     _zoxide_resolve_asset_pattern || return 1
     module_default_github_release_install || return $?
     _zoxide_shell_init
-    module_sidecar_write "${NAME}" "${ZOXIDE_RESOLVED_VERSION:-unknown}"
 }
 
 upgrade() {
     module_dryrun_guard upgrade \
-        "force re-download ${GITHUB_REPO} latest + refresh Sidecar" \
+        "force re-download ${GITHUB_REPO} latest" \
         && return 0
     _zoxide_resolve_asset_pattern || return 1
     module_default_github_release_upgrade || return $?
     _zoxide_shell_init
-    module_sidecar_write "${NAME}" "${ZOXIDE_RESOLVED_VERSION:-unknown}"
 }
 
-remove() {
-    module_default_github_release_remove || return $?
-    module_sidecar_remove "${NAME}"
-}
+# remove: inherit macro default (the wrapper removes the Sidecar).
 
+# purge keeps the shell-rc cleanup; the wrapper removes the Sidecar.
 purge() {
     module_default_github_release_purge || return $?
     if [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]]; then
         return 0
     fi
     _zoxide_shell_rc_cleanup
-    module_sidecar_remove "${NAME}"
 }
 
 detect() {
@@ -130,8 +127,9 @@ is_outdated() {
     [[ -n "${_remote}" && "${_local}" != "${_remote}" ]]
 }
 
-# doctor: binary runnable + heal a missing Sidecar (module-spec §4.7.4:
-# installed without Sidecar = corruption — re-record what we can observe).
+# doctor: binary runnable + Sidecar consistency (module-spec §4.7.4:
+# installed without Sidecar = drift; re-run install/upgrade to heal — the
+# phase-invocation wrapper owns Sidecar writes now, so doctor only warns).
 doctor() {
     module_dryrun_guard doctor "is_installed + ${BIN_NAME} --version + Sidecar consistency" \
         && return 0
@@ -139,11 +137,7 @@ doctor() {
     "${BIN_NAME}" --version >/dev/null 2>&1 \
         || { log_warn "[${NAME}] doctor: zoxide binary not runnable"; return 1; }
     if ! module_sidecar_get_version "${NAME}" >/dev/null 2>&1; then
-        local _ver
-        _ver="$("${BIN_NAME}" --version 2>/dev/null \
-            | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || true)"
-        log_warn "[${NAME}] doctor: Sidecar missing — healing with '${_ver:-unknown}'"
-        module_sidecar_write "${NAME}" "${_ver:-unknown}"
+        log_warn "[${NAME}] doctor: Sidecar missing (ADR-0001 drift; re-run install/upgrade to heal)"
     fi
     return 0
 }
@@ -161,7 +155,8 @@ _zoxide_resolve_asset_pattern() {
         log_error "[${NAME}] cannot resolve latest ${GITHUB_REPO} release version"
         return 1
     fi
-    ZOXIDE_RESOLVED_VERSION="${_ver}"
+    # Feed the resolved tag to the phase-invocation wrapper (module_provided_version).
+    MODULE_GH_RESOLVED_VERSION="${_ver}"
     GITHUB_ASSET_PATTERN="zoxide-${_ver}-$(uname -m)-unknown-linux-musl.tar.gz"
     log_info "[${NAME}] resolved asset: ${GITHUB_ASSET_PATTERN}"
 }

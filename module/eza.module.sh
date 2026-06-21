@@ -81,33 +81,31 @@ module_use_github_release_archetype
 # ── END: archetype-data ─────────────────────────────────────────────────────
 
 # Super-call overrides: archetype handles the binary; we add the legacy
-# `alias ls='eza'` drop + Sidecar write/remove (ADR-0001).
+# `alias ls='eza'` drop. The phase-invocation wrapper writes the Sidecar via
+# module_provided_version (overridden below to report the parsed binary
+# version, since eza has no version-bearing resolver var).
+module_provided_version() { _eza_local_version; }
+
 install() {
     module_default_github_release_install || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _eza_add_ls_alias
-    module_sidecar_write "${NAME}" "$(_eza_local_version)"
 }
 
 upgrade() {
     module_default_github_release_upgrade || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _eza_add_ls_alias
-    module_sidecar_write "${NAME}" "$(_eza_local_version)"
 }
 
-# remove keeps user config (the rc alias survives a remove; spec §4.1).
-remove() {
-    module_default_github_release_remove || return $?
-    module_sidecar_remove "${NAME}"
-}
+# remove keeps user config (the rc alias survives a remove; spec §4.1);
+# inherit the macro default (the wrapper removes the Sidecar).
 
 # purge also strips the alias lines from ~/.bashrc / ~/.zshrc.
 purge() {
     module_default_github_release_purge || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _eza_remove_ls_alias
-    module_sidecar_remove "${NAME}"
 }
 
 # detect: the wired asset is the x86_64 gnu tarball — only offer it there.
@@ -142,8 +140,7 @@ doctor() {
         return 1
     fi
     if ! module_sidecar_get_version "${NAME}" >/dev/null 2>&1; then
-        log_warn "[${NAME}] doctor: Sidecar missing — rewriting it"
-        module_sidecar_write "${NAME}" "$(_eza_local_version)"
+        log_warn "[${NAME}] doctor: Sidecar missing (ADR-0001 drift; re-run install/upgrade to heal)"
     fi
     return 0
 }

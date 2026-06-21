@@ -314,8 +314,8 @@ _scratch_home() {
     _load_module
     _scratch_home
     module_default_apt_install() { return 0; }
-    _batcat_pkg_version() { printf '0.24.0'; }
-    install
+    dpkg-query() { printf '0.24.0'; }
+    module_standalone_main install
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/batcat" ]]
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/batcat")" == "0.24.0" ]]
 }
@@ -327,7 +327,7 @@ _scratch_home() {
         > "${INIT_UBUNTU_STATE_DIR}/state.json"
     local _before; _before="$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")"
     module_default_apt_install() { return 0; }
-    install
+    module_standalone_main install
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/state.json")" == "${_before}" ]]
 }
 
@@ -335,7 +335,7 @@ _scratch_home() {
     _load_module
     _scratch_home
     module_default_apt_install() { return 1; }
-    run install
+    run module_standalone_main install
     assert_failure
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/batcat" ]]
 }
@@ -345,8 +345,8 @@ _scratch_home() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '0.20.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/batcat"
     module_default_apt_upgrade() { return 0; }
-    _batcat_pkg_version() { printf '9.9.9'; }
-    upgrade
+    dpkg-query() { printf '9.9.9'; }
+    module_standalone_main upgrade
     [[ "$(cat "${INIT_UBUNTU_STATE_DIR}/versions/batcat")" == "9.9.9" ]]
 }
 
@@ -355,7 +355,7 @@ _scratch_home() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '0.24.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/batcat"
     module_default_apt_remove() { return 0; }
-    remove
+    module_standalone_main remove
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/batcat" ]]
 }
 
@@ -365,7 +365,7 @@ _scratch_home() {
     mkdir -p "${INIT_UBUNTU_STATE_DIR}/versions"
     printf '0.24.0\n' > "${INIT_UBUNTU_STATE_DIR}/versions/batcat"
     module_default_apt_purge() { return 0; }
-    purge
+    module_standalone_main purge
     [[ ! -e "${INIT_UBUNTU_STATE_DIR}/versions/batcat" ]]
 }
 
@@ -405,7 +405,7 @@ _scratch_home() {
     _scratch_home
     touch "${HOME}/.bashrc"
     module_default_apt_install() { return 0; }
-    _batcat_pkg_version() { printf '0.24.0'; }
+    dpkg-query() { printf '0.24.0'; }
     run install
     assert_success
     run install
@@ -463,11 +463,18 @@ _scratch_home() {
     assert_success
 }
 
-@test "doctor fails when batcat binary is missing from PATH" {
+@test "doctor (inherited default) passes when installed, fails when not" {
+    # batcat now inherits module_default_doctor (is_installed + warn). The
+    # binary --version check moved to verify (TEST_VERIFY_CMD), so doctor's
+    # pass/fail tracks is_installed only.
     _load_module
     is_installed() { return 0; }
-    PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-path" run doctor
+    run doctor
+    assert_success
+    is_installed() { return 1; }
+    run doctor
     assert_failure
+    assert_output --partial "not installed"
 }
 
 @test "is_outdated returns zero when apt lists bat as upgradable" {

@@ -70,6 +70,10 @@ TEST_VERIFY_CMD="command -v claude && claude --version"
 : "${DESCRIPTION[*]:-}" "${POST_INSTALL_MESSAGE[*]:-}" "${WARN_MESSAGE[*]:-}" \
     "${SUPPORTS_USER_HOME}" "${INSTALL_TARGET_DEFAULT}"
 
+# Version recorded in the Sidecar by the phase-invocation wrapper after a
+# successful install/upgrade (overrides the generic VERSION_PROVIDED default).
+module_provided_version() { _claude_code_version; }
+
 # ── Archetype D data ────────────────────────────────────────────────────────
 # Official native installer endpoint + the paths it manages. Tests override
 # CLAUDE_BIN / CLAUDE_DATA_DIR to point at a scratch prefix.
@@ -102,17 +106,16 @@ is_recommended() {
 
 install() {
     module_dryrun_guard install \
-        "curl ${CLAUDE_CODE_INSTALLER_URL} | bash (installs ${CLAUDE_BIN}), write sidecar" \
+        "curl ${CLAUDE_CODE_INSTALLER_URL} | bash (installs ${CLAUDE_BIN})" \
         && return 0
     module_skip_if_installed && return 0
     _claude_code_run_installer || return $?
-    module_sidecar_write "${NAME}" "$(_claude_code_version)"
 }
 
 # upgrade: the tool self-updates; delegate to its own `update` subcommand
-# instead of re-running the installer, then refresh the sidecar.
+# instead of re-running the installer.
 upgrade() {
-    module_dryrun_guard upgrade "claude update (self-updater), refresh sidecar" \
+    module_dryrun_guard upgrade "claude update (self-updater)" \
         && return 0
     if ! is_installed; then
         log_info "[${NAME}] not installed yet — running install instead"
@@ -120,18 +123,16 @@ upgrade() {
         return $?
     fi
     _claude_code_self_update || return $?
-    module_sidecar_write "${NAME}" "$(_claude_code_version)"
 }
 
 # remove: drop the launcher + versioned payloads, keep user config
-# (~/.claude*). The sidecar is state, not config — drop it too.
+# (~/.claude*).
 remove() {
     module_dryrun_guard remove \
-        "rm ${CLAUDE_BIN} + ${CLAUDE_DATA_DIR}, drop sidecar" \
+        "rm ${CLAUDE_BIN} + ${CLAUDE_DATA_DIR}" \
         && return 0
     rm -f "${CLAUDE_BIN}"
     rm -rf "${CLAUDE_DATA_DIR}"
-    module_sidecar_remove "${NAME}"
 }
 
 purge() {

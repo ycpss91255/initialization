@@ -3,7 +3,7 @@
 
 # Module Index
 
-32 modules. Columns come from each module's metadata block
+39 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -11,11 +11,12 @@ to the module source.
 | Module | Category | Tags | Description |
 |---|---|---|---|
 | [anydesk](../../module/anydesk.module.sh) | optional | remote | AnyDesk — remote desktop client (upstream apt repository) |
-| [apt-essentials](../../module/apt-essentials.module.sh) | base | core apt | Universal apt baseline (git, vim, curl, wget, ca-certificates, jq) |
 | [batcat](../../module/batcat.module.sh) | optional | cli-essentials | bat — cat clone with syntax highlighting (Ubuntu binary: batcat) |
+| [build-essential](../../module/build-essential.module.sh) | base | build | build-essential — C/C++ compiler toolchain metapackage (gcc, g++, make) |
 | [claude-code-config](../../module/claude-code-config.module.sh) | optional | agent config dotfile | Personal Claude Code settings (~/.claude: settings.json + statusline) |
 | [claude-code](../../module/claude-code.module.sh) | optional | agent | Anthropic Claude Code CLI agent (official native installer, self-updating) |
 | [codex](../../module/codex.module.sh) | optional | agent | codex — OpenAI Codex CLI coding agent |
+| [curl](../../module/curl.module.sh) | base | http | curl — command-line tool for transferring data with URLs (apt curl package) |
 | [docker](../../module/docker.module.sh) | recommended | container devops | Docker Engine + Compose plugin |
 | [eza](../../module/eza.module.sh) | optional | cli-essentials | Modern ls replacement (eza) + shell alias ls='eza' |
 | [fdfind](../../module/fdfind.module.sh) | optional | cli-essentials | fd (fdfind) — fast, user-friendly alternative to find (apt fd-find) |
@@ -25,8 +26,11 @@ to the module source.
 | [fzf](../../module/fzf.module.sh) | optional | cli-essentials | fzf command-line fuzzy finder (single-binary GitHub release) |
 | [gemini](../../module/gemini.module.sh) | optional | agent | gemini — Google Gemini CLI coding agent (npm install via fnm-managed Node.js) |
 | [git-config](../../module/git-config.module.sh) | recommended | config git dotfile | Personal ~/.gitconfig (aliases, delta diff, rebase pull, ...) |
+| [git](../../module/git.module.sh) | base | vcs | git — distributed version control system (apt git package) |
 | [gum](../../module/gum.module.sh) | optional | cli-essentials tui | gum — a tool for glamorous shell scripts (preferred modern TUI backend) |
+| [htop](../../module/htop.module.sh) | base | monitor | htop — interactive process viewer (apt htop package) |
 | [jetson-stats](../../module/jetson-stats.module.sh) | optional | hardware | jetson-stats — jtop monitor TUI for NVIDIA Jetson (iGPU, nvpmodel, clocks, fan) |
+| [jq](../../module/jq.module.sh) | base | cli core | jq — command-line JSON processor (apt jq package) |
 | [lazydocker](../../module/lazydocker.module.sh) | optional | cli-essentials | lazydocker — terminal UI (TUI) for Docker and docker compose |
 | [lazygit](../../module/lazygit.module.sh) | optional | cli-essentials | lazygit — terminal UI for git commands |
 | [lnav](../../module/lnav.module.sh) | optional | logs | lnav — log file navigator for the terminal (apt package + lnav_pkg config bundle) |
@@ -39,6 +43,9 @@ to the module source.
 | [shell](../../module/shell.module.sh) | recommended | shell core | Shell session basics: ssh client, keychain, xclip |
 | [ssh-config](../../module/ssh-config.module.sh) | optional | config ssh dotfile | Personal ~/.ssh/config templates (per-host alias and key map) |
 | [tmux](../../module/tmux.module.sh) | recommended | terminal multiplexer | Terminal multiplexer + powerline config |
+| [unzip](../../module/unzip.module.sh) | base | archive | unzip — extractor for .zip archives (apt unzip package) |
+| [vim](../../module/vim.module.sh) | base | editor | vim — Vi IMproved terminal text editor (apt vim package) |
 | [vscode](../../module/vscode.module.sh) | optional | editor | Visual Studio Code — Microsoft's GUI code editor (Microsoft apt repo) |
+| [wget](../../module/wget.module.sh) | base | http | wget — non-interactive network downloader (apt wget package) |
 | [yazi](../../module/yazi.module.sh) | optional | filemgr | yazi — blazing-fast TUI file manager + shell alias yz='yazi' |
 | [zoxide](../../module/zoxide.module.sh) | optional | cli-essentials | zoxide smarter cd command (cd is aliased to z) |

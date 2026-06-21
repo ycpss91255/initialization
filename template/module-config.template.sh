@@ -86,7 +86,7 @@ declare -gA WARN_MESSAGE=(
 # 3. Environment constraints
 SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")
 SUPPORTED_PLATFORMS=("desktop" "server" "wsl")   # adjust per doc/module-spec.md §3.3
-DEPENDS_ON=()                                     # e.g. ("apt-essentials" "fzf")
+DEPENDS_ON=()                                     # e.g. ("curl" "fzf")
 CONFLICTS_WITH=()
 SUPPORTS_USER_HOME=false                          # true if pure $HOME/.local install works
 

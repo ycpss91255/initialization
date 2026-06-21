@@ -22,6 +22,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **8 per-tool base modules split from `apt-essentials`** (ADR-0026): `git`,
+  `vim`, `curl`, `wget`, `jq`, `build-essential`, `htop`, `unzip` — each
+  `CATEGORY=base`, archetype-A apt (exactly one apt package), `DEPENDS_ON=()`,
+  independently installable and removable. `ca-certificates` and
+  `software-properties-common` are no longer modules; they are treated as
+  transitive apt dependencies (`ca-certificates` pulled by curl/wget/git,
+  `software-properties-common` installed by any PPA-adding module).
+
+- **state.json forward-only migration `lib/state_migrate.sh`** (ADR-0008,
+  schema 0.1.0→0.2.0): converts an installed `apt-essentials` state entry into
+  individual installed entries for `git` / `vim` / `curl` / `wget` / `jq` (the
+  5 former-bundle packages that are now modules), each `synced.manual=true`.
+
 - **TUI Help system + `ui.tui_hints` inline-hint switch** (#203, design §3): the
   main menu gains a backend-aware **Help** entry (after System Info, before
   Run) that documents what each backend hides — the gum body covers j/k (vim
@@ -92,6 +105,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Dependent modules rewired from the `apt-essentials` bundle to specific tool
+  deps** (ADR-0026): `docker`→`curl`; `anydesk`→`curl`; `fish`→`curl`,`shell`;
+  `font`→`curl`,`unzip`; `fzf`→`curl`; `lazygit`→`curl`,`git`;
+  `neovim`→`curl`,`git-config`; `jetson-stats`→`git`,`curl`; `gum`→`curl`;
+  `shell`→`git`,`curl`; `notion`→`curl`; `git-config`→`git`;
+  `nvidia-driver`→`git`,`curl`; `vscode`→`curl`; `tmux`→`git`,`curl`;
+  `qmk-firmware`→`git`,`build-essential`.
+
+- **State schema version bumped 0.1.0 → 0.2.0** (ADR-0026 / ADR-0008): the
+  first schema change since MVP; triggers the forward-only migration in
+  `lib/state_migrate.sh`.
+
 - **Removed the main-menu section separators** (#216): the `------` divider
   rows confused navigation — gum / whiptail have no non-selectable row, so a
   divider could be landed on and pressing it re-rendered the menu with the
@@ -107,6 +132,14 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `en` with a warning (the warning fires only on an explicit unsupported
   `--lang`, not on auto-detect). zh-CN / ja translations are deferred to 0.2.0
   (#208). `--lang` help and the supported set now read `en | zh-TW`.
+
+### Removed
+
+- **The `apt-essentials` bundle module** (ADR-0026): split into 8 independent
+  per-tool base modules (git, vim, curl, wget, jq, build-essential, htop,
+  unzip). `ca-certificates` and `software-properties-common` are no longer
+  modules — they are now treated as transitive apt dependencies pulled by the
+  tools that need them, not user-facing catalog entries.
 
 ### Fixed
 

@@ -152,9 +152,9 @@ _mock_install_env() {
     [[ "${CATEGORY}" == "recommended" ]]
 }
 
-@test "docker module declares apt-essentials as a dependency" {
+@test "docker module declares curl as a dependency" {
     _load_module
-    [[ " ${DEPENDS_ON[*]} " == *" apt-essentials "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" curl "* ]]
 }
 
 @test "docker module declares SUPPORTS_USER_HOME=false" {
@@ -630,7 +630,7 @@ _mock_install_env() {
     assert_output --partial "name:        docker"
     assert_output --partial "category:    recommended"
     assert_output --partial "container"
-    assert_output --partial "apt-essentials"
+    assert_output --partial "curl"
 }
 
 @test "standalone: info --lang=zh-TW prints the localized description" {

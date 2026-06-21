@@ -116,10 +116,10 @@ _in_home() {
     [[ " ${TAGS[*]} " == *" dotfile "* ]]
 }
 
-@test "git-config DEPENDS_ON is exactly apt-essentials (module name only, Q39)" {
+@test "git-config DEPENDS_ON is exactly git (module name only, Q39)" {
     _load_module
     [[ "${#DEPENDS_ON[@]}" -eq 1 ]]
-    [[ "${DEPENDS_ON[0]}" == "apt-essentials" ]]
+    [[ "${DEPENDS_ON[0]}" == "git" ]]
 }
 
 @test "git-config DESCRIPTION is associative with en + zh-TW entries" {
@@ -518,7 +518,7 @@ _in_home() {
     assert_output --partial "name:        git-config"
     assert_output --partial "category:    recommended"
     assert_output --partial "dotfile"
-    assert_output --partial "depends_on:  apt-essentials"
+    assert_output --partial "depends_on:  git"
 }
 
 @test "standalone: info --lang=zh-TW prints localized description" {

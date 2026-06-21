@@ -53,9 +53,9 @@ Work through `doc/module-spec.md` §3. The required fields:
 
 Then the optional fields that matter most in practice:
 
-- `DEPENDS_ON` — other module names. Nearly everything depends on
-  `apt-essentials`. The engine resolves these; Standalone mode does not
-  (ADR-0001).
+- `DEPENDS_ON` — other module names. Many modules depend on a base tool
+  module such as `curl` or `git` (ADR-0026). The engine resolves these;
+  Standalone mode does not (ADR-0001).
 - `TAGS` — `TAGS[0]` is the TUI grouping key (`cli-essentials`,
   `agent`, `hardware`, ...).
 - `SUPPORTED_PLATFORMS` / `SUPPORTS_USER_HOME` / `RISK_LEVEL` /

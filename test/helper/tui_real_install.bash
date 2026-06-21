@@ -71,7 +71,7 @@ EOF
 #   * a wrapper `setup_ubuntu` that routes data reads → fixtures and
 #     install/dry-run → the REAL setup_ubuntu.sh as the non-root user, with
 #     the #175 gh seam + INIT_UBUNTU_NO_DEPS (so gum installs offline without
-#     dragging its apt-essentials dep onto the apt-less alpine harness).
+#     dragging its curl dep onto the apt-less alpine harness).
 #
 # Requires (from engine_lifecycle.bash, called first by the spec setup):
 #   ENGINE_LT_USER ENGINE_LT_HOME ENGINE_LT_STATE ENGINE_LT_CONFIG
@@ -132,7 +132,7 @@ EOF
     # The wrapper. Data reads → fixtures (deterministic pty nav). Everything
     # else (install, install --dry-run) → REAL setup_ubuntu.sh with:
     #   - the offline github-release seam (#175): version constant + fixture dir
-    #   - INIT_UBUNTU_NO_DEPS=true: gum's apt-essentials dep can't install on
+    #   - INIT_UBUNTU_NO_DEPS=true: gum's curl dep can't install on
     #     the apt-less alpine harness; --no-deps scopes the real install to gum
     #     (the engine keystone proves the same scoping). The TUI forks WITHOUT
     #     --no-deps, so we inject it via the env contract the dispatcher honors

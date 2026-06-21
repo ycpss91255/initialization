@@ -212,7 +212,7 @@ config_show() {
     fi
 
     if ! command -v jq >/dev/null 2>&1; then
-        printf "[config] ERROR: --json requires jq (in apt-essentials)\n" >&2
+        printf "[config] ERROR: --json requires jq (install the 'jq' module or apt-get install jq)\n" >&2
         return 1
     fi
 

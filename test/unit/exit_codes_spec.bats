@@ -186,7 +186,7 @@ EOF
 # ── Code 4 — sudo / root-refusal on Action lifecycle ─────────────────────────
 
 @test "exit 4: install as root refuses (real, non-dry-run)" {
-    # _dispatcher_lifecycle resolves deps first (docker→apt-essentials both
+    # _dispatcher_lifecycle resolves deps first (docker→curl both
     # exist), passes the plan prompt with non-tty stdin (defaults to yes),
     # THEN hits the EUID-0 guard → return 4. Only meaningful when bats runs
     # as root (the test-tools container default); skip cleanly otherwise.

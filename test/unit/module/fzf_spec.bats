@@ -84,9 +84,9 @@ _mock_fetch_ok() {
     [[ " ${TAGS[*]} " == *" cli-essentials "* ]]
 }
 
-@test "fzf module declares apt-essentials as a dependency" {
+@test "fzf module declares curl as a dependency" {
     _load_module
-    [[ " ${DEPENDS_ON[*]} " == *" apt-essentials "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" curl "* ]]
 }
 
 @test "fzf DEPENDS_ON entries are module names only (Q39)" {
@@ -509,7 +509,7 @@ _mock_fetch_ok() {
     assert_output --partial "name:        fzf"
     assert_output --partial "category:    optional"
     assert_output --partial "cli-essentials"
-    assert_output --partial "apt-essentials"
+    assert_output --partial "curl"
 }
 
 @test "standalone: info --lang=zh-TW prints localized description" {

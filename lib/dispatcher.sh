@@ -182,7 +182,7 @@ _dispatcher_list_installed() {
         if [[ -f "${_state_path}" ]]; then
             cat "${_state_path}"
         else
-            printf '{"version":"0.1.0","installed":{}}\n'
+            printf '{"version":"%s","installed":{}}\n' "${STATE_SCHEMA_VERSION}"
         fi
         return 0
     fi

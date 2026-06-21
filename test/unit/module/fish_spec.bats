@@ -169,10 +169,10 @@ _mock_fisher_and_chsh() {
     [[ " ${TAGS[*]} " == *" shell "* ]]
 }
 
-@test "fish DEPENDS_ON is exactly apt-essentials + shell" {
+@test "fish DEPENDS_ON is exactly curl + shell" {
     _load_module
     [[ "${#DEPENDS_ON[@]}" -eq 2 ]]
-    [[ " ${DEPENDS_ON[*]} " == *" apt-essentials "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" curl "* ]]
     [[ " ${DEPENDS_ON[*]} " == *" shell "* ]]
 }
 
@@ -710,7 +710,7 @@ _mock_fisher_and_chsh() {
     assert_success
     assert_output --partial "name:        fish"
     assert_output --partial "category:    recommended"
-    assert_output --partial "apt-essentials"
+    assert_output --partial "curl"
 }
 
 @test "standalone: info --lang=zh-TW prints localized description" {

@@ -65,7 +65,7 @@ readonly STATE_IO_SCHEMA_VERSION="0.2.0"
 
 _state_io_require_jq() {
     if ! command -v jq >/dev/null 2>&1; then
-        printf "[state_io] ERROR: jq not found. Install via 'apt-essentials' module.\n" >&2
+        printf "[state_io] ERROR: jq not found. Install via the 'jq' module or apt-get install jq.\n" >&2
         return 1
     fi
 }

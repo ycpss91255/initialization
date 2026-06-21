@@ -40,17 +40,17 @@ teardown() {
 
 # ── list + show against the real registry ────────────────────────────────────
 
-@test "setup_ubuntu list discovers docker and apt-essentials from module/" {
+@test "setup_ubuntu list discovers docker and curl from module/" {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" list
     assert_success
     assert_output --partial "docker"
-    assert_output --partial "apt-essentials"
+    assert_output --partial "curl"
 }
 
-@test "setup_ubuntu list --category=base shows apt-essentials" {
+@test "setup_ubuntu list --category=base shows curl" {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" list --category=base
     assert_success
-    assert_output --partial "apt-essentials"
+    assert_output --partial "curl"
     refute_output --partial "docker"
 }
 
@@ -58,7 +58,7 @@ teardown() {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" list --category=recommended
     assert_success
     assert_output --partial "docker"
-    refute_output --partial "apt-essentials"
+    refute_output --partial "curl"
 }
 
 @test "setup_ubuntu show docker prints metadata" {
@@ -69,45 +69,45 @@ teardown() {
     assert_output --partial "category:"
     assert_output --partial "recommended"
     assert_output --partial "deps:"
-    assert_output --partial "apt-essentials"
+    assert_output --partial "curl"
 }
 
 # ── Dep resolution under --dry-run ───────────────────────────────────────────
 
-@test "install docker --dry-run pulls apt-essentials BEFORE docker in install order" {
+@test "install docker --dry-run pulls curl BEFORE docker in install order" {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" install docker --dry-run
     assert_success
     assert_output --partial "DRY-RUN"
 
     local _output="${output}"
-    local _apt_line _docker_line
-    _apt_line="$(echo "${_output}" | grep -n 'apt-essentials' | head -1 | cut -d: -f1)"
+    local _curl_line _docker_line
+    _curl_line="$(echo "${_output}" | grep -n -- '- curl' | head -1 | cut -d: -f1)"
     _docker_line="$(echo "${_output}" | grep -n -- '- docker' | head -1 | cut -d: -f1)"
 
-    [[ -n "${_apt_line}"   ]]
+    [[ -n "${_curl_line}"   ]]
     [[ -n "${_docker_line}" ]]
-    [[ "${_apt_line}" -lt "${_docker_line}" ]]
+    [[ "${_curl_line}" -lt "${_docker_line}" ]]
 }
 
 @test "install docker --dry-run prints both modules in the action list" {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" install docker --dry-run
     assert_success
-    assert_output --partial "- apt-essentials"
+    assert_output --partial "- curl"
     assert_output --partial "- docker"
 }
 
-@test "install apt-essentials --dry-run is a single-module action (no deps to pull)" {
-    run bash "${REPO_ROOT}/setup_ubuntu.sh" install apt-essentials --dry-run
+@test "install curl --dry-run is a single-module action (no deps to pull)" {
+    run bash "${REPO_ROOT}/setup_ubuntu.sh" install curl --dry-run
     assert_success
-    assert_output --partial "- apt-essentials"
+    assert_output --partial "- curl"
     refute_output --partial "- docker"
 }
 
-@test "install docker --no-deps --dry-run skips apt-essentials" {
+@test "install docker --no-deps --dry-run skips curl" {
     run bash "${REPO_ROOT}/setup_ubuntu.sh" install docker --no-deps --dry-run
     assert_success
     assert_output --partial "- docker"
-    refute_output --partial "- apt-essentials"
+    refute_output --partial "- curl"
 }
 
 # ── Negative paths ───────────────────────────────────────────────────────────
@@ -204,7 +204,7 @@ EOF
     assert_output --partial "deprecated"
     # Warning goes to stderr only — stdout must parse as state.json.
     bash "${REPO_ROOT}/setup_ubuntu.sh" status --json 2>/dev/null \
-        | jq -e '(.version == "0.1.0") and (.installed | length == 0)' > /dev/null
+        | jq -e '(.version == "0.2.0") and (.installed | length == 0)' > /dev/null
 }
 
 @test "setup_ubuntu list --installed with empty state says 'no modules'" {

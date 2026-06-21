@@ -2,9 +2,10 @@
 # lib/preflight.sh — self-deps preflight (PRD §3.4, AC-34)
 #
 # The tool's own machinery (state / config / detect) shells out to `jq`,
-# and later phases need `curl` / `git` — but those packages ship inside
-# the `apt-essentials` module. Chicken-and-egg: the entrypoint must check
-# its own dependencies BEFORE dispatching anything that needs them.
+# and later phases need `curl` / `git` — but those packages are themselves
+# provided by base modules (jq / curl / git, ADR-0026). Chicken-and-egg: the
+# entrypoint must check its own dependencies BEFORE dispatching anything that
+# needs them.
 #
 # Behavior (PRD §3.4):
 #   - missing + sudo available  → print an apt-style plan and ask ONCE

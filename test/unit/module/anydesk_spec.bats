@@ -140,10 +140,10 @@ _scratch_repo_paths() {
     [[ " ${TAGS[*]} " == *" remote "* ]]
 }
 
-@test "anydesk DEPENDS_ON is exactly apt-essentials (module names only, Q39)" {
+@test "anydesk DEPENDS_ON is exactly curl (module names only, Q39)" {
     _load_module
     [[ "${#DEPENDS_ON[@]}" -eq 1 ]]
-    [[ "${DEPENDS_ON[0]}" == "apt-essentials" ]]
+    [[ "${DEPENDS_ON[0]}" == "curl" ]]
 }
 
 @test "anydesk SUPPORTED_PLATFORMS is desktop-only (Q49)" {

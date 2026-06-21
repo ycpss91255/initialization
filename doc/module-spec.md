@@ -38,7 +38,7 @@
 
 ```bash
 #!/usr/bin/env bash
-# module/apt-essentials.module.sh — base apt utilities
+# module/curl.module.sh — curl baseline (base apt utility)
 
 # ── Dual-mode header ────────────────────────────────────────
 MODULE_STANDALONE="true"
@@ -55,14 +55,14 @@ if [[ "${MODULE_STANDALONE}" == "true" ]]; then
 fi
 
 # ── Metadata ────────────────────────────────────────────────
-NAME="apt-essentials"
+NAME="curl"
 VERSION_PROVIDED="apt-managed"
 CATEGORY="base"
 TAGS=("apt" "base")
 HOMEPAGE=""
 declare -gA DESCRIPTION=(
-    [en]="Curl / git / build-essential and other apt baseline"
-    [zh-TW]="curl/git/build-essential 等 apt 基線工具"
+    [en]="curl baseline (HTTP client)"
+    [zh-TW]="curl 基線(HTTP 客戶端)"
 )
 declare -gA POST_INSTALL_MESSAGE=()
 declare -gA WARN_MESSAGE=()
@@ -74,10 +74,10 @@ SUPPORTS_USER_HOME=false
 RISK_LEVEL="low"
 REBOOT_REQUIRED=false
 INSTALL_TARGET_DEFAULT="sudo"
-TEST_VERIFY_CMD="command -v curl && command -v git"
+TEST_VERIFY_CMD="command -v curl"
 
 # ── Archetype A binding ─────────────────────────────────────
-APT_PKGS=(curl git build-essential ca-certificates)
+APT_PKGS=(curl)
 APT_PPA=""
 CONFIG_PATHS=()
 module_use_apt_archetype                # ← defines is_installed/install/update/remove/purge/verify
@@ -749,7 +749,7 @@ declare -gA POST_INSTALL_MESSAGE=(
 declare -gA WARN_MESSAGE=()
 SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")
 SUPPORTED_PLATFORMS=("desktop" "server" "wsl")
-DEPENDS_ON=("apt-essentials" "git-config" "fzf" "lazygit" "fdfind" "fnm")
+DEPENDS_ON=("curl" "git-config" "fzf" "lazygit" "fdfind" "fnm")
 CONFLICTS_WITH=()
 SUPPORTS_USER_HOME=false
 RISK_LEVEL="low"

@@ -97,10 +97,11 @@ _mock_remote() {
     [[ " ${TAGS[*]} " == *" cli-essentials "* ]]
 }
 
-@test "DEPENDS_ON is exactly apt-essentials (Q39)" {
+@test "DEPENDS_ON is exactly curl + git (Q39)" {
     _load_module
-    [[ "${#DEPENDS_ON[@]}" -eq 1 ]]
-    [[ "${DEPENDS_ON[0]}" == "apt-essentials" ]]
+    [[ "${#DEPENDS_ON[@]}" -eq 2 ]]
+    [[ " ${DEPENDS_ON[*]} " == *" curl "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" git "* ]]
 }
 
 @test "every DEPENDS_ON entry is a real module name (Q39)" {

@@ -95,7 +95,7 @@ sub-objects. `synced` carries machine-portable facts (`manual`,
 `depends_on`, `version_provided`, `installed_at`, `installed_by`) and
 is the only payload that crosses machine boundaries via sync / import /
 export. `local` carries host-specific facts (`install_target_resolved`,
-`user_home_root`, `frozen_pkgs` / `frozen_platform` for apt-essentials)
+`user_home_root`, `frozen_pkgs` / `frozen_platform` for set-resolving modules)
 and is rebuilt on each machine by its own install pipeline.
 
 ### CLI vocabulary (apt-aligned)

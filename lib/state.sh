@@ -50,7 +50,7 @@
 #     NEVER silently rebuilds — manual / dep data must not be lost.
 #     Automated repair belongs to `doctor --fix` (0.3.0), out of scope here.
 #
-# Dependencies: jq (in apt-essentials APT_PKGS; in test-tools image).
+# Dependencies: jq (provided by the 'jq' base module; in test-tools image).
 # Concurrency: flock on ${state_dir}/.state.lock for every write.
 #   Contention prints a one-line wait notice; after
 #   ${INIT_UBUNTU_LOCK_TIMEOUT:-30}s the writer gives up with exit code 1
@@ -61,7 +61,9 @@ if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     return 0 2>/dev/null
 fi
 
-readonly STATE_SCHEMA_VERSION="0.1.0"
+# Bumped to 0.2.0 for ADR-0026 (apt-essentials bundle split into per-tool
+# modules); the forward-only migration lives in lib/state_migrate.sh (ADR-0008).
+readonly STATE_SCHEMA_VERSION="0.2.0"
 readonly STATE_INSTALLED_BY_DEFAULT="init_ubuntu@${INIT_UBUNTU_VERSION:-0.1.0-draft}"
 
 # ── Path resolution ─────────────────────────────────────────────────────────
@@ -80,7 +82,7 @@ _state_lock_path() {
 
 _state_require_jq() {
     if ! command -v jq >/dev/null 2>&1; then
-        printf "[state] ERROR: jq not found. Install via 'apt-essentials' module or apt-get install jq.\n" >&2
+        printf "[state] ERROR: jq not found. Install via the 'jq' module or apt-get install jq.\n" >&2
         return 1
     fi
 }

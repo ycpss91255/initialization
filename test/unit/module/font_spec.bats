@@ -131,10 +131,11 @@ _mock_remote_partial() { MOCK_REMOTE_MODE=partial; _mock_remote; }
     [[ " ${TAGS[*]} " == *" desktop "* ]]
 }
 
-@test "DEPENDS_ON is exactly apt-essentials (curl + unzip provider)" {
+@test "DEPENDS_ON is exactly curl + unzip" {
     _load_module
-    [[ "${#DEPENDS_ON[@]}" -eq 1 ]]
-    [[ "${DEPENDS_ON[0]}" == "apt-essentials" ]]
+    [[ "${#DEPENDS_ON[@]}" -eq 2 ]]
+    [[ " ${DEPENDS_ON[*]} " == *" curl "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" unzip "* ]]
 }
 
 @test "DESCRIPTION is associative with en + zh-TW entries" {

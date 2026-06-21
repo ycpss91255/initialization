@@ -142,10 +142,11 @@ _mock_jtop_bin() {
     [[ " ${TAGS[*]} " == *" hardware "* ]]
 }
 
-@test "jetson-stats module DEPENDS_ON is exactly apt-essentials (Q39)" {
+@test "jetson-stats module DEPENDS_ON is exactly git + curl (Q39)" {
     _load_module
-    [[ "${#DEPENDS_ON[@]}" -eq 1 ]]
-    [[ "${DEPENDS_ON[0]}" == "apt-essentials" ]]
+    [[ "${#DEPENDS_ON[@]}" -eq 2 ]]
+    [[ " ${DEPENDS_ON[*]} " == *" git "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" curl "* ]]
 }
 
 @test "jetson-stats DESCRIPTION is associative with en + zh-TW entries" {

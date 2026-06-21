@@ -532,10 +532,10 @@ FIXTURE_LIST_JSON_LONG_DESC="$(jq '.items += [{
 @test "tui_checklist_entries collapses dep chains to a will-pull hint (Q-A3)" {
     run tui_checklist_entries "${FIXTURE_LIST_JSON}" recommended ""
     assert_success
-    # docker carries depends_on=["apt-essentials"]: one collapsed hint,
+    # docker carries depends_on=["curl"]: one collapsed hint,
     # never the expanded chain. neovim (depends_on=null) gets no hint.
     assert_line --partial "$(printf 'docker\t[container] Docker Engine (will pull 1 deps)\toff')"
-    refute_output --partial "apt-essentials"
+    refute_output --partial "curl"
     assert_line --partial "$(printf 'neovim\t[editor] Neovim editor\toff')"
 }
 
@@ -744,32 +744,32 @@ EOF
 # "req:<the requested module whose transitive closure pulled it>".
 
 _PROV_LIST_JSON='{"items":[
-  {"name":"apt-essentials","depends_on":[]},
-  {"name":"docker","depends_on":["apt-essentials"]},
-  {"name":"font","depends_on":["apt-essentials"]},
+  {"name":"curl","depends_on":[]},
+  {"name":"docker","depends_on":["curl"]},
+  {"name":"font","depends_on":["curl"]},
   {"name":"neovim","depends_on":[]}
 ]}'
 
 @test "tui_plan_provenance tags a user pick as self" {
-    local _plan=$'apt-essentials\nfont'
+    local _plan=$'curl\nfont'
     run tui_plan_provenance "${_PROV_LIST_JSON}" "${_plan}" font
     assert_success
     assert_line "$(printf 'font\tself')"
 }
 
 @test "tui_plan_provenance attributes a pulled dep to the requesting pick" {
-    # font (your selection) pulls apt-essentials (required by font).
-    local _plan=$'apt-essentials\nfont'
+    # font (your selection) pulls curl (required by font).
+    local _plan=$'curl\nfont'
     run tui_plan_provenance "${_PROV_LIST_JSON}" "${_plan}" font
     assert_success
-    assert_line "$(printf 'apt-essentials\treq:font')"
+    assert_line "$(printf 'curl\treq:font')"
 }
 
 @test "tui_plan_provenance keeps the resolver plan order" {
-    local _plan=$'apt-essentials\ndocker\nfont'
+    local _plan=$'curl\ndocker\nfont'
     run tui_plan_provenance "${_PROV_LIST_JSON}" "${_plan}" docker font
     assert_success
-    assert_line --index 0 "$(printf 'apt-essentials\treq:docker')"
+    assert_line --index 0 "$(printf 'curl\treq:docker')"
     assert_line --index 1 "$(printf 'docker\tself')"
     assert_line --index 2 "$(printf 'font\tself')"
 }
@@ -778,11 +778,11 @@ _PROV_LIST_JSON='{"items":[
 # body: "<name> (your selection)" vs "<name> (required by X)". Per-item, no
 # flat "+N deps" count line.
 @test "tui_review_text shows per-item provenance, not a flat dep count" {
-    local _plan=$'apt-essentials\nfont'
+    local _plan=$'curl\nfont'
     run tui_review_text "${_PROV_LIST_JSON}" "${_plan}" font
     assert_success
     assert_output --partial "font (your selection)"
-    assert_output --partial "apt-essentials (required by font)"
+    assert_output --partial "curl (required by font)"
     refute_output --partial "will pull"
 }
 
@@ -790,12 +790,12 @@ _PROV_LIST_JSON='{"items":[
 # tui_summary_text reuses the provenance map to list BOTH picks and pulled
 # deps before the install is forked.
 @test "tui_summary_text lists picks and pulled deps with provenance" {
-    local _plan=$'apt-essentials\ndocker\nfont'
+    local _plan=$'curl\ndocker\nfont'
     run tui_summary_text "${_PROV_LIST_JSON}" "${_plan}" docker font
     assert_success
     assert_output --partial "docker (your selection)"
     assert_output --partial "font (your selection)"
-    assert_output --partial "apt-essentials (required by"
+    assert_output --partial "curl (required by"
 }
 
 # ── Checklist render wrapper (mock backend binary) ───────────────────────────

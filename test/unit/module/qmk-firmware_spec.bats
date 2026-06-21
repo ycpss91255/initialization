@@ -75,16 +75,17 @@ _standalone_module() {
     [[ " ${TAGS[*]} " == *" hardware "* ]]
 }
 
-@test "qmk-firmware DEPENDS_ON is exactly apt-essentials (Q39: module names only)" {
+@test "qmk-firmware DEPENDS_ON is exactly git + build-essential (Q39: module names only)" {
     _load_module
-    [[ "${#DEPENDS_ON[@]}" -eq 1 ]]
-    [[ "${DEPENDS_ON[0]}" == "apt-essentials" ]]
+    [[ "${#DEPENDS_ON[@]}" -eq 2 ]]
+    [[ " ${DEPENDS_ON[*]} " == *" git "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" build-essential "* ]]
 }
 
 @test "qmk-firmware ensures the build-essential package inside install (Q39)" {
     _load_module
-    # build-essential is a package inside apt-essentials, not a module —
-    # the module guarantees it via its own apt prereq list instead.
+    # build-essential is also re-listed in the apt prereq array because
+    # standalone mode does not resolve DEPENDS_ON.
     [[ " ${_QMK_APT_PREREQS[*]} " == *" build-essential "* ]]
 }
 
@@ -614,7 +615,7 @@ _install_fake_qmk_bin() {
     assert_output --partial "name:        qmk-firmware"
     assert_output --partial "category:    optional"
     assert_output --partial "hardware"
-    assert_output --partial "apt-essentials"
+    assert_output --partial "git"
 }
 
 @test "standalone: info --lang=zh-TW prints localized description" {

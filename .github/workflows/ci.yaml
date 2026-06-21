@@ -27,9 +27,18 @@ on:
     branches: [main]
     tags: ['v*']
 
-# Cancel in-flight runs on the same ref when a new commit lands.
+# Concurrency is keyed on the PR HEAD SHA (not github.ref). github.ref for a
+# pull_request is refs/pull/N/merge, which GitHub recomputes whenever the base
+# (main) moves; under serial auto-merge that churn made cancel-in-progress
+# cancel the run of a DISTINCT commit, leaving a head with no run (the
+# "pushed but no CI triggered" recurrence). Keying on head.sha means
+# cancel-in-progress only dedups redundant events for the SAME commit and never
+# starves a distinct commit of its run. (A push/tag has no pull_request, so it
+# falls back to github.ref and never cancels — event_name gate below.)
+# Residual no-runs from GitHub not firing the event at all are recovered by
+# auto-merge-on-green.sh's empty-commit re-trigger (#232).
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:

@@ -110,6 +110,14 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **CI concurrency no longer starves a commit of its run**: the workflow
+  `concurrency.group` is now keyed on the PR head SHA instead of `github.ref`
+  (`refs/pull/N/merge`, which GitHub recomputes when the base moves). Under
+  serial auto-merge that ref churn let `cancel-in-progress` cancel a distinct
+  commit's run, leaving a head with no CI run ("pushed but no CI triggered").
+  Keying on head SHA dedups only redundant same-commit events; residual no-runs
+  from GitHub not firing the event are still recovered by the
+  auto-merge-on-green empty-commit re-trigger (#232).
 - **TUI Manage Installed labels unregistered entries clearly** (#215): a
   state.json entry whose module is no longer in the catalog (`list --json` /
   registry) — a deleted module file or a stale test install — used to render

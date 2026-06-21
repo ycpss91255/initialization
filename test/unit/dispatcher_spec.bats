@@ -690,19 +690,15 @@ EOF
 
 @test "dispatcher_dispatch detect --json emits JSON with form_factor" {
     _load_engine
-    # shellcheck source=../../lib/detect.sh
-    source "${LIB_DIR}/detect.sh"
-    # shellcheck source=../../lib/platform.sh
-    source "${LIB_DIR}/platform.sh"
+    # shellcheck source=../../lib/environment.sh
+    source "${LIB_DIR}/environment.sh"
     dispatcher_dispatch detect --json | jq -e '.form_factor | length > 0' > /dev/null
 }
 
 @test "dispatcher_dispatch detect prints human-readable key: value lines" {
     _load_engine
-    # shellcheck source=../../lib/detect.sh
-    source "${LIB_DIR}/detect.sh"
-    # shellcheck source=../../lib/platform.sh
-    source "${LIB_DIR}/platform.sh"
+    # shellcheck source=../../lib/environment.sh
+    source "${LIB_DIR}/environment.sh"
     run dispatcher_dispatch detect
     assert_success
     assert_output --partial "os.id:"

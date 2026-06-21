@@ -27,8 +27,7 @@ graph TB
     end
 
     subgraph services["Services"]
-        detect["lib/detect.sh"]
-        platform["lib/platform.sh<br/>[N9] 平台分類"]
+        environment["lib/environment.sh<br/>[N9] 環境偵測 + form_factor 分類"]
         install_tgt["lib/install_target.sh<br/>[N6] sudo / user-home"]
         state["lib/state.sh"]
         importer["lib/state_io.sh<br/>[N16] import/export"]
@@ -72,10 +71,11 @@ graph TB
     runner --> state
     runner --> log_svc
 
-    detect --> platform
     state --> state_json
     log_svc --> log_file
     dispatcher --> config_ini
+    dispatcher --> environment
+    runner --> environment
     secrets --> secrets_dir
     i18n -.-> cli
     i18n -.-> tui
@@ -106,8 +106,7 @@ initialization/
 │   ├── resolver.sh                     # 依賴解析(拓樸排序)
 │   ├── runner.sh                       # install/remove/purge 執行流
 │   ├── parallel.sh                     # [N3] non-apt 並行 worker pool
-│   ├── detect.sh                       # 環境偵測
-│   ├── platform.sh                     # [N9] server/desktop/RPi/Jetson/WSL 分類
+│   ├── environment.sh                  # [N9] 環境偵測 (probe) + server/desktop/RPi/Jetson/WSL form_factor 分類
 │   ├── install_target.sh               # [N6] sudo vs user-home 決策
 │   ├── state.sh                        # state.json R/W
 │   ├── state_io.sh                     # [N16] import / export
@@ -176,8 +175,7 @@ initialization/
 │   │   ├── resolver_spec.bats
 │   │   ├── runner_spec.bats
 │   │   ├── parallel_spec.bats          # [N3]
-│   │   ├── detect_spec.bats
-│   │   ├── platform_spec.bats          # [N9]
+│   │   ├── environment_spec.bats       # [N9] probe + form_factor + detect 合約黃金測試
 │   │   ├── install_target_spec.bats    # [N6]
 │   │   ├── state_spec.bats
 │   │   ├── state_io_spec.bats          # [N16]
@@ -235,8 +233,7 @@ sequenceDiagram
     participant DP as dispatcher.sh
     participant RG as registry.sh
     participant RS as resolver.sh
-    participant DT as detect.sh
-    participant PT as platform.sh
+    participant EV as environment.sh
     participant IT as install_target.sh
     participant RN as runner.sh
     participant PR as parallel.sh
@@ -247,9 +244,9 @@ sequenceDiagram
     User->>CLI: setup_ubuntu install neovim
     CLI->>DP: dispatch(install, [neovim], flags)
     DP->>RG: load_all_modules()
-    DP->>DT: detect()
-    DT->>PT: classify (server/desktop/RPi/Jetson)
-    DT-->>DP: env JSON
+    DP->>EV: environment_snapshot()
+    Note over EV: probe host (I/O) then classify form_factor (server/desktop/RPi/Jetson)
+    EV-->>DP: env JSON (+ form_factor)
     DP->>IT: decide install path (sudo or HOME)
     IT-->>DP: target = "sudo" or "user-home"
     DP->>RS: resolve(["neovim"])
@@ -293,11 +290,15 @@ sequenceDiagram
 | `import <file>` / `export <file>` | (無對應) | [N16] state 匯出入 |
 | `help` / `version` | `apt --help` / `apt --version` | 標準 |
 
-### 3.3 環境偵測流程(擴增平台分類)[N9]
+### 3.3 環境偵測流程(probe + form_factor 分類)[N9]
+
+> `lib/environment.sh` 內部分層:私有 `_probe_*`(I/O)在私有 `_classify`
+> (純邏輯)之下;對外只暴露 `environment_snapshot()`(完整 JSON + form_factor)
+> 與 `environment_field <path>`。`setup_ubuntu detect` 走此 snapshot。
 
 ```mermaid
 flowchart TD
-    start([detect_environment])
+    start([environment_snapshot])
     start --> os[OS: lsb_release]
     os --> arch[Arch: uname -m]
     arch --> cpu[CPU: lscpu]
@@ -307,12 +308,13 @@ flowchart TD
     desktop --> session[Session: XDG_SESSION_TYPE]
     session --> virt[Virt: systemd-detect-virt]
     virt --> wsl[WSL: /proc/sys/fs/binfmt_misc/WSLInterop]
-    wsl --> form[platform.classify -> form_factor]
+    wsl --> form[_classify -> form_factor]
     form --> json[Build JSON]
     json --> emit([Emit])
 ```
 
-`platform.classify()` 回傳 `form_factor`,合法值:
+`_classify`(對外經 `environment_snapshot()` / 相容別名 `platform_classify()`)
+回傳 `form_factor`,合法值:
 - `desktop` — 有桌面環境(`$XDG_CURRENT_DESKTOP` 非空)
 - `server` — 無桌面環境,x86_64,非 SBC
 - `rpi-4` / `rpi-5` — 樹莓派
@@ -868,8 +870,8 @@ CLI 旗標 `--color=auto|always|never`(預設 `auto`,套用上述判斷)。
 
 | 既有函式 | 新位置 |
 |---|---|
-| `check_in_WSL` / `check_in_docker` / `check_in_mac` | `lib/detect.sh` |
-| `get_system_param` | `lib/detect.sh` |
+| `check_in_WSL` / `check_in_docker` / `check_in_mac` | `lib/environment.sh` |
+| `get_system_param` | `lib/environment.sh` |
 | `exec_cmd` / `have_sudo_access` / `backup_file` | `lib/general.sh` |
 | `create_temp_file` / `check_pkg_status` | `lib/general.sh` |
 | `setup_apt_mirror` / `apt_pkg_manager` | `lib/general.sh` |

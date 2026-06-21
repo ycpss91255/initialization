@@ -49,6 +49,19 @@ at startup; exposes lookup by name / category / tag.
 
 **Resolver** (`lib/resolver.sh`): topo-sorts DEPENDS_ON graph; rejects cycles.
 
+**Environment** (`lib/environment.sh`): the module that PROBES the host (I/O:
+reads `/etc`, `/proc`, runs `lspci` / `systemd-detect-virt`) and CLASSIFIES a
+single `form_factor` (pure logic: `desktop` / `server` / `rpi-4` / `rpi-5` /
+`jetson-orin` / `wsl` / `container` / `vm` / `unknown`) behind one small
+surface: `environment_snapshot()` returns the full `{os, arch, gpu, …,
+form_factor}` JSON; `environment_field <path>` reads one field off it.
+Internally layered — private `_probe_*` (I/O) under a private `_classify`
+(logic). Backs `setup_ubuntu detect` and the module sub-shell
+`INIT_UBUNTU_FORM_FACTOR`. Merges the former `lib/detect.sh` +
+`lib/platform.sh` (ADR-0019-adjacent `detect --json` output unchanged).
+_Avoid_: platform (now an internal classify step, not a separate module),
+detect (now one probe layer inside Environment).
+
 ### Frontend
 
 **Frontend**: a user-facing entry point that collects intent and forks the

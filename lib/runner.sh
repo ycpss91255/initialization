@@ -103,9 +103,10 @@ _runner_snapshot_os() {
 }
 
 _runner_snapshot_gpu() {
-    # detect.sh may not be loaded (e.g. minimal bats engine); degrade to null.
-    declare -F detect_get_field >/dev/null 2>&1 || return 0
-    detect_get_field gpu.vendor 2>/dev/null || true
+    # environment.sh may not be loaded (e.g. minimal bats engine); degrade
+    # to null rather than erroring out.
+    declare -F environment_field >/dev/null 2>&1 || return 0
+    environment_field gpu.vendor 2>/dev/null || true
 }
 
 # ── Internal: progress rendering helpers (PRD §7.7.1) ───────────────────────

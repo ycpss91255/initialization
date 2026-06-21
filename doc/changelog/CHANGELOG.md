@@ -160,6 +160,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **fzf module-leaf rows no longer print the literal `null`** for a module
+  whose `description` is JSON null (malformed/forked payload): `_tui_fzf_mod_label`
+  now falls back to an empty description (`// ""`), matching the preview
+  renderer's existing `// $none` guard, so a row reads `o name ` instead of
+  `o name  null` (ADR-0019 description-is-a-string contract).
+- **State migration `0.1.0 -> 0.2.0` rebuilds each split tool's `local`
+  sub-object empty** (ADR-0008 synced-vs-local split): the per-tool entries
+  (git/vim/curl/wget/jq) the apt-essentials split creates now always land with
+  `local: {}` instead of preserving a pre-existing entry's stale machine-specific
+  facts (resolved install targets, `last_verified_at`). Those host-derived
+  values must never forward-carry across machines — they are re-derived on the
+  next run.
+
 - **fzf Rich tier could not enter its delegated dialog screens** (ADR-0024):
   in the fzf two-pane navigator, Quick Setup / Manage / Secrets / System Info /
   Review / msgbox still render through the existing `tui_render_*` whiptail

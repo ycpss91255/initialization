@@ -156,6 +156,18 @@ EOF
     assert_output --partial "○ neovim"
 }
 
+@test "mod_label: a null description renders blank, not the literal 'null'" {
+    # ADR-0019 promises description as a string, but a malformed/forked payload
+    # can carry description=null. jq string interpolation of null prints the
+    # literal word "null" — the label must fall back to "" (matches the
+    # preview renderer's `// $none` guard) so the row never shows "name  null".
+    local _json='{"items":[{"name":"docker","description":null,"recommended":false,"depends_on":[]}]}'
+    run _tui_fzf_mod_label "${_json}" docker "${SELSTATE}"
+    assert_success
+    refute_output --partial "null"
+    assert_output "○ docker  "
+}
+
 # ── Main-menu rows: SELECTED/total per category (PRD D2) ──────────────────────
 
 @test "menu_rows: category rows show SELECTED/total, not installed/total" {

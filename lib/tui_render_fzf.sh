@@ -243,7 +243,7 @@ _tui_fzf_mod_label() {
     jq -r --arg n "${_name}" --arg g "${_glyph}" '
         (.items[] | select(.name == $n)) as $m
         | ($m.depends_on // []) as $deps
-        | "\($g) \($m.name)  \($m.description)"
+        | "\($g) \($m.name)  \($m.description // "")"
           + (if $m.recommended == true then " ★" else "" end)
           + (if ($deps | length) > 0 then " (+\($deps | length))" else "" end)
     ' <<<"${_json}"

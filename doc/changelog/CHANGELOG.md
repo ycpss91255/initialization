@@ -160,6 +160,22 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **fzf Rich tier could not enter its delegated dialog screens** (ADR-0024):
+  in the fzf two-pane navigator, Quick Setup / Manage / Secrets / System Info /
+  Review / msgbox still render through the existing `tui_render_*` whiptail
+  dialog screens. Those screens abort on the `${TUI_BACKEND:?TUI_BACKEND not
+  set}` guard, but the fzf tier left `TUI_BACKEND` unset — so selecting Quick
+  Setup (and the other delegated rows) died with "TUI_BACKEND not set"
+  (user-visible: "cannot enter Quick Setup", "other screens flash"). The fzf
+  tier now defaults `TUI_BACKEND=whiptail` when nothing pinned it and drives
+  fzf itself via the dedicated `TUI_FZF_BIN` seam (so the navigator no longer
+  keys the fzf invocation off `TUI_BACKEND`). Added the missing fzf-tier AC-10
+  layer-2 live smoke (`test/integration/tui/harness/smoke_flow_fzf.exp` +
+  `tui_smoke_spec.bats`) which drives the REAL fzf navigator into the delegated
+  whiptail Step-1 screen and back — the regression guard that would have caught
+  this (the prior AC-10/AC-11 smoke only covered gum + whiptail). `fzf` added
+  to the test-tools image for it.
+
 - **CI concurrency no longer starves a commit of its run**: the workflow
   `concurrency.group` is now keyed on the PR head SHA instead of `github.ref`
   (`refs/pull/N/merge`, which GitHub recomputes when the base moves). Under

@@ -82,6 +82,12 @@ RUN apk add --no-cache curl xz && \
 #                        packages it in community (v3.23 ships 0.16.2). Lets
 #                        the AC-10 dual-backend live smoke drive BOTH gum and
 #                        whiptail through the §8.1 flow
+#   - fzf                [init_ubuntu addition] the Rich-tier two-pane
+#                        navigator binary (ADR-0024); alpine packages it in
+#                        community. Lets the AC-10 fzf-tier live smoke
+#                        (smoke_flow_fzf.exp) drive the REAL fzf navigator and
+#                        its delegated whiptail dialog screens — the regression
+#                        guard for the fzf-tier TUI_BACKEND fix (5a3d4a7)
 #   - expect             [init_ubuntu addition] pseudo-tty driver for the
 #                        AC-10 layer-2 TUI smoke tests (issue #73): drives
 #                        the REAL dialog/whiptail through the §8.1 flow in
@@ -118,6 +124,7 @@ RUN apk add --no-cache \
         dialog ncurses-terminfo \
         newt \
         gum \
+        fzf \
         expect \
         jq curl \
         file \
@@ -165,6 +172,7 @@ RUN bash --version >/dev/null && \
     (dialog --version 2>&1 | head -1 >/dev/null || true) && \
     (whiptail --version 2>&1 | head -1 >/dev/null || true) && \
     gum --version >/dev/null && \
+    fzf --version >/dev/null && \
     expect -v >/dev/null
 
 WORKDIR /source

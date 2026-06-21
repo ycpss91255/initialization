@@ -88,6 +88,13 @@ proc tui_press_exit {backend} {
     tui_key_enter
 }
 
+# Brief settle for full-screen curses apps (fzf): the navigator repaints
+# asynchronously and, under a pty with no real terminal pacing, a key sent the
+# instant after a redraw can race the next frame. A short pause lets the prior
+# frame land / a sent key be consumed before the next assertion. Used only by
+# the fzf flow; the dialog backends are blocking button widgets needing none.
+proc tui_settle {{ms 400}} { after $ms }
+
 proc tui_wait_exit_rc {} {
     expect {
         eof {}

@@ -312,6 +312,25 @@ EOF
     assert_output --partial "Docker Engine"
 }
 
+@test "entrypoint --preview reads TUI_LIST_CACHE instead of forking the CLI" {
+    # Perf: the navigator caches list --json to a file and exports its path, so
+    # the preview re-invocation does NOT re-fork the CLI per cursor move. Prove
+    # it by pointing TUI_CLI at a mock that FAILS on list --json: the preview
+    # must still render, which is only possible if it read the cache file.
+    _make_preview_cli
+    local _cache="${BATS_TEST_TMPDIR}/list-cache.json"
+    cp "${PREVIEW_DIR}/list.json" "${_cache}"
+    cat >"${PREVIEW_DIR}/setup_ubuntu_fail" <<'EOF'
+#!/usr/bin/env bash
+exit 7
+EOF
+    chmod +x "${PREVIEW_DIR}/setup_ubuntu_fail"
+    run env "TUI_CLI=${PREVIEW_DIR}/setup_ubuntu_fail" "TUI_LIST_CACHE=${_cache}" \
+        "${REPO_ROOT}/setup_ubuntu_tui.sh" --preview mod:docker "${SELSTATE}"
+    assert_success
+    assert_output --partial "Docker Engine"
+}
+
 @test "entrypoint --toggle strips the mod: token and mutates the selstate live" {
     # fzf's space bind passes the row TOKEN ({1} = mod:<name>), so --toggle
     # must strip the prefix to the bare module name (not store "mod:docker").

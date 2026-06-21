@@ -160,6 +160,13 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **fzf navigator preview no longer re-forks `setup_ubuntu list --json` per
+  cursor move** (perf): the navigator caches the list JSON to a temp file once
+  at session start and exports its path; the `--preview` re-invocation reads the
+  cache instead of re-sourcing the engine and rescanning every module on every
+  keystroke (the "sub-menu / preview lag"). Falls back to a fork when the cache
+  is absent (direct `--preview` calls / tests).
+
 - **fzf module-leaf rows no longer print the literal `null`** for a module
   whose `description` is JSON null (malformed/forked payload): `_tui_fzf_mod_label`
   now falls back to an empty description (`// ""`), matching the preview

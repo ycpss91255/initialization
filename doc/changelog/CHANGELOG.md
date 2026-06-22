@@ -39,6 +39,25 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   CLI owns the install go-ahead (ADR-0025). Manage / Secrets / System Info /
   Help still route to the existing screens this phase.
 
+- **TUI screen registry + session data broker** (front-matter deepenings #6 /
+  #7, ADR-0024 #5 shared data layer): one `TUI_SCREEN_REGISTRY` maps a menu
+  token to its leaf-screen handler (`manage` / `secrets` / `sysinfo` / `help`),
+  and a small `_tui_invoke_screen` dispatcher (stripping a leading `menu:` for
+  the fzf tier) replaces the duplicated token->screen `case` arms that lived in
+  all three dispatch sites (the fzf `_tui_nav_main`, the whiptail
+  `_tui_main_loop`'s `_tui_dispatch`, and `_tui_dispatch`); category-browse /
+  run / quick-setup rows keep their bespoke handling. The data broker
+  (`tui_broker_init` / `tui_broker_list_json` / `tui_broker_detect_json`) forks
+  `list --json` + `detect --json` ONCE per session, caches both to temp files,
+  serves cached accessors with no re-fork, and funnels every fork failure
+  through ONE error path (a single msgbox + clean abort). The fzf `--preview`
+  cache (`TUI_LIST_CACHE`) is folded into the broker (`TUI_BROKER_LIST_CACHE`),
+  with the fork-fallback preserved for direct `--preview` / test calls.
+  Per-query forks (`show <module> --json`, install/manage dry-run plans, the
+  live `list --installed --json` Manage view) stay direct. An injectable
+  cache-file seam keeps it unit-testable while G4 stays intact (no engine lib
+  sourced).
+
 - **8 per-tool base modules split from `apt-essentials`** (ADR-0026): `git`,
   `vim`, `curl`, `wget`, `jq`, `build-essential`, `htop`, `unzip` — each
   `CATEGORY=base`, archetype-A apt (exactly one apt package), `DEPENDS_ON=()`,

@@ -722,6 +722,122 @@ EOF
     assert_output --partial "ERROR"
 }
 
+# ── Session data broker (#7, ADR-0024 #5 shared data layer) ──────────────────
+# The broker forks list + detect ONCE, caches both to session temp files, serves
+# cached accessors, and funnels every fork failure through ONE error path. The
+# injected-JSON seam: when the cache vars point at readable files, init forks
+# NOTHING — the unit-test adapter (and the fzf preview subprocess) rely on it.
+
+# Counting mock CLI: appends one line per invocation to a counter file so we can
+# prove "forks list/detect ONCE" — accessors must NOT re-fork.
+_make_counting_cli() {
+    BROKER_COUNT="${INIT_UBUNTU_TEST_SCRATCH}/broker.count"
+    : >"${BROKER_COUNT}"
+    TUI_CLI="${INIT_UBUNTU_TEST_SCRATCH}/counting_setup_ubuntu"
+    export BROKER_COUNT TUI_CLI
+    cat >"${TUI_CLI}" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"${BROKER_COUNT}"
+case "\$*" in
+  "list --json")   printf '{"items":[{"name":"curl","category":"base","tags":["http"]}]}\n' ;;
+  "detect --json") printf '{"form_factor":"desktop"}\n' ;;
+  *) exit 9 ;;
+esac
+EOF
+    chmod +x "${TUI_CLI}"
+}
+
+@test "tui_broker_init forks list + detect exactly once; accessors serve cache" {
+    _make_counting_cli
+    unset TUI_BROKER_LIST_CACHE TUI_BROKER_DETECT_CACHE
+    run tui_broker_init
+    assert_success
+    # init forked each subcommand once.
+    run grep -c "list --json" "${BROKER_COUNT}"
+    assert_output "1"
+    run grep -c "detect --json" "${BROKER_COUNT}"
+    assert_output "1"
+}
+
+@test "tui_broker accessors return the cached payloads without re-forking" {
+    _make_counting_cli
+    unset TUI_BROKER_LIST_CACHE TUI_BROKER_DETECT_CACHE
+    tui_broker_init
+    # Accessors read the cache files — no further forks beyond init's two.
+    run tui_broker_list_json
+    assert_success
+    assert_output --partial '"name":"curl"'
+    run tui_broker_detect_json
+    assert_success
+    assert_output --partial '"form_factor":"desktop"'
+    # Still exactly one fork of each subcommand (the accessors did not re-fork).
+    run grep -c "list --json" "${BROKER_COUNT}"
+    assert_output "1"
+    run grep -c "detect --json" "${BROKER_COUNT}"
+    assert_output "1"
+    tui_broker_cleanup
+}
+
+@test "tui_broker_init is idempotent: a second call re-forks nothing" {
+    _make_counting_cli
+    unset TUI_BROKER_LIST_CACHE TUI_BROKER_DETECT_CACHE
+    tui_broker_init
+    # Re-run init: both caches already populated → no new forks.
+    run tui_broker_init
+    assert_success
+    run grep -c "list --json" "${BROKER_COUNT}"
+    assert_output "1"
+    tui_broker_cleanup
+}
+
+# A CLI that always fails (any subcommand → rc 7), assigned + exported inside a
+# helper so shellcheck does not flag the @test body for subshell-local mutation
+# (SC2030/2031); same pattern as _make_mock_cli / _make_counting_cli.
+_make_failing_cli() {
+    TUI_CLI="${INIT_UBUNTU_TEST_SCRATCH}/failing_setup_ubuntu"
+    export TUI_CLI
+    printf '#!/usr/bin/env bash\nexit 7\n' >"${TUI_CLI}"
+    chmod +x "${TUI_CLI}"
+}
+
+@test "tui_broker injected-JSON seam: init forks NOTHING when caches are pre-set" {
+    # The test adapter: write fixture JSON to two files, point the cache vars at
+    # them, and init must adopt them as-is with no working CLI at all.
+    local _list="${INIT_UBUNTU_TEST_SCRATCH}/inj_list.json"
+    local _detect="${INIT_UBUNTU_TEST_SCRATCH}/inj_detect.json"
+    printf '{"items":[{"name":"eza","category":"optional","tags":["x"]}]}\n' >"${_list}"
+    printf '{"form_factor":"server"}\n' >"${_detect}"
+    # A failing CLI proves init does NOT fork (it would rc 7); the caches win.
+    _make_failing_cli
+    run env "TUI_BROKER_LIST_CACHE=${_list}" "TUI_BROKER_DETECT_CACHE=${_detect}" \
+        "TUI_CLI=${TUI_CLI}" bash -c '
+            source "'"${LIB_DIR}"'/tui_backend.sh"
+            tui_broker_init || exit 1
+            tui_broker_list_json
+            tui_broker_detect_json
+        '
+    assert_success
+    assert_output --partial '"name":"eza"'
+    assert_output --partial '"form_factor":"server"'
+}
+
+@test "tui_broker single error path: a failing fork aborts with one message" {
+    # CLI fails on detect --json → init routes through the single error path and
+    # returns nonzero. No widget here, so the error degrades to one stderr line.
+    _make_failing_cli
+    unset TUI_BROKER_LIST_CACHE TUI_BROKER_DETECT_CACHE
+    run tui_broker_init
+    assert_failure
+    assert_output --partial "catalog data"
+}
+
+@test "tui_broker accessor before init is the single error path (no crash)" {
+    unset TUI_BROKER_LIST_CACHE TUI_BROKER_DETECT_CACHE
+    run tui_broker_list_json
+    assert_failure
+    assert_output --partial "catalog data"
+}
+
 @test "tui_plan_deps reduces the plan to pulled-in deps (will pull N deps)" {
     local _plan=$'fzf\nlazygit\nneovim\neza'
     run tui_plan_deps "${_plan}" eza neovim

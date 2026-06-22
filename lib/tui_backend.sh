@@ -226,6 +226,13 @@ declare -gA TUI_BACKEND_I18N=(
     [zh-TW.prov_self]="{0} (你的選擇)"
     [en.prov_required_by]="{0} (required by {1})"
     [zh-TW.prov_required_by]="{0} (由 {1} 連帶安裝)"
+
+    # #7 data broker single error path (tui_broker_init fork failure). {0} is
+    # the failed subcommand (e.g. "list --json"). One msgbox, then clean abort.
+    [en.broker_fork_failed_title]="Data error"
+    [zh-TW.broker_fork_failed_title]="資料錯誤"
+    [en.broker_fork_failed]="Failed to read catalog data ('setup_ubuntu {0}'). Aborting."
+    [zh-TW.broker_fork_failed]="無法讀取目錄資料('setup_ubuntu {0}')。即將中止。"
 )
 # kcov-exclude-end
 # TUI_BACKEND_I18N is consumed by i18n_t via a nameref on the table NAME passed
@@ -520,6 +527,104 @@ _tui_cli_json() {
 tui_cli_list_json()      { _tui_cli_json list --json; }
 tui_cli_detect_json()    { _tui_cli_json detect --json; }
 tui_cli_installed_json() { _tui_cli_json list --installed --json; }
+
+# ── Session data broker (#7, ADR-0024 #5 shared data layer) ──────────────────
+# The session-wide `list --json` + `detect --json` payloads change for the
+# whole TUI lifetime only across an install/manage action (which `exit`s the
+# process), so they are fetched ONCE at launch and served from cache for every
+# screen / preview thereafter. The broker is the single owner of that cache and
+# of the single fork-failure error path.
+#
+# Two adapters justify the seam (ADR-0024: real CLI fork in prod, injected JSON
+# in tests) — and BOTH keep G4 intact (the broker sources no engine lib):
+#   1. PROD  — tui_broker_init forks `list --json` / `detect --json` ONCE and
+#              caches each to a session temp file (paths exported so the fzf
+#              `--preview` re-invocation reads the cache instead of re-forking).
+#   2. TESTS — when TUI_BROKER_LIST_CACHE / TUI_BROKER_DETECT_CACHE already
+#              point at readable files, tui_broker_init treats them as injected
+#              payloads and forks NOTHING. This is the unit-test seam: a spec
+#              writes fixture JSON to two temp files, exports the two vars, and
+#              the accessors serve them with no CLI present.
+#
+# Cache file paths (exported so the preview subprocess inherits them):
+: "${TUI_BROKER_LIST_CACHE:=}"
+: "${TUI_BROKER_DETECT_CACHE:=}"
+
+# Single error path: emit ONE error surface + return 1 (clean abort). In a live
+# TUI a dialog backend is wired (TUI_BACKEND set), so render one msgbox; without
+# it (standalone sourcing / unit bats / the fzf preview subprocess) degrade to a
+# single stderr line. Either way it is ONE error surface, not scattered per-call
+# diagnostics. Gate on TUI_BACKEND (not just `declare -F tui_render_msgbox`,
+# which is always defined by this lib) so the widget is only driven when a
+# backend binary actually exists.
+#   _tui_broker_fail <what>
+_tui_broker_fail() {
+    local _what="$1"
+    local _msg; _msg="$(i18n_t TUI_BACKEND_I18N broker_fork_failed "${_what}")"
+    if [[ -n "${TUI_BACKEND:-}" ]] && declare -F tui_render_msgbox >/dev/null 2>&1; then
+        tui_render_msgbox "$(i18n_t TUI_BACKEND_I18N broker_fork_failed_title)" "${_msg}"
+    else
+        printf '%s\n' "${_msg}" >&2
+    fi
+    return 1
+}
+
+# Fetch list + detect ONCE and cache to session temp files. Idempotent: a second
+# call with both caches already populated is a no-op (re-running a screen never
+# re-forks). On ANY fork failure, route through the single error path and abort
+# (rc 1) without leaving a half-populated cache. The injected-JSON seam: when a
+# cache var already points at a readable file, that payload is adopted as-is and
+# NOT re-forked (tests + the fzf preview subprocess both rely on this).
+tui_broker_init() {
+    # detect cache
+    if [[ -n "${TUI_BROKER_DETECT_CACHE}" && -r "${TUI_BROKER_DETECT_CACHE}" ]]; then
+        : # injected (tests) or already initialized — keep it
+    else
+        local _detect
+        _detect="$(tui_cli_detect_json)" || { _tui_broker_fail "detect --json"; return 1; }
+        TUI_BROKER_DETECT_CACHE="$(mktemp)"
+        printf '%s' "${_detect}" >"${TUI_BROKER_DETECT_CACHE}"
+    fi
+    # list cache
+    if [[ -n "${TUI_BROKER_LIST_CACHE}" && -r "${TUI_BROKER_LIST_CACHE}" ]]; then
+        : # injected (tests) or already initialized — keep it
+    else
+        local _list
+        _list="$(tui_cli_list_json)" || { _tui_broker_fail "list --json"; return 1; }
+        TUI_BROKER_LIST_CACHE="$(mktemp)"
+        printf '%s' "${_list}" >"${TUI_BROKER_LIST_CACHE}"
+    fi
+    export TUI_BROKER_LIST_CACHE TUI_BROKER_DETECT_CACHE
+    return 0
+}
+
+# Cached accessors — return the session payload on stdout, NO re-fork. They
+# require tui_broker_init to have run (or the cache vars to be injected); a
+# missing/unreadable cache is the single error path again (a programming error,
+# not a per-call CLI failure).
+tui_broker_list_json() {
+    if [[ -z "${TUI_BROKER_LIST_CACHE}" || ! -r "${TUI_BROKER_LIST_CACHE}" ]]; then
+        _tui_broker_fail "list --json"
+        return 1
+    fi
+    cat -- "${TUI_BROKER_LIST_CACHE}"
+}
+
+tui_broker_detect_json() {
+    if [[ -z "${TUI_BROKER_DETECT_CACHE}" || ! -r "${TUI_BROKER_DETECT_CACHE}" ]]; then
+        _tui_broker_fail "detect --json"
+        return 1
+    fi
+    cat -- "${TUI_BROKER_DETECT_CACHE}"
+}
+
+# Drop the session cache files (called on TUI exit; the selstate temp is wiped
+# alongside). Safe to call when nothing was cached.
+tui_broker_cleanup() {
+    [[ -n "${TUI_BROKER_LIST_CACHE}" ]] && rm -f -- "${TUI_BROKER_LIST_CACHE}"
+    [[ -n "${TUI_BROKER_DETECT_CACHE}" ]] && rm -f -- "${TUI_BROKER_DETECT_CACHE}"
+    return 0
+}
 
 # Module detail payload for the #211 detail view, one forked subprocess:
 #   tui_cli_show_json <module>

@@ -15,7 +15,7 @@ source [file join [file dirname [file normalize [info script]]] tui_expect_lib.t
 if {[llength $argv] != 1} { tui_die "usage: lang_flow.exp <whiptail>" }
 set backend [lindex $argv 0]
 
-# Force backend (skip detection + gum install prompt under a pty) AND force
+# Force backend (skip detection + fzf install prompt under a pty) AND force
 # zh-TW. tui_spawn appends both flags to the setup_ubuntu_tui.sh call.
 tui_spawn --backend $backend --lang zh-TW
 

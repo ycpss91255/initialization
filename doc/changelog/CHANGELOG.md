@@ -55,9 +55,7 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   pre-selected on first entry into the recommended category. Tier resolution
   prefers `fzf` (offering `setup_ubuntu install fzf` when absent + interactive,
   per G4) and falls back to the existing whiptail screens; `--backend
-  fzf|whiptail|gum` forces the path (`gum` stays a legacy dialog backend until
-  the phase-6 gum removal, so the AC-10/AC-11 dual-backend smoke still covers
-  it). No TUI text-input/confirm widget — the forked
+  fzf|whiptail` forces the path. No TUI text-input/confirm widget — the forked
   CLI owns the install go-ahead (ADR-0025). Manage / Secrets / System Info /
   Help still route to the existing screens this phase.
 
@@ -271,6 +269,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   (#208). `--lang` help and the supported set now read `en | zh-TW`.
 
 ### Removed
+
+- **gum as a TUI backend** (ADR-0024): the `_tui_*_gum` adapter family, gum
+  detection / preference, the pre-launch gum-install prompt (#171), the
+  gum-specific i18n entries (`prompt_install_gum`, `gum_keys_*`, `help_gum`,
+  the gum `press_enter` footer), the `--backend gum` accept, and the gum
+  backend smoke / expect fixtures (`smoke_flow_gum.exp`,
+  `real_install_flow_gum.exp`) are all removed. The Rich tier is fzf and the
+  Fallback tier is whiptail (ADR-0024); `--backend gum` is now a usage error
+  (exit 2) that hints `setup_ubuntu install gum`. gum remains a fully
+  supported INSTALLABLE TOOL (`module/gum.module.sh`, archetype B) — only its
+  role as a dialog backend is dropped. The test-tools image no longer bundles
+  the gum binary.
 
 - **The `apt-essentials` bundle module** (ADR-0026): split into 8 independent
   per-tool base modules (git, vim, curl, wget, jq, build-essential, htop,

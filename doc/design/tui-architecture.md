@@ -1,5 +1,12 @@
 # TUI Architecture (current state) — init_ubuntu
 
+> **Superseded in part by ADR-0024.** This document describes the gum-era
+> modal-dialog model (gum Rich tier > whiptail). gum is no longer a TUI
+> backend: the Rich tier is now the fzf two-pane navigator and the Fallback
+> tier is whiptail (gum remains an installable tool only). The "2 backends
+> (gum > whiptail)", per-widget gum adapter rows, and the `smoke_flow_gum.exp`
+> references below are historical; see `doc/adr/0024-fzf-two-pane-tui-replaces-gum.md`.
+
 Complete inventory of the TUI as built today. Companion to
 `tui-uiux.md` (the 0.1.0 design/decisions). The TUI is a CLI frontend
 (G4 / ADR-0019): `setup_ubuntu_tui.sh` forks `setup_ubuntu` / `setup_secrets`

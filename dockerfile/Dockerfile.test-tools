@@ -77,11 +77,13 @@ RUN apk add --no-cache curl xz && \
 #   - newt               [init_ubuntu addition] provides `whiptail`, the
 #                        fallback TUI backend; alpine packages it under
 #                        "newt"
-#   - gum                [init_ubuntu addition] the preferred modern TUI
-#                        backend (charmbracelet/gum, issue #171); alpine
-#                        packages it in community (v3.23 ships 0.16.2). Lets
-#                        the AC-10 dual-backend live smoke drive BOTH gum and
-#                        whiptail through the §8.1 flow
+#   - gum                [init_ubuntu addition] kept for the module/gum.module.sh
+#                        install + verify integration tests (charmbracelet/gum;
+#                        alpine community ships 0.16.2). gum is NO LONGER a TUI
+#                        backend (ADR-0024 drops it; Rich tier = fzf, Fallback =
+#                        whiptail) — the binary stays only because the
+#                        github-release module-lifecycle specs run
+#                        `verify gum` → `command -v gum && gum --version`
 #   - fzf                [init_ubuntu addition] the Rich-tier two-pane
 #                        navigator binary (ADR-0024); alpine packages it in
 #                        community. Lets the AC-10 fzf-tier live smoke

@@ -76,22 +76,3 @@ teardown() {
     #   and the real extract + symlink produced a runnable binary.
     [[ -x "${ENGINE_LT_HOME}/.local/bin/gum" ]]
 }
-
-# gum backend: same literal Proceed → real-install path on the PREFERRED live
-# backend. Skips cleanly when gum isn't baked into the image (Slice B), so a
-# whiptail-only image still passes.
-@test "AC-11 (gum): Proceed forks the REAL setup_ubuntu install — gum lands (state + Sidecar + binary)" {
-    if ! command -v gum >/dev/null 2>&1; then
-        skip "gum not in the test-tools image (Slice B) — gum live real-install deferred"
-    fi
-    engine_lt_make_gh_fixture "$(_gum_asset)" gum "${_GUM_V}"
-    tri_setup_env gum "${_GUM_V}"
-
-    tri_run_flow "${BATS_TEST_DIRNAME}/harness/real_install_flow_gum.exp" gum
-
-    assert_success
-    tri_assert_real_install_forked
-    engine_lt_state_has gum
-    [[ "$(engine_lt_sidecar gum)" == "${_GUM_V}" ]]
-    [[ -x "${ENGINE_LT_HOME}/.local/bin/gum" ]]
-}

@@ -200,7 +200,7 @@ FIXTURE_QS_DETECT_JSON='{"os":{"id":"ubuntu","version":"24.04","codename":"noble
 @test "tui_qs_recommended_entries emits FULL descriptions, unclipped (#183)" {
     # #183: the QS producer no longer clips (the #168 budget moved into the
     # whiptail adapter). Even at an absurdly tiny width the producer must emit
-    # the whole description and inject no ellipsis — gum renders full text.
+    # the whole description and inject no ellipsis — the fzf tier renders full text.
     TUI_WIDTH=24 run tui_qs_recommended_entries "${FIXTURE_QS_LIST_JSON}" desktop
     assert_success
     refute_output --partial "…"
@@ -343,9 +343,9 @@ EOF
 
 _run_qs_e2e() {
     # TUI_BACKEND pinned to the scripted `dialog` mock so the run bypasses
-    # #171 detection / the gum install prompt (dialog is no longer a detected
-    # backend; the dispatcher routes a dialog-named binary through the
-    # whiptail family, whose --menu/--checklist shape the mock emulates).
+    # tier detection / the fzf install prompt (the dispatcher routes a
+    # dialog-named binary through the whiptail family, whose --menu/--checklist
+    # shape the mock emulates).
     run env "PATH=${E2E_BIN}:${PATH}" "HOME=${E2E_HOME}" \
         "TUI_CLI=${E2E_BIN}/setup_ubuntu" \
         "TUI_BACKEND=${E2E_BIN}/dialog" \

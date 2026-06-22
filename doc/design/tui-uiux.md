@@ -1,5 +1,11 @@
 # TUI UI/UX Design — init_ubuntu 0.1.0
 
+> **Superseded in part by ADR-0024.** Sections that frame gum as a TUI backend
+> (the `gum > whiptail` resolution, the gum widget column, gum key footers) are
+> historical: gum is dropped as a backend (Rich tier = fzf two-pane navigator,
+> Fallback tier = whiptail; gum stays an installable tool). See
+> `doc/adr/0024-fzf-two-pane-tui-replaces-gum.md` and `doc/adr/0025`.
+
 Status: design (grilled 2026-06-20). Scope: milestone 0.1.0 (M1).
 Source of truth for the TUI overhaul; each section maps to a tracking issue
 (see §10). The TUI is a CLI frontend (G4 / ADR-0019): it forks

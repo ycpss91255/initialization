@@ -24,6 +24,17 @@ load "${BATS_TEST_DIRNAME}/../helper/tui_harness.bash"
 # shellcheck source=../../lib/tui_render_fzf.sh
 source "${LIB_DIR}/tui_render_fzf.sh"
 
+# Source the entrypoint (#6 screen registry + dispatcher live there). Its main()
+# is guarded to run only when executed directly, so sourcing only defines
+# functions + the TUI_SCREEN_REGISTRY. Done at file scope so the recorder
+# overrides below shadow the real (TUI-drawing) leaf screens cleanly (no
+# per-test function redefinition → no SC2317), exactly like the _tui_has_cmd
+# override pattern. NB: deliberately NO `# shellcheck source=` directive —
+# following the entrypoint inline makes shellcheck treat its trailing `exit` as
+# ending THIS file and flag the rest of the spec as unreachable (SC2317). The
+# source is runtime-only; SC1090/SC1091 do not fire for an unfollowed source.
+source "${REPO_ROOT}/setup_ubuntu_tui.sh"
+
 # Mockable command probe (same seam as tui_backend_spec.bats): report only the
 # names in MOCK_AVAILABLE_CMDS as present, so tier-availability tests need no
 # per-test function redefinition (which would trip SC2317).
@@ -33,6 +44,27 @@ _tui_has_cmd() {
         *" $1 "*) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+# Recorder overrides for the #6 registry leaf screens: each prints its name (and
+# the list_json it was handed) so a test can assert WHICH handler the dispatcher
+# invoked, without drawing a real TUI screen. Defined at file scope AFTER the
+# entrypoint source, so they shadow the real _tui_screen_* (reachable via the
+# registry → no SC2317). The registry already maps manage/secrets/sysinfo/help
+# to these names, so no array mutation is needed.
+_tui_screen_manage()      { printf 'manage:%s\n' "${1:-}"; }
+_tui_screen_secrets()     { printf 'secrets\n'; }
+_tui_screen_system_info() { printf 'sysinfo\n'; }
+_tui_screen_help()        { printf 'help\n'; }
+
+# Re-point a registry entry from a test (the array is defined by the sourced
+# entrypoint). Isolating the write here keeps the @test bodies free of the
+# bare-subscript lint that fires when the array is treated as external; the
+# subscript is a variable, not a bare word.
+#   _set_registry_entry <token> <handler-fn>
+_set_registry_entry() {
+    local _tok="$1" _fn="$2"
+    TUI_SCREEN_REGISTRY["${_tok}"]="${_fn}"
 }
 
 setup() {
@@ -312,11 +344,12 @@ EOF
     assert_output --partial "Docker Engine"
 }
 
-@test "entrypoint --preview reads TUI_LIST_CACHE instead of forking the CLI" {
-    # Perf: the navigator caches list --json to a file and exports its path, so
-    # the preview re-invocation does NOT re-fork the CLI per cursor move. Prove
-    # it by pointing TUI_CLI at a mock that FAILS on list --json: the preview
-    # must still render, which is only possible if it read the cache file.
+@test "entrypoint --preview reads the broker cache instead of forking the CLI" {
+    # Perf (#7): the broker caches list --json to a file and exports its path
+    # (TUI_BROKER_LIST_CACHE), so the preview re-invocation does NOT re-fork the
+    # CLI per cursor move. Prove it by pointing TUI_CLI at a mock that FAILS on
+    # list --json: the preview must still render, which is only possible if it
+    # read the cache file.
     _make_preview_cli
     local _cache="${BATS_TEST_TMPDIR}/list-cache.json"
     cp "${PREVIEW_DIR}/list.json" "${_cache}"
@@ -325,7 +358,7 @@ EOF
 exit 7
 EOF
     chmod +x "${PREVIEW_DIR}/setup_ubuntu_fail"
-    run env "TUI_CLI=${PREVIEW_DIR}/setup_ubuntu_fail" "TUI_LIST_CACHE=${_cache}" \
+    run env "TUI_CLI=${PREVIEW_DIR}/setup_ubuntu_fail" "TUI_BROKER_LIST_CACHE=${_cache}" \
         "${REPO_ROOT}/setup_ubuntu_tui.sh" --preview mod:docker "${SELSTATE}"
     assert_success
     assert_output --partial "Docker Engine"
@@ -365,4 +398,64 @@ EOF
     run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend dialog
     assert_failure 2
     assert_output --partial "fzf|whiptail|gum"
+}
+
+# ── Screen registry dispatch (#6, single token->screen source of truth) ──────
+# The registry + _tui_invoke_screen replace the duplicated token->screen `case`
+# arms across the three dispatch sites (fzf _tui_nav_main, whiptail
+# _tui_main_loop's _tui_dispatch, and _tui_dispatch). The entrypoint is sourced
+# at file scope and the leaf screens are shadowed by recorder stubs (above), so
+# dispatch is verified without launching the real (TUI-drawing) screens.
+
+@test "registry: a menu: token resolves to the right handler (strips menu:)" {
+    run _tui_invoke_screen "menu:manage" '{"items":[]}'
+    assert_success
+    assert_output 'manage:{"items":[]}'
+
+    run _tui_invoke_screen "menu:secrets" '{"items":[]}'
+    assert_output "secrets"
+    run _tui_invoke_screen "menu:sysinfo" '{"items":[]}'
+    assert_output "sysinfo"
+    run _tui_invoke_screen "menu:help" '{"items":[]}'
+    assert_output "help"
+}
+
+@test "registry: a bare tag (no menu: prefix) resolves identically" {
+    # The whiptail tier passes bare tags ('manage'); the fzf tier 'menu:manage'.
+    run _tui_invoke_screen "manage" '{"items":[]}'
+    assert_success
+    assert_output --partial "manage:"
+}
+
+@test "registry: an unknown token is a safe no-op (rc 0, no output)" {
+    # Category / run / quick-setup tokens are handled by the caller, NOT the
+    # registry — _tui_invoke_screen must ignore them without crashing.
+    run _tui_invoke_screen "menu:run" '{"items":[]}'
+    assert_success
+    assert_output ""
+    run _tui_invoke_screen "menu:base" '{"items":[]}'
+    assert_success
+    assert_output ""
+    run _tui_invoke_screen "totally-unknown" '{"items":[]}'
+    assert_success
+    assert_output ""
+}
+
+@test "registry: a registered token with a missing handler fn errors (rc 1)" {
+    # Register a token whose handler function does NOT exist — the dispatcher
+    # must surface a clear error (rc 1), not silently swallow a
+    # registered-but-undefined screen. _set_registry_entry isolates the array
+    # write in a helper so the @test body stays lint-clean.
+    _set_registry_entry manage _tui_no_such_handler
+    run _tui_invoke_screen "menu:manage" '{"items":[]}'
+    assert_failure
+    assert_output --partial "missing"
+}
+
+@test "registry: _tui_dispatch routes leaf tokens through the registry" {
+    # _tui_dispatch (whiptail tier) handles quick-setup/category/run itself and
+    # delegates the rest to the registry dispatcher.
+    run _tui_dispatch secrets '{"items":[]}' '{}'
+    assert_success
+    assert_output "secrets"
 }

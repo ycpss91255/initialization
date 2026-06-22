@@ -1200,15 +1200,16 @@ _tui_nav_main() {
             # disk write either way; the selstate temp dies with the process.
             return 0
         }
+        # Non-leaf rows keep their bespoke handling (per-tier args + nested
+        # navigation); the leaf screens (manage / secrets / sysinfo / help) go
+        # through the shared screen registry (#6) — the same dispatcher the
+        # whiptail tier uses, so the token->screen map lives in ONE place.
         case "${_token}" in
             menu:quick-setup) _tui_screen_quick_setup "${_json}" "${_detect}" ;;
             menu:base | menu:recommended | menu:optional | menu:experimental)
                 _tui_nav_category "${_json}" "${_detect}" "${_token#menu:}" "${_selstate}" ;;
-            menu:manage)  _tui_screen_manage "${_json}" ;;
-            menu:secrets) _tui_screen_secrets ;;
-            menu:sysinfo) _tui_screen_system_info ;;
-            menu:help)    _tui_screen_help ;;
             menu:run)     _tui_nav_run "${_json}" "${_selstate}" ;;
+            *)            _tui_invoke_screen "${_token}" "${_json}" ;;
         esac
     done
 }
@@ -1263,26 +1264,74 @@ _tui_resolve_tier() {
 # acceptable, and it keeps the cleanup statically reachable (no trap).
 _tui_fzf_main_loop() {
     local _json _detect _selstate _rc
-    _detect="$(tui_cli_detect_json)" || return 1
-    _json="$(tui_cli_list_json)" || return 1
+    # The data broker forks list + detect ONCE and caches both to session temp
+    # files (#7). Its list cache (TUI_BROKER_LIST_CACHE, exported) doubles as the
+    # fzf --preview cache: the preview re-invocation reads the cached payload
+    # instead of re-forking `setup_ubuntu list --json` on every cursor move
+    # (which would re-source the engine and rescan every module per keystroke —
+    # the preview lag). The navigator holds the payloads in ${_json}/${_detect};
+    # the preview subprocess cannot see those vars, so they cross the seam as a
+    # file (the fzf-tier analogue of how ${_selstate} is shared).
+    tui_broker_init || return 1
+    _detect="$(tui_broker_detect_json)" || return 1
+    _json="$(tui_broker_list_json)" || return 1
     _selstate="$(mktemp)"
-    # Cache the list JSON to a temp file ONCE and export its path so the fzf
-    # --preview re-invocation reads the cached payload instead of re-forking
-    # `setup_ubuntu list --json` on every cursor move (which would re-source the
-    # engine and rescan every module per keystroke — the preview lag). The
-    # navigator already holds it in ${_json}; the preview subprocess cannot see
-    # that var, so it crosses the seam as a file (the fzf-tier analogue of how
-    # ${_selstate} is shared).
-    TUI_LIST_CACHE="$(mktemp)"; export TUI_LIST_CACHE
-    printf '%s' "${_json}" >"${TUI_LIST_CACHE}"
     _tui_nav_main "${_json}" "${_detect}" "${_selstate}"
     _rc=$?
-    rm -f -- "${_selstate}" "${TUI_LIST_CACHE}"
+    rm -f -- "${_selstate}"
+    tui_broker_cleanup
     return "${_rc}"
 }
 
-# ── Menu action dispatch ─────────────────────────────────────────────────────
+# ── Screen registry (#6, ADR-0024 §screens) ──────────────────────────────────
+# ONE source of truth mapping a menu TOKEN to its leaf-screen handler, replacing
+# the duplicated token->screen `case` arms that lived in all three dispatch
+# sites (the fzf navigator _tui_nav_main, the whiptail _tui_main_loop's
+# _tui_dispatch, and _tui_dispatch itself). The registry covers ONLY the simple
+# leaf screens that were copy-pasted across the three sites:
+#   manage / secrets / sysinfo / help
+# The category-browse / run / quick-setup rows are NOT simple screen dispatches
+# (they take per-tier arguments and drive nested navigation), so they keep their
+# own handling at each call site — the registry never owns them.
+#
+# Every registered handler is called as `<fn> <list_json>`: handlers that need
+# the catalog (manage) read it; handlers that do not (secrets/sysinfo/help)
+# simply ignore the extra positional arg. That uniform arity is what lets ONE
+# dispatcher serve both the fzf tier (which has the list JSON in hand) and the
+# whiptail tier.
+# kcov-exclude-start (registry data table; kcov counts each entry line as uncoverable, repo convention / issue #185)
+declare -gA TUI_SCREEN_REGISTRY=(
+    [manage]=_tui_screen_manage
+    [secrets]=_tui_screen_secrets
+    [sysinfo]=_tui_screen_system_info
+    [help]=_tui_screen_help
+)
+# kcov-exclude-end
 
+# Look up + invoke the handler for a menu token, stripping a leading `menu:` so
+# the fzf tier's `menu:<id>` tokens and the whiptail tier's bare `<id>` tags
+# both resolve. An UNKNOWN token is a safe no-op (rc 0) — the navigator loops
+# simply redraw, never crash, on a token the registry does not own (e.g. the
+# category / run / quick-setup tokens, which the caller handles itself).
+#   _tui_invoke_screen <token-or-tag> <list_json>
+#   rc 0  handler ran (or token is not a registry leaf — safe no-op)
+#   rc 1  registered token but its handler function is missing (programming bug)
+_tui_invoke_screen() {
+    local _token="${1#menu:}" _list_json="${2:-}"
+    local _fn="${TUI_SCREEN_REGISTRY[${_token}]:-}"
+    [[ -z "${_fn}" ]] && return 0  # not a registry leaf → safe no-op
+    if ! declare -F "${_fn}" >/dev/null 2>&1; then
+        printf 'ERROR: _tui_invoke_screen: handler %s for token %s is missing\n' \
+            "${_fn}" "${_token}" >&2
+        return 1
+    fi
+    "${_fn}" "${_list_json}"
+}
+
+# ── Menu action dispatch ─────────────────────────────────────────────────────
+# The whiptail-tier router: the non-leaf rows (quick-setup / category / run)
+# keep their bespoke handling; the leaf screens (manage / secrets / sysinfo /
+# help) go through the shared registry dispatcher (#6).
 _tui_dispatch() {
     case "$1" in
         quick-setup)
@@ -1294,17 +1343,8 @@ _tui_dispatch() {
         run)
             _tui_screen_run "$2"
             ;;
-        manage)
-            _tui_screen_manage "$2"
-            ;;
-        secrets)
-            _tui_screen_secrets
-            ;;
-        sysinfo)
-            _tui_screen_system_info
-            ;;
-        help)
-            _tui_screen_help
+        *)
+            _tui_invoke_screen "$1" "$2"
             ;;
     esac
 }
@@ -1327,8 +1367,13 @@ _tui_confirm_exit() {
 
 _tui_main_loop() {
     local _list_json _detect_json _summary
-    _detect_json="$(tui_cli_detect_json)" || return 1
-    _list_json="$(tui_cli_list_json)" || return 1
+    # Same data broker as the fzf tier (#7): one fork of list + detect, one
+    # error path. The whiptail loop holds the payloads in locals for the menu
+    # render; no preview subprocess here, but routing through the broker keeps a
+    # single fork/error surface across both tiers.
+    tui_broker_init || return 1
+    _detect_json="$(tui_broker_detect_json)" || return 1
+    _list_json="$(tui_broker_list_json)" || return 1
     _summary="$(tui_system_summary "${_detect_json}")"
 
     local _choice _tag _label _desc
@@ -1387,12 +1432,12 @@ main() {
     case "${1:-}" in
         --preview)
             local _pv_json
-            # Read the session list cache the navigator exported (avoids
-            # re-forking `setup_ubuntu list --json` on every cursor move). Fall
-            # back to a fork when the cache is absent (a direct --preview call,
-            # e.g. in unit tests).
-            if [[ -n "${TUI_LIST_CACHE:-}" && -r "${TUI_LIST_CACHE}" ]]; then
-                _pv_json="$(cat -- "${TUI_LIST_CACHE}")"
+            # Read the session list cache the broker exported (#7 — avoids
+            # re-forking `setup_ubuntu list --json` on every cursor move). The
+            # broker's accessor serves the cache; fall back to a direct fork when
+            # the cache is absent (a direct --preview call, e.g. in unit tests).
+            if [[ -n "${TUI_BROKER_LIST_CACHE:-}" && -r "${TUI_BROKER_LIST_CACHE}" ]]; then
+                _pv_json="$(tui_broker_list_json)" || return 1
             else
                 _pv_json="$(tui_cli_list_json)" || return 1
             fi
@@ -1545,5 +1590,10 @@ main() {
     fi
 }
 
-main "$@"
-exit $?
+# Run main only when executed directly. When SOURCED (the #6 registry-dispatch
+# unit tests source this file to call _tui_invoke_screen with stubbed handlers),
+# skip main so the test can drive individual functions without launching the TUI.
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
+    main "$@"
+    exit $?
+fi

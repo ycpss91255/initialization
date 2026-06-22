@@ -64,6 +64,15 @@ _run_smoke() {
         expect "${BATS_TEST_DIRNAME}/harness/smoke_flow.exp" "$1"
 }
 
+# ADR-0024 D10 whiptail-tier feature-parity smoke: drives the nested drill-down,
+# the Manage Secrets three-way picker and Run → Proceed on the live whiptail.
+_run_whiptail_parity() {
+    run env "TUI_ENTRY=${REPO_ROOT}/setup_ubuntu_tui.sh" \
+        "TUI_FARM=${SMOKE_BIN}" "TUI_HOME=${SMOKE_HOME}" \
+        "TUI_CLI_MOCK=${SMOKE_BIN}/setup_ubuntu" \
+        expect "${BATS_TEST_DIRNAME}/harness/smoke_flow_whiptail_parity.exp"
+}
+
 # `--lang zh-TW` render proof: same sealed env, the lang_flow.exp variant.
 _run_lang() {
     run env "TUI_ENTRY=${REPO_ROOT}/setup_ubuntu_tui.sh" \
@@ -158,6 +167,20 @@ _assert_smoke_green() {
     _make_smoke_env_fzf
     _run_smoke_fzf
     _assert_smoke_green
+}
+
+# ADR-0024 D10: the whiptail Fallback tier reaches feature parity with the fzf
+# Rich tier — nested drill-down, the Manage Secrets three-way picker (Token /
+# GPG / SSH), recommended browse, and Run → Review → Proceed forking the ONE
+# install pipeline — all on the LIVE whiptail binary.
+@test "AC-10 parity smoke (whiptail): secrets 3 sub-menus + drill-down + Run/Proceed" {
+    _make_smoke_env whiptail
+    _run_whiptail_parity
+    assert_success
+    # The Proceed leg forked the install pipeline (G4 / AC-11 structural).
+    assert_output --partial "CLI pipeline output"
+    run grep -E "^install (eza|zoxide)" "${SMOKE_CLI_LOG}"
+    assert_success
 }
 
 # `--lang zh-TW` forces the UI language at the entrypoint, overriding the

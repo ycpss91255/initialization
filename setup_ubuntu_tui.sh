@@ -48,6 +48,10 @@ export TUI_SECRETS
 source "${REPO_ROOT}/lib/tui_backend.sh"
 # shellcheck source=lib/tui_render_fzf.sh
 source "${REPO_ROOT}/lib/tui_render_fzf.sh"
+# tui_secrets.sh = the Manage Secrets screens (three-way Token/GPG/SSH picker +
+# sub-screens, ADR-0025). Forks setup_secrets only — sources no engine lib (G4).
+# shellcheck source=lib/tui_secrets.sh
+source "${REPO_ROOT}/lib/tui_secrets.sh"
 
 # Resolve the UI language once (env > config ui.lang > $LANG, sanitized). The
 # TUI never sources the engine, so config_get is absent here and resolution
@@ -86,6 +90,13 @@ declare -gA TUI_I18N=(
     [zh-TW.cat_modules_title]="{0} 模組"
     [en.check_modules_help]="Check modules to install. < OK > keeps this page, < Back > discards it."
     [zh-TW.check_modules_help]="勾選要安裝的模組。< OK > 保留此頁,< Back > 捨棄此頁。"
+    # Sub-category drill-down menu (ADR-0024 D10 nested navigation). The row
+    # shows the bucket name + SELECTED/total (PRD D2); the help line names the
+    # action. {0}=subtag {1}=selected {2}=total.
+    [en.subcat_row]="{0}  ({1}/{2})"
+    [zh-TW.subcat_row]="{0}  ({1}/{2})"
+    [en.subcat_help]="Pick a sub-category to browse its modules:"
+    [zh-TW.subcat_help]="選擇子類別以瀏覽其模組:"
 
     # Review & Install screen (_tui_screen_review).
     [en.title_review]="Review & Install"
@@ -281,6 +292,34 @@ declare -gA TUI_I18N=(
     [en.secrets_ssh_confirm_prompt]="IRREVERSIBLE. Type the key name '{0}' to confirm:"
     [zh-TW.secrets_ssh_confirm_prompt]="此操作無法復原。請輸入金鑰名稱 '{0}' 以確認:"
 
+    # Manage Secrets THREE-WAY picker (ADR-0025 / PRD story 10): Token / GPG /
+    # SSH each get their own list + actions sub-screen, no longer a flat mix.
+    [en.secrets_pick_kind_help]="Pick a secret kind to manage (forks setup_secrets — G4):"
+    [zh-TW.secrets_pick_kind_help]="選擇要管理的密鑰類型 (fork setup_secrets — G4):"
+    [en.secrets_kind_token]="Token"
+    [zh-TW.secrets_kind_token]="Token"
+    [en.secrets_kind_gpg]="GPG"
+    [zh-TW.secrets_kind_gpg]="GPG"
+    [en.secrets_kind_ssh]="SSH"
+    [zh-TW.secrets_kind_ssh]="SSH"
+    # Per-kind sub-screen titles + the action-list captions (each sub-screen
+    # shows the kind's current list inline, then its actions; an empty list
+    # renders "none" — PRD story 11).
+    [en.secrets_token_title]="Manage Secrets — Token"
+    [zh-TW.secrets_token_title]="管理密鑰 — Token"
+    [en.secrets_gpg_title]="Manage Secrets — GPG"
+    [zh-TW.secrets_gpg_title]="管理密鑰 — GPG"
+    [en.secrets_ssh_title]="Manage Secrets — SSH"
+    [zh-TW.secrets_ssh_title]="管理密鑰 — SSH"
+    [en.secrets_pick_action_help]="Current:\n{0}\n\nPick an action:"
+    [zh-TW.secrets_pick_action_help]="目前:\n{0}\n\n選擇動作:"
+    [en.secrets_none]="none"
+    [zh-TW.secrets_none]="無"
+    [en.secrets_action_list]="List (overview)"
+    [zh-TW.secrets_action_list]="列出 (總覽)"
+    [en.secrets_action_remove]="Remove..."
+    [zh-TW.secrets_action_remove]="移除…"
+
     # Main menu loop (_tui_main_loop).
     [en.main_title]="init_ubuntu v{0}"
     [zh-TW.main_title]="init_ubuntu v{0}"
@@ -439,12 +478,69 @@ _tui_screen_detail_picker() {
 
 # ── Checkbox accumulator screens (#70, Q43 / §8.2) ───────────────────────────
 
-# One category page as a pure check-list. < OK > stores the page in the
-# in-memory accumulator (tui_selection_replace_page), < Back > / ESC
-# discards the page. Nothing is executed and nothing touches disk here —
-# `< Run >` on the main menu is the only batch execution point.
+# Whiptail-tier recommended pre-selection (PRD D4 — the fallback analogue of
+# tui_fzf_recommended_preselect): on the FIRST entry into the recommended
+# category, seed the in-memory accumulator with every is_recommended module
+# that survives the platform filter (the shared pure producer
+# tui_recommended_preselect_modules). Idempotent across the session via the
+# SAME guard flag the fzf tier uses (TUI_RECO_PRESELECTED), so re-entering
+# recommended never re-adds picks the user has since unchecked.
+#   _tui_preselect_recommended <list_json> <detect_json>
+_tui_preselect_recommended() {
+    local _json="$1" _detect="$2"
+    [[ -n "${TUI_RECO_PRESELECTED:-}" ]] && return 0
+    local _form; _form="$(tui_effective_form_factor "${_detect}" "${TUI_PLATFORM_OVERRIDE}")"
+    local _name
+    while IFS= read -r _name; do
+        [[ -n "${_name}" ]] && TUI_SELECTION["${_name}"]=1
+    done < <(tui_recommended_preselect_modules "${_json}" "${_form}")
+    TUI_RECO_PRESELECTED=1
+}
+
+# Category screen dispatcher (ADR-0024 D10 nested drill-down, the whiptail
+# analogue of _tui_nav_category): recommended pre-selection fires on first
+# entry, then if the category has >1 TAGS[0] bucket a sub-category menu lets the
+# user pick a bucket before the checklist leaf; a single bucket goes straight to
+# the leaf. < Back > / ESC at the sub-category menu returns to the main menu.
+#   _tui_screen_category <category> <list_json> [<detect_json>]
 _tui_screen_category() {
-    local _cat="$1" _json="$2"
+    local _cat="$1" _json="$2" _detect="${3:-}"
+    if [[ "${_cat}" == "recommended" && -n "${_detect}" ]]; then
+        _tui_preselect_recommended "${_json}" "${_detect}"
+    fi
+    local _nsub; _nsub="$(tui_subtag_count "${_json}" "${_cat}")"
+    if (( _nsub <= 1 )); then
+        # Single bucket (or none): the leaf scopes to the whole category.
+        _tui_screen_category_leaf "${_cat}" "${_json}" ""
+        return 0
+    fi
+    while :; do
+        local -a _rows=()
+        local _sub _sel _tot
+        while IFS= read -r _sub; do
+            [[ -z "${_sub}" ]] && continue
+            read -r _sel _tot < <(tui_subcategory_sel_stats "${_json}" "${_cat}" \
+                "${_sub}" "$(tui_selection_list | tr '\n' ' ')")
+            _rows+=("${_sub}" "$(i18n_t TUI_I18N subcat_row "${_sub}" "${_sel}" "${_tot}")")
+        done < <(tui_subtags "${_json}" "${_cat}")
+        [[ "${#_rows[@]}" -eq 0 ]] && return 0
+        local _choice
+        _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
+            "$(i18n_t TUI_I18N cat_modules_title "${_cat^}")" \
+            "$(i18n_t TUI_I18N subcat_help)" "${_rows[@]}")" || return 0
+        _tui_screen_category_leaf "${_cat}" "${_json}" "${_choice}"
+    done
+}
+
+# One category (or sub-category) page as a pure check-list. < OK > stores the
+# page in the in-memory accumulator (tui_selection_replace_page /
+# tui_selection_replace_subpage), < Back > / ESC discards the page. Nothing is
+# executed and nothing touches disk here — `< Run >` is the only batch
+# execution point. <subtag> "" = whole category; a non-empty bucket scopes the
+# page to that sub-category so unchecking one bucket never wipes another's picks.
+#   _tui_screen_category_leaf <category> <list_json> <subtag>
+_tui_screen_category_leaf() {
+    local _cat="$1" _json="$2" _subtag="${3:-}"
     # Loop so the "View details..." companion entry (#211) can show a detail
     # msgbox and return to the SAME checklist with selections intact: each pass
     # re-derives the rows from the persistent accumulator (tui_selection_list),
@@ -455,7 +551,7 @@ _tui_screen_category() {
         while IFS=$'\t' read -r _name _label _status; do
             _rows+=("${_name}" "${_label}" "${_status}")
         done < <(tui_checklist_entries "${_json}" "${_cat}" \
-            "$(tui_selection_list | tr '\n' ' ')")
+            "$(tui_selection_list | tr '\n' ' ')" "${_subtag}")
 
         if [[ "${#_rows[@]}" -eq 0 ]]; then
             tui_render_msgbox "$(i18n_t TUI_I18N title_modules)" \
@@ -477,27 +573,41 @@ _tui_screen_category() {
             return 0  # Back / ESC: discard this page's changes (Q43)
         fi
 
-        local -a _names=()
-        local _line _wants_detail="false"
-        while IFS= read -r _line; do
-            [[ -z "${_line}" ]] && continue
-            if [[ "${_line}" == "${TUI_DETAIL_SENTINEL}" ]]; then
-                _wants_detail="true"
-                continue  # never a real selection — filtered out (#211)
-            fi
-            _names+=("${_line}")
-        done <<<"${_picked}"
-        # Commit the real picks regardless: opening details does not discard the
-        # page, so the user's checkbox state survives the detail round trip.
-        tui_selection_replace_page "${_json}" "${_cat}" "${_names[@]}"
-
-        if [[ "${_wants_detail}" == "true" ]]; then
+        if _tui_commit_checklist_page "${_json}" "${_cat}" "${_subtag}" "${_picked}"; then
+            # The "View details..." sentinel was checked: open the picker, then
+            # loop back to the SAME checklist with selections intact (#211).
             _tui_screen_detail_picker \
                 "$(tui_modules_in_category "${_json}" "${_cat}")"
-            continue  # back to the same checklist, selections preserved
+            continue
         fi
         return 0
     done
+}
+
+# Parse a committed checklist page (newline-separated checked tags), filter out
+# the "View details..." sentinel, and store the real picks in the accumulator —
+# scoped to the sub-category bucket when drilled in (so the other buckets' picks
+# survive), else the whole category. Returns rc 0 when the sentinel was checked
+# (the caller should open the detail picker + re-loop), rc 1 otherwise.
+#   _tui_commit_checklist_page <list_json> <category> <subtag> <picked-lines>
+_tui_commit_checklist_page() {
+    local _json="$1" _cat="$2" _subtag="$3" _picked="$4"
+    local -a _names=()
+    local _line _wants_detail="false"
+    while IFS= read -r _line; do
+        [[ -z "${_line}" ]] && continue
+        if [[ "${_line}" == "${TUI_DETAIL_SENTINEL}" ]]; then
+            _wants_detail="true"
+            continue  # never a real selection — filtered out (#211)
+        fi
+        _names+=("${_line}")
+    done <<<"${_picked}"
+    if [[ -n "${_subtag}" ]]; then
+        tui_selection_replace_subpage "${_json}" "${_cat}" "${_subtag}" "${_names[@]}"
+    else
+        tui_selection_replace_page "${_json}" "${_cat}" "${_names[@]}"
+    fi
+    [[ "${_wants_detail}" == "true" ]]
 }
 
 # Review & Install screen shared by < Run > (#70) and Quick Setup (#71):
@@ -863,200 +973,9 @@ _tui_screen_manage() {
     done
 }
 
-# ── Manage Secrets sub-menu (#202, design §4) ────────────────────────────────
-# A sub-menu instead of forking bare setup_secrets (which printed usage + rc2).
-# Each flow forks `setup_secrets <subcommand>` (G4 — the TUI never sources the
-# engine). Secret VALUES + passphrases are ALWAYS prompted by setup_secrets on
-# its own no-echo tty (AC-20): the input widget only collects non-secret args
-# (name / user@host / file path), never the value itself.
-
-# Fork a setup_secrets subcommand, then show a plain-text OK / FAILED result
-# msgbox (design §4 Q10; NO emoji — repo hard rule). The terminal is cleared so
-# the forked tool owns it for its own prompts; we return to the sub-menu after.
-#   _tui_secrets_run <result-label> <setup_secrets args...>
-_tui_secrets_run() {
-    local _label="$1"
-    shift
-    clear 2>/dev/null || printf '\033c'
-    "${TUI_SECRETS}" "$@"
-    local _rc=$?
-    if [[ "${_rc}" -eq 0 ]]; then
-        tui_render_msgbox "${_label}" "$(i18n_t TUI_I18N secrets_result_ok "${_label}")"
-    else
-        tui_render_msgbox "${_label}" \
-            "$(i18n_t TUI_I18N secrets_result_fail "${_label}" "${_rc}")"
-    fi
-}
-
-# 1. Read-only overview: combine `list` + `gpg list` + `ssh-key list` into one
-# msgbox. NEVER private/secret content (the subcommands only emit names / public
-# material by design). Each fork's failure is folded into the text, not fatal.
-_tui_secrets_overview() {
-    local _text=""
-    _text+="# tokens"$'\n'"$("${TUI_SECRETS}" list 2>&1)"$'\n\n'
-    _text+="# gpg"$'\n'"$("${TUI_SECRETS}" gpg list 2>&1)"$'\n\n'
-    _text+="# ssh-key"$'\n'"$("${TUI_SECRETS}" ssh-key list 2>&1)"
-    tui_render_msgbox "$(i18n_t TUI_I18N secrets_overview_title)" "${_text}"
-}
-
-# 2. Generate SSH key: type menu (ed25519 default / ecdsa / rsa) → fork
-# `ssh-key generate --type <type>` (ssh-keygen prompts the passphrase itself).
-# Cancel on the type menu forks nothing.
-_tui_secrets_ssh_generate() {
-    local _type
-    _type="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-        "$(i18n_t TUI_I18N secrets_ssh_type_title)" \
-        "$(i18n_t TUI_I18N secrets_ssh_type_help)" \
-        "ed25519" "$(i18n_t TUI_I18N secrets_ssh_type_ed25519)" \
-        "ecdsa"   "$(i18n_t TUI_I18N secrets_ssh_type_ecdsa)" \
-        "rsa"     "$(i18n_t TUI_I18N secrets_ssh_type_rsa)")" || return 0
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_ssh_gen)" \
-        ssh-key generate --type "${_type}"
-}
-
-# 4 / 5 / 7. input(non-secret arg) → fork the subcommand. Cancel / empty submit
-# (tui_render_input contract) forks nothing.
-#   _tui_secrets_input_then <label> <prompt-key> <setup_secrets args...> <arg-placeholder>
-# The collected value is appended as the LAST setup_secrets argument.
-_tui_secrets_ssh_copy() {
-    local _target
-    _target="$(tui_render_input "$(i18n_t TUI_I18N secrets_ssh_copy)" \
-        "$(i18n_t TUI_I18N secrets_copy_prompt)")" || return 0
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_ssh_copy)" \
-        ssh-key copy "${_target}"
-}
-
-_tui_secrets_token_set() {
-    local _name
-    _name="$(tui_render_input "$(i18n_t TUI_I18N secrets_token_set)" \
-        "$(i18n_t TUI_I18N secrets_token_prompt)")" || return 0
-    # Only the NAME reaches argv; setup_secrets prompts the value (AC-20).
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_token_set)" \
-        token set "${_name}"
-}
-
-_tui_secrets_gpg_import() {
-    local _path
-    _path="$(tui_render_input "$(i18n_t TUI_I18N secrets_gpg_import)" \
-        "$(i18n_t TUI_I18N secrets_gpg_import_prompt)")" || return 0
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_gpg_import)" \
-        gpg import "${_path}"
-}
-
-# Build a pick-menu from one-name-per-line list output. Prints the chosen name
-# on stdout (rc 0); rc 1 when the list is empty (caller shows the empty msgbox)
-# or the user cancels. <names> is newline-separated.
-_tui_secrets_pick() {
-    local _title="$1" _name_lines="$2"
-    local -a _rows=()
-    local _n
-    while IFS= read -r _n; do
-        [[ -n "${_n}" ]] && _rows+=("${_n}" "${_n}")
-    done <<<"${_name_lines}"
-    [[ "${#_rows[@]}" -eq 0 ]] && return 1
-    TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-        "${_title}" "$(i18n_t TUI_I18N secrets_pick_help)" "${_rows[@]}"
-}
-
-# 8a. Delete Token: pick from `list` → single yesno → fork `remove <name>`
-# (setup_secrets has no `token remove`; the canonical token delete is the
-# top-level `remove <name>`). Token is the lower danger tier (yesno only).
-_tui_secrets_delete_token() {
-    local _names _name
-    if ! _names="$("${TUI_SECRETS}" list 2>/dev/null)"; then
-        tui_render_msgbox "$(i18n_t TUI_I18N secrets_delete_token)" \
-            "$(i18n_t TUI_I18N secrets_list_failed list)"
-        return 0
-    fi
-    _name="$(_tui_secrets_pick "$(i18n_t TUI_I18N secrets_pick_token_title)" \
-        "${_names}")" || {
-        [[ -n "${_names}" ]] || tui_render_msgbox \
-            "$(i18n_t TUI_I18N secrets_delete_token)" \
-            "$(i18n_t TUI_I18N secrets_none_tokens)"
-        return 0
-    }
-    tui_render_yesno "$(i18n_t TUI_I18N secrets_delete_token)" \
-        "$(i18n_t TUI_I18N secrets_confirm_token "${_name}")" || return 0
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_delete_token)" remove "${_name}"
-}
-
-# 8b. Delete SSH key: pick from the `ssh-key list` public-key basenames →
-# TYPE-TO-CONFIRM (the user must type the exact name; irreversible) → fork
-# `ssh-key remove <name> --yes`. SSH key is the higher danger tier.
-_tui_secrets_delete_ssh() {
-    local _names _name _typed
-    _names="$(_tui_secrets_ssh_names)"
-    _name="$(_tui_secrets_pick "$(i18n_t TUI_I18N secrets_pick_ssh_title)" \
-        "${_names}")" || {
-        [[ -n "${_names}" ]] || tui_render_msgbox \
-            "$(i18n_t TUI_I18N secrets_delete_ssh)" \
-            "$(i18n_t TUI_I18N secrets_none_ssh)"
-        return 0
-    }
-    _typed="$(tui_render_input \
-        "$(i18n_t TUI_I18N secrets_ssh_confirm_title "${_name}")" \
-        "$(i18n_t TUI_I18N secrets_ssh_confirm_prompt "${_name}")")" || return 0
-    [[ "${_typed}" == "${_name}" ]] || return 0
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_delete_ssh)" \
-        ssh-key remove "${_name}" --yes
-}
-
-# SSH key names = the basenames of ~/.ssh/*.pub as reported by `ssh-key list`
-# ("<path>.pub: <key line>"); the agent-identity section is skipped. One per
-# line on stdout. The TUI re-parses the read-only list rather than touching ~.
-_tui_secrets_ssh_names() {
-    "${TUI_SECRETS}" ssh-key list 2>/dev/null | awk '
-        /^agent identities:/ { exit }
-        /\.pub: / {
-            n = $1; sub(/:$/, "", n); sub(/.*\//, "", n); sub(/\.pub$/, "", n)
-            print n
-        }'
-}
-
-# 8. Delete... category menu: only Token + SSH key (GPG deletion is deferred —
-# setup_secrets has no gpg-delete; design §4 / §10).
-_tui_secrets_delete_menu() {
-    local _cat
-    _cat="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-        "$(i18n_t TUI_I18N secrets_delete_title)" \
-        "$(i18n_t TUI_I18N secrets_delete_help)" \
-        "del-token" "$(i18n_t TUI_I18N secrets_delete_token)" \
-        "del-ssh"   "$(i18n_t TUI_I18N secrets_delete_ssh)")" || return 0
-    case "${_cat}" in
-        del-token) _tui_secrets_delete_token ;;
-        del-ssh)   _tui_secrets_delete_ssh ;;
-    esac
-}
-
-# Secrets sub-menu loop. Back / ESC on the sub-menu returns to the main menu;
-# every leaf flow returns here. Unlike install/manage this never exits the TUI
-# (secrets management is a side trip, not a pipeline handoff).
-_tui_screen_secrets() {
-    while :; do
-        local _choice
-        _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-            "$(i18n_t TUI_I18N secrets_title)" \
-            "$(i18n_t TUI_I18N secrets_help)" \
-            "list"       "$(i18n_t TUI_I18N secrets_list)" \
-            "ssh-gen"    "$(i18n_t TUI_I18N secrets_ssh_gen)" \
-            "ssh-load"   "$(i18n_t TUI_I18N secrets_ssh_load)" \
-            "ssh-copy"   "$(i18n_t TUI_I18N secrets_ssh_copy)" \
-            "token-set"  "$(i18n_t TUI_I18N secrets_token_set)" \
-            "gpg-gen"    "$(i18n_t TUI_I18N secrets_gpg_gen)" \
-            "gpg-import" "$(i18n_t TUI_I18N secrets_gpg_import)" \
-            "delete"     "$(i18n_t TUI_I18N secrets_delete)")" || return 0
-        case "${_choice}" in
-            list)       _tui_secrets_overview ;;
-            ssh-gen)    _tui_secrets_ssh_generate ;;
-            ssh-load)   _tui_secrets_run "$(i18n_t TUI_I18N secrets_ssh_load)" ssh-key load ;;
-            ssh-copy)   _tui_secrets_ssh_copy ;;
-            token-set)  _tui_secrets_token_set ;;
-            gpg-gen)    _tui_secrets_run "$(i18n_t TUI_I18N secrets_gpg_gen)" gpg generate ;;
-            gpg-import) _tui_secrets_gpg_import ;;
-            delete)     _tui_secrets_delete_menu ;;
-        esac
-    done
-}
+# ── Manage Secrets screens (#202 / ADR-0025) ─────────────────────────────────
+# Extracted to lib/tui_secrets.sh (three-way Token/GPG/SSH picker + sub-screens,
+# registry-dispatched). Sourced at the top of this file with the other libs.
 
 # ── Help screen (#203, design §3) ────────────────────────────────────────────
 # A read-only msgbox of the backend-aware key reference. gum's native footer
@@ -1303,6 +1222,9 @@ _tui_fzf_main_loop() {
 declare -gA TUI_SCREEN_REGISTRY=(
     [manage]=_tui_screen_manage
     [secrets]=_tui_screen_secrets
+    [secrets-token]=_tui_screen_secrets_token
+    [secrets-gpg]=_tui_screen_secrets_gpg
+    [secrets-ssh]=_tui_screen_secrets_ssh
     [sysinfo]=_tui_screen_system_info
     [help]=_tui_screen_help
 )
@@ -1338,7 +1260,9 @@ _tui_dispatch() {
             _tui_screen_quick_setup "$2" "$3"
             ;;
         base | recommended | optional | experimental)
-            _tui_screen_category "$1" "$2"
+            # $3 = detect_json: lets the category dispatcher fire recommended
+            # pre-selection (PRD D4) on first entry into the recommended category.
+            _tui_screen_category "$1" "$2" "$3"
             ;;
         run)
             _tui_screen_run "$2"
@@ -1384,7 +1308,11 @@ _tui_main_loop() {
             # and so leaves zh-TW / ja double-width labels ragged — issue: the
             # main-menu description column did not line up under --lang zh-TW).
             _menu_args+=("${_tag}" "$(_tui_pad_label "${_label}" 22) ${_desc}")
-        done < <(tui_main_menu_entries "${_list_json}")
+            # PRD D2: the category rows show SELECTED/total, sourced live from
+            # the in-memory accumulator each loop pass (so a freshly committed
+            # page bumps the count on return to the main menu).
+        done < <(tui_main_menu_entries "${_list_json}" \
+            "$(tui_selection_list | tr '\n' ' ')")
 
         # < Exit > (relabeled Cancel) / ESC: drop the process and with it every
         # in-memory selection — zero side effects (Q43). Guard the drop when

@@ -761,6 +761,77 @@ tui_modules_in_category() {
     ' <<<"$1"
 }
 
+# ── Sub-category structure (TAGS[0] grouping — shared between tiers) ──────────
+# The distinct TAGS[0] buckets of a category, alphabetical; a module with no
+# tags falls into the "other" bucket. A category with >1 bucket gets a
+# sub-category drill-down (whiptail tier) / branch screen (fzf tier); a single
+# bucket goes straight to the module leaf. This is the ONE bucketing producer
+# both tiers consume (ADR-0024 D10) — tui_fzf_subtags is a thin wrapper.
+#   tui_subtags <list_json> <category>
+tui_subtags() {
+    jq -r --arg c "$2" '
+        [.items[] | select(.category == $c) | (.tags[0] // "other")]
+        | unique | sort | .[]
+    ' <<<"$1"
+}
+
+# How many distinct TAGS[0] buckets a category has (drives the "drill-down vs
+# straight-to-leaf" decision: >1 → sub-category screen, else module leaf).
+#   tui_subtag_count <list_json> <category>
+tui_subtag_count() {
+    tui_subtags "$1" "$2" | grep -c .
+}
+
+# "<selected> <total>" for a whole category — PRD D2: the main/category-menu
+# count is SELECTED/total (from the in-memory accumulator), NOT installed/total.
+# <selected> is a space-separated module-name list (whitespace padding is fine).
+# Mirrors tui_fzf_category_sel_stats so both tiers agree.
+#   tui_category_sel_stats <list_json> <category> <selected>
+tui_category_sel_stats() {
+    local _sel=" ${3:-} "
+    jq -r --arg c "$2" --arg sel "${_sel}" '
+        [.items[] | select(.category == $c)]
+        | "\([.[] | .name as $n | select($sel | contains(" " + $n + " "))] | length) \(length)"
+    ' <<<"$1"
+}
+
+# "<selected> <total>" for one sub-category bucket (the sub-category menu row
+# count, the whiptail analogue of _tui_fzf_subtag_stats).
+#   tui_subcategory_sel_stats <list_json> <category> <subtag> <selected>
+tui_subcategory_sel_stats() {
+    local _sel=" ${4:-} "
+    jq -r --arg c "$2" --arg t "$3" --arg sel "${_sel}" '
+        [.items[] | select(.category == $c) | select((.tags[0] // "other") == $t)]
+        | "\([.[] | .name as $n | select($sel | contains(" " + $n + " "))] | length) \(length)"
+    ' <<<"$1"
+}
+
+# Module names in one (category, subtag) bucket, alphabetical — the page-replace
+# scope for the drill-down leaf.
+#   tui_modules_in_subcategory <list_json> <category> <subtag>
+tui_modules_in_subcategory() {
+    jq -r --arg c "$2" --arg t "$3" '
+        [.items[] | select(.category == $c) | select((.tags[0] // "other") == $t) | .name]
+        | sort | .[]
+    ' <<<"$1"
+}
+
+# Pure recommended pre-selection set (PRD D4): the is_recommended module names
+# that survive the §15.3 platform filter, one per line, alphabetical. Reuses
+# the SAME filter pipeline as Quick Setup (tui_qs_recommended_entries: platform
+# ∋ form factor → enabled tri-state → recommended). BOTH tiers wrap this — the
+# fzf tier writes the set into the selstate file (tui_fzf_recommended_preselect),
+# the whiptail tier seeds the in-memory accumulator. Only rows the engine marks
+# recommended (status "on") are emitted; an "off" row is never auto-selected.
+#   tui_recommended_preselect_modules <list_json> <form_factor>
+tui_recommended_preselect_modules() {
+    local _name _label _status
+    while IFS=$'\t' read -r _name _label _status; do
+        [[ "${_status}" == "on" ]] && printf '%s\n' "${_name}"
+    done < <(tui_qs_recommended_entries "$1" "$2")
+    return 0  # a trailing "off" row leaves the loop rc 1 — normalize to 0
+}
+
 # ── Checkbox accumulator data (#70, Q43 / §8.2) ──────────────────────────────
 
 # Checklist rows for one category as "name<TAB>label<TAB>on|off" lines.
@@ -780,9 +851,11 @@ tui_modules_in_category() {
 # expanded chain (the Review screen owns the expandable detail). The label is
 # emitted FULL (#183): clipping to the whiptail box budget happens inside the
 # whiptail adapter (_tui_checklist_whiptail), so gum shows full text.
+# A non-empty 4th arg <subtag> scopes the rows to a single TAGS[0] bucket (the
+# sub-category drill-down leaf, ADR-0024 D10) — "" yields the whole category.
 tui_checklist_entries() {
-    local _json="$1" _cat="$2" _selected=" ${3:-} "
-    jq -r --arg c "$2" --arg sel "${_selected}" '
+    local _json="$1" _cat="$2" _selected=" ${3:-} " _subtag="${4:-}"
+    jq -r --arg c "$2" --arg sel "${_selected}" --arg sub "${_subtag}" '
         # Direct forward deps per module name (over the WHOLE payload — a base
         # module is typically depended on from OTHER categories).
         (reduce .items[] as $m ({}; .[$m.name] = ($m.depends_on // []))) as $deps
@@ -803,8 +876,11 @@ tui_checklist_entries() {
         ([.items[].name] | map({ (.): 0 }) | add) as $zero
         | (reduce (.items[].name) as $m ($zero;
             reduce (transitive($m)[]) as $anc (.; .[$anc] += 1))) as $rank
-        # Render only the requested category, but rank against the full graph.
-        | [.items[] | select(.category == $c)]
+        # Render only the requested category (optionally narrowed to one TAGS[0]
+        # bucket for the drill-down leaf), but rank against the full graph.
+        | [.items[]
+           | select(.category == $c)
+           | select($sub == "" or (.tags[0] // "other") == $sub)]
         # Group rank = the max member rank, so the sub-category that owns the
         # most-depended-on module sorts first. Sort groups basic-first then
         # alphabetically (negate the rank so jq ascending sort = basic-first).
@@ -843,6 +919,24 @@ tui_selection_replace_page() {
     while IFS= read -r _name; do
         unset "TUI_SELECTION[${_name}]"
     done < <(tui_modules_in_category "${_json}" "${_cat}")
+    for _name in "$@"; do
+        TUI_SELECTION["${_name}"]=1
+    done
+}
+
+# `< OK >` semantics for one SUB-CATEGORY drill-down page (ADR-0024 D10):
+#   tui_selection_replace_subpage <list_json> <category> <subtag> [<name>...]
+# Drops only the modules in that (category, subtag) bucket, then stores the
+# page's checked names — so unchecking sticks within the bucket WITHOUT
+# disturbing the OTHER sub-categories' picks (a category-wide replace would
+# wipe them when the user drills one bucket at a time).
+tui_selection_replace_subpage() {
+    local _json="$1" _cat="$2" _subtag="$3"
+    shift 3
+    local _name
+    while IFS= read -r _name; do
+        unset "TUI_SELECTION[${_name}]"
+    done < <(tui_modules_in_subcategory "${_json}" "${_cat}" "${_subtag}")
     for _name in "$@"; do
         TUI_SELECTION["${_name}"]=1
     done
@@ -1111,36 +1205,46 @@ tui_detail_unregistered_text() {
     printf '%s\n' "${_text}"
 }
 
-# One §8.1 category row as "tag<TAB>label<TAB>description".
+# One §8.1 category row as "tag<TAB>label<TAB>description". PRD D2: the row
+# count is SELECTED/total (from the in-memory accumulator <selected>), NOT
+# installed/total — mirrors tui_fzf_menu_rows so both tiers show the same count.
+# <selected> is a space-separated module-name list ("" → 0 selected).
+#   _tui_category_entry <list_json> <category> [<selected>]
 _tui_category_entry() {
-    local _json="$1" _cat="$2"
-    local _installed _total
-    read -r _installed _total <<<"$(tui_category_stats "${_json}" "${_cat}")"
+    local _json="$1" _cat="$2" _selected="${3:-}"
+    local _sel _tot
+    read -r _sel _tot <<<"$(tui_category_sel_stats "${_json}" "${_cat}" "${_selected}")"
+    local _label _desc
     case "${_cat}" in
         base)
-            printf 'base\t%s\t%s\n' \
-                "$(i18n_t TUI_BACKEND_I18N cat_base_label)" \
-                "$(i18n_t TUI_BACKEND_I18N cat_base_desc)" ;;
+            _label="$(i18n_t TUI_BACKEND_I18N cat_base_label)"
+            _desc="$(i18n_t TUI_BACKEND_I18N cat_base_desc)" ;;
         recommended)
-            printf 'recommended\t%s\t%s\n' \
-                "$(i18n_t TUI_BACKEND_I18N cat_recommended_label "${_installed}" "${_total}")" \
-                "$(i18n_t TUI_BACKEND_I18N cat_recommended_desc)" ;;
+            # The recommended label has its own {0}/{1} count slot.
+            _label="$(i18n_t TUI_BACKEND_I18N cat_recommended_label "${_sel}" "${_tot}")"
+            _desc="$(i18n_t TUI_BACKEND_I18N cat_recommended_desc)" ;;
         optional)
-            printf 'optional\t%s\t%s\n' \
-                "$(i18n_t TUI_BACKEND_I18N cat_optional_label)" \
-                "$(i18n_t TUI_BACKEND_I18N cat_optional_desc)" ;;
+            _label="$(i18n_t TUI_BACKEND_I18N cat_optional_label)"
+            _desc="$(i18n_t TUI_BACKEND_I18N cat_optional_desc)" ;;
         experimental)
-            printf 'experimental\t%s\t%s\n' \
-                "$(i18n_t TUI_BACKEND_I18N cat_experimental_label)" \
-                "$(i18n_t TUI_BACKEND_I18N cat_experimental_desc)" ;;
+            _label="$(i18n_t TUI_BACKEND_I18N cat_experimental_label)"
+            _desc="$(i18n_t TUI_BACKEND_I18N cat_experimental_desc)" ;;
+        *)
+            return 0 ;;
     esac
+    # D2: every category row carries SELECTED/total. recommended already has it
+    # in the label; the others (no {0}/{1} slot) get the count appended.
+    [[ "${_cat}" != "recommended" ]] && _label="${_label} (${_sel}/${_tot})"
+    printf '%s\t%s\t%s\n' "${_cat}" "${_label}" "${_desc}"
 }
 
 # Full §8.1 main-menu rows ("tag<TAB>label<TAB>description" per line).
 # Category rows are derived from the live payload, so empty categories
 # disappear and future non-empty ones appear without a spec change (Q44).
+# <selected> (optional 2nd arg) is the space-separated accumulator names — the
+# category rows render SELECTED/total from it (PRD D2; "" → 0 selected).
 tui_main_menu_entries() {
-    local _json="$1" _cat
+    local _json="$1" _selected="${2:-}" _cat
 
     # Three logical groups, in order (no separator rows: gum/whiptail have no
     # non-selectable row, so a divider could be landed on and was confusing —
@@ -1152,7 +1256,7 @@ tui_main_menu_entries() {
         "$(i18n_t TUI_BACKEND_I18N menu_quick_setup_label)" \
         "$(i18n_t TUI_BACKEND_I18N menu_quick_setup_desc)"
     while IFS= read -r _cat; do
-        _tui_category_entry "${_json}" "${_cat}"
+        _tui_category_entry "${_json}" "${_cat}" "${_selected}"
     done < <(tui_categories "${_json}")
     printf 'manage\t%s\t%s\n' \
         "$(i18n_t TUI_BACKEND_I18N menu_manage_label)" \

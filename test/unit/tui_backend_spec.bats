@@ -209,14 +209,24 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
     run tui_main_menu_entries "${FIXTURE_LIST_JSON}"
     assert_success
     assert_line --partial "quick-setup"
-    assert_line --partial "Base Tools"
-    assert_line --partial "Recommended (1/2)"
-    assert_line --partial "Optional"
+    # PRD D2: category rows now show SELECTED/total (not installed/total). With
+    # no selection passed, every category row reads 0/total.
+    assert_line --partial "Base Tools (0/1)"
+    assert_line --partial "Recommended (0/2)"
+    assert_line --partial "Optional (0/3)"
     assert_line --partial "Manage Installed"
     assert_line --partial "Manage Secrets"
     assert_line --partial "System Info"
     refute_output --partial "experimental"
     refute_output --partial "Experimental"
+}
+
+@test "tui_main_menu_entries category rows show SELECTED/total from the accumulator (D2)" {
+    run tui_main_menu_entries "${FIXTURE_LIST_JSON}" " eza zoxide "
+    assert_success
+    # Two optional picks → Optional (2/3); recommended untouched → (0/2).
+    assert_line --partial "Optional (2/3)"
+    assert_line --partial "Recommended (0/2)"
 }
 
 @test "tui_main_menu_entries adds experimental row when non-empty (Q44)" {
@@ -1183,8 +1193,9 @@ os.id: ubuntu"
     assert_line --partial "快速安裝"        # Quick Setup
     assert_line --partial "基礎工具"        # Base Tools
     assert_line --partial "管理已安裝項目"  # Manage Installed
-    # The recommended count interpolation survives translation.
-    assert_line --partial "推薦 (1/2)"
+    # The recommended count interpolation survives translation. PRD D2: the
+    # count is SELECTED/total; with no selection passed it reads 0/2.
+    assert_line --partial "推薦 (0/2)"
 }
 
 @test "i18n: platform choices localize the label but keep the tag (#185)" {
@@ -1422,11 +1433,19 @@ EOF
 
 @test "e2e: checked pages accumulate and Run/Proceed forks one install command" {
     tui_e2e_make_harness
+    # ADR-0024 D10 nested drill-down: optional has 2 TAGS[0] buckets
+    # (agent / cli-essentials) so entering it shows a sub-category menu first;
+    # pick cli-essentials → checklist → Back out of the sub-category menu.
+    # recommended likewise has 2 buckets (container / editor).
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
+0|cli-essentials
 0|eza\nzoxide\n
+1|
 0|recommended
+0|editor
 0|neovim\n
+1|
 0|run
 0|proceed
 EOF
@@ -1442,10 +1461,16 @@ EOF
 
 @test "e2e: Back on a checklist page discards only that page (Q43)" {
     tui_e2e_make_harness
+    # optional → cli-essentials → check eza → Back out the sub-cat menu;
+    # recommended → editor → Back (discard that page) → Back the sub-cat menu.
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
+0|cli-essentials
 0|eza\n
+1|
 0|recommended
+0|editor
+1|
 1|
 0|run
 0|proceed
@@ -1473,9 +1498,13 @@ EOF
 
 @test "e2e: Review Back returns to the main menu keeping selections" {
     tui_e2e_make_harness
+    # optional → cli-essentials → check eza → Back out the sub-cat menu →
+    # Run → Review Back (keep selections) → Run again → Proceed.
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
+0|cli-essentials
 0|eza\n
+1|
 0|run
 1|
 0|run
@@ -1489,11 +1518,13 @@ EOF
 
 @test "e2e: Exit with pending selections asks the guard, then drops them (#206)" {
     tui_e2e_make_harness
-    # optional → check eza+zoxide (accumulator now has 2) → main-menu Exit →
-    # guard yesno → confirm leave (rc 0 = Yes).
+    # optional → cli-essentials → check eza+zoxide (accumulator now has 2) →
+    # Back out the sub-cat menu → main-menu Exit → guard yesno → confirm leave.
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
+0|cli-essentials
 0|eza\nzoxide\n
+1|
 1|
 0|
 EOF

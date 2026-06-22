@@ -35,11 +35,17 @@ tui_key_down
 tui_key_down
 tui_key_enter
 
-# 3. Checklist visible; Space checks the highlighted first item
-#    (claude-code — TAGS[0] grouping sorts [agent] first). Match the row's
+# 3a. ADR-0024 D10 nested drill-down: optional has 2 TAGS[0] buckets, so a
+#     sub-category menu (agent / cli-essentials) precedes the checklist. The
+#     highlight starts on the first row (agent); Enter opens that bucket's leaf.
+tui_expect_text "Optional Modules"
+tui_expect_text "agent"
+tui_key_enter
+
+# 3b. Checklist visible; Space checks the highlighted first item
+#    (claude-code — the agent bucket's lone module). Match the row's
 #    description, not the tag: dialog colors the tag's hotkey letter, so
 #    "claude-code" is never a contiguous byte sequence on the stream.
-tui_expect_text "Optional Modules"
 tui_expect_text "Anthropic agent CLI"
 tui_key_space
 # The toggle repaint differs per backend: dialog cursor-addresses the lone
@@ -49,10 +55,15 @@ tui_key_space
 tui_expect_re {\*} "the checked \[*\] mark"
 tui_key_enter   ;# < OK > stores the page in the in-memory accumulator
 
-# 4. Back on the main menu (fresh redraw).
+# 4. OK returns to the SUB-CATEGORY menu (the drill-down loop). Back out of it
+#    to reach the main menu.
+tui_expect_text "Optional Modules"
+tui_press_exit $backend
+
+# 5. Back on the main menu (fresh redraw).
 tui_expect_text "Quick Setup"
 
-# 5. < Exit > with a pending selection: the #206 guard asks to confirm before
+# 6. < Exit > with a pending selection: the #206 guard asks to confirm before
 #    dropping it. Confirm "leave" (the yesno default is Yes/Exit) → clean rc 0,
 #    selection dropped with the process (Q43).
 tui_press_exit $backend

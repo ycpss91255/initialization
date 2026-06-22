@@ -30,12 +30,19 @@ teardown() {
 
 # Canned AC-10 interaction: Optional page (check eza + zoxide), Recommended
 # page (check neovim), < Run >, Review → Proceed.
+# ADR-0024 D10 nested drill-down: optional / recommended each have 2 TAGS[0]
+# buckets, so entering a category shows a sub-category menu before the checklist.
+# Drill in (cli-essentials / editor), check, then Back out the sub-category menu.
 _ac10_responses() {
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
+0|cli-essentials
 0|eza\nzoxide\n
+1|
 0|recommended
+0|editor
 0|neovim\n
+1|
 0|run
 0|proceed
 EOF
@@ -130,13 +137,16 @@ EOF
 
 @test "AC-10 (whiptail): Exit drops selections — exit 0, zero file writes, no fork" {
     tui_e2e_make_harness whiptail
-    # optional → check eza+zoxide → main-menu Exit (rc 1) → exit guard yesno
-    # (rc 0 = Yes, confirm leave). The 4th response is required since #206 added
-    # the guard to BOTH backends; without it the TUI blocks on the guard prompt
-    # (this is what deadlocked the core-2 kcov shard with no per-test timeout).
+    # optional → cli-essentials → check eza+zoxide → Back out the sub-cat menu →
+    # main-menu Exit (rc 1) → exit guard yesno (rc 0 = Yes, confirm leave). The
+    # guard response is required since #206 added it to BOTH backends; without it
+    # the TUI blocks on the guard prompt (this deadlocked the core-2 kcov shard
+    # with no per-test timeout).
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
+0|cli-essentials
 0|eza\nzoxide\n
+1|
 1|
 0|
 EOF
@@ -170,9 +180,12 @@ EOF
 @test "#203 (whiptail): ui.tui_hints=off suppresses the checklist hint line" {
     tui_e2e_make_harness whiptail
     export MOCK_TUI_HINTS="off"
-    # optional checklist (commit nothing) → Back → main Exit (no selections).
+    # optional → cli-essentials → checklist (commit nothing) → Back → Back the
+    # sub-cat menu → main Exit (no selections).
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
+0|cli-essentials
+1|
 1|
 1|
 EOF
@@ -186,8 +199,11 @@ EOF
 @test "#203 (whiptail): default (on) keeps the checklist hint line" {
     tui_e2e_make_harness whiptail
     # MOCK_TUI_HINTS unset → config get returns empty → default ON.
+    # optional → cli-essentials → checklist → Back → Back the sub-cat → Exit.
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|optional
+0|cli-essentials
+1|
 1|
 1|
 EOF

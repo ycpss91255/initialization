@@ -30,13 +30,21 @@ tui_key_down
 tui_key_down
 tui_key_enter
 
-# 3. Checklist (gum choose --no-limit): Space toggles the highlighted first
+# 3a. ADR-0024 D10 drill-down: optional has 2 TAGS[0] buckets, so a sub-category
+#     menu (agent / cli-essentials) precedes the checklist. Enter opens the
+#     highlighted first bucket.
+tui_expect_text "sub-category"
+tui_key_enter
+
+# 3b. Checklist (gum choose --no-limit): Space toggles the highlighted first
 #    item, Enter confirms the page (stored in the in-memory accumulator).
-tui_expect_text "Optional Modules"
+tui_expect_text "Check modules to install"
 tui_key_space
 tui_key_enter
 
-# 4. Back on the main menu (gum re-renders the header rows).
+# 4. OK returns to the sub-category menu; Esc backs out to the main menu.
+tui_expect_text "sub-category"
+send -- "\x1b"
 tui_expect_text "Quick Setup"
 
 # 5. < Exit > on gum is Esc: cancels gum choose (130). With a pending selection

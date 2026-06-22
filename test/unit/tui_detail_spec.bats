@@ -304,18 +304,24 @@ _run_tui_e2e() {
     _make_e2e_detail_harness
     # recommended checklist: check ONLY the "View details..." sentinel (no real
     # module → empty accumulator → clean main-menu exit, no exit guard).
+    # ADR-0024 D10: recommended has 2 TAGS[0] buckets, so a sub-category menu
+    # precedes the checklist; drill into container, then Back out of it.
     # Widget invocation order:
     #   1 main menu      → recommended
-    #   2 checklist      → sentinel only (commits nothing)
-    #   3 detail picker  → docker
-    #   4 detail msgbox  → enter
-    #   5 checklist again→ Back (discard, accumulator still empty)
-    #   6 main menu      → Exit (empty selection → no guard)
+    #   2 sub-cat menu   → container
+    #   3 checklist      → sentinel only (commits nothing)
+    #   4 detail picker  → docker
+    #   5 detail msgbox  → enter
+    #   6 checklist again→ Back (discard, accumulator still empty)
+    #   7 sub-cat menu   → Back
+    #   8 main menu      → Exit (empty selection → no guard)
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|recommended
+0|container
 0|__details__\n
 0|docker
 0|
+1|
 1|
 1|
 EOF
@@ -331,16 +337,20 @@ EOF
 
 @test "e2e: opening then closing the detail view keeps checklist selections" {
     _make_e2e_detail_harness
-    # 1) recommended: check docker + the details sentinel → OK
-    # 2) details picker: pick docker → msgbox → Back to checklist
-    # 3) re-rendered checklist: OK with docker still checked (no new toggles)
-    # 4) Run → Review Proceed: install must include docker (selection survived).
+    # ADR-0024 D10: recommended drills into the container bucket (docker) first.
+    # 1) recommended → container sub-category
+    # 2) checklist: check docker + the details sentinel → OK
+    # 3) details picker: pick docker → msgbox → Back to checklist
+    # 4) re-rendered checklist: OK with docker still checked (no new toggles)
+    # 5) sub-cat menu Back → Run → Review Proceed: install includes docker.
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|recommended
+0|container
 0|docker\n__details__\n
 0|docker
 0|
 0|docker\n
+1|
 0|run
 0|proceed
 EOF

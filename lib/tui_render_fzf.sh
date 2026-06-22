@@ -206,29 +206,27 @@ tui_fzf_sel_toggle() {
 #   tui_fzf_recommended_preselect <list_json> <selstate> <form_factor>
 tui_fzf_recommended_preselect() {
     local _json="$1" _f="$2" _form="$3"
-    local _name _label _status
-    while IFS=$'\t' read -r _name _label _status; do
-        [[ "${_status}" == "on" ]] && tui_fzf_sel_add "${_f}" "${_name}"
-    done < <(tui_qs_recommended_entries "${_json}" "${_form}")
-    return 0  # the last loop iter may leave rc 1 (a row that was "off")
+    # Shared producer (ADR-0024 D10): the pure recommended set lives in the data
+    # layer (tui_recommended_preselect_modules); the fzf tier only writes it into
+    # the selstate file (the whiptail tier seeds the accumulator instead).
+    local _name
+    while IFS= read -r _name; do
+        [[ -n "${_name}" ]] && tui_fzf_sel_add "${_f}" "${_name}"
+    done < <(tui_recommended_preselect_modules "${_json}" "${_form}")
+    return 0
 }
 
 # ── Sub-category structure (TAGS[0] grouping, ADR-0024 #3 levels) ─────────────
-# The distinct TAGS[0] buckets of a category, alphabetical — a module with no
-# tags falls into the "other" bucket. A category with >1 bucket gets a
-# sub-category branch screen; a single bucket goes straight to the module leaf.
+# Thin wrapper over the shared bucketing producer (tui_subtags, in
+# tui_backend.sh) so both tiers split categories identically (ADR-0024 D10).
 tui_fzf_subtags() {
-    local _json="$1" _cat="$2"
-    jq -r --arg c "$2" '
-        [.items[] | select(.category == $c) | (.tags[0] // "other")]
-        | unique | sort | .[]
-    ' <<<"${_json}"
+    tui_subtags "$1" "$2"
 }
 
 # How many distinct TAGS[0] buckets a category has (drives the "branch vs
 # straight-to-leaf" decision: >1 → sub-category screen, else module leaf).
 tui_fzf_subtag_count() {
-    tui_fzf_subtags "$1" "$2" | grep -c .
+    tui_subtag_count "$1" "$2"
 }
 
 # ── Per-level row producers (left-pane rows: "token<TAB>label") ──────────────

@@ -105,14 +105,23 @@ _run_secrets_e2e() {
         "${REPO_ROOT}/setup_ubuntu_tui.sh" </dev/null
 }
 
-# Last logged setup_secrets argv line.
-_last_secrets() { tail -n1 "${E2E_SECRETS_LOG}"; }
+# Last logged setup_secrets ACTION argv line, skipping the read-only list
+# refreshes the sub-screens fork on every loop pass to show the kind's current
+# entries (PRD story 11). Those `list` / `gpg list` / `ssh-key list` lines are
+# not the action under test, so they are filtered out here.
+_last_secrets() {
+    grep -vxE 'list|gpg list|ssh-key list' "${E2E_SECRETS_LOG}" | tail -n1
+}
 
 # ── Sub-menu structure ───────────────────────────────────────────────────────
 
-@test "secrets sub-menu: opening Manage Secrets renders a menu (not a bare fork)" {
+# ADR-0025 / PRD story 10: Manage Secrets is a THREE-WAY picker (Token / GPG /
+# SSH); each kind opens its own sub-screen (registry-dispatched) with that
+# kind's list + actions. The flows below drill: secrets → <kind> → <action>.
+
+@test "secrets picker: opening Manage Secrets renders the Token/GPG/SSH picker" {
     _make_secrets_harness dialog
-    # secrets → (sub-menu) Back → (main) Exit
+    # secrets → (kind picker) Back → (main) Exit
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
 1|
@@ -120,15 +129,17 @@ _last_secrets() { tail -n1 "${E2E_SECRETS_LOG}"; }
 EOF
     _run_secrets_e2e
     assert_success
-    # The sub-menu is a --menu render; bare setup_secrets is NEVER forked.
-    run grep -c -- "--menu" "${E2E_WIDGET_LOG}"
-    # main menu (1) + secrets sub-menu (1) + main menu again (1) = 3 menus
-    assert_output "3"
+    # The picker is a --menu render carrying the three kind tags; bare
+    # setup_secrets is NEVER forked.
+    run cat "${E2E_WIDGET_LOG}"
+    assert_output --partial "token"
+    assert_output --partial "gpg"
+    assert_output --partial "ssh"
     run test -f "${E2E_SECRETS_LOG}"
     assert_failure
 }
 
-@test "secrets sub-menu: Back returns to the main menu, forks nothing" {
+@test "secrets picker: Back returns to the main menu, forks nothing" {
     _make_secrets_harness dialog
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
@@ -141,41 +152,199 @@ EOF
     assert_failure
 }
 
-# ── 1. List existing secrets (read-only overview) ────────────────────────────
+@test "secrets picker: the three kinds dispatch through the screen registry" {
+    # The three sub-screens are registered so both tiers dispatch identically.
+    # Assert the registry entries are declared in the entrypoint (grep the
+    # source rather than sourcing it, which would reassign REPO_ROOT in this
+    # subshell and trip SC2031 on later REPO_ROOT reads).
+    run grep -E '\[secrets-(token|gpg|ssh)\]=_tui_screen_secrets_(token|gpg|ssh)' \
+        "${REPO_ROOT}/setup_ubuntu_tui.sh"
+    assert_success
+    assert_line --partial "[secrets-token]=_tui_screen_secrets_token"
+    assert_line --partial "[secrets-gpg]=_tui_screen_secrets_gpg"
+    assert_line --partial "[secrets-ssh]=_tui_screen_secrets_ssh"
+}
 
-@test "list overview: forks list + gpg list + ssh-key list into a read-only msgbox" {
+# ── Token sub-screen: list / set / remove ────────────────────────────────────
+
+@test "token sub-screen: shows the current token list inline, then actions" {
+    _make_secrets_harness dialog
+    # secrets → token → (action menu) Back → picker Back → exit
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|secrets
+0|token
+1|
+1|
+1|
+EOF
+    _run_secrets_e2e "SECRETS_OUT_list=gh-token\n"
+    assert_success
+    # Entering the token sub-screen forks `list` to show the current entries.
+    run grep -c "^list$" "${E2E_SECRETS_LOG}"
+    assert_output "1"
+}
+
+@test "token sub-screen: empty list renders 'none' (PRD story 11)" {
     _make_secrets_harness dialog
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|list
+0|token
+1|
+1|
+1|
+EOF
+    _run_secrets_e2e
+    assert_success
+    # The action-menu help text carries the localized "none" placeholder.
+    run cat "${E2E_WIDGET_LOG}"
+    assert_output --partial "none"
+}
+
+@test "token set: input(name) → token set <name>; the VALUE is never in argv" {
+    _make_secrets_harness dialog
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|secrets
+0|token
+0|set
+0|gh-token
 0|
 1|
 1|
+1|
 EOF
-    _run_secrets_e2e \
-        "SECRETS_OUT_list=gh-token\n" \
-        "SECRETS_OUT_gpg_list=pub rsa4096/ABCD\n" \
-        "SECRETS_OUT_ssh_key_list=id_ed25519.pub\n"
+    _run_secrets_e2e
     assert_success
-    run cat "${E2E_SECRETS_LOG}"
-    assert_line --index 0 "list"
-    assert_line --index 1 "gpg list"
-    assert_line --index 2 "ssh-key list"
-    # The combined output reached a --msgbox (read-only).
-    run grep -c -- "--msgbox" "${E2E_WIDGET_LOG}"
+    run _last_secrets
+    # Exactly `token set gh-token` — no value token follows (AC-20).
+    assert_output "token set gh-token"
+}
+
+@test "token set: empty name (empty submit = cancel) forks nothing destructive" {
+    _make_secrets_harness dialog
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|secrets
+0|token
+0|set
+0|
+1|
+1|
+1|
+EOF
+    _run_secrets_e2e
+    assert_success
+    run grep -c "^token set" "${E2E_SECRETS_LOG}"
+    assert_failure
+}
+
+@test "token remove: pick from list → single yesno confirm → remove <name>" {
+    _make_secrets_harness dialog
+    # secrets → token → remove → pick name → yesno Yes → result → back → exit
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|secrets
+0|token
+0|remove
+0|gh-token
+0|
+0|
+1|
+1|
+1|
+EOF
+    _run_secrets_e2e "SECRETS_OUT_list=gh-token\nnpm-token\n"
+    assert_success
+    run _last_secrets
+    # Token deletion forks the top-level `remove <name>` (setup_secrets has no
+    # `token remove`; the canonical token delete is `remove <name>`).
+    assert_output "remove gh-token"
+    # A yesno (not type-to-confirm) gated the token deletion.
+    run grep -c -- "--yesno" "${E2E_WIDGET_LOG}"
     assert_success
 }
 
-# ── 2. Generate SSH key (type menu) ──────────────────────────────────────────
+@test "token remove: yesno No forks nothing destructive" {
+    _make_secrets_harness dialog
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|secrets
+0|token
+0|remove
+0|gh-token
+1|
+1|
+1|
+1|
+EOF
+    _run_secrets_e2e "SECRETS_OUT_list=gh-token\n"
+    assert_success
+    run grep -c "^remove " "${E2E_SECRETS_LOG}"
+    assert_failure
+}
+
+# ── GPG sub-screen: list / generate / import (no remove — deferred) ──────────
+
+@test "gpg sub-screen: offers list / generate / import but NO remove (deferred)" {
+    _make_secrets_harness dialog
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|secrets
+0|gpg
+1|
+1|
+1|
+EOF
+    _run_secrets_e2e
+    assert_success
+    run cat "${E2E_WIDGET_LOG}"
+    assert_output --partial "generate"
+    assert_output --partial "import"
+    # GPG deletion is deferred (setup_secrets has no gpg-delete) — no remove tag.
+    refute_output --regexp $'gpg .*\tremove'
+}
+
+@test "gpg generate: forks gpg generate and shows a result msgbox" {
+    _make_secrets_harness dialog
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|secrets
+0|gpg
+0|generate
+0|
+1|
+1|
+1|
+EOF
+    _run_secrets_e2e
+    assert_success
+    run _last_secrets
+    assert_output "gpg generate"
+}
+
+@test "gpg import: input(path) → gpg import <path>" {
+    _make_secrets_harness dialog
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|secrets
+0|gpg
+0|import
+0|/tmp/key.asc
+0|
+1|
+1|
+1|
+EOF
+    _run_secrets_e2e
+    assert_success
+    run _last_secrets
+    assert_output "gpg import /tmp/key.asc"
+}
+
+# ── SSH sub-screen: list / generate / load / copy / remove ───────────────────
 
 @test "ssh generate: type menu default ed25519 → ssh-key generate --type ed25519" {
     _make_secrets_harness dialog
-    # secrets → generate-ssh → type menu pick ed25519 → result OK → back → exit
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|ssh-gen
+0|ssh
+0|generate
 0|ed25519
 0|
+1|
 1|
 1|
 EOF
@@ -189,9 +358,11 @@ EOF
     _make_secrets_harness dialog
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|ssh-gen
+0|ssh
+0|generate
 0|rsa
 0|
+1|
 1|
 1|
 EOF
@@ -205,25 +376,27 @@ EOF
     _make_secrets_harness dialog
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|ssh-gen
+0|ssh
+0|generate
+1|
 1|
 1|
 1|
 EOF
     _run_secrets_e2e
     assert_success
-    run test -f "${E2E_SECRETS_LOG}"
+    run grep -c "^ssh-key generate" "${E2E_SECRETS_LOG}"
     assert_failure
 }
-
-# ── 3. Load SSH key to agent ─────────────────────────────────────────────────
 
 @test "ssh load: forks ssh-key load and shows a result msgbox" {
     _make_secrets_harness dialog
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|ssh-load
+0|ssh
+0|load
 0|
+1|
 1|
 1|
 EOF
@@ -233,16 +406,15 @@ EOF
     assert_output "ssh-key load"
 }
 
-# ── 4. Copy SSH public key to remote (input user@host) ───────────────────────
-
 @test "ssh copy: input(user@host) → ssh-key copy <user@host>" {
     _make_secrets_harness dialog
-    # secrets → copy-ssh → input box returns "git@example.com" → result → back → exit
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|ssh-copy
+0|ssh
+0|copy
 0|git@example.com
 0|
+1|
 1|
 1|
 EOF
@@ -250,7 +422,6 @@ EOF
     assert_success
     run _last_secrets
     assert_output "ssh-key copy git@example.com"
-    # The non-secret arg was collected via an --inputbox.
     run grep -c -- "--inputbox" "${E2E_WIDGET_LOG}"
     assert_success
 }
@@ -259,162 +430,29 @@ EOF
     _make_secrets_harness dialog
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|ssh-copy
+0|ssh
+0|copy
+1|
 1|
 1|
 1|
 EOF
     _run_secrets_e2e
     assert_success
-    run test -f "${E2E_SECRETS_LOG}"
+    run grep -c "^ssh-key copy" "${E2E_SECRETS_LOG}"
     assert_failure
 }
 
-# ── 5. Set token (input name only; value via no-echo tty) ────────────────────
-
-@test "token set: input(name) → token set <name>; the VALUE is never in argv" {
+@test "ssh remove: type-to-confirm matching the name → ssh-key remove <name> --yes" {
     _make_secrets_harness dialog
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|token-set
-0|gh-token
-0|
-1|
-1|
-EOF
-    _run_secrets_e2e
-    assert_success
-    run _last_secrets
-    # Exactly `token set gh-token` — no value token follows (AC-20).
-    assert_output "token set gh-token"
-}
-
-@test "token set: empty name (empty submit = cancel) forks nothing" {
-    _make_secrets_harness dialog
-    cat >"${E2E_RESPONSES}" <<'EOF'
-0|secrets
-0|token-set
-0|
-1|
-1|
-EOF
-    _run_secrets_e2e
-    assert_success
-    run test -f "${E2E_SECRETS_LOG}"
-    assert_failure
-}
-
-# ── 6. Generate GPG key ──────────────────────────────────────────────────────
-
-@test "gpg generate: forks gpg generate and shows a result msgbox" {
-    _make_secrets_harness dialog
-    cat >"${E2E_RESPONSES}" <<'EOF'
-0|secrets
-0|gpg-gen
-0|
-1|
-1|
-EOF
-    _run_secrets_e2e
-    assert_success
-    run _last_secrets
-    assert_output "gpg generate"
-}
-
-# ── 7. Import GPG (input file path) ──────────────────────────────────────────
-
-@test "gpg import: input(path) → gpg import <path>" {
-    _make_secrets_harness dialog
-    cat >"${E2E_RESPONSES}" <<'EOF'
-0|secrets
-0|gpg-import
-0|/tmp/key.asc
-0|
-1|
-1|
-EOF
-    _run_secrets_e2e
-    assert_success
-    run _last_secrets
-    assert_output "gpg import /tmp/key.asc"
-}
-
-# ── 8. Delete… (category menu + danger tiers) ────────────────────────────────
-
-@test "delete: category menu offers only Token and SSH key (GPG deletion deferred)" {
-    _make_secrets_harness dialog
-    # secrets → delete → (category menu) Back → secrets Back → exit
-    cat >"${E2E_RESPONSES}" <<'EOF'
-0|secrets
-0|delete
-1|
-1|
-1|
-EOF
-    _run_secrets_e2e
-    assert_success
-    run cat "${E2E_WIDGET_LOG}"
-    # The category menu carries del-token / del-ssh tags but no gpg-delete.
-    assert_output --partial "del-token"
-    assert_output --partial "del-ssh"
-    refute_output --partial "gpg-delete"
-}
-
-@test "delete token: pick from list → single yesno confirm → remove <name>" {
-    _make_secrets_harness dialog
-    # secrets → delete → del-token → pick name → yesno Yes → result → back → exit
-    cat >"${E2E_RESPONSES}" <<'EOF'
-0|secrets
-0|delete
-0|del-token
-0|gh-token
-0|
-0|
-1|
-1|
-EOF
-    _run_secrets_e2e \
-        "SECRETS_OUT_list=gh-token\nnpm-token\n"
-    assert_success
-    run _last_secrets
-    # Token deletion forks the top-level `remove <name>` (setup_secrets has no
-    # `token remove`; the canonical token delete is `remove <name>`).
-    assert_output "remove gh-token"
-    # A yesno (not type-to-confirm) gated the token deletion.
-    run grep -c -- "--yesno" "${E2E_WIDGET_LOG}"
-    assert_success
-}
-
-@test "delete token: yesno No forks nothing destructive" {
-    _make_secrets_harness dialog
-    cat >"${E2E_RESPONSES}" <<'EOF'
-0|secrets
-0|delete
-0|del-token
-0|gh-token
-1|
-1|
-1|
-EOF
-    _run_secrets_e2e \
-        "SECRETS_OUT_list=gh-token\n"
-    assert_success
-    # `list` was forked to build the pick list, but `remove` never ran.
-    run grep -c "^remove " "${E2E_SECRETS_LOG}"
-    assert_failure
-}
-
-@test "delete ssh key: type-to-confirm matching the name → ssh-key remove <name> --yes" {
-    _make_secrets_harness dialog
-    # secrets → delete → del-ssh → pick key → type-to-confirm input "id_ed25519"
-    #   → result → back → exit
-    cat >"${E2E_RESPONSES}" <<'EOF'
-0|secrets
-0|delete
-0|del-ssh
+0|ssh
+0|remove
 0|id_ed25519
 0|id_ed25519
 0|
+1|
 1|
 1|
 EOF
@@ -428,14 +466,15 @@ EOF
     assert_success
 }
 
-@test "delete ssh key: a non-matching type-to-confirm aborts (no remove fork)" {
+@test "ssh remove: a non-matching type-to-confirm aborts (no remove fork)" {
     _make_secrets_harness dialog
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|delete
-0|del-ssh
+0|ssh
+0|remove
 0|id_ed25519
 0|WRONG-NAME
+1|
 1|
 1|
 1|
@@ -447,14 +486,42 @@ EOF
     assert_failure
 }
 
+# ── List overview (reachable from each sub-screen's "list" action) ───────────
+
+@test "list overview: forks list + gpg list + ssh-key list into a read-only msgbox" {
+    _make_secrets_harness dialog
+    # secrets → token → list → msgbox → back → picker Back → exit
+    cat >"${E2E_RESPONSES}" <<'EOF'
+0|secrets
+0|token
+0|list
+0|
+1|
+1|
+1|
+EOF
+    _run_secrets_e2e \
+        "SECRETS_OUT_list=gh-token\n" \
+        "SECRETS_OUT_gpg_list=pub rsa4096/ABCD\n" \
+        "SECRETS_OUT_ssh_key_list=id_ed25519.pub\n"
+    assert_success
+    run cat "${E2E_SECRETS_LOG}"
+    assert_output --partial "gpg list"
+    assert_output --partial "ssh-key list"
+    run grep -c -- "--msgbox" "${E2E_WIDGET_LOG}"
+    assert_success
+}
+
 # ── Result feedback (OK / FAILED) ────────────────────────────────────────────
 
 @test "result msgbox: a failing op surfaces FAILED with the rc (plain text, no emoji)" {
     _make_secrets_harness dialog
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|ssh-load
+0|ssh
+0|load
 0|
+1|
 1|
 1|
 EOF
@@ -469,8 +536,10 @@ EOF
     _make_secrets_harness dialog
     cat >"${E2E_RESPONSES}" <<'EOF'
 0|secrets
-0|ssh-load
+0|ssh
+0|load
 0|
+1|
 1|
 1|
 EOF
@@ -482,11 +551,11 @@ EOF
 
 # ── No-emoji guarantee across the whole secrets surface ──────────────────────
 
-@test "no-emoji: the secrets sub-menu source carries no emoji / check-cross glyphs" {
-    # Repo-wide hard rule: plain text only. Grep the screen + lib for the
+@test "no-emoji: the secrets surface carries no emoji / check-cross glyphs" {
+    # Repo-wide hard rule: plain text only. Grep the screen + secrets lib for the
     # common offenders (checkmark / cross / sparkles) — none allowed.
     run grep -nP '[\x{2705}\x{274C}\x{2714}\x{2716}\x{2728}\x{1F500}-\x{1FAFF}]' \
-        "${REPO_ROOT}/setup_ubuntu_tui.sh"
+        "${REPO_ROOT}/setup_ubuntu_tui.sh" "${REPO_ROOT}/lib/tui_secrets.sh"
     assert_failure
 }
 
@@ -495,6 +564,7 @@ EOF
 @test "token get: never appears as a secrets sub-menu action (shoulder-surfing)" {
     # `token get` would print the secret value on screen — it must not be a
     # forkable action anywhere in the TUI.
-    run grep -n "token get" "${REPO_ROOT}/setup_ubuntu_tui.sh"
+    run grep -rn "token get" \
+        "${REPO_ROOT}/setup_ubuntu_tui.sh" "${REPO_ROOT}/lib/tui_secrets.sh"
     assert_failure
 }

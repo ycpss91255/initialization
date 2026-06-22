@@ -1,0 +1,108 @@
+#!/usr/bin/env expect
+# smoke_flow_whiptail_parity.exp — whiptail Fallback tier feature-parity smoke
+# (ADR-0024 D10): the redesigned whiptail tier on the LIVE whiptail binary under
+# a pseudo-tty. Covers the parity features the Rich tier has:
+#   - Manage Secrets THREE-WAY picker (Token / GPG / SSH sub-menus, ADR-0025)
+#   - nested category drill-down (main → category → sub-category → checklist)
+#   - browse recommended (recommended pre-selection fires on first entry, PRD D4)
+#   - Run → Review → Proceed forks the ONE install pipeline (G4 / AC-11)
+#
+# Forced onto the whiptail tier via `--backend whiptail` (skips detection + the
+# fzf-install prompt). Data comes from the recording mock setup_ubuntu.
+# Exit codes: 0 = green; 99 = harness assertion; else = the TUI's own rc.
+
+source [file join [file dirname [file normalize [info script]]] tui_expect_lib.tcl]
+
+tui_spawn --backend whiptail
+
+# 1. Main menu visible.
+tui_expect_text "Quick Setup"
+tui_expect_text "Manage Secrets"
+
+# 2. Manage Secrets: the THREE-WAY picker (Token / GPG / SSH). Highlight starts
+#    on the menu's title; move to the Manage Secrets row and Enter.
+#    quick-setup → base → recommended → optional → manage → secrets = 5 downs.
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_enter
+
+# 3. The picker renders Token / GPG / SSH (PRD story 10). Assert all three.
+tui_expect_text "Token"
+tui_expect_text "GPG"
+tui_expect_text "SSH"
+
+# 4. Enter the SSH sub-screen (3rd row): Token → GPG → SSH = 2 downs.
+tui_key_down
+tui_key_down
+tui_key_enter
+# The SSH sub-screen lists its actions (generate / load / copy ...).
+tui_expect_text "Generate SSH key"
+tui_expect_text "Load SSH key"
+# Back out of the SSH sub-screen → back to the picker.
+tui_press_exit whiptail
+tui_expect_text "Token"
+# Back out of the picker → main menu.
+tui_press_exit whiptail
+tui_expect_text "Quick Setup"
+
+# 5. Browse recommended (recommended pre-selection fires on first entry — PRD
+#    D4). recommended is the 3rd menu row (quick-setup → base → recommended).
+tui_key_down
+tui_key_down
+tui_key_enter
+# recommended has 2 TAGS[0] buckets (container / editor) → a sub-category menu.
+tui_expect_text "Recommended Modules"
+tui_expect_text "container"
+tui_expect_text "editor"
+# Back out of the recommended sub-category menu → main menu.
+tui_press_exit whiptail
+tui_expect_text "Quick Setup"
+
+# 6. Browse optional → drill cli-essentials → check the first item → OK.
+#    optional is the 4th menu row (quick-setup → base → recommended → optional).
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_enter
+# optional has 2 buckets (agent / cli-essentials); enter cli-essentials (2nd).
+tui_expect_text "Optional Modules"
+tui_key_down
+tui_key_enter
+# The cli-essentials checklist: check the highlighted first item, OK.
+tui_expect_text "cd alternative"
+tui_key_space
+tui_expect_re {\*} "the checked \[*\] mark"
+tui_key_enter
+# OK returns to the sub-category menu; Back out → main menu.
+tui_expect_text "Optional Modules"
+tui_press_exit whiptail
+tui_expect_text "Quick Setup"
+
+# 7. Run → Review & Install → Proceed forks the ONE install pipeline (G4). Run
+#    is the LAST menu row; Tab to the listbox end is awkward, so walk down to it
+#    (quick-setup → base → recommended → optional → manage → secrets → sysinfo →
+#    help → run = 8 downs).
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_down
+tui_key_enter
+# Review screen: the plan lists what will install; Proceed (the lone menu row)
+# forks the CLI pipeline and the TUI execs it. Wait for the screen to settle so
+# the Enter activates the focused listbox row (proceed) rather than racing the
+# redraw, then confirm the install pipeline forked.
+tui_expect_text "Review"
+tui_settle
+tui_key_enter
+# The mock install prints "CLI pipeline output" then the TUI exits.
+tui_expect_text "CLI pipeline output"
+set rc [tui_wait_exit_rc]
+if {$rc != 0} { tui_die "TUI exited rc=$rc (want 0) after Proceed" }
+exit 0

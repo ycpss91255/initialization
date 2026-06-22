@@ -22,6 +22,28 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **whiptail Fallback tier reaches feature parity with the fzf Rich tier**
+  (ADR-0024 D10 — feature-equivalent, render-degraded): the whiptail screens now
+  match the navigator feature-for-feature. Nested category drill-down (main ->
+  category -> sub-category menu -> checklist leaf; a single TAGS[0] bucket goes
+  straight to the leaf), main/category-menu counts are SELECTED/total (PRD D2),
+  `is_recommended` modules are pre-selected on first entry into the recommended
+  category (PRD D4, idempotent via the shared `TUI_RECO_PRESELECTED` session
+  guard), and module detail stays reachable on the read-only detail screen. The
+  bucketing (`tui_subtags` / `tui_subtag_count`), the SELECTED/total counts
+  (`tui_category_sel_stats`) and the recommended pre-selection set
+  (`tui_recommended_preselect_modules`) are now pure producers in the shared
+  data layer that BOTH tiers wrap (the fzf wrappers delegate to them), so the
+  two tiers cannot drift. Manage Secrets becomes a three-way Token / GPG / SSH
+  picker (extracted to `lib/tui_secrets.sh`), each kind a registry-dispatched
+  sub-screen showing that kind's current list (empty -> "none", PRD story 11)
+  plus its actions (Token: list/set/remove; GPG: list/generate/import; SSH:
+  list/generate/load/copy/remove); per ADR-0025 every text input forks the
+  `setup_secrets` CLI on its own no-echo tty (the TUI never renders a value
+  widget). A parity test asserts both tiers produce the same `setup_ubuntu
+  install` fork argv for an identical selection, and a live-whiptail expect
+  smoke covers the drill-down, the three secrets sub-menus and Run -> Proceed.
+
 - **fzf two-pane navigator (Rich tier)** for the install-pick flow (ADR-0024,
   ADR-0025): every navigable level (main menu -> category -> sub-category ->
   module leaf) is one fzf two-pane screen — left pane is the current level, the

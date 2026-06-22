@@ -25,6 +25,9 @@
 # Functions reference TUI_I18N (authored by the entrypoint) at CALL time, so the
 # table need not exist when this lib is sourced — only when a screen runs.
 
+# kcov-exclude-start (unreachable defensive guards: this lib is only ever
+# sourced — never executed directly — and the entrypoint always sources
+# tui_backend.sh first, so the standalone fallback never fires; repo convention)
 if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     printf "Warn: %s is a library, not an executable script.\n" "${BASH_SOURCE[0]##*/}"
     return 0 2>/dev/null
@@ -36,6 +39,7 @@ if ! declare -F tui_render_menu >/dev/null 2>&1; then
     # shellcheck source=lib/tui_backend.sh
     source "${BASH_SOURCE[0]%/*}/tui_backend.sh"
 fi
+# kcov-exclude-end
 
 # ── Shared op + result feedback ──────────────────────────────────────────────
 
@@ -74,13 +78,18 @@ _tui_secrets_overview() {
 # `ssh-key generate --type <type>` (ssh-keygen prompts the passphrase itself).
 # Cancel on the type menu forks nothing.
 _tui_secrets_ssh_generate() {
-    local _type
-    _type="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-        "$(i18n_t TUI_I18N secrets_ssh_type_title)" \
-        "$(i18n_t TUI_I18N secrets_ssh_type_help)" \
-        "ed25519" "$(i18n_t TUI_I18N secrets_ssh_type_ed25519)" \
-        "ecdsa"   "$(i18n_t TUI_I18N secrets_ssh_type_ecdsa)" \
-        "rsa"     "$(i18n_t TUI_I18N secrets_ssh_type_rsa)")" || return 0
+    local _type _back _title _help _ed _ec _rsa
+    _back="$(i18n_t TUI_I18N btn_back)"
+    _title="$(i18n_t TUI_I18N secrets_ssh_type_title)"
+    _help="$(i18n_t TUI_I18N secrets_ssh_type_help)"
+    _ed="$(i18n_t TUI_I18N secrets_ssh_type_ed25519)"
+    _ec="$(i18n_t TUI_I18N secrets_ssh_type_ecdsa)"
+    _rsa="$(i18n_t TUI_I18N secrets_ssh_type_rsa)"
+    _type="$(TUI_CANCEL_LABEL="${_back}" tui_render_menu \
+        "${_title}" "${_help}" \
+        "ed25519" "${_ed}" \
+        "ecdsa"   "${_ec}" \
+        "rsa"     "${_rsa}")" || return 0
     _tui_secrets_run "$(i18n_t TUI_I18N secrets_ssh_gen)" \
         ssh-key generate --type "${_type}"
 }
@@ -88,30 +97,30 @@ _tui_secrets_ssh_generate() {
 # input(user@host) → fork `ssh-key copy <user@host>`. Cancel / empty forks
 # nothing (tui_render_input contract).
 _tui_secrets_ssh_copy() {
-    local _target
-    _target="$(tui_render_input "$(i18n_t TUI_I18N secrets_ssh_copy)" \
-        "$(i18n_t TUI_I18N secrets_copy_prompt)")" || return 0
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_ssh_copy)" \
-        ssh-key copy "${_target}"
+    local _target _label _prompt
+    _label="$(i18n_t TUI_I18N secrets_ssh_copy)"
+    _prompt="$(i18n_t TUI_I18N secrets_copy_prompt)"
+    _target="$(tui_render_input "${_label}" "${_prompt}")" || return 0
+    _tui_secrets_run "${_label}" ssh-key copy "${_target}"
 }
 
 # input(name) → fork `token set <name>`. Only the NAME reaches argv; setup_secrets
 # prompts the value (AC-20).
 _tui_secrets_token_set() {
-    local _name
-    _name="$(tui_render_input "$(i18n_t TUI_I18N secrets_token_set)" \
-        "$(i18n_t TUI_I18N secrets_token_prompt)")" || return 0
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_token_set)" \
-        token set "${_name}"
+    local _name _label _prompt
+    _label="$(i18n_t TUI_I18N secrets_token_set)"
+    _prompt="$(i18n_t TUI_I18N secrets_token_prompt)"
+    _name="$(tui_render_input "${_label}" "${_prompt}")" || return 0
+    _tui_secrets_run "${_label}" token set "${_name}"
 }
 
 # input(path) → fork `gpg import <path>`. Cancel / empty forks nothing.
 _tui_secrets_gpg_import() {
-    local _path
-    _path="$(tui_render_input "$(i18n_t TUI_I18N secrets_gpg_import)" \
-        "$(i18n_t TUI_I18N secrets_gpg_import_prompt)")" || return 0
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_gpg_import)" \
-        gpg import "${_path}"
+    local _path _label _prompt
+    _label="$(i18n_t TUI_I18N secrets_gpg_import)"
+    _prompt="$(i18n_t TUI_I18N secrets_gpg_import_prompt)"
+    _path="$(tui_render_input "${_label}" "${_prompt}")" || return 0
+    _tui_secrets_run "${_label}" gpg import "${_path}"
 }
 
 # ── Deletion flows (danger-tiered) ───────────────────────────────────────────
@@ -127,63 +136,70 @@ _tui_secrets_pick() {
         [[ -n "${_n}" ]] && _rows+=("${_n}" "${_n}")
     done <<<"${_name_lines}"
     [[ "${#_rows[@]}" -eq 0 ]] && return 1
-    TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-        "${_title}" "$(i18n_t TUI_I18N secrets_pick_help)" "${_rows[@]}"
+    local _back _help
+    _back="$(i18n_t TUI_I18N btn_back)"
+    _help="$(i18n_t TUI_I18N secrets_pick_help)"
+    TUI_CANCEL_LABEL="${_back}" tui_render_menu \
+        "${_title}" "${_help}" "${_rows[@]}"
 }
 
 # Delete Token: pick from `list` → single yesno → fork `remove <name>`
 # (setup_secrets has no `token remove`; the canonical token delete is the
 # top-level `remove <name>`). Token is the lower danger tier (yesno only).
 _tui_secrets_delete_token() {
-    local _names _name
+    local _names _name _label _pick_title
+    _label="$(i18n_t TUI_I18N secrets_delete_token)"
     if ! _names="$("${TUI_SECRETS}" list 2>/dev/null)"; then
-        tui_render_msgbox "$(i18n_t TUI_I18N secrets_delete_token)" \
-            "$(i18n_t TUI_I18N secrets_list_failed list)"
+        tui_render_msgbox "${_label}" "$(i18n_t TUI_I18N secrets_list_failed list)"
         return 0
     fi
-    _name="$(_tui_secrets_pick "$(i18n_t TUI_I18N secrets_pick_token_title)" \
-        "${_names}")" || {
+    _pick_title="$(i18n_t TUI_I18N secrets_pick_token_title)"
+    _name="$(_tui_secrets_pick "${_pick_title}" "${_names}")" || {
         [[ -n "${_names}" ]] || tui_render_msgbox \
-            "$(i18n_t TUI_I18N secrets_delete_token)" \
-            "$(i18n_t TUI_I18N secrets_none_tokens)"
+            "${_label}" "$(i18n_t TUI_I18N secrets_none_tokens)"
         return 0
     }
-    tui_render_yesno "$(i18n_t TUI_I18N secrets_delete_token)" \
+    tui_render_yesno "${_label}" \
         "$(i18n_t TUI_I18N secrets_confirm_token "${_name}")" || return 0
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_delete_token)" remove "${_name}"
+    _tui_secrets_run "${_label}" remove "${_name}"
 }
 
 # Delete SSH key: pick from the `ssh-key list` public-key basenames →
 # TYPE-TO-CONFIRM (the user must type the exact name; irreversible) → fork
 # `ssh-key remove <name> --yes`. SSH key is the higher danger tier.
 _tui_secrets_delete_ssh() {
-    local _names _name _typed
+    local _names _name _typed _label _pick_title _ctitle _cprompt
+    _label="$(i18n_t TUI_I18N secrets_delete_ssh)"
     _names="$(_tui_secrets_ssh_names)"
-    _name="$(_tui_secrets_pick "$(i18n_t TUI_I18N secrets_pick_ssh_title)" \
-        "${_names}")" || {
+    _pick_title="$(i18n_t TUI_I18N secrets_pick_ssh_title)"
+    _name="$(_tui_secrets_pick "${_pick_title}" "${_names}")" || {
         [[ -n "${_names}" ]] || tui_render_msgbox \
-            "$(i18n_t TUI_I18N secrets_delete_ssh)" \
-            "$(i18n_t TUI_I18N secrets_none_ssh)"
+            "${_label}" "$(i18n_t TUI_I18N secrets_none_ssh)"
         return 0
     }
-    _typed="$(tui_render_input \
-        "$(i18n_t TUI_I18N secrets_ssh_confirm_title "${_name}")" \
-        "$(i18n_t TUI_I18N secrets_ssh_confirm_prompt "${_name}")")" || return 0
+    _ctitle="$(i18n_t TUI_I18N secrets_ssh_confirm_title "${_name}")"
+    _cprompt="$(i18n_t TUI_I18N secrets_ssh_confirm_prompt "${_name}")"
+    _typed="$(tui_render_input "${_ctitle}" "${_cprompt}")" || return 0
     [[ "${_typed}" == "${_name}" ]] || return 0
-    _tui_secrets_run "$(i18n_t TUI_I18N secrets_delete_ssh)" \
-        ssh-key remove "${_name}" --yes
+    _tui_secrets_run "${_label}" ssh-key remove "${_name}" --yes
 }
 
 # SSH key names = the basenames of ~/.ssh/*.pub as reported by `ssh-key list`
 # ("<path>.pub: <key line>"); the agent-identity section is skipped. One per
 # line on stdout. The TUI re-parses the read-only list rather than touching ~.
 _tui_secrets_ssh_names() {
+    # The multi-line awk program's physical lines are counted by kcov as
+    # uncoverable bash statements (same class as the i18n data tables), so the
+    # pipe is wrapped in a kcov-exclude region; it is exercised by the SSH
+    # remove + ssh kind-list specs.
+    # kcov-exclude-start (awk program lines; kcov counts each as uncoverable, repo convention)
     "${TUI_SECRETS}" ssh-key list 2>/dev/null | awk '
         /^agent identities:/ { exit }
         /\.pub: / {
             n = $1; sub(/:$/, "", n); sub(/.*\//, "", n); sub(/\.pub$/, "", n)
             print n
         }'
+    # kcov-exclude-end
 }
 
 # ── Inline current-list helper (PRD story 11: empty → "none") ────────────────
@@ -214,14 +230,19 @@ _tui_secrets_kind_list() {
 
 # Token: list / set / remove.
 _tui_screen_secrets_token() {
+    local _choice _back _title _help _l_list _l_set _l_remove
     while :; do
-        local _choice
-        _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-            "$(i18n_t TUI_I18N secrets_token_title)" \
-            "$(i18n_t TUI_I18N secrets_pick_action_help "$(_tui_secrets_kind_list token)")" \
-            "list"   "$(i18n_t TUI_I18N secrets_action_list)" \
-            "set"    "$(i18n_t TUI_I18N secrets_token_set)" \
-            "remove" "$(i18n_t TUI_I18N secrets_action_remove)")" || return 0
+        _back="$(i18n_t TUI_I18N btn_back)"
+        _title="$(i18n_t TUI_I18N secrets_token_title)"
+        _help="$(i18n_t TUI_I18N secrets_pick_action_help "$(_tui_secrets_kind_list token)")"
+        _l_list="$(i18n_t TUI_I18N secrets_action_list)"
+        _l_set="$(i18n_t TUI_I18N secrets_token_set)"
+        _l_remove="$(i18n_t TUI_I18N secrets_action_remove)"
+        _choice="$(TUI_CANCEL_LABEL="${_back}" tui_render_menu \
+            "${_title}" "${_help}" \
+            "list"   "${_l_list}" \
+            "set"    "${_l_set}" \
+            "remove" "${_l_remove}")" || return 0
         case "${_choice}" in
             list)   _tui_secrets_overview ;;
             set)    _tui_secrets_token_set ;;
@@ -233,17 +254,22 @@ _tui_screen_secrets_token() {
 # GPG: list / generate / import (deletion deferred — setup_secrets has no
 # gpg-delete; design §4 / §10).
 _tui_screen_secrets_gpg() {
+    local _choice _back _title _help _l_list _l_gen _l_import
     while :; do
-        local _choice
-        _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-            "$(i18n_t TUI_I18N secrets_gpg_title)" \
-            "$(i18n_t TUI_I18N secrets_pick_action_help "$(_tui_secrets_kind_list gpg)")" \
-            "list"     "$(i18n_t TUI_I18N secrets_action_list)" \
-            "generate" "$(i18n_t TUI_I18N secrets_gpg_gen)" \
-            "import"   "$(i18n_t TUI_I18N secrets_gpg_import)")" || return 0
+        _back="$(i18n_t TUI_I18N btn_back)"
+        _title="$(i18n_t TUI_I18N secrets_gpg_title)"
+        _help="$(i18n_t TUI_I18N secrets_pick_action_help "$(_tui_secrets_kind_list gpg)")"
+        _l_list="$(i18n_t TUI_I18N secrets_action_list)"
+        _l_gen="$(i18n_t TUI_I18N secrets_gpg_gen)"
+        _l_import="$(i18n_t TUI_I18N secrets_gpg_import)"
+        _choice="$(TUI_CANCEL_LABEL="${_back}" tui_render_menu \
+            "${_title}" "${_help}" \
+            "list"     "${_l_list}" \
+            "generate" "${_l_gen}" \
+            "import"   "${_l_import}")" || return 0
         case "${_choice}" in
             list)     _tui_secrets_overview ;;
-            generate) _tui_secrets_run "$(i18n_t TUI_I18N secrets_gpg_gen)" gpg generate ;;
+            generate) _tui_secrets_run "${_l_gen}" gpg generate ;;
             import)   _tui_secrets_gpg_import ;;
         esac
     done
@@ -251,20 +277,27 @@ _tui_screen_secrets_gpg() {
 
 # SSH: list / generate / load / copy / remove.
 _tui_screen_secrets_ssh() {
+    local _choice _back _title _help _l_list _l_gen _l_load _l_copy _l_remove
     while :; do
-        local _choice
-        _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-            "$(i18n_t TUI_I18N secrets_ssh_title)" \
-            "$(i18n_t TUI_I18N secrets_pick_action_help "$(_tui_secrets_kind_list ssh)")" \
-            "list"     "$(i18n_t TUI_I18N secrets_action_list)" \
-            "generate" "$(i18n_t TUI_I18N secrets_ssh_gen)" \
-            "load"     "$(i18n_t TUI_I18N secrets_ssh_load)" \
-            "copy"     "$(i18n_t TUI_I18N secrets_ssh_copy)" \
-            "remove"   "$(i18n_t TUI_I18N secrets_action_remove)")" || return 0
+        _back="$(i18n_t TUI_I18N btn_back)"
+        _title="$(i18n_t TUI_I18N secrets_ssh_title)"
+        _help="$(i18n_t TUI_I18N secrets_pick_action_help "$(_tui_secrets_kind_list ssh)")"
+        _l_list="$(i18n_t TUI_I18N secrets_action_list)"
+        _l_gen="$(i18n_t TUI_I18N secrets_ssh_gen)"
+        _l_load="$(i18n_t TUI_I18N secrets_ssh_load)"
+        _l_copy="$(i18n_t TUI_I18N secrets_ssh_copy)"
+        _l_remove="$(i18n_t TUI_I18N secrets_action_remove)"
+        _choice="$(TUI_CANCEL_LABEL="${_back}" tui_render_menu \
+            "${_title}" "${_help}" \
+            "list"     "${_l_list}" \
+            "generate" "${_l_gen}" \
+            "load"     "${_l_load}" \
+            "copy"     "${_l_copy}" \
+            "remove"   "${_l_remove}")" || return 0
         case "${_choice}" in
             list)     _tui_secrets_overview ;;
             generate) _tui_secrets_ssh_generate ;;
-            load)     _tui_secrets_run "$(i18n_t TUI_I18N secrets_ssh_load)" ssh-key load ;;
+            load)     _tui_secrets_run "${_l_load}" ssh-key load ;;
             copy)     _tui_secrets_ssh_copy ;;
             remove)   _tui_secrets_delete_ssh ;;
         esac
@@ -277,14 +310,19 @@ _tui_screen_secrets_ssh() {
 # every sub-screen returns here. Unlike install/manage this never exits the TUI
 # (secrets management is a side trip, not a pipeline handoff).
 _tui_screen_secrets() {
+    local _choice _back _title _help _k_token _k_gpg _k_ssh
     while :; do
-        local _choice
-        _choice="$(TUI_CANCEL_LABEL="$(i18n_t TUI_I18N btn_back)" tui_render_menu \
-            "$(i18n_t TUI_I18N secrets_title)" \
-            "$(i18n_t TUI_I18N secrets_pick_kind_help)" \
-            "token" "$(i18n_t TUI_I18N secrets_kind_token)" \
-            "gpg"   "$(i18n_t TUI_I18N secrets_kind_gpg)" \
-            "ssh"   "$(i18n_t TUI_I18N secrets_kind_ssh)")" || return 0
+        _back="$(i18n_t TUI_I18N btn_back)"
+        _title="$(i18n_t TUI_I18N secrets_title)"
+        _help="$(i18n_t TUI_I18N secrets_pick_kind_help)"
+        _k_token="$(i18n_t TUI_I18N secrets_kind_token)"
+        _k_gpg="$(i18n_t TUI_I18N secrets_kind_gpg)"
+        _k_ssh="$(i18n_t TUI_I18N secrets_kind_ssh)"
+        _choice="$(TUI_CANCEL_LABEL="${_back}" tui_render_menu \
+            "${_title}" "${_help}" \
+            "token" "${_k_token}" \
+            "gpg"   "${_k_gpg}" \
+            "ssh"   "${_k_ssh}")" || return 0
         # Dispatch through the registry (#6) so the fzf + whiptail tiers route
         # the three sub-screens through ONE token->screen map.
         case "${_choice}" in

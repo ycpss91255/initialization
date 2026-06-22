@@ -163,6 +163,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **`lib/tui_secrets.sh` Manage Secrets screens hoist their per-render i18n
+  label lookups into locals** (test-coverage refactor, behavior-identical). Each
+  sub-screen menu / input / pick previously built its widget call inline as
+  `_var="$(... $(i18n_t ...) ...)"`; the nested command substitutions on the
+  assignment's opening line are counted by kcov as unexecuted even when the
+  screen runs, holding the file at 73.5%. The labels are now fetched into named
+  locals first, so the menu/input calls reference plain `${vars}` and the screen
+  bodies, list-render branches ("none" vs populated) and per-action CLI-fork
+  dispatch are attributed correctly; the file rises to ~96% under the new
+  in-process `test/unit/tui_secrets_e2e_spec.bats`. No user-visible change.
+
 - **Sidecar write/remove moved to the phase-invocation layer + archetype macros
   now emit all 10 Lifecycle functions** (architecture deepening #2 + #4;
   ADR-0027, refines ADR-0001 on *where* and ADR-0002 on macro completeness). A

@@ -978,12 +978,11 @@ _tui_screen_manage() {
 # registry-dispatched). Sourced at the top of this file with the other libs.
 
 # ── Help screen (#203, design §3) ────────────────────────────────────────────
-# A read-only msgbox of the backend-aware key reference. gum's native footer
-# omits j/k + esc semantics; whiptail has no footer at all and Tab (to reach the
-# Back/Exit buttons) is the non-obvious key — so each backend gets its own body
-# (tui_help_text, authored in the backend lib). This menu entry is the ONLY
-# help mechanism: a contextual `?`-key inside a widget is impossible on both
-# backends (neither lets us intercept keys mid-dialog).
+# A read-only msgbox of the whiptail key reference. whiptail has no key footer
+# at all and Tab (to reach the Back/Exit buttons) is the non-obvious key — so
+# the body (tui_help_text, authored in the backend lib) centers on it. This menu
+# entry is the ONLY help mechanism: a contextual `?`-key inside a widget is
+# impossible on whiptail (it does not let us intercept keys mid-dialog).
 _tui_screen_help() {
     tui_render_msgbox "$(i18n_t TUI_I18N title_help)" \
         "$(tui_help_text "$(_tui_backend_family)")"
@@ -1386,9 +1385,9 @@ main() {
     # (Ctrl+C SIGINT trap deferred: a signal trap inside the TUI subprocess
     # deadlocks kcov ptrace in the coverage unit shard, so it is reimplemented
     # kcov-safe in a #206 follow-up. The exit guard below stays.)
-    # --backend is parsed BEFORE detection (#171): a valid value forces
-    # TUI_BACKEND and skips BOTH detection and the gum install prompt; an
-    # invalid value is a usage error (exit 2).
+    # --backend is parsed BEFORE detection: a valid value (fzf|whiptail) forces
+    # the tier and skips BOTH detection and the fzf install prompt; an invalid
+    # value is a usage error (exit 2).
     local _forced_tier=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -1400,20 +1399,24 @@ main() {
                 printf 'init_ubuntu %s\n' "${INIT_UBUNTU_VERSION}"
                 return 0
                 ;;
-            # --backend forces the rendering path, skipping detection AND the
+            # --backend forces the rendering tier, skipping detection AND the
             # install prompt; an invalid value is a usage error (exit 2).
             # `fzf` selects the Rich two-pane navigator (ADR-0024); `whiptail`
-            # and `gum` select the legacy dialog loop with that backend binary.
-            # gum is accepted but legacy (dormant pending the phase-6 removal) —
-            # the AC-10/AC-11 dual-backend smoke still exercises it.
+            # selects the Fallback dialog tier. gum is NO LONGER a backend
+            # (ADR-0024); `--backend gum` is a usage error with an install hint.
             --backend)
                 case "${2:-}" in
-                    fzf | whiptail | gum)
+                    fzf | whiptail)
                         _forced_tier="$2"
                         shift 2
                         ;;
+                    gum)
+                        printf 'ERROR: gum is no longer a TUI backend; install it as a tool via: setup_ubuntu install gum\n\n' >&2
+                        _tui_usage >&2
+                        return 2
+                        ;;
                     *)
-                        printf 'ERROR: --backend requires fzf|whiptail|gum (got %s)\n\n' \
+                        printf 'ERROR: --backend requires fzf|whiptail (got %s)\n\n' \
                             "${2:-<missing>}" >&2
                         _tui_usage >&2
                         return 2
@@ -1422,12 +1425,17 @@ main() {
                 ;;
             --backend=*)
                 case "${1#--backend=}" in
-                    fzf | whiptail | gum)
+                    fzf | whiptail)
                         _forced_tier="${1#--backend=}"
                         shift
                         ;;
+                    gum)
+                        printf 'ERROR: gum is no longer a TUI backend; install it as a tool via: setup_ubuntu install gum\n\n' >&2
+                        _tui_usage >&2
+                        return 2
+                        ;;
                     *)
-                        printf 'ERROR: --backend requires fzf|whiptail|gum (got %s)\n\n' \
+                        printf 'ERROR: --backend requires fzf|whiptail (got %s)\n\n' \
                             "${1#--backend=}" >&2
                         _tui_usage >&2
                         return 2
@@ -1476,9 +1484,9 @@ main() {
         if [[ "${_forced_tier}" == "fzf" ]]; then
             _tier="fzf"
         else
-            # gum / whiptail force the legacy dialog loop with that backend.
+            # --backend whiptail forces the Fallback dialog tier.
             _tier="whiptail"
-            TUI_BACKEND="${_forced_tier}"
+            TUI_BACKEND="whiptail"
         fi
     elif [[ -n "${TUI_BACKEND:-}" ]]; then
         _tier="whiptail"  # env-pinned widget (harness / CI) → fallback render

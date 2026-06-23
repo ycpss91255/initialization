@@ -1,7 +1,7 @@
 #!/usr/bin/env expect
 # smoke_flow.exp <whiptail> — AC-10 layer 2: the literal §11.1 flow on the
-# live whiptail widget under a pseudo-tty (#171 dropped dialog; gum drives
-# its own smoke_flow_gum.exp):
+# live whiptail widget under a pseudo-tty (ADR-0024: gum dropped; the fzf Rich
+# tier drives its own smoke_flow_fzf.exp):
 #   open main menu → enter Optional → check one item → OK → Exit
 #
 # In-flow assertions (each tui_expect_text is one): every screen renders

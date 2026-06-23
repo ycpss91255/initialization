@@ -25,12 +25,14 @@ under `.agents/`; the `.claude/` paths are symlinks. Claude-runtime entries
   `keyboards/`, etc.) keep whatever the upstream uses, and acronyms
   (`adr/`, `prd/`, `ci/`) stay as-is. File names (including ones ending
   in `s`) are out of scope — deferred to 0.2.0.
-- TUI backends are **gum (preferred) > whiptail (fallback)**; `dialog` is
-  dropped (see `doc/adr/0023-gum-preferred-tui-backend.md`). The TUI = CLI
-  frontend (PRD G4): it forks `setup_ubuntu install gum` rather than
-  installing inline, and `setup_ubuntu_tui.sh --backend gum|whiptail` forces
-  a backend (skips detection + the pre-launch gum-install prompt) — the lever
-  CI/QA use to test either backend.
+- TUI tiers are **fzf (Rich tier, two-pane navigator) preferred > whiptail
+  (Fallback tier) guaranteed** (see
+  `doc/adr/0024-fzf-two-pane-tui-replaces-gum.md`, supersedes ADR-0023; gum is
+  dropped as a backend — it remains installable as a tool via `setup_ubuntu
+  install gum`). The TUI = CLI frontend (PRD G4): it forks `setup_ubuntu
+  install fzf` rather than installing inline, and `setup_ubuntu_tui.sh
+  --backend fzf|whiptail` forces a tier (skips detection + the pre-launch
+  fzf-install prompt) — the lever CI/QA use to test either tier.
 
 ## Hard rules
 

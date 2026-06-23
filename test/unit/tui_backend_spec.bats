@@ -2,15 +2,15 @@
 # test/unit/tui_backend_spec.bats — lib/tui_backend.sh + setup_ubuntu_tui.sh
 #
 # Issue #69 (PRD §8.1 / §8.5, G4): TUI skeleton.
-#   - Backend detection: prefer `dialog`, fall back to `whiptail`; both
-#     missing → fatal with the §8.5 fix guidance (no auto-install).
+#   - Backend detection: whiptail is the dialog backend (gum dropped per
+#     ADR-0024); missing → fatal with the §8.5 fix guidance (no auto-install).
 #   - No sudo → exit 4 suggesting CLI mode.
 #   - Menu data parsing: exclusively from `setup_ubuntu list --json` /
 #     `detect --json` (ADR-0019 schema). Empty CATEGORYs are hidden (Q44).
 #   - G4 grep gate: setup_ubuntu_tui.sh never sources engine libs.
 #
 # HOST-SAFETY: command probes (`_tui_has_cmd`, `_tui_has_sudo`) are
-# overridden below with parameterized mocks — no real dialog/whiptail/sudo
+# overridden below with parameterized mocks — no real whiptail/sudo
 # is touched. Menu parsing eats inline ADR-0019 fixtures, never live state.
 
 load "${BATS_TEST_DIRNAME}/../helper/common"
@@ -28,12 +28,6 @@ source "${LIB_DIR}/tui_backend.sh"
 # MOCK_HAS_SUDO        true|false
 
 _tui_has_cmd() {
-    # gum may "appear" only after the install fork drops its marker file
-    # (the prelaunch re-detect path) — gated by MOCK_GUM_MARKER so the
-    # before/after states are data-driven, no in-test function redefinition.
-    if [[ "${1}" == "gum" && -n "${MOCK_GUM_MARKER:-}" && -f "${MOCK_GUM_MARKER}" ]]; then
-        return 0
-    fi
     case " ${MOCK_AVAILABLE_CMDS:-} " in
         *" ${1} "*) return 0 ;;
     esac
@@ -44,13 +38,6 @@ _tui_has_sudo() {
     [[ "${MOCK_HAS_SUDO:-true}" == "true" ]]
 }
 
-# Mockable interactivity gate for _tui_prelaunch_backend (MOCK_STDIN_TTY=
-# true|false), same data-driven pattern as the command/sudo probes — keeps
-# the prelaunch tests free of per-test function redefinition (SC2317).
-_tui_stdin_is_tty() {
-    [[ "${MOCK_STDIN_TTY:-false}" == "true" ]]
-}
-
 setup() {
     setup_test_env
     # The clip helpers (#168) count characters; pin a UTF-8 locale so the
@@ -59,8 +46,6 @@ setup() {
     export LC_ALL=C.UTF-8
     MOCK_AVAILABLE_CMDS=""
     MOCK_HAS_SUDO="true"
-    MOCK_STDIN_TTY="false"
-    MOCK_GUM_MARKER=""
     unset TUI_BACKEND 2>/dev/null || true
 }
 
@@ -82,52 +67,37 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
   "risk_level": "high", "reboot_required": false, "homepage": null}] | .count = 5' \
   <<<"${FIXTURE_LIST_JSON}")"
 
-# ── Backend selection (§8.5, #171: gum > whiptail; dialog dropped) ───────────
+# ── Backend selection (§8.5; whiptail is the dialog backend, gum dropped) ────
 
-@test "tui_backend_detect prefers gum when both backends exist (#171)" {
-    MOCK_AVAILABLE_CMDS="gum whiptail"
-    run tui_backend_detect
-    assert_success
-    assert_output "gum"
-}
-
-@test "tui_backend_detect falls back to whiptail when gum missing" {
+@test "tui_backend_detect returns whiptail when present" {
     MOCK_AVAILABLE_CMDS="whiptail"
     run tui_backend_detect
     assert_success
     assert_output "whiptail"
 }
 
-@test "tui_backend_detect prefers gum even over a present dialog (#171 dialog dropped)" {
-    # dialog is no longer a detected backend: gum wins, and dialog alone
-    # is invisible to detection.
-    MOCK_AVAILABLE_CMDS="gum dialog"
-    run tui_backend_detect
-    assert_success
-    assert_output "gum"
-}
-
-@test "tui_backend_detect ignores dialog (dropped from the set, #171)" {
+@test "tui_backend_detect ignores dialog (dropped from the set)" {
     MOCK_AVAILABLE_CMDS="dialog"
     run tui_backend_detect
     assert_failure
 }
 
-@test "tui_backend_detect fails when both backends missing" {
+@test "tui_backend_detect ignores gum (no longer a backend, ADR-0024)" {
+    # gum is dropped: a present gum is invisible to detection — only whiptail
+    # counts as the dialog backend.
+    MOCK_AVAILABLE_CMDS="gum"
+    run tui_backend_detect
+    assert_failure
+}
+
+@test "tui_backend_detect fails when whiptail is missing" {
     MOCK_AVAILABLE_CMDS=""
     run tui_backend_detect
     assert_failure
 }
 
-@test "tui_backend_detect honors TUI_BACKEND=gum override" {
-    MOCK_AVAILABLE_CMDS="whiptail"
-    TUI_BACKEND="gum" run tui_backend_detect
-    assert_success
-    assert_output "gum"
-}
-
-@test "tui_backend_detect honors TUI_BACKEND=whiptail override even when gum present" {
-    MOCK_AVAILABLE_CMDS="gum whiptail"
+@test "tui_backend_detect honors TUI_BACKEND=whiptail override" {
+    MOCK_AVAILABLE_CMDS=""
     TUI_BACKEND="whiptail" run tui_backend_detect
     assert_success
     assert_output "whiptail"
@@ -139,13 +109,7 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
     [ "${TUI_BACKEND}" = "whiptail" ]
 }
 
-@test "tui_backend_init prefers gum (#171)" {
-    MOCK_AVAILABLE_CMDS="gum whiptail"
-    tui_backend_init
-    [ "${TUI_BACKEND}" = "gum" ]
-}
-
-@test "tui_backend_init fatal prints §8.5 fix guidance when both missing" {
+@test "tui_backend_init fatal prints §8.5 fix guidance when whiptail is missing" {
     MOCK_AVAILABLE_CMDS=""
     run tui_backend_init
     assert_failure 1
@@ -251,7 +215,7 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
     done <<<"${output}"
 }
 
-# ── main-menu rows (#216: no separator rows — gum/whiptail can't render a
+# ── main-menu rows (#216: no separator rows — whiptail can't render a
 #    non-selectable divider, so ordering conveys the grouping) ────────────────
 
 @test "tui_main_menu_entries renders all action rows in order, no separators (#216)" {
@@ -281,35 +245,7 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
 
 # ── ui.tui_hints inline-hint gating (#203, design §3) ────────────────────────
 # TUI_HINTS=1 (default/unset) keeps the inline hints; TUI_HINTS=0 suppresses
-# the gum --show-help footer + header hint and the whiptail multi-select hint.
-
-@test "gum menu: TUI_HINTS=0 drops --show-help and the keybind hint (#203)" {
-    _make_mock_gum
-    TUI_HINTS=0 MOCK_GUM_OUTPUT='Run\n' run tui_render_menu "Main" "Pick one" run "Run"
-    assert_success
-    run cat "${MOCK_GUM_LOG}"
-    refute_output --partial "--show-help"
-    refute_output --partial "esc"
-}
-
-@test "gum menu: TUI_HINTS=1 keeps --show-help and the keybind hint (#203 default)" {
-    _make_mock_gum
-    TUI_HINTS=1 MOCK_GUM_OUTPUT='Run\n' run tui_render_menu "Main" "Pick one" run "Run"
-    assert_success
-    run cat "${MOCK_GUM_LOG}"
-    assert_output --partial "--show-help"
-    assert_output --partial "esc"
-}
-
-@test "gum checklist: TUI_HINTS=0 drops --show-help and the toggle hint (#203)" {
-    _make_mock_gum
-    TUI_HINTS=0 MOCK_GUM_OUTPUT='' run tui_render_checklist "Optional" "Pick" \
-        eza "ls alternative" off
-    assert_success
-    run cat "${MOCK_GUM_LOG}"
-    refute_output --partial "--show-help"
-    refute_output --partial "space/x"
-}
+# the whiptail multi-select hint.
 
 @test "whiptail checklist: TUI_HINTS=1 appends the multi-select hint line (#203)" {
     _make_mock_widget
@@ -338,15 +274,7 @@ FIXTURE_LIST_JSON_WITH_EXPERIMENTAL="$(jq '.items += [{
 }
 
 # ── Help-screen body text (#203, design §3) ──────────────────────────────────
-# Backend-aware reference. gum body documents j/k (vim) + esc semantics;
-# whiptail body centers on Tab.
-
-@test "tui_help_text (gum) documents j/k and esc-drops-selections (#203)" {
-    run tui_help_text gum
-    assert_success
-    assert_output --partial "j/k"
-    assert_output --partial "esc"
-}
+# The whiptail Fallback tier reference centers on Tab (gum dropped, ADR-0024).
 
 @test "tui_help_text (whiptail) centers on Tab (#203)" {
     run tui_help_text whiptail
@@ -455,8 +383,8 @@ FIXTURE_LIST_JSON_LONG_DESC="$(jq '.items += [{
 
 @test "tui_checklist_entries emits the FULL description, unclipped (#183)" {
     # #183: the producer no longer clips — the #168 budget moved into the
-    # whiptail adapter. gum reads this output directly and renders full text,
-    # so the producer MUST emit the whole "[tag] description" and no ellipsis.
+    # whiptail adapter. The fzf tier reads this output directly and renders full
+    # text, so the producer MUST emit the whole "[tag] description" / no ellipsis.
     TUI_WIDTH=72 run tui_checklist_entries "${FIXTURE_LIST_JSON_LONG_DESC}" optional ""
     assert_success
     assert_line --partial "[agent] Anthropic Claude Code CLI agent (official native installer, self-updating)"
@@ -503,20 +431,6 @@ FIXTURE_LIST_JSON_LONG_DESC="$(jq '.items += [{
     run cat "${MOCK_WIDGET_LOG}"
     assert_output --partial "…"
     refute_output --partial "self-updating)"
-}
-
-@test "tui_render_checklist (gum) passes the FULL item, unclipped (#183)" {
-    _make_mock_gum
-    local _long="[agent] Anthropic Claude Code CLI agent (official native installer, self-updating)"
-    # gum manages its own width: the adapter must hand gum the full item, so
-    # the logged argv contains the whole description and no adapter ellipsis.
-    MOCK_GUM_OUTPUT="${_long}"$'\n' TUI_WIDTH=72 run tui_render_checklist "Optional" "Pick" \
-        claude-code "${_long}" off
-    assert_success
-    assert_output "claude-code"
-    run cat "${MOCK_GUM_LOG}"
-    assert_output --partial "self-updating)"
-    refute_output --partial "…"
 }
 
 # ── Checkbox accumulator (#70, Q43 / §8.2) ───────────────────────────────────
@@ -944,22 +858,6 @@ EOF
     chmod +x "${TUI_BACKEND}"
 }
 
-# Mock `gum` binary: logs every invocation (subcommand + args, one line) to
-# MOCK_GUM_LOG, replays MOCK_GUM_OUTPUT on STDOUT (gum emits choices on
-# stdout, unlike dialog/whiptail's stderr+fd-swap), exits MOCK_GUM_RC.
-_make_mock_gum() {
-    MOCK_GUM_LOG="${INIT_UBUNTU_TEST_SCRATCH}/gum.log"
-    TUI_BACKEND="${INIT_UBUNTU_TEST_SCRATCH}/gum"
-    export MOCK_GUM_LOG TUI_BACKEND
-    cat >"${TUI_BACKEND}" <<EOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >>"${MOCK_GUM_LOG}"
-[[ -n "\${MOCK_GUM_OUTPUT:-}" ]] && printf '%b' "\${MOCK_GUM_OUTPUT}"
-exit "\${MOCK_GUM_RC:-0}"
-EOF
-    chmod +x "${TUI_BACKEND}"
-}
-
 @test "tui_render_checklist passes --separate-output and returns one tag per line" {
     _make_mock_widget
     MOCK_WIDGET_OUTPUT='eza\nzoxide\n' run tui_render_checklist "Optional" "Pick" eza "[x] eza" off zoxide "[x] zoxide" off
@@ -978,132 +876,6 @@ EOF
     assert_failure
 }
 
-# ── gum adapters (#171: gum > whiptail; mock `gum` on PATH) ──────────────────
-# gum has no hidden value: `gum choose` echoes the chosen *item* label, so the
-# menu adapter maps that label back to its tag BY INDEX (duplicate-label safe).
-
-@test "gum menu: gum choose over items, maps chosen label back to its tag by index" {
-    _make_mock_gum
-    # Three rows; user picks the 2nd item ("Recommended"). Adapter must emit
-    # the matching tag "recommended" (not the item label). Inline env (not a
-    # standalone export) keeps the mock-read var out of SC2030/2031 territory.
-    MOCK_GUM_OUTPUT='Recommended\n' run tui_render_menu "Main" "Pick one" \
-        quick-setup "Quick Setup" recommended "Recommended" run "Run"
-    assert_success
-    assert_output "recommended"
-    # gum was invoked as `gum choose` over the ITEM labels, not the tags.
-    run cat "${MOCK_GUM_LOG}"
-    assert_output --partial "choose"
-    assert_output --partial "Recommended"
-}
-
-@test "gum menu: duplicate item labels resolve to the FIRST matching tag by index" {
-    _make_mock_gum
-    # Two rows share the label "Browse". gum echoes only the label; the
-    # adapter maps the chosen label to a tag by its first index match, so a
-    # picked "Browse" lands on tag "a" (the first occurrence) — never crashes
-    # or mis-maps on the duplicate.
-    MOCK_GUM_OUTPUT='Browse\n' run tui_render_menu "M" "t" a "Browse" b "Browse"
-    assert_success
-    assert_output "a"
-}
-
-@test "gum checklist: gum choose --no-limit, checked items -> tags one per line" {
-    _make_mock_gum
-    # User checks "ls alternative" + "cd alternative"; adapter maps each back
-    # to its tag (eza, zoxide), one per line (--separate-output contract).
-    MOCK_GUM_OUTPUT='ls alternative\ncd alternative\n' \
-        run tui_render_checklist "Optional" "Pick" \
-        eza "ls alternative" off zoxide "cd alternative" off claude "agent CLI" off
-    assert_success
-    assert_line --index 0 "eza"
-    assert_line --index 1 "zoxide"
-    run cat "${MOCK_GUM_LOG}"
-    assert_output --partial "choose"
-    assert_output --partial "--no-limit"
-}
-
-@test "gum menu: header carries the keybind hint + --show-help (Esc=back is otherwise hidden)" {
-    _make_mock_gum
-    MOCK_GUM_OUTPUT='Run\n' run tui_render_menu "Main" "Pick one" run "Run"
-    assert_success
-    run cat "${MOCK_GUM_LOG}"
-    assert_output --partial "--show-help"
-    # gum's native footer never advertises Esc; the header hint must.
-    assert_output --partial "esc"
-}
-
-@test "gum checklist: header carries the toggle/back keybind hint + --show-help" {
-    _make_mock_gum
-    MOCK_GUM_OUTPUT='' run tui_render_checklist "Optional" "Pick" eza "ls alternative" off
-    assert_success
-    run cat "${MOCK_GUM_LOG}"
-    assert_output --partial "--show-help"
-    # The select key (the user's question: "is it space?") must be visible.
-    assert_output --partial "space/x"
-}
-
-@test "gum checklist: nothing checked yields empty stdout, success" {
-    _make_mock_gum
-    MOCK_GUM_OUTPUT='' run tui_render_checklist "Optional" "Pick" eza "ls alternative" off
-    assert_success
-    assert_output ""
-}
-
-@test "gum checklist: Esc/Ctrl-C (rc 130) propagates as nonzero, not swallowed" {
-    _make_mock_gum
-    MOCK_GUM_RC=130 run tui_render_checklist "Optional" "Pick" eza "ls alternative" off
-    assert_failure
-    [ "${status}" -ne 0 ]
-}
-
-@test "gum yesno: maps to gum confirm, rc 0 = yes" {
-    _make_mock_gum
-    MOCK_GUM_RC=0 run tui_render_yesno "Confirm" "Proceed?"
-    assert_success
-    run cat "${MOCK_GUM_LOG}"
-    assert_output --partial "confirm"
-}
-
-@test "gum yesno: gum confirm rc 1 = no (cancel), not swallowed" {
-    _make_mock_gum
-    MOCK_GUM_RC=1 run tui_render_yesno "Confirm" "Proceed?"
-    assert_failure
-}
-
-@test "gum msgbox: renders text via gum style/format and returns success" {
-    _make_mock_gum
-    run tui_render_msgbox "Info" "hello world"
-    assert_success
-    run cat "${MOCK_GUM_LOG}"
-    # gum uses style or format for the box; either is acceptable.
-    assert_output --regexp "style|format"
-}
-
-@test "gum msgbox: content starting with -- is passed after a -- guard (System Info crash)" {
-    _make_mock_gum
-    # detect output starts with "------ init_ubuntu environment ------"; without
-    # a -- guard gum parses it as a flag and aborts ("unknown flag").
-    run tui_render_msgbox "System Info" "------ env ------
-os.id: ubuntu"
-    assert_success
-    run cat "${MOCK_GUM_LOG}"
-    assert_output --partial "--"
-    assert_output --partial "------ env ------"
-}
-
-@test "gum menu: does not double-apply _tui_clip (gum manages its own width)" {
-    _make_mock_gum
-    # A very long item passes through to gum unclipped (no ellipsis injected
-    # by the adapter — gum owns wrapping).
-    local _long="This is an extremely long menu item label that would overflow a 72 column whiptail box several times over"
-    MOCK_GUM_OUTPUT="${_long}"$'\n' run tui_render_menu "M" "t" only "${_long}"
-    assert_success
-    assert_output "only"
-    run cat "${MOCK_GUM_LOG}"
-    refute_output --partial "…"
-}
-
 @test "render wrappers relabel Cancel per backend (Exit / Back buttons)" {
     _make_mock_widget
     TUI_CANCEL_LABEL="Exit" run tui_render_menu "T" "txt" a "A"
@@ -1112,19 +884,84 @@ os.id: ubuntu"
     assert_output --partial "--cancel-button Exit"
 }
 
-# ── Input widget (§5: tui_render_input; gum input / whiptail --inputbox) ─────
+# Mock binary named `dialog` so the adapter dispatcher still routes through the
+# whiptail family (anything not literally `gum` did, and gum is gone) but the
+# button-relabel helpers take their `*` branch (--cancel-label / --yes-label /
+# --no-label, the dialog-style long flags). Same log/replay shape as the
+# whiptail mock; exercises the relabel branches the whiptail mock cannot reach.
+_make_mock_dialog() {
+    MOCK_WIDGET_LOG="${INIT_UBUNTU_TEST_SCRATCH}/widget.log"
+    TUI_BACKEND="${INIT_UBUNTU_TEST_SCRATCH}/dialog"
+    export MOCK_WIDGET_LOG TUI_BACKEND
+    cat >"${TUI_BACKEND}" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"${MOCK_WIDGET_LOG}"
+[[ -n "\${MOCK_WIDGET_OUTPUT:-}" ]] && printf '%b' "\${MOCK_WIDGET_OUTPUT}" >&2
+exit "\${MOCK_WIDGET_RC:-0}"
+EOF
+    chmod +x "${TUI_BACKEND}"
+}
+
+@test "menu relabel: a dialog-named binary takes the --cancel-label branch" {
+    _make_mock_dialog
+    TUI_CANCEL_LABEL="Back" run tui_render_menu "T" "txt" a "A"
+    run cat "${MOCK_WIDGET_LOG}"
+    assert_output --partial "--cancel-label Back"
+}
+
+@test "tui_render_msgbox (whiptail) passes --title and --msgbox" {
+    _make_mock_widget
+    run tui_render_msgbox "Info" "hello world"
+    assert_success
+    run cat "${MOCK_WIDGET_LOG}"
+    assert_output --partial "--title Info"
+    assert_output --partial "--msgbox"
+}
+
+@test "tui_render_yesno (whiptail) maps to --yesno; rc 0 = yes" {
+    _make_mock_widget
+    MOCK_WIDGET_RC=0 run tui_render_yesno "Confirm" "Proceed?"
+    assert_success
+    run cat "${MOCK_WIDGET_LOG}"
+    assert_output --partial "--yesno"
+}
+
+@test "tui_render_yesno (whiptail) rc 1 = no (cancel), not swallowed" {
+    _make_mock_widget
+    MOCK_WIDGET_RC=1 run tui_render_yesno "Confirm" "Proceed?"
+    assert_failure
+}
+
+@test "yesno relabel: whiptail uses --yes-button / --no-button" {
+    _make_mock_widget
+    TUI_YES_LABEL="Proceed" TUI_NO_LABEL="Cancel" \
+        run tui_render_yesno "Confirm" "Proceed?"
+    run cat "${MOCK_WIDGET_LOG}"
+    assert_output --partial "--yes-button Proceed"
+    assert_output --partial "--no-button Cancel"
+}
+
+@test "yesno relabel: a dialog-named binary uses --yes-label / --no-label" {
+    _make_mock_dialog
+    TUI_YES_LABEL="Proceed" TUI_NO_LABEL="Cancel" \
+        run tui_render_yesno "Confirm" "Proceed?"
+    run cat "${MOCK_WIDGET_LOG}"
+    assert_output --partial "--yes-label Proceed"
+    assert_output --partial "--no-label Cancel"
+}
+
+@test "_tui_backend_family is whiptail regardless of the TUI_BACKEND basename (gum dropped)" {
+    TUI_BACKEND="/usr/bin/gum" run _tui_backend_family
+    assert_success
+    assert_output "whiptail"
+    TUI_BACKEND="whiptail" run _tui_backend_family
+    assert_output "whiptail"
+}
+
+# ── Input widget (§5: tui_render_input; whiptail --inputbox) ─────────────────
 # Contract: success → typed value on stdout + rc 0; cancel (nonzero rc) → fail;
 # empty submit (rc 0, empty value) → treated as cancel → fail. No no-echo
 # variant (secret values never pass through this widget — AC-20).
-
-@test "input (gum): gum input returns the typed value, invoked as 'input'" {
-    _make_mock_gum
-    MOCK_GUM_OUTPUT='git@github.com\n' run tui_render_input "Copy SSH key" "user@host" ""
-    assert_success
-    assert_output "git@github.com"
-    run cat "${MOCK_GUM_LOG}"
-    assert_output --partial "input"
-}
 
 @test "input (whiptail): --inputbox returns the typed value (captured from stderr)" {
     _make_mock_widget
@@ -1135,21 +972,9 @@ os.id: ubuntu"
     assert_output --partial "--inputbox"
 }
 
-@test "input (gum): cancel (rc 1) → tui_render_input fails (nonzero)" {
-    _make_mock_gum
-    MOCK_GUM_RC=1 run tui_render_input "Set token" "Token name" ""
-    assert_failure
-}
-
 @test "input (whiptail): cancel (rc 1) → tui_render_input fails (nonzero)" {
     _make_mock_widget
     MOCK_WIDGET_RC=1 run tui_render_input "Set token" "Token name" ""
-    assert_failure
-}
-
-@test "input (gum): empty submit (rc 0, empty value) → fails (empty = cancel)" {
-    _make_mock_gum
-    MOCK_GUM_OUTPUT='' MOCK_GUM_RC=0 run tui_render_input "Set token" "Token name" ""
     assert_failure
 }
 
@@ -1251,13 +1076,13 @@ os.id: ubuntu"
     assert_failure 2
 }
 
-# ── --backend flag (#171: testability lever; skips detection + install prompt) ─
+# ── --backend flag (ADR-0024: testability lever; skips detection + prompt) ────
 # These drive the REAL entrypoint with a sealed PATH farm so detection / the
-# install prompt can be observed without a live gum/whiptail.
+# install prompt can be observed without a live fzf/whiptail.
 
-# Build a sealed env where ONLY whiptail (mock) exists — neither gum nor a
-# real backend leaks in. The mock backends/CLI immediately exit so the main
-# loop unwinds after the first widget call; we only assert pre-launch wiring.
+# Build a sealed env where the mock whiptail + fzf tiers exist. The mock
+# backends/CLI immediately exit so the main loop unwinds after the first widget
+# call; we only assert pre-launch wiring.
 _make_flag_env() {
     FLAG_DIR="${INIT_UBUNTU_TEST_SCRATCH}/flagenv"
     rm -rf "${FLAG_DIR}"; mkdir -p "${FLAG_DIR}/bin" "${FLAG_DIR}/home"
@@ -1274,9 +1099,8 @@ EOF
     chmod +x "${FLAG_BIN}/sudo"
     # A widget mock that records which backend/tier basename was invoked then
     # exits nonzero (Cancel/ESC) so the main loop returns immediately. fzf is
-    # the Rich tier; whiptail the Fallback; gum is dropped (ADR-0024) but kept
-    # here so a stray gum call would still be observable in the log.
-    for _w in whiptail gum fzf; do
+    # the Rich tier; whiptail the Fallback (gum is dropped, ADR-0024).
+    for _w in whiptail fzf; do
         cat >"${FLAG_BIN}/${_w}" <<EOF
 #!/usr/bin/env bash
 printf 'BACKEND=%s ARGS=%s\n' "${_w}" "\$*" >>"${FLAG_LOG}"
@@ -1316,84 +1140,18 @@ EOF
     assert_output --partial "Usage:"
 }
 
-@test "--backend gum is accepted (legacy dialog backend, pending phase-6 removal)" {
-    # gum stays a valid --backend value until the dedicated gum-removal phase,
-    # so the AC-10/AC-11 dual-backend smoke keeps exercising it. It must NOT be
-    # rejected as a usage error.
-    run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend gum --help
-    assert_success
+@test "--backend gum is rejected with exit 2 and the install-as-a-tool hint (ADR-0024)" {
+    # gum is no longer a TUI backend (ADR-0024). --backend gum is a usage error
+    # that points the user at installing gum as a tool instead.
+    run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend gum
+    assert_failure 2
+    assert_output --partial "gum is no longer a TUI backend"
+    assert_output --partial "setup_ubuntu install gum"
 }
 
 @test "--backend with no value exits 2 with usage" {
     run "${REPO_ROOT}/setup_ubuntu_tui.sh" --backend
     assert_failure 2
-}
-
-# ── Pre-launch install-prompt flow (#171) ────────────────────────────────────
-# gum absent + interactive → plain stdin `read` prompt (default Yes); on yes
-# fork `setup_ubuntu install gum`, re-detect. The helper `_tui_prelaunch_backend`
-# isolates this so it is unit-testable without a tty: it reads the answer from
-# stdin, honors the `[[ -t 0 ]]` interactivity gate via a mockable
-# `_tui_stdin_is_tty`, and prints the resolved backend.
-
-@test "prelaunch: gum present -> use gum, no prompt" {
-    MOCK_AVAILABLE_CMDS="gum whiptail"
-    run _tui_prelaunch_backend </dev/null
-    assert_success
-    assert_output "gum"
-}
-
-@test "prelaunch: gum absent + non-interactive -> whiptail silently, no prompt" {
-    MOCK_AVAILABLE_CMDS="whiptail"
-    MOCK_STDIN_TTY="false" run _tui_prelaunch_backend </dev/null
-    assert_success
-    assert_output "whiptail"
-    refute_output --partial "Install gum"
-}
-
-@test "prelaunch: gum absent + interactive + answer no -> whiptail" {
-    MOCK_AVAILABLE_CMDS="whiptail"
-    MOCK_STDIN_TTY="true" run _tui_prelaunch_backend <<<"n"
-    assert_success
-    assert_output --partial "whiptail"
-    assert_output --partial "Install gum"
-}
-
-@test "prelaunch: interactive + answer yes -> forks install gum, re-detects to gum" {
-    # The install fork is mocked: it 'creates' gum (drops the marker file) so
-    # the post-fork _tui_has_cmd gum re-check succeeds (MOCK_GUM_MARKER seam).
-    _make_mock_cli   # sets TUI_CLI + MOCK_CLI_LOG
-    local _marker="${INIT_UBUNTU_TEST_SCRATCH}/gum_installed"
-    # Mock CLI: `install gum` writes the marker.
-    cat >"${TUI_CLI}" <<EOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >>"${MOCK_CLI_LOG}"
-[[ "\$*" == "install gum" ]] && : >"${_marker}"
-EOF
-    chmod +x "${TUI_CLI}"
-    MOCK_AVAILABLE_CMDS="whiptail"
-    MOCK_STDIN_TTY="true" MOCK_GUM_MARKER="${_marker}" \
-        run _tui_prelaunch_backend <<<"y"
-    assert_success
-    assert_output --partial "gum"
-    # The fork really happened with the G4 argv.
-    run cat "${MOCK_CLI_LOG}"
-    assert_output --partial "install gum"
-}
-
-@test "prelaunch: interactive + yes but install fails -> warn + whiptail" {
-    _make_mock_cli
-    # install gum 'fails' (never creates gum); probe stays whiptail-only.
-    cat >"${TUI_CLI}" <<EOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >>"${MOCK_CLI_LOG}"
-exit 1
-EOF
-    chmod +x "${TUI_CLI}"
-    MOCK_AVAILABLE_CMDS="whiptail"
-    MOCK_STDIN_TTY="true" run _tui_prelaunch_backend <<<"y"
-    assert_success
-    assert_output --partial "whiptail"
 }
 
 # ── Real CLI list --json fork (issue #165 regression guard, G4 / ADR-0019) ───

@@ -155,7 +155,7 @@ tui_e2e_make_harness() {
     E2E_WIDGET_LOG="${_dir}/widget.log"
     E2E_CLI_LOG="${_dir}/cli.log"
     # Absolute path to the scripted widget — pinned into TUI_BACKEND by
-    # tui_e2e_run so the run bypasses #171 detection / the gum install prompt.
+    # tui_e2e_run so the run bypasses tier detection / the fzf install prompt.
     E2E_WIDGET_PATH="${E2E_BIN}/${_widget}"
     export E2E_BIN E2E_HOME E2E_RESPONSES E2E_WIDGET_LOG E2E_CLI_LOG \
            E2E_WIDGET_PATH
@@ -178,7 +178,7 @@ EOF
 
 # Run the real TUI under the sealed harness PATH (bats `run` semantics).
 # TUI_BACKEND is pinned to the scripted-widget mock path so the run bypasses
-# #171 backend detection / the gum install prompt entirely: the adapter
+# tier detection / the fzf install prompt entirely: the adapter
 # dispatcher keys on the basename, so a mock named `dialog`/`whiptail` routes
 # through the whiptail family (the shared --menu/--checklist shape these
 # scripted widgets emulate), regardless of detection preference.

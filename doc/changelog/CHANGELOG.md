@@ -22,6 +22,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`lib/tui_backend.sh` branch-coverage unit tests**
+  (`test/unit/tui_backend_branches_spec.bats`): focused in-process tests for the
+  CLI-fork error paths (`_tui_cli_json` ADR-0019 non-JSON guard;
+  `tui_cli_install_plan` / `tui_cli_manage_plan` fork-failed + no-plan paths),
+  the data-broker single error surface (`_tui_broker_fail` msgbox branch and the
+  detect-cache accessor error) and the `_tui_category_entry` unknown-category
+  default. Recovers per-file coverage lost when the gum adapters were dropped
+  (ADR-0024); no runtime change.
+
 - **whiptail Fallback tier reaches feature parity with the fzf Rich tier**
   (ADR-0024 D10 — feature-equivalent, render-degraded): the whiptail screens now
   match the navigator feature-for-feature. Nested category drill-down (main ->

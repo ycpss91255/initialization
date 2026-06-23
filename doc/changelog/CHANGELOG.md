@@ -20,6 +20,8 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+## [v0.1.0-rc3] - 2026-06-23
+
 ### Added
 
 - **`lib/tui_backend.sh` branch-coverage unit tests**

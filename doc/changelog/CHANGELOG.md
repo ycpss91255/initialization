@@ -37,6 +37,26 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   removed. Covered by unit tests (`test/unit/general_spec.bats`,
   `test/unit/module/ssh-config_spec.bats`) and a real engine-lifecycle
   integration test (`test/integration/lifecycle/engine_lifecycle_spec.bats`).
+- **yazi `<Right>` arrow now opens files like `l` / `<Enter>`** (#272): added a
+  `<Right>` entry to `mgr.prepend_keymap` in `module/config/yazi/keymap.toml`
+  routed through the same `plugin smart-enter` run, so pressing `<Right>` on a
+  regular file opens it via the configured opener instead of silently no-oping.
+- **yazi routes `application/xml` (and `*+xml`) to code preview/spot and
+  `$EDITOR`** (#162): `module/config/yazi/yazi.toml` now maps
+  `application/{xml,xml-dtd}` and `application/*+xml` to the `edit` opener and
+  to the `code` spotter/previewer (new `prepend_spotters` block + prepended
+  `prepend_previewers` entries), so `.xml` files preview with syntax
+  highlighting and open in `$EDITOR` instead of falling through to `file` /
+  `xdg-open`. ZIP-based Office formats (`*.docx`/`*.xlsx`) are excluded — they
+  are not `*+xml` and keep their `archive` handling.
+
+### Changed
+
+- **yazi config drops keys removed upstream in v26.5.6** (#273): removed the
+  inert `title_format` (`[mgr]`) and `micro_workers` / `macro_workers`
+  (`[tasks]`) keys from `module/config/yazi/yazi.toml`. All three matched
+  Yazi's shipped defaults (never customized) and were removed upstream; the
+  rest of `[mgr]` / `[tasks]` is unchanged.
 
 ## [v0.1.0-rc3] - 2026-06-23
 

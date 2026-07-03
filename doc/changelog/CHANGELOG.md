@@ -20,6 +20,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Fixed
+
+- **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
+  is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
+  `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever
+  `BACKUP_DIR` was empty. The v2 path (`runner` / `module_bootstrap` / `lib`)
+  never sets `BACKUP_DIR`, so any config-type module (fish / tmux / neovim /
+  ssh-config, etc.) that backed up an existing config on a re-run or upgrade
+  aborted the entire run on all targets. `backup_file` now defaults
+  `BACKUP_DIR` into the tool's state dir
+  (`${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/init_ubuntu}/backup/<timestamp>`,
+  the same base convention as `state_get_path()`), warns once, and continues —
+  backups still work when a dir is provided. The now-redundant per-module
+  `BACKUP_DIR` pre-seed in `module/claude-code-config.module.sh` upgrade is
+  removed. Covered by unit tests (`test/unit/general_spec.bats`,
+  `test/unit/module/ssh-config_spec.bats`) and a real engine-lifecycle
+  integration test (`test/integration/lifecycle/engine_lifecycle_spec.bats`).
+
 ## [v0.1.0-rc3] - 2026-06-23
 
 ### Added

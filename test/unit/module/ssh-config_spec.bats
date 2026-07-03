@@ -349,15 +349,18 @@ _use_backup_dir() {
     [[ -f "${BACKUP_DIR}/config" ]]
 }
 
-@test "upgrade over an existing config fails fatally when BACKUP_DIR is unset" {
-    # backup_file (lib/general.sh) log_fatals without BACKUP_DIR; the
-    # archetype's `|| true` cannot catch an exit. Documents the current
-    # contract: standalone upgrades need BACKUP_DIR when a config exists.
+@test "upgrade over an existing config does NOT abort when BACKUP_DIR is unset (F1)" {
+    # Regression (linux-review F1): backup_file used to log_fatal (exit 1,
+    # uncatchable by the archetype's `|| true`) with BACKUP_DIR unset — the
+    # v2 path never sets it, so every config re-run/upgrade aborted. It now
+    # defaults BACKUP_DIR into the state dir and the upgrade completes.
     _load_module
     install
     BACKUP_DIR='' run upgrade
-    assert_failure
-    assert_output --partial "BACKUP_DIR is not set"
+    assert_success
+    # The pre-existing config is still snapshotted under the defaulted dir.
+    run bash -c "cat '${INIT_UBUNTU_STATE_DIR}'/backup/*/config"
+    assert_success
 }
 
 # ── remove / purge ───────────────────────────────────────────────────────────

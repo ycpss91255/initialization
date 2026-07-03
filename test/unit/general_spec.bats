@@ -238,14 +238,25 @@ teardown() {
 
 # ── backup_file ──────────────────────────────────────────────────────────────
 
-@test "backup_file fails fatally when BACKUP_DIR is unset" {
+# Regression (linux-review F1): the v2 path (runner / module_bootstrap / lib)
+# never sets BACKUP_DIR, so any config module that calls backup_file on a
+# re-run/upgrade used to hit `log_fatal "BACKUP_DIR is not set."` — an exit 1
+# that a caller's `|| true` cannot catch, aborting the whole run on every
+# target. backup_file must instead default BACKUP_DIR into the tool's state
+# dir and keep going.
+@test "backup_file does NOT fatally exit when BACKUP_DIR is unset (defaults into state dir)" {
+    printf 'payload\n' > "${INIT_UBUNTU_TEST_SCRATCH}/src.txt"
     run bash -c "
         unset BACKUP_DIR
         source '${LIB_DIR}/general.sh'
-        backup_file '${INIT_UBUNTU_TEST_SCRATCH}/whatever.txt'
+        backup_file '${INIT_UBUNTU_TEST_SCRATCH}/src.txt'
     "
-    assert_failure
-    assert_output --partial "BACKUP_DIR is not set"
+    assert_success
+    assert_output --partial "BACKUP_DIR"
+    # The file must still be snapshotted under the defaulted state-dir backup.
+    run bash -c "cat '${INIT_UBUNTU_STATE_DIR}'/backup/*/src.txt"
+    assert_success
+    assert_output "payload"
 }
 
 @test "backup_file copies an existing file into BACKUP_DIR" {

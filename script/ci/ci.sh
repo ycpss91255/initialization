@@ -205,7 +205,28 @@ _run_shellcheck() {
         _info "  (no shell scripts to check — skipping)"
         return 0
     fi
-    _find_lintable_sh | xargs -0 shellcheck -x
+    # Parallelize: a single `xargs shellcheck` passed ALL ~197 files to one
+    # ShellCheck process — 212s serial and the critical-path CI tail. Adding
+    # -P alone does nothing (still one child); we ALSO batch with -n so xargs
+    # forks one shellcheck per ${SHELLCHECK_BATCH} files across $(nproc)
+    # workers. `-x` still resolves `source`d files from disk regardless of
+    # which batch they land in, so batching never changes WHICH files/sources
+    # are checked.
+    #
+    # Fail-signal (correctness constraint): xargs returns 123 — not 1 — when
+    # ANY batched child shellcheck reports a violation. We capture that rc
+    # and treat ANY nonzero (incl. 123) as failure via _die, so the lint step
+    # exits nonzero on a violation regardless of set -e state. Do NOT compare
+    # against a single expected code (e.g. `-eq 1`): that would swallow 123.
+    local _jobs
+    _jobs="$(nproc 2>/dev/null || echo 4)"
+    local _rc=0
+    _find_lintable_sh \
+        | xargs -0 -P "${_jobs}" -n "${SHELLCHECK_BATCH:-40}" shellcheck -x \
+        || _rc=$?
+    if [[ "${_rc}" -ne 0 ]]; then
+        _die "ShellCheck failed (rc=${_rc}) — see violations above"
+    fi
     _info "ShellCheck OK"
 }
 

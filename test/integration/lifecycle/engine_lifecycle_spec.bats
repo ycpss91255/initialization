@@ -198,10 +198,39 @@ teardown() {
     [[ ! -f "${ENGINE_LT_HOME}/.ssh/config" ]]
 }
 
+# Regression (linux-review F1): the v2 path never exports BACKUP_DIR. A config
+# module that backs up an existing config on upgrade used to hit
+# `log_fatal "BACKUP_DIR is not set."` — exit 1, uncatchable by the archetype's
+# `|| true`, aborting the whole run on every target. Drive the REAL engine
+# upgrade with BACKUP_DIR forced empty (the last env assignment wins over the
+# helper's default) and prove the run completes and still snapshots the config.
+@test "config: real upgrade does NOT abort when BACKUP_DIR is unset (F1)" {
+    engine_lt_run "" install ssh-config --no-deps -y
+    assert_success
+    [[ -f "${ENGINE_LT_HOME}/.ssh/config" ]]
+
+    # BACKUP_DIR= empties the helper-injected value → backup_file must default
+    # it into the state dir instead of fatally aborting.
+    engine_lt_run "BACKUP_DIR=" upgrade ssh-config -y
+    assert_success
+    engine_lt_assert_no_wiring_errors
+    refute_output --partial "BACKUP_DIR is not set"
+    # Managed config survived the upgrade and the pre-upgrade copy was snapshotted
+    # under the defaulted state-dir backup.
+    [[ -f "${ENGINE_LT_HOME}/.ssh/config" ]]
+    grep -q "init_ubuntu managed" "${ENGINE_LT_HOME}/.ssh/config"
+    run bash -c "cat '${ENGINE_LT_STATE}'/backup/*/config"
+    assert_success
+}
+
 # ── custom archetype (claude-code-config: macro + hand-rolled overrides) ─────
 
 @test "custom: real install runs the overridden lifecycle + records state, then verify + remove" {
-    engine_lt_run "" install claude-code-config --no-deps -y
+    # Skip the best-effort `npm install -g ccstatusline` host install (#231):
+    # the launcher binary is not needed for the config-drop lifecycle assertions
+    # and hard rule 2 forbids host package installs from a test path.
+    engine_lt_run "INIT_UBUNTU_STATUSLINE_NO_BINARY=true" \
+        install claude-code-config --no-deps -y
     assert_success
     engine_lt_assert_no_wiring_errors
     assert_output --partial "claude-code-config installed"
@@ -209,11 +238,13 @@ teardown() {
     engine_lt_state_has claude-code-config
     # The custom _claude_config_drop_files override dropped all companion files.
     [[ -f "${ENGINE_LT_HOME}/.claude/settings.json" ]]
-    [[ -x "${ENGINE_LT_HOME}/.claude/run-statusline.sh" ]]
+    [[ -x "${ENGINE_LT_HOME}/.claude/run-ccstatusline.sh" ]]
+    [[ -f "${ENGINE_LT_HOME}/.config/ccstatusline/settings.json" ]]
     [[ -n "$(engine_lt_sidecar claude-code-config)" ]]
 
     # Idempotent re-install.
-    engine_lt_run "" install claude-code-config --no-deps -y
+    engine_lt_run "INIT_UBUNTU_STATUSLINE_NO_BINARY=true" \
+        install claude-code-config --no-deps -y
     assert_success
 
     engine_lt_run "" verify claude-code-config

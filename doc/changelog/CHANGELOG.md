@@ -38,6 +38,143 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   Exit-code-contract script (`set -uo pipefail`, ADR-0007): `0` normal, `2`
   arg error. Args: `--repo` (required), `--interval` (default 180),
   `--state-file`, `--once`, `-h|--help`.
+- **Standard template for one-off bash tools** (`template/tool.template.sh`) +
+  matching conformance spec (`test/unit/tool_template_spec.bats`), guide
+  (`doc/guide/small-tool-template.md`) and ADR-0029. Gives `tool/` one-off
+  scripts a proven skeleton: `--help`, `--dry-run`, the `0=ok / 2=usage-error`
+  exit-code contract, grep-guarded idempotent work, and `set -euo pipefail`
+  (ADR-0007 always-act — closes the missing-`set -u` bug class an audit found
+  across the ~16 untested one-off scripts). The template draws the tool-vs-module
+  line explicitly: one-offs use this; reusable tools are promoted to modules
+  (PRD §6.5/§6.6). No existing tools are retrofitted by this change.
+### Changed
+
+- **Time-balanced CI core-shard partition** (`script/ci/shard_partition.sh`,
+  `script/ci/ci.sh`, `.github/workflows/ci.yaml`; ADR-0028): the core
+  (non-module) unit-test matrix now partitions specs by **measured runtime**
+  via greedy-LPT (Longest Processing Time) instead of count round-robin. The
+  audit measured the four core kcov shards at ~96-121 s each (the long pole
+  after lint) because a few heavy specs pinned individual shards; the new
+  partition balances the eight default shards to ~52-57 s each. Weights live in
+  a committed, self-maintaining file (`test/ci-shard-weights.tsv`, refreshed
+  from real bats junit timings via `just -f justfile.ci shard-weights-refresh`
+  and `script/ci/junit_to_weights.sh`) — reproducible from the repo, not a
+  CI-only cache (base ADR-00000017's no-CI-only-cache principle). The shard
+  count is now dynamic: `vars.CI_CORE_SHARDS` (default 8, up from a hardcoded
+  4) drives a `fromJSON` matrix. Every spec still runs exactly once, so the
+  coverage-merge denominator and the AC-17 80 % gate are unchanged.
+
+- **`claude-code-config` statusline switches from the `cc-statusline` Claude
+  plugin to the `ccstatusline` global binary** (sirmalloc/ccstatusline; #231,
+  also resolves #116). The launcher `module/config/claude/run-statusline.sh`
+  is renamed to `run-ccstatusline.sh` and now execs the `ccstatusline` binary,
+  feeding it the real tmux pane width minus the flexMode `-8` offset and
+  post-processing reset timers with an NBSP-aware sed pipeline (5 rules,
+  single-highest-unit only). A new `ccstatusline.settings.json` template ships
+  the maintainer-verified two-row layout (version 3) and is dropped to the XDG
+  config path (`${XDG_CONFIG_HOME:-~/.config}/ccstatusline/settings.json`);
+  `settings.json` drops the obsolete `cc-statusline` marketplace/plugin
+  entries and points `statusLine.command` at `run-ccstatusline.sh`. Install
+  best-effort provisions the binary via `npm install -g ccstatusline`
+  (skippable under `INIT_UBUNTU_STATUSLINE_NO_BINARY` so no host package
+  install runs from a test path).
+### Added
+
+- **Archetype real-mutation-body coverage unit tests**
+  (`test/unit/module_helper_real_bodies_spec.bats`): closes the highest-risk
+  gap in the module archetype layer (module-template-audit #1 + #2). The apt
+  archetype's REAL (non-dry-run) lifecycle bodies were never executed by any
+  test — per-module specs stub `install()`/`remove()`/`purge()` wholesale, and
+  the one integration apt test is reduced and not in the kcov shards. The new
+  specs stub the external side-effecting commands (`sudo`, `have_sudo_access`,
+  `is_installed`; real `rm` against scratch paths) and drive the real branches
+  of `module_default_apt_install` (PPA add via `apt-add-repository`, both
+  no-sudo guards, `apt-get update`/`install`), `module_default_apt_upgrade`
+  (`--only-upgrade` + no-sudo guard), `module_default_apt_remove`, and
+  `module_default_apt_purge` (`apt-get purge` + PPA `--remove` +
+  `CONFIG_PATHS` rm loop). Also covers the `purge` default of the
+  github-release archetype (`module_default_github_release_purge`: remove +
+  `CONFIG_PATHS` loop) and the config archetype
+  (`module_default_config_purge`) — `purge` is the ADR-0015 rollback verb and
+  was previously only exercised in dry-run. Test-only; no production code
+  changed.
+- **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
+  a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
+  for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,
+  `C-Arrow`/`M-C-Arrow` window/pane/session navigation, and `C-Arrow` copy-mode-vi
+  pane navigation — reusing the exact commands and flags of their vi-key
+  counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
+  session auto-restores on tmux server start (issue #266). Existing `hjkl`
+  bindings are unchanged.
+
+### Changed
+
+- **CI ShellCheck lint now runs in parallel across CPUs** (`script/ci/ci.sh`
+  `_run_shellcheck`): the lint step previously piped all ~197 scripts to a
+  single `xargs -0 shellcheck -x` process (~212s serial and the critical-path
+  CI tail). It now forks one `shellcheck` per `${SHELLCHECK_BATCH:-40}`-file
+  batch across `$(nproc)` workers via
+  `xargs -0 -P "$(nproc)" -n "${SHELLCHECK_BATCH:-40}" shellcheck -x`. The
+  fail-on-violation signal is preserved: `xargs` returns 123 (not 1) when any
+  batched child reports a violation, so the code captures the exit status and
+  `_die`s on ANY nonzero (never comparing against a single expected code), and
+  the lint step still exits nonzero on any violation. `-x` continues to
+  resolve `source`d files from disk regardless of batch, so batching does not
+  change WHICH files/sources are linted. Covered by new unit tests in
+  `test/unit/script/ci_spec.bats` (fail-signal on violation, pass when clean,
+  and a violation hidden among many batches still fails via xargs 123).
+
+### Fixed
+
+- **CI fish syntax check now actually lints the fish config** (`script/ci/ci.sh`):
+  `_find_lintable_fish` pruned `module/config` wholesale (copied from the
+  ShellCheck pass, where the .sh files there are vendored third-party config).
+  But every tracked `*.fish` file lives under `module/config/fish/**` — the
+  maintainer's own fish config that init_ubuntu installs — so the prune dropped
+  100% of them: the `fish -n` check ran over ZERO files and was silently a
+  no-op. Discovery now prunes only the one genuinely vendored fish path
+  (`module/config/neovim/fnm_shell_config`, the fnm-generated shell
+  integration) while keeping the deprecated/holding/v1 prunes, so all 21
+  real fish scripts are checked. New regression spec
+  (`test/unit/script/ci_lint_discovery_spec.bats`) asserts the discovery
+  returns a nonzero count over the repo so it cannot silently regress to 0
+  again. No fish syntax violations surfaced once the files were actually
+  checked.
+- **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
+  is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
+  `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever
+  `BACKUP_DIR` was empty. The v2 path (`runner` / `module_bootstrap` / `lib`)
+  never sets `BACKUP_DIR`, so any config-type module (fish / tmux / neovim /
+  ssh-config, etc.) that backed up an existing config on a re-run or upgrade
+  aborted the entire run on all targets. `backup_file` now defaults
+  `BACKUP_DIR` into the tool's state dir
+  (`${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/init_ubuntu}/backup/<timestamp>`,
+  the same base convention as `state_get_path()`), warns once, and continues —
+  backups still work when a dir is provided. The now-redundant per-module
+  `BACKUP_DIR` pre-seed in `module/claude-code-config.module.sh` upgrade is
+  removed. Covered by unit tests (`test/unit/general_spec.bats`,
+  `test/unit/module/ssh-config_spec.bats`) and a real engine-lifecycle
+  integration test (`test/integration/lifecycle/engine_lifecycle_spec.bats`).
+- **yazi `<Right>` arrow now opens files like `l` / `<Enter>`** (#272): added a
+  `<Right>` entry to `mgr.prepend_keymap` in `module/config/yazi/keymap.toml`
+  routed through the same `plugin smart-enter` run, so pressing `<Right>` on a
+  regular file opens it via the configured opener instead of silently no-oping.
+- **yazi routes `application/xml` (and `*+xml`) to code preview/spot and
+  `$EDITOR`** (#162): `module/config/yazi/yazi.toml` now maps
+  `application/{xml,xml-dtd}` and `application/*+xml` to the `edit` opener and
+  to the `code` spotter/previewer (new `prepend_spotters` block + prepended
+  `prepend_previewers` entries), so `.xml` files preview with syntax
+  highlighting and open in `$EDITOR` instead of falling through to `file` /
+  `xdg-open`. ZIP-based Office formats (`*.docx`/`*.xlsx`) are excluded — they
+  are not `*+xml` and keep their `archive` handling.
+
+### Changed
+
+- **yazi config drops keys removed upstream in v26.5.6** (#273): removed the
+  inert `title_format` (`[mgr]`) and `micro_workers` / `macro_workers`
+  (`[tasks]`) keys from `module/config/yazi/yazi.toml`. All three matched
+  Yazi's shipped defaults (never customized) and were removed upstream; the
+  rest of `[mgr]` / `[tasks]` is unchanged.
 
 ## [v0.1.0-rc3] - 2026-06-23
 

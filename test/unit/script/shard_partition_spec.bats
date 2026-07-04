@@ -32,7 +32,9 @@ setup() {
 10 d_spec.bats
 1 e_spec.bats
 EOF
-    SPECS=$'test/unit/a_spec.bats\ntest/unit/b_spec.bats\ntest/unit/c_spec.bats\ntest/unit/d_spec.bats\ntest/unit/e_spec.bats'
+    # Exported so the `run bash -c "... \"\${SPECS}\" ..."` tests below can see
+    # it in the child shell (an unexported var expands to empty there).
+    export SPECS=$'test/unit/a_spec.bats\ntest/unit/b_spec.bats\ntest/unit/c_spec.bats\ntest/unit/d_spec.bats\ntest/unit/e_spec.bats'
 }
 
 teardown() {

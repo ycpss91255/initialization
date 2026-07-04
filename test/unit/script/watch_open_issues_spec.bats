@@ -117,6 +117,36 @@ _diff() { run bash -c "source '${SCRIPT}'; watch_issues_diff '${PREV}' '${CUR}'"
     assert_output --partial "--repo is required"
 }
 
+@test "--repo as the last token exits 2, does not hang" {
+    run "${SCRIPT}" --repo
+    assert_failure 2
+    assert_output --partial "--repo needs a value"
+}
+
+@test "--interval as the last token exits 2, does not hang" {
+    run "${SCRIPT}" --repo o/r --interval
+    assert_failure 2
+    assert_output --partial "--interval needs a value"
+}
+
+@test "--state-file as the last token exits 2, does not hang" {
+    run "${SCRIPT}" --repo o/r --state-file
+    assert_failure 2
+    assert_output --partial "--state-file needs a value"
+}
+
+@test "--interval 0 exits 2 (rejects busy-spin)" {
+    run "${SCRIPT}" --repo o/r --interval 0 --once
+    assert_failure 2
+    assert_output --partial "--interval must be a positive integer"
+}
+
+@test "--interval non-numeric exits 2" {
+    run "${SCRIPT}" --repo o/r --interval abc --once
+    assert_failure 2
+    assert_output --partial "--interval must be a positive integer"
+}
+
 # ── --once baseline arm (offline, gh stubbed to a canned issue list) ─────────
 
 @test "--once on a fresh state-file arms the baseline: 'watch armed: N issues'" {
@@ -136,4 +166,22 @@ EOF
     run "${SCRIPT}" --repo o/r --once --state-file "${sf}"
     assert_success
     assert_output --partial "watch armed: 2 issues"
+}
+
+@test "zero open issues: arms once, then stays quiet on the next cycle" {
+    cat > "${STUB_DIR}/gh" <<'EOF'
+#!/usr/bin/env bash
+echo '[]'
+EOF
+    chmod +x "${STUB_DIR}/gh"
+    local sf="${BATS_TEST_TMPDIR}/state.tsv"
+    : > "${sf}"
+    run "${SCRIPT}" --repo o/r --once --state-file "${sf}"
+    assert_success
+    assert_output --partial "watch armed: 0 issues"
+    # Second cycle against the same empty-but-armed baseline: no re-arm, silent.
+    run "${SCRIPT}" --repo o/r --once --state-file "${sf}"
+    assert_success
+    refute_output --partial "watch armed"
+    assert_output ""
 }

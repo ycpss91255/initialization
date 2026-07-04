@@ -21,7 +21,7 @@
 #
 # Options:
 #   --repo <OWNER>/<REPO>  GitHub repo (required)
-#   --interval <seconds>   Poll interval (default 180)
+#   --interval <seconds>   Poll interval, positive integer >= 1 (default 180)
 #   --state-file <path>    Snapshot file to diff against (default: a mktemp).
 #                          If it already holds a snapshot, the first cycle
 #                          reports changes against it instead of arming fresh.
@@ -35,7 +35,7 @@
 #   2   = arg error (missing/unknown flag)
 #
 # Output:
-#   On arm (empty state-file): one line `watch armed: N issues`.
+#   On the first (arming) cycle: one line `watch armed: N issues`.
 #   Thereafter, only when something changed: a dated header
 #   `== issue changes: <UTC> ==` followed by the NEW/UPDATED/CLOSED lines.
 #   Quiet otherwise, so Monitor fires only on real changes.
@@ -109,6 +109,7 @@ _snapshot() {
 # Warns and returns 0 on a transient fetch failure so the poll loop survives.
 _check_cycle() {
   local repo="$1" state_file="$2"
+  local armed_flag="${state_file}.armed"
   local cur changes
   cur="$(mktemp)"
 
@@ -118,9 +119,15 @@ _check_cycle() {
     return 0
   fi
 
-  # Empty state-file => arm the baseline, do not report.
-  if [[ ! -s "$state_file" ]]; then
+  # Arm the baseline on the first cycle only. "Armed" is tracked by a sentinel
+  # flag file rather than by state-file non-emptiness, so a repo with zero open
+  # issues (empty-but-armed baseline) stays quiet instead of re-arming — and
+  # emitting `watch armed: 0 issues` — on every poll. A pre-populated
+  # state-file counts as already armed, so it diffs on the first cycle
+  # (the documented --state-file behaviour).
+  if [[ ! -f "$armed_flag" && ! -s "$state_file" ]]; then
     mv "$cur" "$state_file"
+    : > "$armed_flag"
     printf 'watch armed: %s issues\n' "$(wc -l < "$state_file" | tr -d ' ')"
     return 0
   fi
@@ -131,6 +138,7 @@ _check_cycle() {
     printf '%s\n' "$changes"
   fi
   mv "$cur" "$state_file"
+  : > "$armed_flag"
   return 0
 }
 
@@ -140,16 +148,24 @@ main() {
   while (( $# > 0 )); do
     case "$1" in
       -h|--help)    usage; exit 0 ;;
-      --repo)       repo="${2:-}"; shift 2 ;;
-      --interval)   interval="${2:-}"; shift 2 ;;
-      --state-file) state_file="${2:-}"; shift 2 ;;
+      # Value flags: fail fast (exit 2) when the value is missing rather than
+      # letting `shift 2` no-op on the last token and spin the while loop.
+      --repo)       [[ $# -ge 2 ]] || { err "--repo needs a value"; exit 2; }; repo="$2"; shift 2 ;;
+      --interval)   [[ $# -ge 2 ]] || { err "--interval needs a value"; exit 2; }; interval="$2"; shift 2 ;;
+      --state-file) [[ $# -ge 2 ]] || { err "--state-file needs a value"; exit 2; }; state_file="$2"; shift 2 ;;
       --once)       once=1; shift ;;
       *)            err "unknown arg: $1"; usage; exit 2 ;;
     esac
   done
 
   [[ -n "$repo" ]] || { err "--repo is required"; usage; exit 2; }
-  [[ "$interval" =~ ^[0-9]+$ ]] || { err "--interval must be a non-negative integer"; exit 2; }
+  # A poll interval of 0 would busy-spin the gh fetch with no delay, so require
+  # a positive integer (>= 1) rather than merely non-negative. Explicit if/
+  # early-return (not `A && B || C`, which trips SC2015 and is not if-then-else).
+  if ! [[ "$interval" =~ ^[0-9]+$ ]] || (( interval < 1 )); then
+    err "--interval must be a positive integer (>= 1)"
+    exit 2
+  fi
   [[ -n "$state_file" ]] || state_file="$(mktemp)"
 
   _check_cycle "$repo" "$state_file"
@@ -159,7 +175,7 @@ main() {
   fi
 
   while true; do
-    (( interval > 0 )) && sleep "$interval"
+    sleep "$interval"
     _check_cycle "$repo" "$state_file"
   done
 }

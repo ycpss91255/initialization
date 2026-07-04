@@ -36,6 +36,53 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   best-effort provisions the binary via `npm install -g ccstatusline`
   (skippable under `INIT_UBUNTU_STATUSLINE_NO_BINARY` so no host package
   install runs from a test path).
+### Added
+
+- **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
+  a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
+  for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,
+  `C-Arrow`/`M-C-Arrow` window/pane/session navigation, and `C-Arrow` copy-mode-vi
+  pane navigation — reusing the exact commands and flags of their vi-key
+  counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
+  session auto-restores on tmux server start (issue #266). Existing `hjkl`
+  bindings are unchanged.
+### Fixed
+
+- **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
+  is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
+  `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever
+  `BACKUP_DIR` was empty. The v2 path (`runner` / `module_bootstrap` / `lib`)
+  never sets `BACKUP_DIR`, so any config-type module (fish / tmux / neovim /
+  ssh-config, etc.) that backed up an existing config on a re-run or upgrade
+  aborted the entire run on all targets. `backup_file` now defaults
+  `BACKUP_DIR` into the tool's state dir
+  (`${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/init_ubuntu}/backup/<timestamp>`,
+  the same base convention as `state_get_path()`), warns once, and continues —
+  backups still work when a dir is provided. The now-redundant per-module
+  `BACKUP_DIR` pre-seed in `module/claude-code-config.module.sh` upgrade is
+  removed. Covered by unit tests (`test/unit/general_spec.bats`,
+  `test/unit/module/ssh-config_spec.bats`) and a real engine-lifecycle
+  integration test (`test/integration/lifecycle/engine_lifecycle_spec.bats`).
+- **yazi `<Right>` arrow now opens files like `l` / `<Enter>`** (#272): added a
+  `<Right>` entry to `mgr.prepend_keymap` in `module/config/yazi/keymap.toml`
+  routed through the same `plugin smart-enter` run, so pressing `<Right>` on a
+  regular file opens it via the configured opener instead of silently no-oping.
+- **yazi routes `application/xml` (and `*+xml`) to code preview/spot and
+  `$EDITOR`** (#162): `module/config/yazi/yazi.toml` now maps
+  `application/{xml,xml-dtd}` and `application/*+xml` to the `edit` opener and
+  to the `code` spotter/previewer (new `prepend_spotters` block + prepended
+  `prepend_previewers` entries), so `.xml` files preview with syntax
+  highlighting and open in `$EDITOR` instead of falling through to `file` /
+  `xdg-open`. ZIP-based Office formats (`*.docx`/`*.xlsx`) are excluded — they
+  are not `*+xml` and keep their `archive` handling.
+
+### Changed
+
+- **yazi config drops keys removed upstream in v26.5.6** (#273): removed the
+  inert `title_format` (`[mgr]`) and `micro_workers` / `macro_workers`
+  (`[tasks]`) keys from `module/config/yazi/yazi.toml`. All three matched
+  Yazi's shipped defaults (never customized) and were removed upstream; the
+  rest of `[mgr]` / `[tasks]` is unchanged.
 
 ## [v0.1.0-rc3] - 2026-06-23
 

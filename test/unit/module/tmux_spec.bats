@@ -208,6 +208,86 @@ _mock_apt_list() {
     [[ -d "${MODULE_DIR}/config/tmux/tmux-powerline" ]]
 }
 
+# ── Keybinding / plugin config content (issues #265, #266, #245) ─────────────
+# These assert the shipped tmux.conf text directly (same "repo ships X"
+# precedent as qmk-firmware_spec.bats). _TMUX_CONF points at the canonical
+# deploy source per module/tmux.module.sh.
+
+_TMUX_CONF() { printf '%s' "${MODULE_DIR}/config/tmux/tmux.conf"; }
+
+@test "issue #265: tmux.conf binds M-m (no prefix) to resize-pane -Z zoom toggle" {
+    run grep -qE '^bind-key -n M-m resize-pane -Z$' "$(_TMUX_CONF)"
+    assert_success
+}
+
+@test "issue #266: tmux.conf enables @continuum-restore (uncommented, on)" {
+    run grep -qE "^set -g @continuum-restore 'on'\$" "$(_TMUX_CONF)"
+    assert_success
+    # continuum plugin must still be declared for the option to take effect.
+    run grep -qE "^set -g @plugin 'tmux-plugins/tmux-continuum'\$" "$(_TMUX_CONF)"
+    assert_success
+}
+
+@test "issue #245: resize-pane root M-Arrow mirrors M-h/l/k/j" {
+    local _conf; _conf="$(_TMUX_CONF)"
+    run grep -qE '^bind-key -nr M-Left[[:space:]]+resize-pane -L 3$'  "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -nr M-Right[[:space:]]+resize-pane -R 3$' "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -nr M-Up[[:space:]]+resize-pane -U 1$'    "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -nr M-Down[[:space:]]+resize-pane -D 1$'  "${_conf}"
+    assert_success
+}
+
+@test "issue #245: swap prefix Arrow mirrors h/l/k/j" {
+    local _conf; _conf="$(_TMUX_CONF)"
+    run grep -qE '^bind-key -r Left[[:space:]]+swap-window -t :- \\; select-window -t :-$'  "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -r Right[[:space:]]+swap-window -t :\+ \\; select-window -t :\+$' "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -r Up[[:space:]]+swap-pane -s :\.- \\; display-panes$'   "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -r Down[[:space:]]+swap-pane -s :\.\+ \\; display-panes$' "${_conf}"
+    assert_success
+}
+
+@test "issue #245: nav root C-Arrow / M-C-Arrow mirrors C-h/l/k/j and M-C-k/j" {
+    local _conf; _conf="$(_TMUX_CONF)"
+    run grep -qE '^bind-key -nr C-Left[[:space:]]+select-window -t :-$'  "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -nr C-Right[[:space:]]+select-window -t :\+$' "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -nr C-Up[[:space:]]+select-pane -t :\.- \\; display-panes$'   "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -nr C-Down[[:space:]]+select-pane -t :\.\+ \\; display-panes$' "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -nr M-C-Down[[:space:]]+switch-client -n$' "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -nr M-C-Up[[:space:]]+switch-client -p$'   "${_conf}"
+    assert_success
+}
+
+@test "issue #245: copy-mode-vi C-Arrow mirrors C-j/C-k pane navigation" {
+    local _conf; _conf="$(_TMUX_CONF)"
+    run grep -qE '^bind-key -T copy-mode-vi C-Down[[:space:]]+select-pane -t :\.\+ \\; display-panes$' "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -T copy-mode-vi C-Up[[:space:]]+select-pane -t :\.- \\; display-panes$'   "${_conf}"
+    assert_success
+}
+
+@test "issue #245: original hjkl bindings remain unchanged" {
+    local _conf; _conf="$(_TMUX_CONF)"
+    run grep -qE '^bind-key -nr M-h resize-pane -L 3$' "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -r h swap-window -t :- \\; select-window -t :-$' "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -nr C-j select-pane -t :\.\+ \\; display-panes$' "${_conf}"
+    assert_success
+    run grep -qE '^bind-key -T copy-mode-vi C-j select-pane -t :\.\+ \\; display-panes$' "${_conf}"
+    assert_success
+}
+
 # ── is_installed: relies on dpkg ─────────────────────────────────────────────
 
 @test "is_installed returns nonzero when dpkg does not report tmux" {

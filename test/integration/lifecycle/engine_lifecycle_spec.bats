@@ -198,6 +198,31 @@ teardown() {
     [[ ! -f "${ENGINE_LT_HOME}/.ssh/config" ]]
 }
 
+# Regression (linux-review F1): the v2 path never exports BACKUP_DIR. A config
+# module that backs up an existing config on upgrade used to hit
+# `log_fatal "BACKUP_DIR is not set."` — exit 1, uncatchable by the archetype's
+# `|| true`, aborting the whole run on every target. Drive the REAL engine
+# upgrade with BACKUP_DIR forced empty (the last env assignment wins over the
+# helper's default) and prove the run completes and still snapshots the config.
+@test "config: real upgrade does NOT abort when BACKUP_DIR is unset (F1)" {
+    engine_lt_run "" install ssh-config --no-deps -y
+    assert_success
+    [[ -f "${ENGINE_LT_HOME}/.ssh/config" ]]
+
+    # BACKUP_DIR= empties the helper-injected value → backup_file must default
+    # it into the state dir instead of fatally aborting.
+    engine_lt_run "BACKUP_DIR=" upgrade ssh-config -y
+    assert_success
+    engine_lt_assert_no_wiring_errors
+    refute_output --partial "BACKUP_DIR is not set"
+    # Managed config survived the upgrade and the pre-upgrade copy was snapshotted
+    # under the defaulted state-dir backup.
+    [[ -f "${ENGINE_LT_HOME}/.ssh/config" ]]
+    grep -q "init_ubuntu managed" "${ENGINE_LT_HOME}/.ssh/config"
+    run bash -c "cat '${ENGINE_LT_STATE}'/backup/*/config"
+    assert_success
+}
+
 # ── custom archetype (claude-code-config: macro + hand-rolled overrides) ─────
 
 @test "custom: real install runs the overridden lifecycle + records state, then verify + remove" {

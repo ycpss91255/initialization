@@ -267,7 +267,17 @@ function have_sudo_access() {
 #   backup_file folder folder/file.txt
 function backup_file() {
     if [[ -z "${BACKUP_DIR:-}" ]]; then
-        log_fatal "BACKUP_DIR is not set."
+        # The v2 path (runner / module_bootstrap / lib) never sets BACKUP_DIR —
+        # only legacy v1 module/setup_*.sh scripts do. Fatally aborting here
+        # (log_fatal = exit 1) is uncatchable by a caller's `|| true` and would
+        # kill the whole run whenever a config module re-runs/upgrades over an
+        # existing config (linux-review F1). Default it into the tool's state
+        # dir instead — same base convention as state_get_path() — and export
+        # it so repeated calls in one run share a single snapshot dir and the
+        # warning fires only once.
+        local _state_base="${INIT_UBUNTU_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/init_ubuntu}"
+        export BACKUP_DIR="${_state_base}/backup/${DATETIME:-$(date +%Y%m%d-%H%M%S)}"
+        log_warn "BACKUP_DIR not set; defaulting to ${BACKUP_DIR}"
     fi
 
     log_debug "Backup directory: ${BACKUP_DIR}"

@@ -20,6 +20,22 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Fixed
+
+- **`setup_ubuntu doctor` now invokes each module's `doctor()` override**
+  (architecture-review F1): previously the Engine `doctor` subcommand ran only
+  the state.json-vs-reality drift report and never called a module's `doctor()`,
+  while `runner_doctor()` sat as dead code and all four `template/*.template.sh`
+  files promised the opposite ("Engine calls this from `setup_ubuntu doctor`").
+  `doctor` now AUGMENTS the drift report with the per-module health check: with
+  no args it runs `doctor()` across every installed module, with `doctor
+  <module>...` it scopes to the named modules (unknown names → exit 2). The
+  Diag-class exit code (PRD §7.4) is nonzero when EITHER the drift report OR a
+  module's `doctor()` fails, so `runner_doctor()` is reachable and the template
+  contract is true. Modules without a `doctor()` override fall back to
+  `is_installed` (ADR-0002 / ADR-0009), wired in `lib/runner.sh` so the doctor
+  phase no longer aborts on an unimplemented `doctor()`.
+
 ## [v0.1.0-rc3] - 2026-06-23
 
 ### Added

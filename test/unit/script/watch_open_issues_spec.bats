@@ -14,6 +14,10 @@
 
 load "${BATS_TEST_DIRNAME}/../../helper/common"
 
+# `run --separate-stderr` (below) needs bats >= 1.5.0; declare it so bats does
+# not emit a BW02 warning and to fail loudly on an older runner.
+bats_require_minimum_version 1.5.0
+
 setup() {
     setup_test_env
     SCRIPT="${REPO_ROOT}/.claude/script/watch-open-issues.sh"
@@ -40,7 +44,11 @@ teardown() {
 # Emit a snapshot fixture line: number<TAB>updatedAt<TAB>title
 _snap() { printf '%s\t%s\t%s\n' "$1" "$2" "$3"; }
 
-_diff() { run bash -c "source '${SCRIPT}'; watch_issues_diff '${PREV}' '${CUR}'"; }
+# `run --separate-stderr` keeps `$output` = STDOUT only, so the strict
+# empty-output (quiet) assertion is immune to stderr noise — under the kcov
+# coverage shard, kcov prints a "LINENO is not an integer" warning to stderr,
+# which a plain `run` would merge into `$output` and break `assert_output ""`.
+_diff() { run --separate-stderr bash -c "source '${SCRIPT}'; watch_issues_diff '${PREV}' '${CUR}'"; }
 
 # ── Pure diff function: NEW / UPDATED / CLOSED ───────────────────────────────
 
@@ -180,7 +188,9 @@ EOF
     assert_success
     assert_output --partial "watch armed: 0 issues"
     # Second cycle against the same empty-but-armed baseline: no re-arm, silent.
-    run "${SCRIPT}" --repo o/r --once --state-file "${sf}"
+    # `--separate-stderr` keeps `$output` = STDOUT only so the strict quiet
+    # assertion is immune to kcov's stderr warning under the coverage shard.
+    run --separate-stderr "${SCRIPT}" --repo o/r --once --state-file "${sf}"
     assert_success
     refute_output --partial "watch armed"
     assert_output ""

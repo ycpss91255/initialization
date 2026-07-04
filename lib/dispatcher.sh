@@ -1080,6 +1080,7 @@ _dispatcher_doctor_drift() {
                 bash --noprofile --norc -c "
                     source '${LIB_DIR}/logger.sh' >/dev/null 2>&1
                     source '${LIB_DIR}/general.sh' >/dev/null 2>&1
+                    source '${LIB_DIR}/module_helper.sh' >/dev/null 2>&1
                     source '${_file}'
                     is_installed
                 " >/dev/null 2>&1

@@ -20,6 +20,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Added
+
+- **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
+  a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
+  for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,
+  `C-Arrow`/`M-C-Arrow` window/pane/session navigation, and `C-Arrow` copy-mode-vi
+  pane navigation — reusing the exact commands and flags of their vi-key
+  counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
+  session auto-restores on tmux server start (issue #266). Existing `hjkl`
+  bindings are unchanged.
 ### Fixed
 
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`

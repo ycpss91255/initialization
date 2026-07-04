@@ -201,7 +201,11 @@ teardown() {
 # ── custom archetype (claude-code-config: macro + hand-rolled overrides) ─────
 
 @test "custom: real install runs the overridden lifecycle + records state, then verify + remove" {
-    engine_lt_run "" install claude-code-config --no-deps -y
+    # Skip the best-effort `npm install -g ccstatusline` host install (#231):
+    # the launcher binary is not needed for the config-drop lifecycle assertions
+    # and hard rule 2 forbids host package installs from a test path.
+    engine_lt_run "INIT_UBUNTU_STATUSLINE_NO_BINARY=true" \
+        install claude-code-config --no-deps -y
     assert_success
     engine_lt_assert_no_wiring_errors
     assert_output --partial "claude-code-config installed"
@@ -209,11 +213,13 @@ teardown() {
     engine_lt_state_has claude-code-config
     # The custom _claude_config_drop_files override dropped all companion files.
     [[ -f "${ENGINE_LT_HOME}/.claude/settings.json" ]]
-    [[ -x "${ENGINE_LT_HOME}/.claude/run-statusline.sh" ]]
+    [[ -x "${ENGINE_LT_HOME}/.claude/run-ccstatusline.sh" ]]
+    [[ -f "${ENGINE_LT_HOME}/.config/ccstatusline/settings.json" ]]
     [[ -n "$(engine_lt_sidecar claude-code-config)" ]]
 
     # Idempotent re-install.
-    engine_lt_run "" install claude-code-config --no-deps -y
+    engine_lt_run "INIT_UBUNTU_STATUSLINE_NO_BINARY=true" \
+        install claude-code-config --no-deps -y
     assert_success
 
     engine_lt_run "" verify claude-code-config

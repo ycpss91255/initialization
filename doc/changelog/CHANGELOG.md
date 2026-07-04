@@ -37,6 +37,22 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`script/watch-open-issues.sh` open-issue CHANGE-WATCHER**
+  (`test/unit/script/watch_open_issues_spec.bats`): a Monitor-companion poll
+  script (same shape as `auto-merge-on-green.sh` / `wait-pr-ci.sh`) that a
+  maintainer session wraps in a single Monitor to get timely notification when
+  any OPEN GitHub issue changes. Each cycle snapshots
+  `gh issue list --state open` to a stable `number<TAB>updatedAt<TAB>title`
+  stream and diffs it against the previous snapshot; it prints a dated header
+  plus `NEW #n` / `UPDATED #n` / `CLOSED #n` lines only when something changed
+  (quiet otherwise, so Monitor fires only on real changes), arming with a
+  one-line `watch armed: N issues` baseline on start. The comparison lives in a
+  PURE, offline-unit-testable function `watch_issues_diff <prev> <cur>` that
+  reads two snapshot files and touches no network; the main loop owns the
+  `gh` fetch, the sleep, and graceful handling of transient fetch failures.
+  Exit-code-contract script (`set -uo pipefail`, ADR-0007): `0` normal, `2`
+  arg error. Args: `--repo` (required), `--interval` (default 180),
+  `--state-file`, `--once`, `-h|--help`.
 - **Standard template for one-off bash tools** (`template/tool.template.sh`) +
   matching conformance spec (`test/unit/tool_template_spec.bats`), guide
   (`doc/guide/small-tool-template.md`) and ADR-0029. Gives `tool/` one-off

@@ -167,6 +167,15 @@ _find_lintable_sh() {
         -print0
 }
 
+# NOTE: fish discovery must NOT prune module/config wholesale like the
+# ShellCheck pass does. The .sh files under module/config are vendored
+# third-party config, but the *.fish files there ARE the maintainer's own
+# fish config (module/config/fish/**) that init_ubuntu installs — they are
+# authored here and MUST be linted. Pruning module/config dropped every
+# fish file (0 checked; the linter was silently a no-op). Instead we keep
+# the deprecated/holding/v1 prunes and prune only the one genuinely
+# vendored fish path: module/config/neovim/fnm_shell_config (fnm-generated
+# shell integration).
 _find_lintable_fish() {
     find "${REPO_ROOT}" \
         \( -path "${REPO_ROOT}/.git" -o \
@@ -177,7 +186,7 @@ _find_lintable_fish() {
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
            -path "${REPO_ROOT}/tool" -o \
-           -path "${REPO_ROOT}/module/config" -o \
+           -path "${REPO_ROOT}/module/config/neovim/fnm_shell_config" -o \
            -path "${REPO_ROOT}/module/submodule" -o \
            -path "${REPO_ROOT}/module/function" \) -prune -o \
         -type f -name "*.fish" -print0

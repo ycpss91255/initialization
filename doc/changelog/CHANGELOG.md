@@ -66,6 +66,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   bindings are unchanged.
 ### Fixed
 
+- **CI fish syntax check now actually lints the fish config** (`script/ci/ci.sh`):
+  `_find_lintable_fish` pruned `module/config` wholesale (copied from the
+  ShellCheck pass, where the .sh files there are vendored third-party config).
+  But every tracked `*.fish` file lives under `module/config/fish/**` — the
+  maintainer's own fish config that init_ubuntu installs — so the prune dropped
+  100% of them: the `fish -n` check ran over ZERO files and was silently a
+  no-op. Discovery now prunes only the one genuinely vendored fish path
+  (`module/config/neovim/fnm_shell_config`, the fnm-generated shell
+  integration) while keeping the deprecated/holding/v1 prunes, so all 21
+  real fish scripts are checked. New regression spec
+  (`test/unit/script/ci_lint_discovery_spec.bats`) asserts the discovery
+  returns a nonzero count over the repo so it cannot silently regress to 0
+  again. No fish syntax violations surfaced once the files were actually
+  checked.
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
   is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
   `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever

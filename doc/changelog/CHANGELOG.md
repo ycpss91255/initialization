@@ -20,6 +20,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Added
+
+- **Standard template for one-off bash tools** (`template/tool.template.sh`) +
+  matching conformance spec (`test/unit/tool_template_spec.bats`), guide
+  (`doc/guide/small-tool-template.md`) and ADR-0028. Gives `tool/` one-off
+  scripts a proven skeleton: `--help`, `--dry-run`, the `0=ok / 2=usage-error`
+  exit-code contract, grep-guarded idempotent work, and `set -euo pipefail`
+  (ADR-0007 always-act — closes the missing-`set -u` bug class an audit found
+  across the ~16 untested one-off scripts). The template draws the tool-vs-module
+  line explicitly: one-offs use this; reusable tools are promoted to modules
+  (PRD §6.5/§6.6). No existing tools are retrofitted by this change.
+
 ## [v0.1.0-rc3] - 2026-06-23
 
 ### Added

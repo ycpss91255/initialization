@@ -20,8 +20,42 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Changed
+
+- **`claude-code-config` statusline switches from the `cc-statusline` Claude
+  plugin to the `ccstatusline` global binary** (sirmalloc/ccstatusline; #231,
+  also resolves #116). The launcher `module/config/claude/run-statusline.sh`
+  is renamed to `run-ccstatusline.sh` and now execs the `ccstatusline` binary,
+  feeding it the real tmux pane width minus the flexMode `-8` offset and
+  post-processing reset timers with an NBSP-aware sed pipeline (5 rules,
+  single-highest-unit only). A new `ccstatusline.settings.json` template ships
+  the maintainer-verified two-row layout (version 3) and is dropped to the XDG
+  config path (`${XDG_CONFIG_HOME:-~/.config}/ccstatusline/settings.json`);
+  `settings.json` drops the obsolete `cc-statusline` marketplace/plugin
+  entries and points `statusLine.command` at `run-ccstatusline.sh`. Install
+  best-effort provisions the binary via `npm install -g ccstatusline`
+  (skippable under `INIT_UBUNTU_STATUSLINE_NO_BINARY` so no host package
+  install runs from a test path).
 ### Added
 
+- **Archetype real-mutation-body coverage unit tests**
+  (`test/unit/module_helper_real_bodies_spec.bats`): closes the highest-risk
+  gap in the module archetype layer (module-template-audit #1 + #2). The apt
+  archetype's REAL (non-dry-run) lifecycle bodies were never executed by any
+  test — per-module specs stub `install()`/`remove()`/`purge()` wholesale, and
+  the one integration apt test is reduced and not in the kcov shards. The new
+  specs stub the external side-effecting commands (`sudo`, `have_sudo_access`,
+  `is_installed`; real `rm` against scratch paths) and drive the real branches
+  of `module_default_apt_install` (PPA add via `apt-add-repository`, both
+  no-sudo guards, `apt-get update`/`install`), `module_default_apt_upgrade`
+  (`--only-upgrade` + no-sudo guard), `module_default_apt_remove`, and
+  `module_default_apt_purge` (`apt-get purge` + PPA `--remove` +
+  `CONFIG_PATHS` rm loop). Also covers the `purge` default of the
+  github-release archetype (`module_default_github_release_purge`: remove +
+  `CONFIG_PATHS` loop) and the config archetype
+  (`module_default_config_purge`) — `purge` is the ADR-0015 rollback verb and
+  was previously only exercised in dry-run. Test-only; no production code
+  changed.
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,
@@ -50,6 +84,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **CI fish syntax check now actually lints the fish config** (`script/ci/ci.sh`):
+  `_find_lintable_fish` pruned `module/config` wholesale (copied from the
+  ShellCheck pass, where the .sh files there are vendored third-party config).
+  But every tracked `*.fish` file lives under `module/config/fish/**` — the
+  maintainer's own fish config that init_ubuntu installs — so the prune dropped
+  100% of them: the `fish -n` check ran over ZERO files and was silently a
+  no-op. Discovery now prunes only the one genuinely vendored fish path
+  (`module/config/neovim/fnm_shell_config`, the fnm-generated shell
+  integration) while keeping the deprecated/holding/v1 prunes, so all 21
+  real fish scripts are checked. New regression spec
+  (`test/unit/script/ci_lint_discovery_spec.bats`) asserts the discovery
+  returns a nonzero count over the repo so it cannot silently regress to 0
+  again. No fish syntax violations surfaced once the files were actually
+  checked.
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
   is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
   `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever

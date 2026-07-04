@@ -410,3 +410,72 @@ EOF
     assert_failure
     assert_output --partial "Invalid CORE_SHARD_COUNT"
 }
+
+# ── ShellCheck parallelization + fail-signal (perf/ci-parallel-shellcheck) ───
+# The lint step forks shellcheck across nproc workers (xargs -P + -n batch)
+# instead of one serial `xargs shellcheck` over all ~197 files (the 212s
+# critical-path tail). The correctness constraint: parallelizing must NOT
+# lose the fail-on-violation signal — xargs exits 123 when ANY batched child
+# reports a violation, and the lint step must still exit nonzero on that.
+
+# Stub the three lint tools onto the fixture PATH (already prepended in
+# setup). shellcheck records argv and FAILS (rc=1) for any file containing
+# the literal token SHELLCHECK_VIOLATION; hadolint/fish are inert no-ops so
+# the fixture Dockerfiles / (absent) fish files never gate the lint test.
+_stub_lint_tools() {
+    cat > "${FIXTURE_ROOT}/bin/shellcheck" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${STUB_CALL_LOG}/shellcheck.calls"
+_rc=0
+for _a in "$@"; do
+    case "${_a}" in
+        -*) ;;
+        *) grep -q 'SHELLCHECK_VIOLATION' "${_a}" 2>/dev/null && _rc=1 ;;
+    esac
+done
+exit "${_rc}"
+EOF
+    printf '#!/usr/bin/env bash\nexit 0\n' > "${FIXTURE_ROOT}/bin/hadolint"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "${FIXTURE_ROOT}/bin/fish"
+    chmod +x "${FIXTURE_ROOT}/bin/shellcheck" \
+             "${FIXTURE_ROOT}/bin/hadolint" \
+             "${FIXTURE_ROOT}/bin/fish"
+}
+
+@test "lint fails (nonzero) when a linted script has a ShellCheck violation" {
+    _stub_lint_tools
+    printf '#!/usr/bin/env bash\n: SHELLCHECK_VIOLATION\n' \
+        > "${FIXTURE_ROOT}/bad.sh"
+    run "${CI_SH}" --ci-lint
+    assert_failure
+    assert_output --partial "ShellCheck failed"
+}
+
+@test "lint passes (zero) when every linted script is clean" {
+    _stub_lint_tools
+    run "${CI_SH}" --ci-lint
+    assert_success
+    assert_output --partial "ShellCheck OK"
+}
+
+@test "parallel lint still fails when one violation hides among many clean scripts (xargs 123 preserved)" {
+    _stub_lint_tools
+    # Enough clean scripts that a small batch size forces xargs to fork
+    # several shellcheck invocations — the violation lives in only one batch.
+    local _i
+    for _i in $(seq 1 40); do
+        printf '#!/usr/bin/env bash\n:\n' \
+            > "${FIXTURE_ROOT}/clean_${_i}.sh"
+    done
+    printf '#!/usr/bin/env bash\n: SHELLCHECK_VIOLATION\n' \
+        > "${FIXTURE_ROOT}/needle_bad.sh"
+
+    SHELLCHECK_BATCH=5 run "${CI_SH}" --ci-lint
+    assert_failure
+
+    # Batching must have forked MORE THAN ONE shellcheck process — proof the
+    # run is parallelized across batches, not a single serial invocation.
+    run wc -l < "${STUB_CALL_LOG}/shellcheck.calls"
+    assert_success
+    [[ "${output// /}" -gt 1 ]]
+}

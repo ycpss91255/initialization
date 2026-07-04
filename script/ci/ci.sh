@@ -167,6 +167,15 @@ _find_lintable_sh() {
         -print0
 }
 
+# NOTE: fish discovery must NOT prune module/config wholesale like the
+# ShellCheck pass does. The .sh files under module/config are vendored
+# third-party config, but the *.fish files there ARE the maintainer's own
+# fish config (module/config/fish/**) that init_ubuntu installs — they are
+# authored here and MUST be linted. Pruning module/config dropped every
+# fish file (0 checked; the linter was silently a no-op). Instead we keep
+# the deprecated/holding/v1 prunes and prune only the one genuinely
+# vendored fish path: module/config/neovim/fnm_shell_config (fnm-generated
+# shell integration).
 _find_lintable_fish() {
     find "${REPO_ROOT}" \
         \( -path "${REPO_ROOT}/.git" -o \
@@ -177,7 +186,7 @@ _find_lintable_fish() {
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
            -path "${REPO_ROOT}/tool" -o \
-           -path "${REPO_ROOT}/module/config" -o \
+           -path "${REPO_ROOT}/module/config/neovim/fnm_shell_config" -o \
            -path "${REPO_ROOT}/module/submodule" -o \
            -path "${REPO_ROOT}/module/function" \) -prune -o \
         -type f -name "*.fish" -print0
@@ -196,7 +205,28 @@ _run_shellcheck() {
         _info "  (no shell scripts to check — skipping)"
         return 0
     fi
-    _find_lintable_sh | xargs -0 shellcheck -x
+    # Parallelize: a single `xargs shellcheck` passed ALL ~197 files to one
+    # ShellCheck process — 212s serial and the critical-path CI tail. Adding
+    # -P alone does nothing (still one child); we ALSO batch with -n so xargs
+    # forks one shellcheck per ${SHELLCHECK_BATCH} files across $(nproc)
+    # workers. `-x` still resolves `source`d files from disk regardless of
+    # which batch they land in, so batching never changes WHICH files/sources
+    # are checked.
+    #
+    # Fail-signal (correctness constraint): xargs returns 123 — not 1 — when
+    # ANY batched child shellcheck reports a violation. We capture that rc
+    # and treat ANY nonzero (incl. 123) as failure via _die, so the lint step
+    # exits nonzero on a violation regardless of set -e state. Do NOT compare
+    # against a single expected code (e.g. `-eq 1`): that would swallow 123.
+    local _jobs
+    _jobs="$(nproc 2>/dev/null || echo 4)"
+    local _rc=0
+    _find_lintable_sh \
+        | xargs -0 -P "${_jobs}" -n "${SHELLCHECK_BATCH:-40}" shellcheck -x \
+        || _rc=$?
+    if [[ "${_rc}" -ne 0 ]]; then
+        _die "ShellCheck failed (rc=${_rc}) — see violations above"
+    fi
     _info "ShellCheck OK"
 }
 

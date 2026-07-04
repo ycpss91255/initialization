@@ -2,7 +2,7 @@
 # test/unit/tool_template_spec.bats — conformance spec for template/tool.template.sh
 #
 # The tool template is the standard skeleton for ONE-OFF bash tools under
-# tool/ (see doc/adr/0028-small-tool-template.md, doc/guide/small-tool-template.md).
+# tool/ (see doc/adr/0029-small-tool-template.md, doc/guide/small-tool-template.md).
 # This spec drives a reference instantiation of the template through the
 # 3 canonical contract cases plus idempotency, so downstream one-off tools
 # inherit a proven shape:

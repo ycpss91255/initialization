@@ -24,7 +24,7 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 - **Standard template for one-off bash tools** (`template/tool.template.sh`) +
   matching conformance spec (`test/unit/tool_template_spec.bats`), guide
-  (`doc/guide/small-tool-template.md`) and ADR-0028. Gives `tool/` one-off
+  (`doc/guide/small-tool-template.md`) and ADR-0029. Gives `tool/` one-off
   scripts a proven skeleton: `--help`, `--dry-run`, the `0=ok / 2=usage-error`
   exit-code contract, grep-guarded idempotent work, and `set -euo pipefail`
   (ADR-0007 always-act — closes the missing-`set -u` bug class an audit found

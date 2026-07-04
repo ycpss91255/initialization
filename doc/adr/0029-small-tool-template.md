@@ -1,4 +1,4 @@
-# ADR-0028: Standardize one-off bash tools on a template + test pattern
+# ADR-0029: Standardize one-off bash tools on a template + test pattern
 
 - **Status:** Accepted
 - **Date:** 2026-07-04

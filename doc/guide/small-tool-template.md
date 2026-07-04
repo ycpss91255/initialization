@@ -5,7 +5,7 @@ that live under `tool/`. It gives every such script the same predictable shape:
 a `--help`, a `--dry-run`, an explicit exit-code contract, grep-guarded
 idempotent work, and `set -euo pipefail`.
 
-See also: [ADR-0028](../adr/0028-small-tool-template.md).
+See also: [ADR-0029](../adr/0029-small-tool-template.md).
 
 ## When to use it (and when NOT to)
 

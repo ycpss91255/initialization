@@ -30,6 +30,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+
+### Changed
+
+- **CI ShellCheck lint now runs in parallel across CPUs** (`script/ci/ci.sh`
+  `_run_shellcheck`): the lint step previously piped all ~197 scripts to a
+  single `xargs -0 shellcheck -x` process (~212s serial and the critical-path
+  CI tail). It now forks one `shellcheck` per `${SHELLCHECK_BATCH:-40}`-file
+  batch across `$(nproc)` workers via
+  `xargs -0 -P "$(nproc)" -n "${SHELLCHECK_BATCH:-40}" shellcheck -x`. The
+  fail-on-violation signal is preserved: `xargs` returns 123 (not 1) when any
+  batched child reports a violation, so the code captures the exit status and
+  `_die`s on ANY nonzero (never comparing against a single expected code), and
+  the lint step still exits nonzero on any violation. `-x` continues to
+  resolve `source`d files from disk regardless of batch, so batching does not
+  change WHICH files/sources are linted. Covered by new unit tests in
+  `test/unit/script/ci_spec.bats` (fail-signal on violation, pass when clean,
+  and a violation hidden among many batches still fails via xargs 123).
+
 ### Fixed
 
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`

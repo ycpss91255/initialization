@@ -20,6 +20,23 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Changed
+
+- **Time-balanced CI core-shard partition** (`script/ci/shard_partition.sh`,
+  `script/ci/ci.sh`, `.github/workflows/ci.yaml`; ADR-0028): the core
+  (non-module) unit-test matrix now partitions specs by **measured runtime**
+  via greedy-LPT (Longest Processing Time) instead of count round-robin. The
+  audit measured the four core kcov shards at ~96-121 s each (the long pole
+  after lint) because a few heavy specs pinned individual shards; the new
+  partition balances the eight default shards to ~52-57 s each. Weights live in
+  a committed, self-maintaining file (`test/ci-shard-weights.tsv`, refreshed
+  from real bats junit timings via `just -f justfile.ci shard-weights-refresh`
+  and `script/ci/junit_to_weights.sh`) — reproducible from the repo, not a
+  CI-only cache (base ADR-00000017's no-CI-only-cache principle). The shard
+  count is now dynamic: `vars.CI_CORE_SHARDS` (default 8, up from a hardcoded
+  4) drives a `fromJSON` matrix. Every spec still runs exactly once, so the
+  coverage-merge denominator and the AC-17 80 % gate are unchanged.
+
 ### Added
 
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):

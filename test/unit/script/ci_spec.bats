@@ -43,6 +43,13 @@ setup() {
     printf 'FROM kcov/kcov\n' \
         > "${FIXTURE_ROOT}/dockerfile/Dockerfile.kcov-tools"
 
+    # The core-<N> sub-shard partition delegates to a sibling helper
+    # (ADR-0028); mirror it so SCRIPT_DIR-relative resolution works in the
+    # fixture. No weights file is copied, so the partition falls back to the
+    # default per-spec weight — still exhaustive + pairwise-disjoint.
+    cp "${REPO_ROOT}/script/ci/shard_partition.sh" \
+       "${FIXTURE_ROOT}/script/ci/shard_partition.sh"
+
     # Fixture unit specs (content never executed — bats is stubbed).
     printf '#!/usr/bin/env bats\n' \
         > "${FIXTURE_ROOT}/test/unit/module/alpha_spec.bats"
@@ -340,9 +347,12 @@ EOF
     assert_output --partial "KCOV_TOOLS_IMAGE=kcov-tools:pinned"
 }
 
-# ── Core sub-shard partitioning (issue #226) ─────────────────────────────────
-# Round-robin split of the sorted non-module specs into CORE_SHARD_COUNT
-# shards; the union of all shards is exactly the full set, pairwise-disjoint.
+# ── Core sub-shard partitioning (issue #226; ADR-0028) ───────────────────────
+# Time-weighted greedy-LPT split of the sorted non-module specs into
+# CORE_SHARD_COUNT shards (shard_partition.sh); the union of all shards is
+# exactly the full set, pairwise-disjoint. (In this fixture no weights file is
+# present, so every spec takes the default weight — the exhaustive + disjoint
+# invariant holds regardless of weight source.)
 
 @test "--ci-unit --module core-<N> --kcov writes coverage/shard-core-<N>" {
     # Add a few more core specs so the round-robin split is observable.
@@ -360,7 +370,7 @@ EOF
     [[ -d "${FIXTURE_ROOT}/coverage/shard-core-0" ]]
 }
 
-@test "core-<N> round-robin shards partition the core specs with no gap/overlap" {
+@test "core-<N> LPT shards partition the core specs with no gap/overlap" {
     # Five sorted core specs: aaa, bbb, ccc, ddd, core_thing.
     printf '#!/usr/bin/env bats\n' > "${FIXTURE_ROOT}/test/unit/aaa_spec.bats"
     printf '#!/usr/bin/env bats\n' > "${FIXTURE_ROOT}/test/unit/bbb_spec.bats"

@@ -38,6 +38,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   install runs from a test path).
 ### Added
 
+- **Archetype real-mutation-body coverage unit tests**
+  (`test/unit/module_helper_real_bodies_spec.bats`): closes the highest-risk
+  gap in the module archetype layer (module-template-audit #1 + #2). The apt
+  archetype's REAL (non-dry-run) lifecycle bodies were never executed by any
+  test — per-module specs stub `install()`/`remove()`/`purge()` wholesale, and
+  the one integration apt test is reduced and not in the kcov shards. The new
+  specs stub the external side-effecting commands (`sudo`, `have_sudo_access`,
+  `is_installed`; real `rm` against scratch paths) and drive the real branches
+  of `module_default_apt_install` (PPA add via `apt-add-repository`, both
+  no-sudo guards, `apt-get update`/`install`), `module_default_apt_upgrade`
+  (`--only-upgrade` + no-sudo guard), `module_default_apt_remove`, and
+  `module_default_apt_purge` (`apt-get purge` + PPA `--remove` +
+  `CONFIG_PATHS` rm loop). Also covers the `purge` default of the
+  github-release archetype (`module_default_github_release_purge`: remove +
+  `CONFIG_PATHS` loop) and the config archetype
+  (`module_default_config_purge`) — `purge` is the ADR-0015 rollback verb and
+  was previously only exercised in dry-run. Test-only; no production code
+  changed.
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,

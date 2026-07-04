@@ -14,7 +14,6 @@ show_hidden    = false
 show_symlink   = true
 scrolloff      = 5
 mouse_events   = [ "click", "scroll" ]
-title_format   = "Yazi: {cwd}"
 
 [preview]
 wrap            = "yes"
@@ -81,6 +80,9 @@ rules = [
 	# JSON
 	{ mime = "application/{json,ndjson}", use = [ "edit", "reveal" ] },
 	{ mime = "*/javascript", use = [ "edit", "reveal" ] },
+	# XML (mime-ext maps .xml to application/xml, not text/*)
+	{ mime = "application/{xml,xml-dtd}", use = [ "edit", "reveal" ] },
+	{ mime = "application/*+xml",         use = [ "edit", "reveal" ] },
 	# Empty file
 	{ mime = "inode/empty", use = [ "edit", "reveal" ] },
 	# Virtual file system
@@ -90,8 +92,6 @@ rules = [
 ]
 
 [tasks]
-micro_workers    = 10
-macro_workers    = 10
 bizarre_retry    = 3
 image_alloc      = 536870912  # 512MB
 image_bound      = [ 10000, 10000 ]
@@ -174,7 +174,17 @@ previewers = [
 	# Fallback
 	{ url = "*", run = "file" },
 ]
+prepend_spotters = [
+	# XML — mime-ext maps .xml to application/xml, which the built-in
+	# rules don't route to `code`; send XML (and *+xml) to the code spotter.
+	{ mime = "application/{xml,xml-dtd}", run = "code" },
+	{ mime = "application/*+xml",         run = "code" },
+]
 prepend_previewers = [
+	# XML — same reason as the spotter above: route to the code previewer
+	# instead of falling through to the `file` fallback classification.
+	{ mime = "application/{xml,xml-dtd}", run = "code" },
+	{ mime = "application/*+xml",         run = "code" },
 	# Markdown via glow (through piper)
 	{ url = "*.md",           run = 'piper -- CLICOLOR_FORCE=1 glow -w=$w -s=dark "$1"' },
 	{ mime = "text/markdown", run = 'piper -- CLICOLOR_FORCE=1 glow -w=$w -s=dark "$1"' },

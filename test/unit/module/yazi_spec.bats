@@ -641,3 +641,73 @@ _standalone_module() {
     assert_success
     [[ ! -e "$(_sidecar_path)" ]]
 }
+
+# ── Tracked config content (keymap.toml / yazi.toml) ─────────────────────────
+# Precedent: qmk-firmware_spec / codex_spec assert on tracked config-file
+# content. These lock the fixes for #272 (Right-arrow parity), #273 (drop
+# dead v26.5.6 keys) and #162 (route application/xml to code + $EDITOR).
+
+_yazi_keymap() { printf '%s' "${MODULE_DIR}/config/yazi/keymap.toml"; }
+_yazi_conf()   { printf '%s' "${MODULE_DIR}/config/yazi/yazi.toml"; }
+
+# Print the lines of a bracketed list block ("<key> = [ ... ]") from yazi.toml,
+# from the opening "<key> = [" line through the first line that is a lone "]".
+_yazi_block() {
+    awk -v key="$1" '
+        index($0, key " = [") { inb = 1 }
+        inb                   { print }
+        inb && /^\]/          { inb = 0 }
+    ' "$(_yazi_conf)"
+}
+
+# ── #272: <Right> smart-enter parity with l / <Enter> ────────────────────────
+
+@test "#272 keymap.toml binds <Right> to the smart-enter run (parity with l/<Enter>)" {
+    # The <Right> on-line must be immediately followed by the same
+    # 'plugin smart-enter' run as the existing l / <Enter> entries.
+    run grep -A1 -F 'on   = "<Right>"' "$(_yazi_keymap)"
+    assert_success
+    assert_output --partial 'run  = "plugin smart-enter"'
+}
+
+# ── #273: drop dead v26.5.6 keys (title_format / micro/macro_workers) ────────
+
+@test "#273 yazi.toml no longer declares title_format" {
+    run grep -Eq '^[[:space:]]*title_format[[:space:]]*=' "$(_yazi_conf)"
+    assert_failure
+}
+
+@test "#273 yazi.toml no longer declares micro_workers or macro_workers" {
+    run grep -Eq '^[[:space:]]*(micro|macro)_workers[[:space:]]*=' "$(_yazi_conf)"
+    assert_failure
+}
+
+@test "#273 the surviving [tasks] keys are untouched" {
+    run grep -Eq '^[[:space:]]*bizarre_retry[[:space:]]*=' "$(_yazi_conf)"
+    assert_success
+    run grep -Eq '^[[:space:]]*suppress_preload[[:space:]]*=' "$(_yazi_conf)"
+    assert_success
+}
+
+# ── #162: route application/xml (+*+xml) to code preview/spot + $EDITOR ───────
+
+@test "#162 opener routes application/xml and *+xml to the edit (\$EDITOR) opener" {
+    run grep -Eq 'application/\{xml,xml-dtd\}".*use = \[ "edit"' "$(_yazi_conf)"
+    assert_success
+    run grep -Eq 'application/\*\+xml".*use = \[ "edit"' "$(_yazi_conf)"
+    assert_success
+}
+
+@test "#162 a prepend_spotters block routes xml and *+xml to the code spotter" {
+    local _b; _b="$(_yazi_block prepend_spotters)"
+    [[ -n "${_b}" ]]
+    [[ "${_b}" == *'application/{xml,xml-dtd}", run = "code"'* ]]
+    [[ "${_b}" == *'application/*+xml"'*'run = "code"'* ]]
+}
+
+@test "#162 prepend_previewers routes xml and *+xml to the code previewer" {
+    local _b; _b="$(_yazi_block prepend_previewers)"
+    [[ -n "${_b}" ]]
+    [[ "${_b}" == *'application/{xml,xml-dtd}", run = "code"'* ]]
+    [[ "${_b}" == *'application/*+xml"'*'run = "code"'* ]]
+}

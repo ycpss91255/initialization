@@ -20,6 +20,22 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Changed
+
+- **`claude-code-config` statusline switches from the `cc-statusline` Claude
+  plugin to the `ccstatusline` global binary** (sirmalloc/ccstatusline; #231,
+  also resolves #116). The launcher `module/config/claude/run-statusline.sh`
+  is renamed to `run-ccstatusline.sh` and now execs the `ccstatusline` binary,
+  feeding it the real tmux pane width minus the flexMode `-8` offset and
+  post-processing reset timers with an NBSP-aware sed pipeline (5 rules,
+  single-highest-unit only). A new `ccstatusline.settings.json` template ships
+  the maintainer-verified two-row layout (version 3) and is dropped to the XDG
+  config path (`${XDG_CONFIG_HOME:-~/.config}/ccstatusline/settings.json`);
+  `settings.json` drops the obsolete `cc-statusline` marketplace/plugin
+  entries and points `statusLine.command` at `run-ccstatusline.sh`. Install
+  best-effort provisions the binary via `npm install -g ccstatusline`
+  (skippable under `INIT_UBUNTU_STATUSLINE_NO_BINARY` so no host package
+  install runs from a test path).
 ### Added
 
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):

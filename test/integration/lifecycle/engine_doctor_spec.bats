@@ -57,7 +57,7 @@ teardown() {
 
     # Tamper: strip the launcher's exec bit. is_installed (settings.json
     # managed) is unaffected, so the drift report cannot be the failure source.
-    chmod -x "${ENGINE_LT_HOME}/.claude/run-statusline.sh"
+    chmod -x "${ENGINE_LT_HOME}/.claude/run-ccstatusline.sh"
 
     engine_lt_run "" doctor claude-code-config
     assert_failure

@@ -32,6 +32,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   bindings are unchanged.
 ### Fixed
 
+- **`list --installed` now shows the resolved Sidecar version instead of the
+  static `VERSION_PROVIDED` literal** (architecture-review F2 +
+  module-template-audit): the Sidecar (`versions/<name>`) records the version
+  actually pinned at install time (e.g. `0.44.1`), but `lib/dispatcher.sh`
+  `_dispatcher_list_installed` rendered the VERSION column from state.json's
+  `synced.version_provided` — the module's declared literal, often the `latest`
+  sentinel — so users saw `latest` rather than what was really installed. This
+  was two parallel sources of truth for the installed version. A new
+  `_dispatcher_installed_version` helper reads the Sidecar via
+  `module_sidecar_get_version` as the single source of truth for the INSTALLED
+  version, falling back to `version_provided` only when no Sidecar exists
+  (module records none, or a pre-Sidecar install). `version_provided` keeps its
+  meaning as the declared/catalog version; only the installed-version display
+  changed. Covered by unit tests in `test/unit/dispatcher_spec.bats`.
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
   is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
   `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever

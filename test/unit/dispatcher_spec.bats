@@ -304,6 +304,40 @@ _load_engine() {
     dispatcher_dispatch list --installed --json | jq -e '.installed.noop.synced.manual == true' > /dev/null
 }
 
+# ── F2: installed VERSION column is single-sourced from the Sidecar ──────────
+# (doc/review/architecture-review.md F2 + module-template-audit) The Sidecar
+# records the RESOLVED version (e.g. 0.44.1); state.json only keeps the static
+# VERSION_PROVIDED literal (often "latest"). list --installed must display the
+# resolved Sidecar version so users see what is really installed.
+
+@test "list --installed shows resolved Sidecar version, not static version_provided (F2)" {
+    _load_engine
+    # shellcheck source=../../lib/module_helper.sh
+    source "${LIB_DIR}/module_helper.sh"
+    # state.json keeps the static literal the module declared ("latest")…
+    state_record_install noop true latest
+    # …while the Sidecar holds the version actually resolved at install time.
+    module_sidecar_write noop 0.44.1
+
+    run dispatcher_dispatch list --installed
+    assert_success
+    assert_output --partial "0.44.1"
+    refute_output --partial "latest"
+}
+
+@test "list --installed falls back to version_provided when no Sidecar exists" {
+    _load_engine
+    # shellcheck source=../../lib/module_helper.sh
+    source "${LIB_DIR}/module_helper.sh"
+    # Installed before the Sidecar existed (or a module that writes none):
+    # no versions/<name> file, so the state literal is the only source.
+    state_record_install noop true v1.2.3
+
+    run dispatcher_dispatch list --installed
+    assert_success
+    assert_output --partial "v1.2.3"
+}
+
 # ── import / export conflict pipeline (issue #43, ADR-0013) ─────────────────
 
 # Writes a payload referencing the fixture module `noop` to $1.

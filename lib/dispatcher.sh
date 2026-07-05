@@ -170,6 +170,28 @@ _dispatcher_version() {
 
 # ── list / show ──────────────────────────────────────────────────────────────
 
+# _dispatcher_installed_version <name> — the single source of truth for a
+# module's INSTALLED version. The Sidecar (module_sidecar_get_version) records
+# the RESOLVED version pinned at install time (e.g. 0.44.1); state.json only
+# keeps the static VERSION_PROVIDED literal the module declared (often the
+# "latest" sentinel). Prefer the Sidecar so `list --installed` shows what is
+# actually on disk (architecture-review F2). Fall back to state.json's
+# version_provided only when no Sidecar exists — a module that records none, or
+# an entry installed before Sidecars existed. NOTE: version_provided keeps its
+# meaning as the catalog/declared version; only the INSTALLED display changes.
+_dispatcher_installed_version() {
+    local _name="$1"
+    local _ver
+    if declare -F module_sidecar_get_version >/dev/null 2>&1; then
+        if _ver="$(module_sidecar_get_version "${_name}" 2>/dev/null)" \
+            && [[ -n "${_ver}" ]]; then
+            printf '%s' "${_ver}"
+            return 0
+        fi
+    fi
+    state_get_field "${_name}" version_provided
+}
+
 # list --installed [--json] — the state.json view (replaces `status`, PRD §7.2).
 _dispatcher_list_installed() {
     local _json="${1:-false}"
@@ -198,7 +220,7 @@ _dispatcher_list_installed() {
     local _n _manual _ver _at
     while IFS= read -r _n; do
         _manual="$(state_get_field "${_n}" manual)"
-        _ver="$(state_get_field "${_n}" version_provided)"
+        _ver="$(_dispatcher_installed_version "${_n}")"
         _at="$(state_get_field "${_n}" installed_at)"
         printf "%-30s  %-7s  %-12s  %s\n" "${_n}" "${_manual}" "${_ver}" "${_at}"
     done <<< "${_names}"

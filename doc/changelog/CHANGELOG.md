@@ -59,6 +59,13 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   highlighting and open in `$EDITOR` instead of falling through to `file` /
   `xdg-open`. ZIP-based Office formats (`*.docx`/`*.xlsx`) are excluded — they
   are not `*+xml` and keep their `archive` handling.
+- **`tool/setup_wayland.sh` no longer aborts on a missing helper path**: the
+  script sourced `../function/logger.sh` and `../function/general.sh`, but no
+  `function/` dir exists at the repo root, so under `set -euo pipefail` it
+  aborted before doing anything. Repointed both sources to the live helpers
+  (`lib/logger.sh` + `lib/general.sh`), which define every function the script
+  uses (`have_sudo_access`, `log_info`/`log_warn`/`log_fatal`, `exec_cmd`).
+  Behavior is otherwise unchanged.
 
 ### Changed
 
@@ -67,6 +74,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   (`[tasks]`) keys from `module/config/yazi/yazi.toml`. All three matched
   Yazi's shipped defaults (never customized) and were removed upstream; the
   rest of `[mgr]` / `[tasks]` is unchanged.
+
+### Removed
+
+- **17 superseded legacy scripts from the deprecated holding areas**
+  (`doc/review/legacy-disposition.md`): the v1 remove scripts under `tool/remove/`
+  (`remove_docker.sh`, `remove_font.sh`, `remove_neovim.sh`,
+  `remove_nvidia_driver.sh`) and the legacy `small-tools/` config/tool payload
+  (`config/fish/config.fish`, the `config/fish/functions/` helpers
+  `docker-build-run` / `docker-exec` / `efc` / `ehk` / `etc` / `sfc` / `stc` /
+  `system-update-upgrade`, `config/ssh/ssh_config`, `config/tmux/tmux.conf`,
+  `config/.vimrc`, `tools/eza.sh`). All are superseded by the v2 `module/`
+  equivalents and nothing live sources them; both `tool/` and `small-tools/` are
+  already CI-excluded holding areas (`script/ci/ci.sh` lint/kcov prune,
+  `.codecov.yaml` ignore).
 
 ## [v0.1.0-rc3] - 2026-06-23
 

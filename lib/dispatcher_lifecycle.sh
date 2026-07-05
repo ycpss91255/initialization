@@ -10,7 +10,8 @@
 #   _dispatcher_upgrade               upgrade [<module>...]
 #   _dispatcher_verify                verify  [<module>...]
 #   _dispatcher_doctor_validate_modules  doctor --validate-modules (PRD §9.1)
-#   _dispatcher_doctor                doctor (state-drift report)
+#   _dispatcher_doctor_drift          doctor state-drift report ([<module>...])
+#   _dispatcher_doctor                doctor (drift + module doctor() overrides)
 #
 # Sourced by lib/dispatcher.sh; not an executable script.
 
@@ -329,36 +330,15 @@ _dispatcher_doctor_validate_modules() {
     printf "\n[dispatcher] doctor --validate-modules: all module metadata is valid.\n"
 }
 
-_dispatcher_doctor() {
-    # PRD §9.1 / AC-24: `--validate-modules` runs the metadata linter instead
-    # of the state-drift report. Parse argv so the flag is honored; an unknown
-    # flag is an argument error (exit 2). Plain `doctor` (no args) keeps the
-    # original 0/1 drift behavior.
-    local _arg
-    for _arg in "$@"; do
-        case "${_arg}" in
-            --validate-modules)
-                _dispatcher_doctor_validate_modules
-                return $?
-                ;;
-            --fix)
-                printf "[dispatcher] WARN: %s is stubbed; ignoring\n" "${_arg}" >&2
-                ;;
-            -*)
-                printf "[dispatcher] ERROR: unknown doctor flag %s\n" "${_arg}" >&2
-                return 2
-                ;;
-            *)
-                printf "[dispatcher] ERROR: doctor takes no positional args (got '%s')\n" "${_arg}" >&2
-                return 2
-                ;;
-        esac
-    done
-
-    if ! declare -F state_list_installed >/dev/null 2>&1; then
-        printf "[dispatcher] ERROR: state lib not loaded\n" >&2
-        return 1
-    fi
+# _dispatcher_doctor_drift [<module>...]: the state.json-vs-reality report.
+# Iterates every module state records as installed, sources each in a fresh
+# subshell to run is_installed, and prints a STATE-RECORD vs SYSTEM-ACTUAL
+# table. An optional positional filter restricts the table to the named modules
+# (intersected with what state records installed) — `doctor <module>` uses it.
+# Returns 1 when any drift item is found, 0 when state and host agree.
+_dispatcher_doctor_drift() {
+    local _filter_str=""
+    [[ "$#" -gt 0 ]] && _filter_str=" $* "
 
     printf "%-30s  %-15s  %-15s  %s\n" "MODULE" "STATE-RECORD" "SYSTEM-ACTUAL" "STATUS"
     local _names; _names="$(state_list_installed)"
@@ -366,6 +346,9 @@ _dispatcher_doctor() {
     local _n _file _actual _status
     if [[ -n "${_names}" ]]; then
         while IFS= read -r _n; do
+            [[ -n "${_n}" ]] || continue
+            # Scope to the named modules when a filter was supplied.
+            [[ -n "${_filter_str}" && "${_filter_str}" != *" ${_n} "* ]] && continue
             _file="$(registry_get_field "${_n}" file)"
             if [[ -z "${_file}" ]]; then
                 _actual="not-registered"
@@ -376,6 +359,7 @@ _dispatcher_doctor() {
                 bash --noprofile --norc -c "
                     source '${LIB_DIR}/logger.sh' >/dev/null 2>&1
                     source '${LIB_DIR}/general.sh' >/dev/null 2>&1
+                    source '${LIB_DIR}/module_helper.sh' >/dev/null 2>&1
                     source '${_file}'
                     is_installed
                 " >/dev/null 2>&1
@@ -398,4 +382,75 @@ _dispatcher_doctor() {
         return 1
     fi
     printf "\n[dispatcher] doctor: state.json and system are consistent.\n"
+    return 0
+}
+
+_dispatcher_doctor() {
+    # PRD §9.1 / AC-24: `--validate-modules` runs the metadata linter instead
+    # of the state-drift report. Parse argv so the flag is honored; an unknown
+    # flag is an argument error (exit 2). Positional args name specific modules
+    # to diagnose (else every installed module).
+    local -a _requested=()
+    local _arg
+    for _arg in "$@"; do
+        case "${_arg}" in
+            --validate-modules)
+                _dispatcher_doctor_validate_modules
+                return $?
+                ;;
+            --fix)
+                printf "[dispatcher] WARN: %s is stubbed; ignoring\n" "${_arg}" >&2
+                ;;
+            -*)
+                printf "[dispatcher] ERROR: unknown doctor flag %s\n" "${_arg}" >&2
+                return 2
+                ;;
+            *)
+                _requested+=("${_arg}")
+                ;;
+        esac
+    done
+
+    if ! declare -F state_list_installed >/dev/null 2>&1; then
+        printf "[dispatcher] ERROR: state lib not loaded\n" >&2
+        return 1
+    fi
+
+    # Named modules must resolve through the registry (argument-class error).
+    local _m
+    for _m in ${_requested[@]+"${_requested[@]}"}; do
+        if declare -F registry_has >/dev/null 2>&1 && ! registry_has "${_m}"; then
+            printf "[dispatcher] ERROR: unknown module '%s'\n" "${_m}" >&2
+            return 2
+        fi
+    done
+
+    # Target set: the named modules, else every module recorded installed.
+    local -a _targets=()
+    if [[ "${#_requested[@]}" -gt 0 ]]; then
+        _targets=("${_requested[@]}")
+    else
+        local _line
+        while IFS= read -r _line; do
+            [[ -n "${_line}" ]] && _targets+=("${_line}")
+        done < <(state_list_installed)
+    fi
+
+    # Part 1 (PRESERVED): the state-drift report, scoped to the target set.
+    local _drift_rc=0
+    _dispatcher_doctor_drift ${_targets[@]+"${_targets[@]}"} || _drift_rc=$?
+
+    # Part 2 (F1 / ADR-0002 / ADR-0009): AUGMENT the drift report by invoking
+    # each target module's doctor() override through the runner. This is the
+    # wiring the templates promise — without it the overrides were dead code.
+    local _doctor_rc=0
+    if declare -F runner_doctor >/dev/null 2>&1; then
+        runner_doctor ${_targets[@]+"${_targets[@]}"} || _doctor_rc=$?
+    fi
+
+    # Diag class (PRD §7.4): 0 = pass, 1 = fail. Fail if EITHER half flags.
+    if [[ "${_drift_rc}" -ne 0 || "${_doctor_rc}" -ne 0 ]]; then
+        return 1
+    fi
+    return 0
 }

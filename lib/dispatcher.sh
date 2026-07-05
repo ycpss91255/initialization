@@ -57,7 +57,8 @@ Subcommands:
   upgrade [<module>...]  Run upgrade() for given modules (or all installed)
   verify  [<module>...]  Run verify() for given modules (or all installed)
   search  <keyword>      Search modules by name / category / tag
-  doctor                 Diff state.json vs system reality
+  doctor  [<module>...]  Diff state.json vs system reality + run doctor()
+                         for given modules (or all installed)
   config  set|get|unset|show <section.key> [<value>]
                          Read / write ~/.config/init_ubuntu/config.ini
   sync    <user@host>    Push state via SSH (or --pull for the reverse)
@@ -102,7 +103,8 @@ See PRD §7 for the full CLI specification."
   upgrade [<module>...]  對指定模組執行 upgrade()(未指定則為所有已安裝模組)
   verify  [<module>...]  對指定模組執行 verify()(未指定則為所有已安裝模組)
   search  <keyword>      依名稱 / 分類 / 標籤搜尋模組
-  doctor                 比對 state.json 與系統實際狀態
+  doctor  [<module>...]  比對 state.json 與系統實際狀態,並執行指定模組的
+                         doctor()(未指定則為所有已安裝模組)
   config  set|get|unset|show <section.key> [<value>]
                          讀取 / 寫入 ~/.config/init_ubuntu/config.ini
   sync    <user@host>    透過 SSH 推送狀態(或以 --pull 反向拉取)

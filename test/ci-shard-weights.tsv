@@ -1,0 +1,71 @@
+# ci-shard-weights.tsv — per-spec partition weights for the time-weighted
+# greedy-LPT core-shard partition (script/ci/shard_partition.sh).
+#
+# Format: <seconds> <spec-basename>   (comment lines start with '#')
+# One line per non-module ("core") unit spec. `seconds` is the measured
+# kcov-mode runtime rounded to a whole second (>=1). A spec absent here
+# falls back to the default weight inside shard_partition.sh, so a brand-new
+# spec still gets partitioned until CI records its real time.
+#
+# SELF-MAINTAINING + COMMITTED (no CI-only cache; see ADR-0028): refreshed
+# from real kcov junit timings via `just -f justfile.ci shard-weights-refresh`
+# and committed. Reproducible from the repo — never lives only in the Actions
+# cache. Seed below is derived from the audit core total (~432s over 1372
+# @tests) proportional to each spec's @test count.
+4 approval_check_spec.bats
+5 auto_merge_on_green_spec.bats
+10 cli_input_validation_spec.bats
+7 ci_spec.bats
+4 color_spec.bats
+8 config_spec.bats
+3 disable_diff_spec.bats
+38 dispatcher_spec.bats
+13 e2e_spec.bats
+4 enforce_gh_issue_template_spec.bats
+5 enforce_long_job_timeout_spec.bats
+3 enforce_shellcheck_disable_approval_spec.bats
+15 environment_spec.bats
+9 exit_codes_spec.bats
+2 generate_module_filters_spec.bats
+23 general_spec.bats
+3 gen_module_index_spec.bats
+7 i18n_spec.bats
+4 install_output_spec.bats
+1 junit_to_weights_spec.bats
+3 libload_guard_spec.bats
+11 logger_spec.bats
+3 module_bootstrap_spec.bats
+26 module_helper_spec.bats
+7 preflight_spec.bats
+17 registry_spec.bats
+2 remind_ci_auto_merge_spec.bats
+3 resolve_kcov_tools_tag_spec.bats
+3 resolve_test_tools_tag_spec.bats
+3 resolver_spec.bats
+10 runner_spec.bats
+4 select_unit_matrix_spec.bats
+3 shard_partition_spec.bats
+24 secrets_spec.bats
+10 secrets_hardening_spec.bats
+2 state_concurrency_spec.bats
+2 state_interface_spec.bats
+12 state_io_spec.bats
+7 state_migrate_spec.bats
+14 state_spec.bats
+8 sync_spec.bats
+4 template_consistency_spec.bats
+5 template_smoke_spec.bats
+3 transcript_reader_spec.bats
+4 tui_ac10_spec.bats
+33 tui_backend_spec.bats
+3 tui_backend_branches_spec.bats
+5 tui_detail_spec.bats
+7 tui_manage_spec.bats
+7 tui_quick_setup_spec.bats
+11 tui_render_fzf_spec.bats
+1 tui_review_provenance_spec.bats
+9 tui_secrets_e2e_spec.bats
+8 tui_secrets_menu_spec.bats
+4 tui_whiptail_tier_spec.bats
+1 wait_pr_ci_spec.bats
+2 worktree_create_spec.bats

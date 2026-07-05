@@ -68,6 +68,11 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   Yazi's shipped defaults (never customized) and were removed upstream; the
   rest of `[mgr]` / `[tasks]` is unchanged.
 
+### Removed
+
+- Remove stale machine-local `small-tools/config/fish/fish_variables`; portable
+  fish config lives in `module/config/fish/`.
+
 ## [v0.1.0-rc3] - 2026-06-23
 
 ### Added

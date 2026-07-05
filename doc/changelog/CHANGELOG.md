@@ -22,6 +22,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`trash-maintenance` promoted to a v2 module** (`module/trash-maintenance.module.sh`,
+  custom archetype): the legacy `tool/trash-maintenance.sh` one-off is now a
+  proper lifecycle module and the single source of truth for trash retention.
+  `install` deploys the corrected cleanup script
+  (`module/config/trash-maintenance/trash-maintenance.sh`) to `~/.local/bin/`,
+  schedules it via a marked daily user crontab entry
+  (`# init_ubuntu:trash-maintenance`, no sudo), and disables GNOME's own trash
+  auto-delete (`org.gnome.desktop.privacy remove-old-trash-files false`) so
+  `gsd-housekeeping` never fights the script (issue #275). `remove`/`purge`
+  strip the cron entry + script and `gsettings reset` the GNOME key back to
+  default; `purge` also wipes the log. The gsettings/cron effects are
+  desktop/host-only, so unit tests
+  (`test/unit/module/trash-maintenance_spec.bats`) assert the module CONTAINS
+  the right commands and exercise the cron seam against a stubbed `crontab`.
+
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,
@@ -30,7 +45,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+
 ### Fixed
+
+- **`trash-maintenance` cleanup no longer silently no-ops** (issue #277), with
+  the two latent bugs reproduced under PATH-stub tests before fixing:
+  (1) `trash-empty` is invoked without `-f` — that option does not exist on
+  older trash-cli (0.17.x) and errored out the age-based purge, and is a no-op
+  on newer versions; (2) `current_kb()` now captures whatever partial total
+  `du` printed and swallows a non-zero `du` exit (defaulting to `0`), so a
+  single permission-denied subpath under `Trash/files` can no longer abort the
+  run under `set -euo pipefail` before the size-cap comparison and eviction
+  loop execute. The default `MAX_GB` cap drops from 50 to 30. `TODO.md`'s
+  "Trash 自動維護" section and `module/config/gsettings_config` are updated to
+  match (defaults, no `-f`, GNOME auto-delete disabled, `old-files-age`
+  dropped). The old `tool/trash-maintenance.sh` copy is removed.
 
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
   is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called

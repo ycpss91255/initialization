@@ -20,6 +20,37 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Security
+
+- **Hardened the github-release fetch/extract path** (`lib/module_helper.sh`
+  plus `module/fzf.module.sh` / `module/yazi.module.sh` /
+  `module/lazydocker.module.sh`), per the security review (`doc/review/security-review.md`):
+  - **SR-01 (HIGH) — production-reachable test seam closed.** The offline test
+    seams `INIT_UBUNTU_TEST_GH_FIXTURE_DIR` / `INIT_UBUNTU_TEST_GH_VERSION` were
+    gated only on the variable being non-empty, so a poisoned env (rc file,
+    env-preserving sudo policy, compromised parent) could swap the install
+    payload with no test harness present. They now activate ONLY when the
+    dedicated `INIT_UBUNTU_TEST_MODE=1` flag is set — a signal production never
+    sets and the bats harness always does. A fixture var set without the flag is
+    ignored (a warning is logged) and the real download runs.
+  - **SR-02 (MEDIUM) — safe archive extraction.** A shared
+    `_module_safe_tar_extract` / `_module_safe_unzip_extract` pair (backed by a
+    directly-testable `module_archive_members_safe` guard) now rejects any
+    archive member with an absolute path or a `..` component before extracting,
+    and root `tar` extraction passes `--no-same-owner --no-same-permissions` so a
+    malicious/MITM archive cannot restore archived owner/uid/setuid bits or
+    escape `INSTALL_DIR`. Wired into the shared archetype default and the
+    fzf/yazi/lazydocker direct fetchers.
+  - **SR-03 (MEDIUM) — best-effort SHA-256 verification.** When a module declares
+    `GITHUB_CHECKSUM_ASSET`, the release's checksums file is fetched from the same
+    release, the artifact digest is verified before extraction, and a MISMATCH
+    aborts the install. Releases without a declared/available checksum log a clear
+    warning and proceed (many upstreams publish none), so no github-release
+    install hard-fails. Helpers: `module_verify_sha256`, `_module_checksum_lookup`,
+    `_module_github_release_verify_checksum`.
+  - Covered by `test/unit/module_fetch_hardening_spec.bats`; the seam-gated
+    lifecycle tests set `INIT_UBUNTU_TEST_MODE=1` via the shared harnesses.
+
 ### Fixed
 
 - **`setup_ubuntu doctor` now invokes each module's `doctor()` override**

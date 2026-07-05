@@ -68,6 +68,14 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **Hook enforcement specs** (`test/unit/hook/`): unit specs for every
+  previously-untested `.claude/hook/*.sh`, bringing the hook layer to 100%
+  spec coverage. New specs cover `test-must-use-docker`,
+  `enforce_semver_tag_via_script`, `check_changelog_drift`,
+  `enforce_gh_body_file`, `enforce_gh_english`, `remind_no_emoji`,
+  `remind_main_sync`, `remind_workflow_tdd`, and
+  `check_main_fresh_before_worktree` — each asserting the real block/deny path
+  and the allow/silent path (plus meaningful edge branches).
 - **`trash-maintenance` promoted to a v2 module** (`module/trash-maintenance.module.sh`,
   custom archetype): the legacy `tool/trash-maintenance.sh` one-off is now a
   proper lifecycle module and the single source of truth for trash retention.

@@ -22,6 +22,14 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Hook enforcement specs** (`test/unit/hook/`): unit specs for every
+  previously-untested `.claude/hook/*.sh`, bringing the hook layer to 100%
+  spec coverage. New specs cover `test-must-use-docker`,
+  `enforce_semver_tag_via_script`, `check_changelog_drift`,
+  `enforce_gh_body_file`, `enforce_gh_english`, `remind_no_emoji`,
+  `remind_main_sync`, `remind_workflow_tdd`, and
+  `check_main_fresh_before_worktree` — each asserting the real block/deny path
+  and the allow/silent path (plus meaningful edge branches).
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,

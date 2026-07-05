@@ -20,8 +20,99 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Fixed
+
+- **`setup_ubuntu doctor` now invokes each module's `doctor()` override**
+  (architecture-review F1): previously the Engine `doctor` subcommand ran only
+  the state.json-vs-reality drift report and never called a module's `doctor()`,
+  while `runner_doctor()` sat as dead code and all four `template/*.template.sh`
+  files promised the opposite ("Engine calls this from `setup_ubuntu doctor`").
+  `doctor` now AUGMENTS the drift report with the per-module health check: with
+  no args it runs `doctor()` across every installed module, with `doctor
+  <module>...` it scopes to the named modules (unknown names → exit 2). The
+  Diag-class exit code (PRD §7.4) is nonzero when EITHER the drift report OR a
+  module's `doctor()` fails, so `runner_doctor()` is reachable and the template
+  contract is true. Modules without a `doctor()` override fall back to
+  `is_installed` (ADR-0002 / ADR-0009), wired in `lib/runner.sh` so the doctor
+  phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`script/watch-open-issues.sh` open-issue CHANGE-WATCHER**
+  (`test/unit/script/watch_open_issues_spec.bats`): a Monitor-companion poll
+  script (same shape as `auto-merge-on-green.sh` / `wait-pr-ci.sh`) that a
+  maintainer session wraps in a single Monitor to get timely notification when
+  any OPEN GitHub issue changes. Each cycle snapshots
+  `gh issue list --state open` to a stable `number<TAB>updatedAt<TAB>title`
+  stream and diffs it against the previous snapshot; it prints a dated header
+  plus `NEW #n` / `UPDATED #n` / `CLOSED #n` lines only when something changed
+  (quiet otherwise, so Monitor fires only on real changes), arming with a
+  one-line `watch armed: N issues` baseline on start. The comparison lives in a
+  PURE, offline-unit-testable function `watch_issues_diff <prev> <cur>` that
+  reads two snapshot files and touches no network; the main loop owns the
+  `gh` fetch, the sleep, and graceful handling of transient fetch failures.
+  Exit-code-contract script (`set -uo pipefail`, ADR-0007): `0` normal, `2`
+  arg error. Args: `--repo` (required), `--interval` (default 180),
+  `--state-file`, `--once`, `-h|--help`.
+- **Standard template for one-off bash tools** (`template/tool.template.sh`) +
+  matching conformance spec (`test/unit/tool_template_spec.bats`), guide
+  (`doc/guide/small-tool-template.md`) and ADR-0029. Gives `tool/` one-off
+  scripts a proven skeleton: `--help`, `--dry-run`, the `0=ok / 2=usage-error`
+  exit-code contract, grep-guarded idempotent work, and `set -euo pipefail`
+  (ADR-0007 always-act — closes the missing-`set -u` bug class an audit found
+  across the ~16 untested one-off scripts). The template draws the tool-vs-module
+  line explicitly: one-offs use this; reusable tools are promoted to modules
+  (PRD §6.5/§6.6). No existing tools are retrofitted by this change.
+### Changed
+
+- **Time-balanced CI core-shard partition** (`script/ci/shard_partition.sh`,
+  `script/ci/ci.sh`, `.github/workflows/ci.yaml`; ADR-0028): the core
+  (non-module) unit-test matrix now partitions specs by **measured runtime**
+  via greedy-LPT (Longest Processing Time) instead of count round-robin. The
+  audit measured the four core kcov shards at ~96-121 s each (the long pole
+  after lint) because a few heavy specs pinned individual shards; the new
+  partition balances the eight default shards to ~52-57 s each. Weights live in
+  a committed, self-maintaining file (`test/ci-shard-weights.tsv`, refreshed
+  from real bats junit timings via `just -f justfile.ci shard-weights-refresh`
+  and `script/ci/junit_to_weights.sh`) — reproducible from the repo, not a
+  CI-only cache (base ADR-00000017's no-CI-only-cache principle). The shard
+  count is now dynamic: `vars.CI_CORE_SHARDS` (default 8, up from a hardcoded
+  4) drives a `fromJSON` matrix. Every spec still runs exactly once, so the
+  coverage-merge denominator and the AC-17 80 % gate are unchanged.
+
+- **`claude-code-config` statusline switches from the `cc-statusline` Claude
+  plugin to the `ccstatusline` global binary** (sirmalloc/ccstatusline; #231,
+  also resolves #116). The launcher `module/config/claude/run-statusline.sh`
+  is renamed to `run-ccstatusline.sh` and now execs the `ccstatusline` binary,
+  feeding it the real tmux pane width minus the flexMode `-8` offset and
+  post-processing reset timers with an NBSP-aware sed pipeline (5 rules,
+  single-highest-unit only). A new `ccstatusline.settings.json` template ships
+  the maintainer-verified two-row layout (version 3) and is dropped to the XDG
+  config path (`${XDG_CONFIG_HOME:-~/.config}/ccstatusline/settings.json`);
+  `settings.json` drops the obsolete `cc-statusline` marketplace/plugin
+  entries and points `statusLine.command` at `run-ccstatusline.sh`. Install
+  best-effort provisions the binary via `npm install -g ccstatusline`
+  (skippable under `INIT_UBUNTU_STATUSLINE_NO_BINARY` so no host package
+  install runs from a test path).
+### Added
+
+- **Archetype real-mutation-body coverage unit tests**
+  (`test/unit/module_helper_real_bodies_spec.bats`): closes the highest-risk
+  gap in the module archetype layer (module-template-audit #1 + #2). The apt
+  archetype's REAL (non-dry-run) lifecycle bodies were never executed by any
+  test — per-module specs stub `install()`/`remove()`/`purge()` wholesale, and
+  the one integration apt test is reduced and not in the kcov shards. The new
+  specs stub the external side-effecting commands (`sudo`, `have_sudo_access`,
+  `is_installed`; real `rm` against scratch paths) and drive the real branches
+  of `module_default_apt_install` (PPA add via `apt-add-repository`, both
+  no-sudo guards, `apt-get update`/`install`), `module_default_apt_upgrade`
+  (`--only-upgrade` + no-sudo guard), `module_default_apt_remove`, and
+  `module_default_apt_purge` (`apt-get purge` + PPA `--remove` +
+  `CONFIG_PATHS` rm loop). Also covers the `purge` default of the
+  github-release archetype (`module_default_github_release_purge`: remove +
+  `CONFIG_PATHS` loop) and the config archetype
+  (`module_default_config_purge`) — `purge` is the ADR-0015 rollback verb and
+  was previously only exercised in dry-run. Test-only; no production code
+  changed.
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,
@@ -46,8 +137,54 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   (blessed by their own specs; `doc/module-spec.md` §4.1 still lists these as
   "optional", conflicting with ADR-0002 — flagged for the maintainer, quarantined
   in an allowlist that turns red if any gap is later closed).
+
+### Changed
+
+- **CI ShellCheck lint now runs in parallel across CPUs** (`script/ci/ci.sh`
+  `_run_shellcheck`): the lint step previously piped all ~197 scripts to a
+  single `xargs -0 shellcheck -x` process (~212s serial and the critical-path
+  CI tail). It now forks one `shellcheck` per `${SHELLCHECK_BATCH:-40}`-file
+  batch across `$(nproc)` workers via
+  `xargs -0 -P "$(nproc)" -n "${SHELLCHECK_BATCH:-40}" shellcheck -x`. The
+  fail-on-violation signal is preserved: `xargs` returns 123 (not 1) when any
+  batched child reports a violation, so the code captures the exit status and
+  `_die`s on ANY nonzero (never comparing against a single expected code), and
+  the lint step still exits nonzero on any violation. `-x` continues to
+  resolve `source`d files from disk regardless of batch, so batching does not
+  change WHICH files/sources are linted. Covered by new unit tests in
+  `test/unit/script/ci_spec.bats` (fail-signal on violation, pass when clean,
+  and a violation hidden among many batches still fails via xargs 123).
+
 ### Fixed
 
+- **`list --installed` now shows the resolved Sidecar version instead of the
+  static `VERSION_PROVIDED` literal** (architecture-review F2 +
+  module-template-audit): the Sidecar (`versions/<name>`) records the version
+  actually pinned at install time (e.g. `0.44.1`), but `lib/dispatcher.sh`
+  `_dispatcher_list_installed` rendered the VERSION column from state.json's
+  `synced.version_provided` — the module's declared literal, often the `latest`
+  sentinel — so users saw `latest` rather than what was really installed. This
+  was two parallel sources of truth for the installed version. A new
+  `_dispatcher_installed_version` helper reads the Sidecar via
+  `module_sidecar_get_version` as the single source of truth for the INSTALLED
+  version, falling back to `version_provided` only when no Sidecar exists
+  (module records none, or a pre-Sidecar install). `version_provided` keeps its
+  meaning as the declared/catalog version; only the installed-version display
+  changed. Covered by unit tests in `test/unit/dispatcher_spec.bats`.
+- **CI fish syntax check now actually lints the fish config** (`script/ci/ci.sh`):
+  `_find_lintable_fish` pruned `module/config` wholesale (copied from the
+  ShellCheck pass, where the .sh files there are vendored third-party config).
+  But every tracked `*.fish` file lives under `module/config/fish/**` — the
+  maintainer's own fish config that init_ubuntu installs — so the prune dropped
+  100% of them: the `fish -n` check ran over ZERO files and was silently a
+  no-op. Discovery now prunes only the one genuinely vendored fish path
+  (`module/config/neovim/fnm_shell_config`, the fnm-generated shell
+  integration) while keeping the deprecated/holding/v1 prunes, so all 21
+  real fish scripts are checked. New regression spec
+  (`test/unit/script/ci_lint_discovery_spec.bats`) asserts the discovery
+  returns a nonzero count over the repo so it cannot silently regress to 0
+  again. No fish syntax violations surfaced once the files were actually
+  checked.
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
   is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
   `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever

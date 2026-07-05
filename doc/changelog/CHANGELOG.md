@@ -121,6 +121,22 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+- **Module-iterating contract-conformance meta-test**
+  (`test/unit/module/contract_conformance_spec.bats`): a single meta-test that
+  DISCOVERS every `module/*.module.sh` dynamically (so new/edited modules are
+  auto-covered) and asserts each satisfies the shared contract
+  (`doc/module-spec.md` + ADR-0002) — all 10 mandatory lifecycle functions
+  defined, required metadata well-formed (`NAME` matches the filename stem;
+  `CATEGORY`/`SUPPORTED_PLATFORMS`/`RISK_LEVEL` in their allowed sets;
+  `DESCRIPTION` associative with an `en` entry; `TAGS`/`SUPPORTED_UBUNTU`
+  non-empty), and a known lifecycle-binding mechanism (archetype macro or
+  hand-written custom lifecycle). Closes the audit gap where the 39 modules were
+  only covered by ad-hoc per-module specs with no cross-module contract sweep.
+  Surfaces one documented, self-cleaning deviation from ADR-0002: the custom
+  modules `docker`, `font`, and `nvidia-driver` omit `is_outdated()`/`doctor()`
+  (blessed by their own specs; `doc/module-spec.md` §4.1 still lists these as
+  "optional", conflicting with ADR-0002 — flagged for the maintainer, quarantined
+  in an allowlist that turns red if any gap is later closed).
 
 ### Changed
 

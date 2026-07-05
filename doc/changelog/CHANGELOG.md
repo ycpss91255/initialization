@@ -246,6 +246,23 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **`lib/dispatcher.sh` split into four cohesive libs** (architecture-review
+  E1): the 1291-line dispatcher god-file (well over the 800-line cap) is now a
+  ~281-line thin orchestrator that owns only global-flag parsing, the shared
+  i18n table, and subcommand routing. Its handler clusters moved to sibling
+  libs sourced by the orchestrator: `lib/dispatcher_render.sh`
+  (module-metadata → JSON / description renderers), `lib/dispatcher_catalog.sh`
+  (`list` / `show` / `search` / `detect`), `lib/dispatcher_lifecycle.sh`
+  (`install` / `remove` / `purge` / `upgrade` / `verify` / `doctor`), and
+  `lib/dispatcher_state_io.sh` (`status` / `export` / `import` / `config` /
+  `sync`). The module-metadata-as-JSON renderer that was copy-pasted three
+  times is deduped into single `_dispatcher_json_str_array` (array → JSON
+  string array) and `_dispatcher_module_probe` (source a module once →
+  recommended + description) primitives used everywhere. Pure refactor:
+  identical subcommands, output, exit codes, and JSON; the existing
+  `dispatcher_spec` / engine / integration-lifecycle specs stay green
+  unchanged, with a focused `test/unit/dispatcher_render_spec.bats` pinning the
+  new render seams.
 - **yazi config drops keys removed upstream in v26.5.6** (#273): removed the
   inert `title_format` (`[mgr]`) and `micro_workers` / `macro_workers`
   (`[tasks]`) keys from `module/config/yazi/yazi.toml`. All three matched

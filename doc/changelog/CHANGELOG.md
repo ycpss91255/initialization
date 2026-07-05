@@ -278,6 +278,8 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Removed
 
+- Remove stale machine-local `small-tools/config/fish/fish_variables`; portable
+  fish config lives in `module/config/fish/`.
 - **17 superseded legacy scripts from the deprecated holding areas**
   (`doc/review/legacy-disposition.md`): the v1 remove scripts under `tool/remove/`
   (`remove_docker.sh`, `remove_font.sh`, `remove_neovim.sh`,

@@ -49,6 +49,18 @@ module_get_warn_message()         { module_i18n_get WARN_MESSAGE         "$@"; }
 
 # ─── 3. Generic guards ──────────────────────────────────────────────────────
 
+# _module_test_mode_active — SR-01 gate. The github-release OFFLINE seams
+# (INIT_UBUNTU_TEST_GH_FIXTURE_DIR / INIT_UBUNTU_TEST_GH_VERSION) swap the
+# install payload / version resolver, so they MUST NOT be reachable in a normal
+# production run merely by setting an env var (a poisoned rc, an env-preserving
+# sudo policy, a compromised parent process). They now activate ONLY when this
+# dedicated flag is set — a signal production NEVER sets and the bats harness
+# always does. Setting a TEST_GH_* var alone (without INIT_UBUNTU_TEST_MODE=1)
+# is ignored, so "can set one env var" can no longer plant a root-path binary.
+_module_test_mode_active() {
+    [[ "${INIT_UBUNTU_TEST_MODE:-}" == "1" ]]
+}
+
 # module_dryrun_guard <phase> "<description>"
 #   Returns 0 (= caller should `return 0`) if INIT_UBUNTU_DRY_RUN=true,
 #   logs the description; returns 1 otherwise.
@@ -291,7 +303,8 @@ module_default_github_release_is_installed() {
     # makes is_installed report a never-installed module as present, masking
     # the very real-install path #174 broke. Scoped to the fixture var so
     # production keeps the PATH fallback (pre-Sidecar installs).
-    [[ -n "${INIT_UBUNTU_TEST_GH_FIXTURE_DIR:-}" ]] && return 1
+    # SR-01: only honor the offline-fixture signal under an explicit test mode.
+    _module_test_mode_active && [[ -n "${INIT_UBUNTU_TEST_GH_FIXTURE_DIR:-}" ]] && return 1
     command -v "${_bin}" >/dev/null 2>&1
 }
 
@@ -303,12 +316,132 @@ module_default_github_release_is_installed() {
 # resolver (e.g. _gum_resolve_asset_pattern) run for real but offline. The
 # guard means production (var unset) keeps general.sh's GitHub-API lookup
 # untouched. Pairs with INIT_UBUNTU_TEST_GH_FIXTURE_DIR (the fetch seam).
-if [[ -n "${INIT_UBUNTU_TEST_GH_VERSION:-}" ]]; then
+# SR-01: gated on _module_test_mode_active — INIT_UBUNTU_TEST_GH_VERSION alone
+# (without INIT_UBUNTU_TEST_MODE=1) no longer shadows the real resolver.
+if _module_test_mode_active && [[ -n "${INIT_UBUNTU_TEST_GH_VERSION:-}" ]]; then
     get_github_pkg_latest_version() {
         local -n _outvar="${1:?get_github_pkg_latest_version needs <outvar>}"
         _outvar="${INIT_UBUNTU_TEST_GH_VERSION}"
     }
 fi
+
+# ─── 5a. Archive-safety + integrity helpers (SR-02 / SR-03) ─────────────────
+#
+# Downloaded archives are extracted as root; a MITM/compromised-mirror tarball
+# could carry `..`/absolute members that escape INSTALL_DIR, or archived
+# owner/uid/setuid bits. These helpers are shared by the archetype default AND
+# the per-module direct fetchers (fzf/yazi/lazydocker) so the hardening lives
+# in one place.
+
+# module_archive_members_safe — read newline-separated archive member paths on
+# stdin; return 1 (reject) if ANY member is an absolute path or contains a
+# `..` path component (either can escape the extraction dir). Pure + directly
+# unit-testable (SR-02).
+module_archive_members_safe() {
+    local _member
+    while IFS= read -r _member; do
+        [[ -z "${_member}" ]] && continue
+        case "${_member}" in
+            /*|..|../*|*/..|*/../*) return 1 ;;
+        esac
+    done
+    return 0
+}
+
+# _module_safe_tar_extract <tarball> <install_dir> <strip> [sudo]
+#   Reject unsafe members (SR-02 traversal guard), then extract with
+#   --no-same-owner --no-same-permissions so a root extraction can NOT restore
+#   archived owner/uid or setuid bits.
+_module_safe_tar_extract() {
+    local _tarball="${1:?tarball}" _dir="${2:?install dir}"
+    local _strip="${3:-1}" _sudo="${4:-}"
+    if ! tar -tzf "${_tarball}" 2>/dev/null | module_archive_members_safe; then
+        log_error "[${NAME:-?}] refusing archive: unsafe (absolute or '..') member path in ${_tarball}"
+        return 1
+    fi
+    ${_sudo} tar --no-same-owner --no-same-permissions \
+        -C "${_dir}" --strip-components="${_strip}" -xzf "${_tarball}"
+}
+
+# _module_safe_unzip_extract <zipfile> <install_dir> [sudo]
+#   Zip equivalent of the tar guard. unzip extracts as the current user (no
+#   ownership restore), so the concern is purely member-path traversal (SR-02).
+_module_safe_unzip_extract() {
+    local _zip="${1:?zipfile}" _dir="${2:?install dir}" _sudo="${3:-}"
+    if ! unzip -Z1 "${_zip}" 2>/dev/null | module_archive_members_safe; then
+        log_error "[${NAME:-?}] refusing archive: unsafe (absolute or '..') member path in ${_zip}"
+        return 1
+    fi
+    ${_sudo} unzip -q -o "${_zip}" -d "${_dir}"
+}
+
+# module_verify_sha256 <file> <expected-hex>
+#   0 = digest matches, 1 = mismatch / undeterminable. Pure + directly
+#   unit-testable (SR-03).
+module_verify_sha256() {
+    local _file="${1:?file}" _expected="${2:?expected hex}"
+    [[ -f "${_file}" ]] || return 1
+    local _actual=""
+    _actual="$(sha256sum "${_file}" 2>/dev/null | awk '{print $1}')"
+    [[ -n "${_actual}" ]] || return 1
+    [[ "${_actual}" == "${_expected}" ]]
+}
+
+# _module_checksum_lookup <sums-file> <asset-name>
+#   Print the sha256 hex for <asset-name> from a `sha256sum`-format file
+#   (`<hex>  <name>`, optionally `*name` for binary mode / `./name`). Empty
+#   output => no matching entry.
+_module_checksum_lookup() {
+    local _sums="${1:?sums file}" _asset="${2:?asset}"
+    [[ -f "${_sums}" ]] || return 0
+    awk -v a="${_asset}" '
+        { n=$2; sub(/^[*]/,"",n); sub(/^\.\//,"",n);
+          if (n==a) { print $1; exit } }' "${_sums}"
+}
+
+# _module_github_release_verify_checksum <artifact> <asset-name>
+#   Best-effort SHA-256 integrity check (SR-03). When the module declares
+#   GITHUB_CHECKSUM_ASSET, fetch that checksums file from the SAME release
+#   (offline seam mirrors the artifact fetch), look up <asset-name>'s digest,
+#   and verify. A MISMATCH returns 1 (abort the install). No declaration /
+#   unreachable checksum asset / no matching digest => log_warn + return 0:
+#   many upstreams publish no checksums, so this must not hard-fail every
+#   github-release install.
+_module_github_release_verify_checksum() {
+    local _artifact="${1:?artifact}" _asset="${2:?asset}"
+    local _checksum_asset="${GITHUB_CHECKSUM_ASSET:-}"
+    if [[ -z "${_checksum_asset}" ]]; then
+        log_warn "[${NAME:-?}] no GITHUB_CHECKSUM_ASSET declared; skipping integrity check for ${_asset}"
+        return 0
+    fi
+    local _sums
+    _sums="$(mktemp 2>/dev/null || printf '/tmp/%s-sums-%s' "${NAME:-x}" "$$")"
+    if _module_test_mode_active && [[ -n "${INIT_UBUNTU_TEST_GH_FIXTURE_DIR:-}" ]]; then
+        if ! cp "${INIT_UBUNTU_TEST_GH_FIXTURE_DIR%/}/${_checksum_asset}" "${_sums}" 2>/dev/null; then
+            rm -f "${_sums}"
+            log_warn "[${NAME:-?}] checksum fixture ${_checksum_asset} absent; proceeding without integrity check"
+            return 0
+        fi
+    elif ! curl -fsSL --retry 3 -o "${_sums}" \
+            "https://github.com/${GITHUB_REPO}/releases/latest/download/${_checksum_asset}" 2>/dev/null; then
+        rm -f "${_sums}"
+        log_warn "[${NAME:-?}] checksum download failed for ${_checksum_asset}; proceeding without integrity check"
+        return 0
+    fi
+    local _expected=""
+    _expected="$(_module_checksum_lookup "${_sums}" "${_asset}")"
+    rm -f "${_sums}"
+    if [[ -z "${_expected}" ]]; then
+        log_warn "[${NAME:-?}] no digest for ${_asset} in ${_checksum_asset}; proceeding without integrity check"
+        return 0
+    fi
+    if module_verify_sha256 "${_artifact}" "${_expected}"; then
+        log_info "[${NAME:-?}] sha256 verified for ${_asset}"
+        return 0
+    fi
+    log_error "[${NAME:-?}] sha256 MISMATCH for ${_asset} — refusing to install"
+    return 1
+}
 
 # Internal: do the actual download + extract + symlink, used by install + update.
 _module_github_release_fetch_and_install() {
@@ -346,9 +479,20 @@ _module_github_release_fetch_and_install() {
     # real, so the engine→runner→module-source→archetype-macro chain is
     # exercised end to end while staying deterministic. Never set in
     # production; the curl path below is the default.
+    # SR-01: only honor the offline fixture under an explicit test mode. A
+    # TEST_GH_FIXTURE_DIR set alone (no INIT_UBUNTU_TEST_MODE=1) is ignored and
+    # the real curl path runs — env alone cannot swap the install payload.
+    local _use_fixture=false
     if [[ -n "${INIT_UBUNTU_TEST_GH_FIXTURE_DIR:-}" ]]; then
+        if _module_test_mode_active; then
+            _use_fixture=true
+        else
+            log_warn "[${NAME}] ignoring INIT_UBUNTU_TEST_GH_FIXTURE_DIR: test seam requires INIT_UBUNTU_TEST_MODE=1"
+        fi
+    fi
+    if [[ "${_use_fixture}" == "true" ]]; then
         local _fixture="${INIT_UBUNTU_TEST_GH_FIXTURE_DIR%/}/${GITHUB_ASSET_PATTERN}"
-        log_info "[${NAME}] [test-fixture] copy ${_fixture} (offline; INIT_UBUNTU_TEST_GH_FIXTURE_DIR set)"
+        log_info "[${NAME}] [test-fixture] copy ${_fixture} (offline; INIT_UBUNTU_TEST_MODE=1)"
         if ! cp "${_fixture}" "${_tmp}"; then
             log_error "[${NAME}] test fixture missing: ${_fixture}"
             rm -f "${_tmp}"
@@ -364,6 +508,11 @@ _module_github_release_fetch_and_install() {
         rm -f "${_tmp}"
         return 1
     fi
+    # SR-03: best-effort SHA-256 integrity check (mismatch aborts).
+    if ! _module_github_release_verify_checksum "${_tmp}" "${GITHUB_ASSET_PATTERN}"; then
+        rm -f "${_tmp}"
+        return 1
+    fi
     if [[ -e "${INSTALL_DIR}" ]]; then
         if declare -F backup_file >/dev/null 2>&1; then
             backup_file "${INSTALL_DIR}" || true
@@ -371,7 +520,11 @@ _module_github_release_fetch_and_install() {
         ${_sudo} rm -rf "${INSTALL_DIR}"
     fi
     ${_sudo} mkdir -p "${INSTALL_DIR}"
-    ${_sudo} tar -C "${INSTALL_DIR}" --strip-components="${_strip}" -xzf "${_tmp}"
+    # SR-02: traversal-guarded, --no-same-owner extraction.
+    if ! _module_safe_tar_extract "${_tmp}" "${INSTALL_DIR}" "${_strip}" "${_sudo}"; then
+        rm -f "${_tmp}"
+        return 1
+    fi
     rm -f "${_tmp}"
     ${_sudo} ln -sfn "${INSTALL_DIR}/${_bin_path}" "${_bin_link}"
     log_info "[${NAME}] installed ${BIN_NAME}${_ver:+ v${_ver}} -> ${_bin_link}"

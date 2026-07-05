@@ -207,7 +207,8 @@ _yazi_fetch_and_install() {
         ${_sudo} rm -rf "${INSTALL_DIR}"
     fi
     ${_sudo} mkdir -p "${INSTALL_DIR}"
-    if ! ${_sudo} unzip -q -o "${_tmp}" -d "${INSTALL_DIR}"; then
+    # SR-02: traversal-guarded unzip (shared helper rejects '..'/absolute members).
+    if ! _module_safe_unzip_extract "${_tmp}" "${INSTALL_DIR}" "${_sudo}"; then
         log_error "[${NAME}] unzip failed for ${_tmp}"
         rm -f "${_tmp}"
         return 1

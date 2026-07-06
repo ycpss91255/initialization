@@ -241,7 +241,7 @@ gsettings set org.gnome.desktop.privacy old-files-age 'uint32 90'
   [] sudo apt install cifs-utils autofs (driver)
   [] sudo apt install smbclient (check tool)
     - smbclient -L <IP> -U <USER>
-[] libreoffice
+[x] libreoffice  # module/libreoffice.module.sh (issue #312)
   - sudo add-apt-repository ppa:libreoffice/ppa
 [] claude code
   [] pipx install claude-monitor

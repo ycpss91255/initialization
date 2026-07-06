@@ -22,6 +22,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **LibreOffice module** (`module/libreoffice.module.sh`, issue #312): a v2
+  contract module riding the apt archetype. Installs LibreOffice via the
+  upstream `ppa:libreoffice/ppa` (explicit repository choice — tracks the
+  fresh point releases rather than the distro-archive version frozen into a
+  given Ubuntu release); the PPA is added on install and removed on purge, and
+  `~/.config/libreoffice` is cleared on purge only. Desktop-only:
+  `SUPPORTED_PLATFORMS=("desktop")` and `is_recommended()` never pre-ticks on
+  headless server / WSL / SBC form factors. Covered by
+  `test/unit/module/libreoffice_spec.bats`.
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,

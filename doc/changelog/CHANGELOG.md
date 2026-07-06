@@ -68,6 +68,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **glow module** (`module/glow.module.sh`, issue #314): `glow` (the
+  charmbracelet CLI markdown renderer) is now installable as a module — it was
+  a yazi markdown-preview dependency that no module installed. GitHub-release
+  archetype (`charmbracelet/glow`, versioned goreleaser tarball with
+  `--strip-components=1`), full 10-function lifecycle, Sidecar (ADR-0001). The
+  yazi module now surfaces glow in its `POST_INSTALL_MESSAGE` (installable on
+  demand via `setup_ubuntu install glow`) rather than hard-wiring it as a
+  `DEPENDS_ON` (Q39: module-names-only, yazi runs fine without it). Covered by
+  `test/unit/module/glow_spec.bats` and an extended `yazi_spec.bats`.
 - **Hook enforcement specs** (`test/unit/hook/`): unit specs for every
   previously-untested `.claude/hook/*.sh`, bringing the hook layer to 100%
   spec coverage. New specs cover `test-must-use-docker`,

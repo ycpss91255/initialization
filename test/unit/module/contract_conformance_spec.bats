@@ -71,6 +71,8 @@ font:is_outdated
 font:doctor
 nvidia-driver:is_outdated
 nvidia-driver:doctor
+trash-maintenance:is_outdated
+trash-maintenance:doctor
 "
 
 # _is_known_gap <module-stem> <function> — is this pair a documented deviation?

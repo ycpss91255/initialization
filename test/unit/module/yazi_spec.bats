@@ -70,6 +70,16 @@ _load_module() {
     [[ "${#DEPENDS_ON[@]}" -eq 0 ]]
 }
 
+@test "yazi documents glow as its markdown-preview dependency (issue #314)" {
+    _load_module
+    # glow stays an optional preview dep (not a hard DEPENDS_ON per Q39); it is
+    # surfaced to the user in POST_INSTALL_MESSAGE so `yazi` markdown previews
+    # can be enabled on demand via `setup_ubuntu install glow`.
+    [[ "$(module_get_post_install_message en)" == *"glow"* ]]
+    [[ "$(module_get_post_install_message zh-TW)" == *"glow"* ]]
+    [[ -f "${MODULE_DIR}/glow.module.sh" ]]
+}
+
 @test "yazi DESCRIPTION is associative with en + zh-TW entries" {
     _load_module
     local _decl; _decl="$(declare -p DESCRIPTION 2>/dev/null)"

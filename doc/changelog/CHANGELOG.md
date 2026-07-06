@@ -220,6 +220,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **tmux config now installs to the XDG path `~/.config/tmux/tmux.conf`**
+  (#138): `module/tmux.module.sh` `_install_tmux_config()` dropped `tmux.conf`
+  to the legacy `~/.tmux.conf`, but modern tmux reads the XDG path and the
+  config's own `source-file` reload binding targets
+  `~/.config/tmux/tmux.conf`. Every `install` / `upgrade` therefore missed the
+  active location and the repo silently diverged from the host. The install
+  target, its backup-before-overwrite, the dry-run description, and the
+  `POST_INSTALL_MESSAGE` reload hint all move to `~/.config/tmux/tmux.conf`.
+  `~/.tmux.conf` stays in `CONFIG_PATHS` as a legacy cleanup path so `purge`
+  still removes stale copies. Covered by unit tests
+  (`test/unit/module/tmux_spec.bats`).
 - **`trash-maintenance` cleanup no longer silently no-ops** (issue #277), with
   the two latent bugs reproduced under PATH-stub tests before fixing:
   (1) `trash-empty` is invoked without `-f` — that option does not exist on

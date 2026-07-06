@@ -68,6 +68,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`tmuxp` module — apt to pipx migration** (`module/tmuxp.module.sh`, issue
+  #313): tmuxp is now a first-class custom-archetype module installed via
+  user-level `pipx install tmuxp` (newer upstream release + venv isolation)
+  instead of riding along as an apt package in the legacy
+  `module/setup_small_tools.sh` flow. `install()` migrates a pre-existing
+  apt-owned tmuxp away (`sudo apt-get remove -y tmuxp python3-libtmux`) when
+  apt owns it and sudo is available, and apt-installs `pipx` if missing. All 10
+  lifecycle functions are implemented; `setup_small_tools.sh` no longer
+  apt-installs `tmuxp`.
 - **glow module** (`module/glow.module.sh`, issue #314): `glow` (the
   charmbracelet CLI markdown renderer) is now installable as a module — it was
   a yazi markdown-preview dependency that no module installed. GitHub-release

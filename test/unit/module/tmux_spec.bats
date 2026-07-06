@@ -220,6 +220,11 @@ _TMUX_CONF() { printf '%s' "${MODULE_DIR}/config/tmux/tmux.conf"; }
     assert_success
 }
 
+@test "issue #144: tmux.conf binds M-u (no prefix) to resize-pane -Z zoom toggle" {
+    run grep -qE '^bind-key -n M-u resize-pane -Z$' "$(_TMUX_CONF)"
+    assert_success
+}
+
 @test "issue #266: tmux.conf enables @continuum-restore (uncommented, on)" {
     run grep -qE "^set -g @continuum-restore 'on'\$" "$(_TMUX_CONF)"
     assert_success

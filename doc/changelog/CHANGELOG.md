@@ -30,6 +30,11 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+- **tmux `M-u` no-prefix zoom toggle** (`module/config/tmux/tmux.conf`,
+  issue #144): a single-hand, prefix-free `M-u` binding mapped to
+  `resize-pane -Z`, equivalent to the built-in `prefix -> z`. `M-u` was chosen
+  because `M-k` is the vim-style resize-up key; it joins the existing `M-m`
+  zoom binding and changes no existing key.
 ### Fixed
 
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`

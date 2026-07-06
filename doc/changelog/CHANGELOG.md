@@ -59,6 +59,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   highlighting and open in `$EDITOR` instead of falling through to `file` /
   `xdg-open`. ZIP-based Office formats (`*.docx`/`*.xlsx`) are excluded — they
   are not `*+xml` and keep their `archive` handling.
+- **`claude-rm` resolves customTitle on fork / resumed sessions** (#33):
+  `module/config/fish/functions/claude-rm.fish` only read line 1 of each
+  session `.jsonl` when matching a `customTitle`, so fork / resumed sessions —
+  whose first line is `leafUuid` / `permissionMode` / a file-history snapshot
+  and whose `customTitle` appears on a later line — always reported
+  `No session matched` even though Tab completion listed the title. The
+  resolver now scans the first 50 lines and selects the `customTitle` line
+  (`head -50 | grep -m1 '"customTitle"'`), matching the 50-line window
+  `_claude_sessions.py` uses for completion. Covered by content assertions in
+  `test/unit/module/fish_spec.bats`.
 
 ### Changed
 

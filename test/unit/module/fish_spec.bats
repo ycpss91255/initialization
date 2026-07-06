@@ -807,3 +807,45 @@ _mock_fisher_and_chsh() {
     assert_success
     refute_output --partial "Usage:"
 }
+
+# ── claude-rm customTitle match on fork / resumed sessions (issue #33) ────────
+# The claude-rm helper (config payload dropped by this module) resolves a
+# customTitle to its session file. Fork / resumed sessions put customTitle on a
+# LATER line (line 1 is a leafUuid / permissionMode / file-history snapshot), so
+# a first-line-only scan misses them and reports "No session matched" even
+# though Tab completion — backed by _claude_sessions.py, which scans the first
+# 50 lines — shows the title. The resolver must use the SAME 50-line window as
+# the completion helper. Verified via tracked-config-content assertions
+# (precedent: codex_spec / yazi_spec / qmk-firmware_spec), since the runtime
+# match path depends on python3 (a user-host dependency absent from the
+# Docker test-tools image).
+
+_CLAUDE_RM_FN="${MODULE_DIR}/config/fish/functions/claude-rm.fish"
+_CLAUDE_SESSIONS_PY="${MODULE_DIR}/config/fish/_claude_sessions.py"
+
+@test "claude-rm ships the customTitle resolver function (issue #33)" {
+    [[ -f "${_CLAUDE_RM_FN}" ]]
+    grep -Fq 'function claude-rm' "${_CLAUDE_RM_FN}"
+}
+
+@test "claude-rm scans the first 50 lines for customTitle, not just line 1 (issue #33)" {
+    # The resolver must widen its customTitle scan to the first 50 lines and
+    # select the customTitle line explicitly, so fork / resumed sessions whose
+    # line 1 is leafUuid / permissionMode / a snapshot are still matched.
+    grep -Fq 'head -50 ' "${_CLAUDE_RM_FN}"
+    grep -Fq "grep -m1 '\"customTitle\"'" "${_CLAUDE_RM_FN}"
+}
+
+@test "claude-rm no longer reads only the first line for customTitle (issue #33 regression)" {
+    # Regression guard: the customTitle branch must not pipe a bare
+    # `head -1 $f` straight into the JSON parser (the pre-fix behavior).
+    run grep -F 'head -1 ' "${_CLAUDE_RM_FN}"
+    assert_failure
+}
+
+@test "claude-rm customTitle window matches _claude_sessions.py (issue #33)" {
+    # The completion helper scans the first 50 lines (`if i > 50: break`);
+    # the resolver must stay aligned or completion and resolution disagree —
+    # exactly the issue #33 symptom.
+    grep -Fq 'i > 50' "${_CLAUDE_SESSIONS_PY}"
+}

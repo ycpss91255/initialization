@@ -31,8 +31,8 @@ declare -gA DESCRIPTION=(
     [zh-TW]="終端機 multiplexer + powerline 主題"
 )
 declare -gA POST_INSTALL_MESSAGE=(
-    [en]="Run 'tmux source ~/.tmux.conf' inside an existing session to reload."
-    [zh-TW]="在現有 session 內執行 'tmux source ~/.tmux.conf' 以重新載入設定。"
+    [en]="Run 'tmux source ~/.config/tmux/tmux.conf' inside an existing session to reload."
+    [zh-TW]="在現有 session 內執行 'tmux source ~/.config/tmux/tmux.conf' 以重新載入設定。"
 )
 declare -gA WARN_MESSAGE=()
 SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")
@@ -58,7 +58,7 @@ module_use_apt_archetype
 # Override install: archetype install pkgs, then drop config.
 install() {
     module_default_apt_install || return $?
-    module_dryrun_guard install "drop tmux config to ${HOME}/.tmux.conf + tmux-powerline" && return 0
+    module_dryrun_guard install "drop tmux config to ${HOME}/.config/tmux/tmux.conf + tmux-powerline" && return 0
     _install_tmux_config
 }
 
@@ -79,16 +79,21 @@ is_recommended() {
 # ── Private helpers ─────────────────────────────────────────────────────────
 _install_tmux_config() {
     local _src="${MODULE_DIR:-${BASH_SOURCE[0]%/*}}/config/tmux"
+    # Modern tmux reads the XDG path first; tmux.conf's own source-file reload
+    # binding also targets ~/.config/tmux/tmux.conf, so install must write
+    # there (not the legacy ~/.tmux.conf) or repo and host diverge (issue #138).
+    local _dest_dir="${HOME}/.config/tmux"
     [[ -d "${_src}" ]] || { log_warn "[${NAME}] tmux config dir missing: ${_src}"; return 0; }
-    if [[ -f "${HOME}/.tmux.conf" ]] && declare -F backup_file >/dev/null 2>&1; then
-        backup_file "${HOME}/.tmux.conf" || true
+    mkdir -p "${_dest_dir}"
+    if [[ -f "${_dest_dir}/tmux.conf" ]] && declare -F backup_file >/dev/null 2>&1; then
+        backup_file "${_dest_dir}/tmux.conf" || true
     fi
-    cp "${_src}/tmux.conf" "${HOME}/.tmux.conf"
+    cp "${_src}/tmux.conf" "${_dest_dir}/tmux.conf"
     if [[ -d "${_src}/tmux-powerline" ]]; then
         mkdir -p "${HOME}/.tmux"
         cp -r "${_src}/tmux-powerline" "${HOME}/.tmux/"
     fi
-    log_info "[${NAME}] dropped tmux config -> ${HOME}/.tmux.conf"
+    log_info "[${NAME}] dropped tmux config -> ${_dest_dir}/tmux.conf"
 }
 
 # ── Standalone footer ───────────────────────────────────────────────────────

@@ -11,6 +11,10 @@ setup() {
     setup_test_env
     export LOG_LEVEL=INFO
     export LOG_COLOR=false
+    # Never run the real `npm install -g ccstatusline` host install from a
+    # test path (hard rule 2 / #231): the module short-circuits the binary
+    # provisioning step on this guard.
+    export INIT_UBUNTU_STATUSLINE_NO_BINARY=true
     TEST_HOME="${INIT_UBUNTU_TEST_SCRATCH}/home"
     mkdir -p "${TEST_HOME}"
     export TEST_HOME
@@ -151,10 +155,11 @@ _fake_claude_on_path() {
     [[ -f "${CONFIG_TEMPLATE_SRC}" ]]
 }
 
-@test "claude-code-config repo ships all three template files" {
+@test "claude-code-config repo ships all four template files" {
     [[ -f "${MODULE_DIR}/config/claude/settings.json" ]]
-    [[ -f "${MODULE_DIR}/config/claude/run-statusline.sh" ]]
+    [[ -f "${MODULE_DIR}/config/claude/run-ccstatusline.sh" ]]
     [[ -f "${MODULE_DIR}/config/claude/settings.statusline.json" ]]
+    [[ -f "${MODULE_DIR}/config/claude/ccstatusline.settings.json" ]]
 }
 
 @test "claude-code-config CONFIG_MARKER is JSON-safe (already present in template)" {
@@ -218,7 +223,7 @@ _fake_claude_on_path() {
     INIT_UBUNTU_DRY_RUN=true run remove
     assert_success
     [[ -f "${HOME}/.claude/settings.json" ]]
-    [[ -f "${HOME}/.claude/run-statusline.sh" ]]
+    [[ -f "${HOME}/.claude/run-ccstatusline.sh" ]]
     [[ -f "${INIT_UBUNTU_STATE_DIR}/versions/claude-code-config" ]]
 }
 
@@ -240,10 +245,10 @@ _fake_claude_on_path() {
     grep -qF "${CONFIG_MARKER}" "${HOME}/.claude/settings.json"
 }
 
-@test "install drops run-statusline.sh as an executable" {
+@test "install drops run-ccstatusline.sh as an executable" {
     _load_module
     install
-    [[ -x "${HOME}/.claude/run-statusline.sh" ]]
+    [[ -x "${HOME}/.claude/run-ccstatusline.sh" ]]
 }
 
 @test "install drops settings.statusline.json (mode 644)" {
@@ -253,24 +258,42 @@ _fake_claude_on_path() {
     [[ "$(stat -c '%a' "${HOME}/.claude/settings.statusline.json")" == "644" ]]
 }
 
-# ── statusline width feeding (#228) ──────────────────────────────────────────
-# Claude Code invokes the status line with a piped (non-TTY) stdout, so the
-# cc-statusline renderer cannot auto-detect terminal width and clips with `...`.
-# run-statusline.sh must feed the real width (from tmux pane_width, minus a
-# small margin) via CCSTATUSLINE_WIDTH. These run the launcher with stubbed
-# tmux/node + a fake plugin cache so the renderer just echoes the width it got.
+@test "install drops the ccstatusline layout to the XDG config path (#231)" {
+    _load_module
+    install
+    local _xdg="${HOME}/.config/ccstatusline/settings.json"
+    [[ -f "${_xdg}" ]]
+    [[ "$(stat -c '%a' "${_xdg}")" == "644" ]]
+    # Byte-fidelity: the XDG drop equals the shipped template (no home paths).
+    run jq -e '.version == 3' "${_xdg}"
+    assert_success
+}
+
+@test "install skips the host npm binary install under the test guard (#231)" {
+    _load_module
+    # INIT_UBUNTU_STATUSLINE_NO_BINARY=true (setup) — no npm install must fire.
+    run install
+    assert_success
+    refute_output --partial "npm install -g ccstatusline"
+}
+
+# ── statusline width feeding (#228 / #231) ───────────────────────────────────
+# Claude Code invokes the status line with a piped (non-TTY) stdout, so
+# ccstatusline cannot auto-detect terminal width and clips with `...`.
+# run-ccstatusline.sh must feed the real width (tmux pane_width, minus the
+# flexMode offset of 8) via CCSTATUSLINE_WIDTH. These run the launcher with
+# stubbed tmux + a fake `ccstatusline` binary that just echoes the width it got.
 
 _run_statusline() {
-    local home="${INIT_UBUNTU_TEST_SCRATCH}/sl-home"
     local bin="${INIT_UBUNTU_TEST_SCRATCH}/sl-bin"
-    mkdir -p "${home}/.claude/plugins/cache/cc-statusline/cc-statusline/2.2.19" "${bin}"
-    # Fake renderer: report whatever width the launcher handed down. Quoted
+    mkdir -p "${bin}"
+    # Fake ccstatusline: report whatever width the launcher handed down. Quoted
     # heredoc keeps ${CCSTATUSLINE_WIDTH} literal — it must expand when the
     # fake runs, not while this helper writes it.
-    cat > "${bin}/node" <<'NODE'
+    cat > "${bin}/ccstatusline" <<'CCS'
 #!/bin/sh
 printf 'WIDTH=%s\n' "${CCSTATUSLINE_WIDTH:-unset}"
-NODE
+CCS
     # Fake tmux: emit a fixed pane width, or fail when MOCK_TMUX_FAIL=1.
     if [[ "${MOCK_TMUX_FAIL:-0}" == "1" ]]; then
         cat > "${bin}/tmux" <<'TMUX'
@@ -283,21 +306,114 @@ TMUX
 printf '%s\n' "${MOCK_PANE_WIDTH:-99}"
 TMUX
     fi
-    chmod +x "${bin}/node" "${bin}/tmux"
-    HOME="${home}" PATH="${bin}:${PATH}" \
-        bash "${MODULE_DIR}/config/claude/run-statusline.sh"
+    chmod +x "${bin}/ccstatusline" "${bin}/tmux"
+    PATH="${bin}:${PATH}" \
+        bash "${MODULE_DIR}/config/claude/run-ccstatusline.sh"
 }
 
-@test "statusline feeds tmux pane width minus a small margin (#228)" {
+@test "statusline feeds tmux pane width minus the flexMode offset (#231)" {
     MOCK_PANE_WIDTH=99 run _run_statusline
     assert_success
-    assert_output "WIDTH=97"
+    assert_output "WIDTH=91"
 }
 
 @test "statusline omits the width override when tmux is unavailable (#228)" {
     MOCK_TMUX_FAIL=1 run _run_statusline
     assert_success
     assert_output "WIDTH=unset"
+}
+
+# ── Config-content fidelity to the #231 final consolidated files ─────────────
+# Per the qmk/codex/yazi precedent: assert on the shipped template content, not
+# on runtime behavior. These lock the maintainer-verified regex/values so a
+# careless edit (e.g. the \+ -> * 7d31% regression) is caught.
+
+_ccs_run="${MODULE_DIR}/config/claude/run-ccstatusline.sh"
+_ccs_json="${MODULE_DIR}/config/claude/ccstatusline.settings.json"
+
+@test "run-ccstatusline.sh parses (bash -n)" {
+    run bash -n "${_ccs_run}"
+    assert_success
+}
+
+@test "run-ccstatusline.sh execs the ccstatusline binary" {
+    grep -q '^exec ccstatusline' "${_ccs_run}"
+}
+
+@test "run-ccstatusline.sh feeds width with the flexMode -8 offset (#231)" {
+    grep -qF 'CCSTATUSLINE_WIDTH=' "${_ccs_run}"
+    grep -qF 'width - 8' "${_ccs_run}"
+}
+
+@test "run-ccstatusline.sh defines the NBSP separator (U+00A0 UTF-8 bytes)" {
+    grep -qF "NBSP=\$'\\xc2\\xa0'" "${_ccs_run}"
+}
+
+@test "run-ccstatusline.sh has the percentage-rounding sed rule (rule 1)" {
+    grep -qF 's/\([0-9]\+\)\.[0-9]\+%/\1%/g' "${_ccs_run}"
+}
+
+@test "run-ccstatusline.sh has the days sub-unit stripper with \\+ (rule 2)" {
+    # Anchored substrings avoid embedding ${NBSP} in the needle; the NBSP
+    # separator + \+ group form is asserted by the dedicated tests below.
+    grep -qF '\([0-9]\+d\)\(' "${_ccs_run}"
+}
+
+@test "run-ccstatusline.sh has the hours sub-unit stripper with \\+ (rule 3)" {
+    grep -qF '\([0-9]\+hr\)\(' "${_ccs_run}"
+}
+
+@test "run-ccstatusline.sh has the mid-unit truncation stripper (rule 4)" {
+    grep -qF 's/\([0-9]\+[a-z]\)\.\.\./\1/g' "${_ccs_run}"
+}
+
+@test "run-ccstatusline.sh has the hr->h shortener (rule 5)" {
+    grep -qF 's/\([0-9]\+\)hr/\1h/g' "${_ccs_run}"
+}
+
+@test "run-ccstatusline.sh sub-unit groups use \\+ not * (the 7d31% bugfix)" {
+    # The one-or-more group quantifier must be present twice (d + hr rules)...
+    [[ "$(grep -cF '[0-9a-z.]\+\)\+' "${_ccs_run}")" -eq 2 ]]
+    # ...and the buggy zero-or-more form must be gone entirely.
+    run grep -F '[0-9a-z.]*\)\+' "${_ccs_run}"
+    assert_failure
+}
+
+@test "ccstatusline.settings.json is valid JSON" {
+    run jq empty "${_ccs_json}"
+    assert_success
+}
+
+@test "ccstatusline.settings.json declares version 3" {
+    run jq -e '.version == 3' "${_ccs_json}"
+    assert_success
+}
+
+@test "ccstatusline.settings.json has the two-row layout (+ trailing empty row)" {
+    run jq -e '(.lines | length) == 3
+               and (.lines[0] | length) > 0
+               and (.lines[1] | length) > 0
+               and (.lines[2] | length) == 0' "${_ccs_json}"
+    assert_success
+}
+
+@test "ccstatusline.settings.json row 1 leads with cwd then git (reordered layout)" {
+    run jq -e '.lines[0][0].type == "current-working-dir"
+               and .lines[0][2].type == "git-branch"' "${_ccs_json}"
+    assert_success
+}
+
+@test "ccstatusline.settings.json row 2 inlines reset timers (no separate Reset row)" {
+    run jq -e '[.lines[1][].type] as $t
+               | ($t | index("context-percentage")) != null
+               and ($t | index("reset-timer")) != null
+               and ($t | index("weekly-reset-timer")) != null' "${_ccs_json}"
+    assert_success
+}
+
+@test "ccstatusline.settings.json omits the volatile installation block" {
+    run jq -e 'has("installation") | not' "${_ccs_json}"
+    assert_success
 }
 
 @test "install localizes template-author home paths to the current HOME" {
@@ -390,18 +506,19 @@ TMUX
     run upgrade
     assert_success
     [[ -f "${HOME}/.claude/settings.json" ]]
-    [[ -x "${HOME}/.claude/run-statusline.sh" ]]
+    [[ -x "${HOME}/.claude/run-ccstatusline.sh" ]]
 }
 
 # ── remove / purge ───────────────────────────────────────────────────────────
 
-@test "remove deletes all three dropped files" {
+@test "remove deletes all three dropped files + the XDG layout" {
     _load_module
     install
     remove
     [[ ! -e "${HOME}/.claude/settings.json" ]]
-    [[ ! -e "${HOME}/.claude/run-statusline.sh" ]]
+    [[ ! -e "${HOME}/.claude/run-ccstatusline.sh" ]]
     [[ ! -e "${HOME}/.claude/settings.statusline.json" ]]
+    [[ ! -e "${HOME}/.config/ccstatusline/settings.json" ]]
 }
 
 @test "remove does not touch unmanaged files in ~/.claude" {
@@ -413,13 +530,14 @@ TMUX
     [[ -f "${HOME}/.claude/CLAUDE.md" ]]
 }
 
-@test "purge deletes all three dropped files" {
+@test "purge deletes all three dropped files + the XDG layout" {
     _load_module
     install
     purge
     [[ ! -e "${HOME}/.claude/settings.json" ]]
-    [[ ! -e "${HOME}/.claude/run-statusline.sh" ]]
+    [[ ! -e "${HOME}/.claude/run-ccstatusline.sh" ]]
     [[ ! -e "${HOME}/.claude/settings.statusline.json" ]]
+    [[ ! -e "${HOME}/.config/ccstatusline/settings.json" ]]
 }
 
 # ── Idempotency (AC-5 pattern) ───────────────────────────────────────────────
@@ -503,10 +621,10 @@ TMUX
     assert_success
 }
 
-@test "doctor fails when run-statusline.sh lost its executable bit" {
+@test "doctor fails when run-ccstatusline.sh lost its executable bit" {
     _load_module
     module_standalone_main install
-    chmod 644 "${HOME}/.claude/run-statusline.sh"
+    chmod 644 "${HOME}/.claude/run-ccstatusline.sh"
     run doctor
     assert_failure
 }
@@ -544,7 +662,7 @@ TMUX
 @test "is_outdated succeeds when a companion file was deleted" {
     _load_module
     install
-    rm -f "${HOME}/.claude/run-statusline.sh"
+    rm -f "${HOME}/.claude/run-ccstatusline.sh"
     run is_outdated
     assert_success
 }

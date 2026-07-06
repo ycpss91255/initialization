@@ -32,6 +32,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   bindings are unchanged.
 ### Fixed
 
+- **fish no longer leaks focus-event sequences (`ESC[I` / `^[[I`) into external
+  commands** (#164): under tmux (`focus-events on`) + fish 4.x, fish injects a
+  focus-in sequence around command launch (fish-shell#12232) that a plain shell
+  script does not consume, so it appears as literal input and can corrupt an
+  interactive `read` (e.g. capturing `\e[Itest` instead of `test`). New
+  `conf.d` snippet
+  (`module/config/fish/conf.d/disable_focus_during_commands.fish`) disables
+  focus reporting (`ESC[?1004l`) on `fish_preexec`; fish re-enables it on its
+  next prompt and nvim on startup, so tmux `focus-events on` stays on and
+  nvim's `FocusGained` autoread keeps working. Covered by unit tests in
+  `test/unit/module/fish_spec.bats`.
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
   is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
   `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever

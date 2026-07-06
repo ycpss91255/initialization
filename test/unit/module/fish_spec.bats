@@ -154,6 +154,31 @@ _mock_fisher_and_chsh() {
     [[ -f "${MODULE_DIR}/config/fish/fish_plugins" ]]
 }
 
+# ── Issue #164: disable focus reporting during commands ──────────────────────
+# fish injects focus-event sequences (ESC[I / ESC[O, shown as ^[[I) into
+# external commands under tmux (focus-events on) + fish 4.x (fish-shell#12232).
+# A conf.d snippet disables focus reporting on fish_preexec so the sequences
+# stop leaking into interactive scripts, while nvim's FocusGained autoread
+# still works (tmux focus-events stays on).
+
+@test "fish ships the focus-reporting workaround conf.d snippet (#164)" {
+    [[ -f "${MODULE_DIR}/config/fish/conf.d/disable_focus_during_commands.fish" ]]
+}
+
+@test "focus workaround disables focus reporting on fish_preexec (#164)" {
+    local _f="${MODULE_DIR}/config/fish/conf.d/disable_focus_during_commands.fish"
+    run grep -F -- '--on-event fish_preexec' "${_f}"
+    [[ "${status}" -eq 0 ]]
+    run grep -F -- '\e[?1004l' "${_f}"
+    [[ "${status}" -eq 0 ]]
+}
+
+@test "focus workaround references upstream fish-shell#12232 (#164)" {
+    run grep -F -- 'fish-shell/issues/12232' \
+        "${MODULE_DIR}/config/fish/conf.d/disable_focus_during_commands.fish"
+    [[ "${status}" -eq 0 ]]
+}
+
 # ── Metadata sanity ──────────────────────────────────────────────────────────
 
 @test "fish module declares NAME=fish" {

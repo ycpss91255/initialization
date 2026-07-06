@@ -125,6 +125,29 @@ coverage-unit module="": _ensure-kcov-image
 coverage-merge: _ensure-kcov-image
     ./script/ci/ci.sh --merge-coverage
 
+# Refresh the committed core-shard weights (ADR-0028) from REAL bats junit
+# timings, then fold them into test/ci-shard-weights.tsv. The time-weighted
+# greedy-LPT core partition (script/ci/shard_partition.sh) reads that file, so
+# rebalancing is a data refresh — no code change. Run locally and COMMIT the
+# diff: the weights are reproducible from the repo, never a CI-only cache
+# (base ADR-00000017's no-CI-only-cache principle). Runs the non-module
+# ("core") specs under bats junit in the test-tools image; unmeasured specs
+# keep their prior weight, new specs are added.
+shard-weights-refresh: _ensure-image
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p coverage/core-junit
+    rm -f coverage/core-junit/*.xml
+    specs="$(find test/unit -type f -name '*.bats' ! -path 'test/unit/module/*' \
+        | sort | tr '\n' ' ')"
+    docker compose -f compose.yaml run --rm \
+        -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+        ci -c "bats --report-formatter junit --output coverage/core-junit ${specs}"
+    ./script/ci/junit_to_weights.sh --merge test/ci-shard-weights.tsv \
+        coverage/core-junit/*.xml > test/ci-shard-weights.tsv.new
+    mv test/ci-shard-weights.tsv.new test/ci-shard-weights.tsv
+    echo "refreshed test/ci-shard-weights.tsv from coverage/core-junit"
+
 # ── Image build ──────────────────────────────────────────────────────────────
 
 # Builds the content-keyed tag (issue #113) and re-points the legacy

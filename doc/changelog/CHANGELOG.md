@@ -20,8 +20,171 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Security
+
+- **Hardened the github-release fetch/extract path** (`lib/module_helper.sh`
+  plus `module/fzf.module.sh` / `module/yazi.module.sh` /
+  `module/lazydocker.module.sh`), per the security review (`doc/review/security-review.md`):
+  - **SR-01 (HIGH) — production-reachable test seam closed.** The offline test
+    seams `INIT_UBUNTU_TEST_GH_FIXTURE_DIR` / `INIT_UBUNTU_TEST_GH_VERSION` were
+    gated only on the variable being non-empty, so a poisoned env (rc file,
+    env-preserving sudo policy, compromised parent) could swap the install
+    payload with no test harness present. They now activate ONLY when the
+    dedicated `INIT_UBUNTU_TEST_MODE=1` flag is set — a signal production never
+    sets and the bats harness always does. A fixture var set without the flag is
+    ignored (a warning is logged) and the real download runs.
+  - **SR-02 (MEDIUM) — safe archive extraction.** A shared
+    `_module_safe_tar_extract` / `_module_safe_unzip_extract` pair (backed by a
+    directly-testable `module_archive_members_safe` guard) now rejects any
+    archive member with an absolute path or a `..` component before extracting,
+    and root `tar` extraction passes `--no-same-owner --no-same-permissions` so a
+    malicious/MITM archive cannot restore archived owner/uid/setuid bits or
+    escape `INSTALL_DIR`. Wired into the shared archetype default and the
+    fzf/yazi/lazydocker direct fetchers.
+  - **SR-03 (MEDIUM) — best-effort SHA-256 verification.** When a module declares
+    `GITHUB_CHECKSUM_ASSET`, the release's checksums file is fetched from the same
+    release, the artifact digest is verified before extraction, and a MISMATCH
+    aborts the install. Releases without a declared/available checksum log a clear
+    warning and proceed (many upstreams publish none), so no github-release
+    install hard-fails. Helpers: `module_verify_sha256`, `_module_checksum_lookup`,
+    `_module_github_release_verify_checksum`.
+  - Covered by `test/unit/module_fetch_hardening_spec.bats`; the seam-gated
+    lifecycle tests set `INIT_UBUNTU_TEST_MODE=1` via the shared harnesses.
+
+### Fixed
+
+- **`setup_ubuntu doctor` now invokes each module's `doctor()` override**
+  (architecture-review F1): previously the Engine `doctor` subcommand ran only
+  the state.json-vs-reality drift report and never called a module's `doctor()`,
+  while `runner_doctor()` sat as dead code and all four `template/*.template.sh`
+  files promised the opposite ("Engine calls this from `setup_ubuntu doctor`").
+  `doctor` now AUGMENTS the drift report with the per-module health check: with
+  no args it runs `doctor()` across every installed module, with `doctor
+  <module>...` it scopes to the named modules (unknown names → exit 2). The
+  Diag-class exit code (PRD §7.4) is nonzero when EITHER the drift report OR a
+  module's `doctor()` fails, so `runner_doctor()` is reachable and the template
+  contract is true. Modules without a `doctor()` override fall back to
+  `is_installed` (ADR-0002 / ADR-0009), wired in `lib/runner.sh` so the doctor
+  phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`tmuxp` module — apt to pipx migration** (`module/tmuxp.module.sh`, issue
+  #313): tmuxp is now a first-class custom-archetype module installed via
+  user-level `pipx install tmuxp` (newer upstream release + venv isolation)
+  instead of riding along as an apt package in the legacy
+  `module/setup_small_tools.sh` flow. `install()` migrates a pre-existing
+  apt-owned tmuxp away (`sudo apt-get remove -y tmuxp python3-libtmux`) when
+  apt owns it and sudo is available, and apt-installs `pipx` if missing. All 10
+  lifecycle functions are implemented; `setup_small_tools.sh` no longer
+  apt-installs `tmuxp`.
+- **glow module** (`module/glow.module.sh`, issue #314): `glow` (the
+  charmbracelet CLI markdown renderer) is now installable as a module — it was
+  a yazi markdown-preview dependency that no module installed. GitHub-release
+  archetype (`charmbracelet/glow`, versioned goreleaser tarball with
+  `--strip-components=1`), full 10-function lifecycle, Sidecar (ADR-0001). The
+  yazi module now surfaces glow in its `POST_INSTALL_MESSAGE` (installable on
+  demand via `setup_ubuntu install glow`) rather than hard-wiring it as a
+  `DEPENDS_ON` (Q39: module-names-only, yazi runs fine without it). Covered by
+  `test/unit/module/glow_spec.bats` and an extended `yazi_spec.bats`.
+- **Hook enforcement specs** (`test/unit/hook/`): unit specs for every
+  previously-untested `.claude/hook/*.sh`, bringing the hook layer to 100%
+  spec coverage. New specs cover `test-must-use-docker`,
+  `enforce_semver_tag_via_script`, `check_changelog_drift`,
+  `enforce_gh_body_file`, `enforce_gh_english`, `remind_no_emoji`,
+  `remind_main_sync`, `remind_workflow_tdd`, and
+  `check_main_fresh_before_worktree` — each asserting the real block/deny path
+  and the allow/silent path (plus meaningful edge branches).
+- **`trash-maintenance` promoted to a v2 module** (`module/trash-maintenance.module.sh`,
+  custom archetype): the legacy `tool/trash-maintenance.sh` one-off is now a
+  proper lifecycle module and the single source of truth for trash retention.
+  `install` deploys the corrected cleanup script
+  (`module/config/trash-maintenance/trash-maintenance.sh`) to `~/.local/bin/`,
+  schedules it via a marked daily user crontab entry
+  (`# init_ubuntu:trash-maintenance`, no sudo), and disables GNOME's own trash
+  auto-delete (`org.gnome.desktop.privacy remove-old-trash-files false`) so
+  `gsd-housekeeping` never fights the script (issue #275). `remove`/`purge`
+  strip the cron entry + script and `gsettings reset` the GNOME key back to
+  default; `purge` also wipes the log. The gsettings/cron effects are
+  desktop/host-only, so unit tests
+  (`test/unit/module/trash-maintenance_spec.bats`) assert the module CONTAINS
+  the right commands and exercise the cron seam against a stubbed `crontab`.
+
+- **`script/watch-open-issues.sh` open-issue CHANGE-WATCHER**
+  (`test/unit/script/watch_open_issues_spec.bats`): a Monitor-companion poll
+  script (same shape as `auto-merge-on-green.sh` / `wait-pr-ci.sh`) that a
+  maintainer session wraps in a single Monitor to get timely notification when
+  any OPEN GitHub issue changes. Each cycle snapshots
+  `gh issue list --state open` to a stable `number<TAB>updatedAt<TAB>title`
+  stream and diffs it against the previous snapshot; it prints a dated header
+  plus `NEW #n` / `UPDATED #n` / `CLOSED #n` lines only when something changed
+  (quiet otherwise, so Monitor fires only on real changes), arming with a
+  one-line `watch armed: N issues` baseline on start. The comparison lives in a
+  PURE, offline-unit-testable function `watch_issues_diff <prev> <cur>` that
+  reads two snapshot files and touches no network; the main loop owns the
+  `gh` fetch, the sleep, and graceful handling of transient fetch failures.
+  Exit-code-contract script (`set -uo pipefail`, ADR-0007): `0` normal, `2`
+  arg error. Args: `--repo` (required), `--interval` (default 180),
+  `--state-file`, `--once`, `-h|--help`.
+- **Standard template for one-off bash tools** (`template/tool.template.sh`) +
+  matching conformance spec (`test/unit/tool_template_spec.bats`), guide
+  (`doc/guide/small-tool-template.md`) and ADR-0029. Gives `tool/` one-off
+  scripts a proven skeleton: `--help`, `--dry-run`, the `0=ok / 2=usage-error`
+  exit-code contract, grep-guarded idempotent work, and `set -euo pipefail`
+  (ADR-0007 always-act — closes the missing-`set -u` bug class an audit found
+  across the ~16 untested one-off scripts). The template draws the tool-vs-module
+  line explicitly: one-offs use this; reusable tools are promoted to modules
+  (PRD §6.5/§6.6). No existing tools are retrofitted by this change.
+### Changed
+
+- **Time-balanced CI core-shard partition** (`script/ci/shard_partition.sh`,
+  `script/ci/ci.sh`, `.github/workflows/ci.yaml`; ADR-0028): the core
+  (non-module) unit-test matrix now partitions specs by **measured runtime**
+  via greedy-LPT (Longest Processing Time) instead of count round-robin. The
+  audit measured the four core kcov shards at ~96-121 s each (the long pole
+  after lint) because a few heavy specs pinned individual shards; the new
+  partition balances the eight default shards to ~52-57 s each. Weights live in
+  a committed, self-maintaining file (`test/ci-shard-weights.tsv`, refreshed
+  from real bats junit timings via `just -f justfile.ci shard-weights-refresh`
+  and `script/ci/junit_to_weights.sh`) — reproducible from the repo, not a
+  CI-only cache (base ADR-00000017's no-CI-only-cache principle). The shard
+  count is now dynamic: `vars.CI_CORE_SHARDS` (default 8, up from a hardcoded
+  4) drives a `fromJSON` matrix. Every spec still runs exactly once, so the
+  coverage-merge denominator and the AC-17 80 % gate are unchanged.
+
+- **`claude-code-config` statusline switches from the `cc-statusline` Claude
+  plugin to the `ccstatusline` global binary** (sirmalloc/ccstatusline; #231,
+  also resolves #116). The launcher `module/config/claude/run-statusline.sh`
+  is renamed to `run-ccstatusline.sh` and now execs the `ccstatusline` binary,
+  feeding it the real tmux pane width minus the flexMode `-8` offset and
+  post-processing reset timers with an NBSP-aware sed pipeline (5 rules,
+  single-highest-unit only). A new `ccstatusline.settings.json` template ships
+  the maintainer-verified two-row layout (version 3) and is dropped to the XDG
+  config path (`${XDG_CONFIG_HOME:-~/.config}/ccstatusline/settings.json`);
+  `settings.json` drops the obsolete `cc-statusline` marketplace/plugin
+  entries and points `statusLine.command` at `run-ccstatusline.sh`. Install
+  best-effort provisions the binary via `npm install -g ccstatusline`
+  (skippable under `INIT_UBUNTU_STATUSLINE_NO_BINARY` so no host package
+  install runs from a test path).
+### Added
+
+- **Archetype real-mutation-body coverage unit tests**
+  (`test/unit/module_helper_real_bodies_spec.bats`): closes the highest-risk
+  gap in the module archetype layer (module-template-audit #1 + #2). The apt
+  archetype's REAL (non-dry-run) lifecycle bodies were never executed by any
+  test — per-module specs stub `install()`/`remove()`/`purge()` wholesale, and
+  the one integration apt test is reduced and not in the kcov shards. The new
+  specs stub the external side-effecting commands (`sudo`, `have_sudo_access`,
+  `is_installed`; real `rm` against scratch paths) and drive the real branches
+  of `module_default_apt_install` (PPA add via `apt-add-repository`, both
+  no-sudo guards, `apt-get update`/`install`), `module_default_apt_upgrade`
+  (`--only-upgrade` + no-sudo guard), `module_default_apt_remove`, and
+  `module_default_apt_purge` (`apt-get purge` + PPA `--remove` +
+  `CONFIG_PATHS` rm loop). Also covers the `purge` default of the
+  github-release archetype (`module_default_github_release_purge`: remove +
+  `CONFIG_PATHS` loop) and the config archetype
+  (`module_default_config_purge`) — `purge` is the ADR-0015 rollback verb and
+  was previously only exercised in dry-run. Test-only; no production code
+  changed.
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,
@@ -30,6 +193,40 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+- **Module-iterating contract-conformance meta-test**
+  (`test/unit/module/contract_conformance_spec.bats`): a single meta-test that
+  DISCOVERS every `module/*.module.sh` dynamically (so new/edited modules are
+  auto-covered) and asserts each satisfies the shared contract
+  (`doc/module-spec.md` + ADR-0002) — all 10 mandatory lifecycle functions
+  defined, required metadata well-formed (`NAME` matches the filename stem;
+  `CATEGORY`/`SUPPORTED_PLATFORMS`/`RISK_LEVEL` in their allowed sets;
+  `DESCRIPTION` associative with an `en` entry; `TAGS`/`SUPPORTED_UBUNTU`
+  non-empty), and a known lifecycle-binding mechanism (archetype macro or
+  hand-written custom lifecycle). Closes the audit gap where the 39 modules were
+  only covered by ad-hoc per-module specs with no cross-module contract sweep.
+  Surfaces one documented, self-cleaning deviation from ADR-0002: the custom
+  modules `docker`, `font`, and `nvidia-driver` omit `is_outdated()`/`doctor()`
+  (blessed by their own specs; `doc/module-spec.md` §4.1 still lists these as
+  "optional", conflicting with ADR-0002 — flagged for the maintainer, quarantined
+  in an allowlist that turns red if any gap is later closed).
+
+### Changed
+
+- **CI ShellCheck lint now runs in parallel across CPUs** (`script/ci/ci.sh`
+  `_run_shellcheck`): the lint step previously piped all ~197 scripts to a
+  single `xargs -0 shellcheck -x` process (~212s serial and the critical-path
+  CI tail). It now forks one `shellcheck` per `${SHELLCHECK_BATCH:-40}`-file
+  batch across `$(nproc)` workers via
+  `xargs -0 -P "$(nproc)" -n "${SHELLCHECK_BATCH:-40}" shellcheck -x`. The
+  fail-on-violation signal is preserved: `xargs` returns 123 (not 1) when any
+  batched child reports a violation, so the code captures the exit status and
+  `_die`s on ANY nonzero (never comparing against a single expected code), and
+  the lint step still exits nonzero on any violation. `-x` continues to
+  resolve `source`d files from disk regardless of batch, so batching does not
+  change WHICH files/sources are linted. Covered by new unit tests in
+  `test/unit/script/ci_spec.bats` (fail-signal on violation, pass when clean,
+  and a violation hidden among many batches still fails via xargs 123).
+
 ### Fixed
 
 - **fish no longer leaks focus-event sequences (`ESC[I` / `^[[I`) into external
@@ -43,6 +240,58 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   next prompt and nvim on startup, so tmux `focus-events on` stays on and
   nvim's `FocusGained` autoread keeps working. Covered by unit tests in
   `test/unit/module/fish_spec.bats`.
+- **tmux config now installs to the XDG path `~/.config/tmux/tmux.conf`**
+  (#138): `module/tmux.module.sh` `_install_tmux_config()` dropped `tmux.conf`
+  to the legacy `~/.tmux.conf`, but modern tmux reads the XDG path and the
+  config's own `source-file` reload binding targets
+  `~/.config/tmux/tmux.conf`. Every `install` / `upgrade` therefore missed the
+  active location and the repo silently diverged from the host. The install
+  target, its backup-before-overwrite, the dry-run description, and the
+  `POST_INSTALL_MESSAGE` reload hint all move to `~/.config/tmux/tmux.conf`.
+  `~/.tmux.conf` stays in `CONFIG_PATHS` as a legacy cleanup path so `purge`
+  still removes stale copies. Covered by unit tests
+  (`test/unit/module/tmux_spec.bats`).
+- **`trash-maintenance` cleanup no longer silently no-ops** (issue #277), with
+  the two latent bugs reproduced under PATH-stub tests before fixing:
+  (1) `trash-empty` is invoked without `-f` — that option does not exist on
+  older trash-cli (0.17.x) and errored out the age-based purge, and is a no-op
+  on newer versions; (2) `current_kb()` now captures whatever partial total
+  `du` printed and swallows a non-zero `du` exit (defaulting to `0`), so a
+  single permission-denied subpath under `Trash/files` can no longer abort the
+  run under `set -euo pipefail` before the size-cap comparison and eviction
+  loop execute. The default `MAX_GB` cap drops from 50 to 30. `TODO.md`'s
+  "Trash 自動維護" section and `module/config/gsettings_config` are updated to
+  match (defaults, no `-f`, GNOME auto-delete disabled, `old-files-age`
+  dropped). The old `tool/trash-maintenance.sh` copy is removed.
+
+- **`list --installed` now shows the resolved Sidecar version instead of the
+  static `VERSION_PROVIDED` literal** (architecture-review F2 +
+  module-template-audit): the Sidecar (`versions/<name>`) records the version
+  actually pinned at install time (e.g. `0.44.1`), but `lib/dispatcher.sh`
+  `_dispatcher_list_installed` rendered the VERSION column from state.json's
+  `synced.version_provided` — the module's declared literal, often the `latest`
+  sentinel — so users saw `latest` rather than what was really installed. This
+  was two parallel sources of truth for the installed version. A new
+  `_dispatcher_installed_version` helper reads the Sidecar via
+  `module_sidecar_get_version` as the single source of truth for the INSTALLED
+  version, falling back to `version_provided` only when no Sidecar exists
+  (module records none, or a pre-Sidecar install). `version_provided` keeps its
+  meaning as the declared/catalog version; only the installed-version display
+  changed. Covered by unit tests in `test/unit/dispatcher_spec.bats`.
+- **CI fish syntax check now actually lints the fish config** (`script/ci/ci.sh`):
+  `_find_lintable_fish` pruned `module/config` wholesale (copied from the
+  ShellCheck pass, where the .sh files there are vendored third-party config).
+  But every tracked `*.fish` file lives under `module/config/fish/**` — the
+  maintainer's own fish config that init_ubuntu installs — so the prune dropped
+  100% of them: the `fish -n` check ran over ZERO files and was silently a
+  no-op. Discovery now prunes only the one genuinely vendored fish path
+  (`module/config/neovim/fnm_shell_config`, the fnm-generated shell
+  integration) while keeping the deprecated/holding/v1 prunes, so all 21
+  real fish scripts are checked. New regression spec
+  (`test/unit/script/ci_lint_discovery_spec.bats`) asserts the discovery
+  returns a nonzero count over the repo so it cannot silently regress to 0
+  again. No fish syntax violations surfaced once the files were actually
+  checked.
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
   is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
   `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever
@@ -70,14 +319,64 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   highlighting and open in `$EDITOR` instead of falling through to `file` /
   `xdg-open`. ZIP-based Office formats (`*.docx`/`*.xlsx`) are excluded — they
   are not `*+xml` and keep their `archive` handling.
+- **`claude-rm` resolves customTitle on fork / resumed sessions** (#33):
+  `module/config/fish/functions/claude-rm.fish` only read line 1 of each
+  session `.jsonl` when matching a `customTitle`, so fork / resumed sessions —
+  whose first line is `leafUuid` / `permissionMode` / a file-history snapshot
+  and whose `customTitle` appears on a later line — always reported
+  `No session matched` even though Tab completion listed the title. The
+  resolver now scans the first 50 lines and selects the `customTitle` line
+  (`head -50 | grep -m1 '"customTitle"'`), matching the 50-line window
+  `_claude_sessions.py` uses for completion. Covered by content assertions in
+  `test/unit/module/fish_spec.bats`.
+- **`tool/setup_wayland.sh` no longer aborts on a missing helper path**: the
+  script sourced `../function/logger.sh` and `../function/general.sh`, but no
+  `function/` dir exists at the repo root, so under `set -euo pipefail` it
+  aborted before doing anything. Repointed both sources to the live helpers
+  (`lib/logger.sh` + `lib/general.sh`), which define every function the script
+  uses (`have_sudo_access`, `log_info`/`log_warn`/`log_fatal`, `exec_cmd`).
+  Behavior is otherwise unchanged.
 
 ### Changed
 
+- **`lib/dispatcher.sh` split into four cohesive libs** (architecture-review
+  E1): the 1291-line dispatcher god-file (well over the 800-line cap) is now a
+  ~281-line thin orchestrator that owns only global-flag parsing, the shared
+  i18n table, and subcommand routing. Its handler clusters moved to sibling
+  libs sourced by the orchestrator: `lib/dispatcher_render.sh`
+  (module-metadata → JSON / description renderers), `lib/dispatcher_catalog.sh`
+  (`list` / `show` / `search` / `detect`), `lib/dispatcher_lifecycle.sh`
+  (`install` / `remove` / `purge` / `upgrade` / `verify` / `doctor`), and
+  `lib/dispatcher_state_io.sh` (`status` / `export` / `import` / `config` /
+  `sync`). The module-metadata-as-JSON renderer that was copy-pasted three
+  times is deduped into single `_dispatcher_json_str_array` (array → JSON
+  string array) and `_dispatcher_module_probe` (source a module once →
+  recommended + description) primitives used everywhere. Pure refactor:
+  identical subcommands, output, exit codes, and JSON; the existing
+  `dispatcher_spec` / engine / integration-lifecycle specs stay green
+  unchanged, with a focused `test/unit/dispatcher_render_spec.bats` pinning the
+  new render seams.
 - **yazi config drops keys removed upstream in v26.5.6** (#273): removed the
   inert `title_format` (`[mgr]`) and `micro_workers` / `macro_workers`
   (`[tasks]`) keys from `module/config/yazi/yazi.toml`. All three matched
   Yazi's shipped defaults (never customized) and were removed upstream; the
   rest of `[mgr]` / `[tasks]` is unchanged.
+
+### Removed
+
+- Remove stale machine-local `small-tools/config/fish/fish_variables`; portable
+  fish config lives in `module/config/fish/`.
+- **17 superseded legacy scripts from the deprecated holding areas**
+  (`doc/review/legacy-disposition.md`): the v1 remove scripts under `tool/remove/`
+  (`remove_docker.sh`, `remove_font.sh`, `remove_neovim.sh`,
+  `remove_nvidia_driver.sh`) and the legacy `small-tools/` config/tool payload
+  (`config/fish/config.fish`, the `config/fish/functions/` helpers
+  `docker-build-run` / `docker-exec` / `efc` / `ehk` / `etc` / `sfc` / `stc` /
+  `system-update-upgrade`, `config/ssh/ssh_config`, `config/tmux/tmux.conf`,
+  `config/.vimrc`, `tools/eza.sh`). All are superseded by the v2 `module/`
+  equivalents and nothing live sources them; both `tool/` and `small-tools/` are
+  already CI-excluded holding areas (`script/ci/ci.sh` lint/kcov prune,
+  `.codecov.yaml` ignore).
 
 ## [v0.1.0-rc3] - 2026-06-23
 

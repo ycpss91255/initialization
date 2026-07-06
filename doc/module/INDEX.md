@@ -3,7 +3,7 @@
 
 # Module Index
 
-39 modules. Columns come from each module's metadata block
+40 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -43,6 +43,7 @@ to the module source.
 | [shell](../../module/shell.module.sh) | recommended | shell core | Shell session basics: ssh client, keychain, xclip |
 | [ssh-config](../../module/ssh-config.module.sh) | optional | config ssh dotfile | Personal ~/.ssh/config templates (per-host alias and key map) |
 | [tmux](../../module/tmux.module.sh) | recommended | terminal multiplexer | Terminal multiplexer + powerline config |
+| [tmuxp](../../module/tmuxp.module.sh) | optional | terminal session | tmuxp — tmux session manager (freeze/restore sessions from YAML), pipx-managed |
 | [unzip](../../module/unzip.module.sh) | base | archive | unzip — extractor for .zip archives (apt unzip package) |
 | [vim](../../module/vim.module.sh) | base | editor | vim — Vi IMproved terminal text editor (apt vim package) |
 | [vscode](../../module/vscode.module.sh) | optional | editor | Visual Studio Code — Microsoft's GUI code editor (Microsoft apt repo) |

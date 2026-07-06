@@ -158,6 +158,7 @@ case "\$*" in
         export INIT_UBUNTU_CONFIG_DIR="${ENGINE_LT_CONFIG}"
         export BACKUP_DIR="${ENGINE_LT_BACKUP}"
         export INIT_UBUNTU_NO_DEPS=true
+        export INIT_UBUNTU_TEST_MODE=1
         export INIT_UBUNTU_TEST_GH_VERSION="${_gh_version}"
         export INIT_UBUNTU_TEST_GH_FIXTURE_DIR="${ENGINE_LT_FIXTURE}"
         export LOG_COLOR=false LOG_LEVEL=INFO

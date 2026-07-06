@@ -122,10 +122,10 @@ Unit-scope filter (combine with --unit-only / --ci-unit; issue #31):
                         matrix includes modules without specs yet)
   --module core         Only run the non-module unit specs (engine/lib/
                         hook/script/template specs) as a single shard
-  --module core-<N>     Only run the Nth (0-based) round-robin sub-shard
+  --module core-<N>     Only run the Nth (0-based) time-weighted LPT sub-shard
                         of the core specs out of $CORE_SHARD_COUNT
-                        (default 4); the CI core matrix runs these in
-                        parallel like the per-module matrix (issue #226).
+                        (default 8; ADR-0028); the CI core matrix runs these
+                        in parallel like the per-module matrix (issue #226).
                         Shard output: coverage/shard-core-<N>
 
   -h, --help            Show this help
@@ -167,6 +167,15 @@ _find_lintable_sh() {
         -print0
 }
 
+# NOTE: fish discovery must NOT prune module/config wholesale like the
+# ShellCheck pass does. The .sh files under module/config are vendored
+# third-party config, but the *.fish files there ARE the maintainer's own
+# fish config (module/config/fish/**) that init_ubuntu installs — they are
+# authored here and MUST be linted. Pruning module/config dropped every
+# fish file (0 checked; the linter was silently a no-op). Instead we keep
+# the deprecated/holding/v1 prunes and prune only the one genuinely
+# vendored fish path: module/config/neovim/fnm_shell_config (fnm-generated
+# shell integration).
 _find_lintable_fish() {
     find "${REPO_ROOT}" \
         \( -path "${REPO_ROOT}/.git" -o \
@@ -177,7 +186,7 @@ _find_lintable_fish() {
            -path "${REPO_ROOT}/coverage" -o \
            -path "${REPO_ROOT}/small-tools" -o \
            -path "${REPO_ROOT}/tool" -o \
-           -path "${REPO_ROOT}/module/config" -o \
+           -path "${REPO_ROOT}/module/config/neovim/fnm_shell_config" -o \
            -path "${REPO_ROOT}/module/submodule" -o \
            -path "${REPO_ROOT}/module/function" \) -prune -o \
         -type f -name "*.fish" -print0
@@ -196,7 +205,28 @@ _run_shellcheck() {
         _info "  (no shell scripts to check — skipping)"
         return 0
     fi
-    _find_lintable_sh | xargs -0 shellcheck -x
+    # Parallelize: a single `xargs shellcheck` passed ALL ~197 files to one
+    # ShellCheck process — 212s serial and the critical-path CI tail. Adding
+    # -P alone does nothing (still one child); we ALSO batch with -n so xargs
+    # forks one shellcheck per ${SHELLCHECK_BATCH} files across $(nproc)
+    # workers. `-x` still resolves `source`d files from disk regardless of
+    # which batch they land in, so batching never changes WHICH files/sources
+    # are checked.
+    #
+    # Fail-signal (correctness constraint): xargs returns 123 — not 1 — when
+    # ANY batched child shellcheck reports a violation. We capture that rc
+    # and treat ANY nonzero (incl. 123) as failure via _die, so the lint step
+    # exits nonzero on a violation regardless of set -e state. Do NOT compare
+    # against a single expected code (e.g. `-eq 1`): that would swallow 123.
+    local _jobs
+    _jobs="$(nproc 2>/dev/null || echo 4)"
+    local _rc=0
+    _find_lintable_sh \
+        | xargs -0 -P "${_jobs}" -n "${SHELLCHECK_BATCH:-40}" shellcheck -x \
+        || _rc=$?
+    if [[ "${_rc}" -ne 0 ]]; then
+        _die "ShellCheck failed (rc=${_rc}) — see violations above"
+    fi
     _info "ShellCheck OK"
 }
 
@@ -349,22 +379,30 @@ _find_core_specs_sorted() {
              | sort -z)
 }
 
-# Deterministic round-robin partition of the sorted core specs: shard <idx>
-# (0-based) gets every spec whose position in the sorted list is congruent
-# to <idx> modulo <count>. Round-robin (vs contiguous slices) keeps the
-# per-shard spec count balanced to within 1 even when a few specs dominate
-# the runtime, and the union of all <count> shards is exactly the full set
-# with no overlap. Populates the caller-named array (nameref).
+# Time-weighted greedy-LPT partition of the sorted core specs (ADR-0028,
+# adapting ycpss91255-docker/base ADR-00000017): shard <idx> (0-based) gets
+# the subset that shard_partition.sh assigns when bin-packing by MEASURED
+# runtime (test/ci-shard-weights.tsv; unknown specs take a default weight).
+# This replaces the old count round-robin — round-robin balanced spec COUNT
+# but not TIME, so a few heavy specs pinned one core shard ~30 % above the
+# others. LPT balances the wall clock instead. The union of all <count>
+# shards is still exactly the full set with no overlap (shard_partition.sh
+# assigns each spec to exactly one shard), so the coverage-merge denominator
+# stays whole. Populates the caller-named array (nameref).
 _partition_core_specs_for_shard() {
     local -n _dst_arr="$1"
     local _idx="$2" _count="$3"
     local -a _all=()
     _find_core_specs_sorted _all
     _dst_arr=()
-    local _i
-    for ((_i = _idx; _i < ${#_all[@]}; _i += _count)); do
-        _dst_arr+=("${_all[_i]}")
-    done
+    (( ${#_all[@]} == 0 )) && return 0
+    local _weights="${SHARD_WEIGHTS_FILE:-${REPO_ROOT}/test/ci-shard-weights.tsv}"
+    local _f
+    while IFS= read -r _f; do
+        [[ -n "${_f}" ]] && _dst_arr+=("${_f}")
+    done < <(printf '%s\n' "${_all[@]}" \
+        | "${SCRIPT_DIR}/shard_partition.sh" \
+            --index "${_idx}" --count "${_count}" --weights "${_weights}")
 }
 
 # Scope: honors MODULE_FILTER (set via --module; issue #31, PRD M10):
@@ -372,10 +410,10 @@ _partition_core_specs_for_shard() {
 #   core      — every unit spec EXCEPT test/unit/module/ (engine/lib/hook/
 #               script/template specs) as ONE shard; the legacy single
 #               `test-unit (core)` job (kept for local dev + back-compat)
-#   core-<N>  — the Nth (0-based) round-robin sub-shard of the core specs
-#               out of CORE_SHARD_COUNT (default 4); the CI core matrix
-#               runs these in parallel like the per-module matrix (#226).
-#               Shard output: coverage/shard-core-<N>
+#   core-<N>  — the Nth (0-based) time-weighted LPT sub-shard of the core
+#               specs out of CORE_SHARD_COUNT (default 8; ADR-0028); the CI
+#               core matrix runs these in parallel like the per-module matrix
+#               (#226). Shard output: coverage/shard-core-<N>
 #   <name>    — only test/unit/module/<name>_spec.bats; a missing spec is a
 #               skip (exit 0) so matrix jobs for not-yet-specced modules
 #               stay green instead of failing the shard
@@ -403,7 +441,7 @@ _run_unit() {
         core-*)
             # core-<N>: one round-robin sub-shard of the core specs (#226).
             local _shard_idx="${MODULE_FILTER#core-}"
-            local _shard_count="${CORE_SHARD_COUNT:-4}"
+            local _shard_count="${CORE_SHARD_COUNT:-8}"
             if [[ ! "${_shard_idx}" =~ ^[0-9]+$ ]]; then
                 _die "Invalid core shard index in --module ${MODULE_FILTER} (expected core-<N>, N a non-negative integer)"
             fi
@@ -413,7 +451,7 @@ _run_unit() {
             if (( _shard_idx >= _shard_count )); then
                 _die "core shard index ${_shard_idx} out of range for CORE_SHARD_COUNT=${_shard_count} (valid: 0..$((_shard_count - 1)))"
             fi
-            _info "Running Bats unit tests (core shard ${_shard_idx}/${_shard_count}: round-robin non-module specs)"
+            _info "Running Bats unit tests (core shard ${_shard_idx}/${_shard_count}: time-weighted LPT non-module specs)"
             local -a _specs=()
             _partition_core_specs_for_shard _specs "${_shard_idx}" "${_shard_count}"
             if [[ "${#_specs[@]}" -eq 0 ]]; then

@@ -13,6 +13,12 @@
 # per ADR-0001 / module-spec §4.7.4: written on install/upgrade success,
 # deleted on remove/purge; state.json is engine-only.
 #
+# Optional preview dependency (issue #314): yazi renders markdown previews
+# via glow. It is NOT a hard DEPENDS_ON (yazi runs fine without it, and
+# DEPENDS_ON stays module-names-only per Q39) — instead it is surfaced to
+# the user in POST_INSTALL_MESSAGE and installable on demand with
+# `setup_ubuntu install glow` (module/glow.module.sh).
+#
 # Standalone usage:
 #   bash module/yazi.module.sh install [--dry-run]
 #   bash module/yazi.module.sh upgrade / remove / purge / verify / doctor
@@ -51,8 +57,8 @@ declare -gA DESCRIPTION=(
     [zh-TW]="yazi — 高速終端機檔案管理器 + shell alias yz='yazi'"
 )
 declare -gA POST_INSTALL_MESSAGE=(
-    [en]="alias yz='yazi' appended to ~/.bashrc / ~/.zshrc — re-source your rc or restart the shell."
-    [zh-TW]="已將 alias yz='yazi' 加入 ~/.bashrc / ~/.zshrc — 請重新 source rc 或重啟 shell。"
+    [en]="alias yz='yazi' appended to ~/.bashrc / ~/.zshrc — re-source your rc or restart the shell. For markdown previews, install glow: setup_ubuntu install glow."
+    [zh-TW]="已將 alias yz='yazi' 加入 ~/.bashrc / ~/.zshrc — 請重新 source rc 或重啟 shell。若需 markdown 預覽,請安裝 glow:setup_ubuntu install glow。"
 )
 declare -gA WARN_MESSAGE=()
 SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")

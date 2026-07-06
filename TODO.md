@@ -244,7 +244,7 @@ gsettings set org.gnome.desktop.privacy old-files-age 'uint32 90'
 [] libreoffice
   - sudo add-apt-repository ppa:libreoffice/ppa
 [] claude code
-  [] pipx install claude-monitor
+  [x] pipx install claude-monitor  # module/claude-monitor.module.sh (issue #315)
 - tmuxp
   [] sudo apt remove tmuxp python3-libtmux
   [] pipx install tmuxp

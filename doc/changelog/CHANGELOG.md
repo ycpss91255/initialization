@@ -22,6 +22,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`claude-monitor` module** (`module/claude-monitor.module.sh`, issue #315):
+  a new custom-archetype module that installs the `claude-monitor` Claude Code
+  usage-monitor TUI via `pipx` (user-home scope, no sudo except the one-time
+  pipx bootstrap via apt when absent). Implements the full ADR-0002 ten-function
+  lifecycle: `pipx install/upgrade/uninstall`, `is_installed` via the on-PATH
+  shim or `pipx list`, `is_outdated` via `pipx runpip ... list --outdated`, and
+  a `doctor` that checks the launcher answers `--version`. Sidecar version comes
+  from `pipx list --short` (falls back to `pipx-managed`). Auto-registered by
+  the `*.module.sh` registry scan; covered by
+  `test/unit/module/claude-monitor_spec.bats`.
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,

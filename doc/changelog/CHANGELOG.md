@@ -32,6 +32,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   bindings are unchanged.
 ### Fixed
 
+- **Claude Code settings templates ship no hardcoded `/home/<user>` paths**
+  (#100): `module/config/claude/settings.json` and `settings.statusline.json`
+  now carry a `__HOME__` sentinel for the `statusLine.command` path instead of
+  a template-author home prefix, and the machine-specific, fnm-Node-version-
+  pinned `sandbox.seccomp.applyPath` field is dropped (Claude Code locates the
+  seccomp helper itself). `module/claude-code-config.module.sh`
+  `_claude_config_localize` now resolves the `__HOME__` sentinel to the current
+  `$HOME` on drop, replacing the over-broad `/home/<user>` rewrite that could
+  clobber legitimate foreign paths (linux-review F16). Covered by unit tests in
+  `test/unit/module/claude-code-config_spec.bats`.
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
   is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
   `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever

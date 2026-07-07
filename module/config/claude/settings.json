@@ -8,7 +8,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "/home/yunchien/.claude/run-statusline.sh",
+    "command": "__HOME__/.claude/run-statusline.sh",
     "refreshInterval": 30
   },
   "extraKnownMarketplaces": {
@@ -22,11 +22,6 @@
   "language": "zh-TW",
   "enabledPlugins": {
     "cc-statusline@cc-statusline": true
-  },
-  "sandbox": {
-    "seccomp": {
-      "applyPath": "/home/yunchien/.local/share/fnm/node-versions/v22.19.0/installation/lib/node_modules/@anthropic-ai/sandbox-runtime/vendor/seccomp/x64/apply-seccomp"
-    }
   },
   "theme": "dark",
   "verbose": false,

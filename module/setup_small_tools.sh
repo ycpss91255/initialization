@@ -225,11 +225,12 @@ function _install_ranger() {
 }
 
 function _install_tmux() {
-    # tmux and tmuxp
+    # tmux only. tmuxp moved to a pipx-managed module (module/tmuxp.module.sh,
+    # issue #313) for a newer release + venv isolation, so it is no longer
+    # apt-installed here.
     _tmux_pkgs=(
         "xclip"
         "tmux"
-        "tmuxp"
         # tmux-plugins/tmux-logging dependency
         "ansifilter"
         # dep fzf

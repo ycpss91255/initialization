@@ -68,6 +68,22 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   Yazi's shipped defaults (never customized) and were removed upstream; the
   rest of `[mgr]` / `[tasks]` is unchanged.
 
+### Removed
+
+- **ranger module** (issue #319, supersedes #61): yazi (#60) is now the daily
+  file manager across machines, so the redundant ranger catalog entry is
+  dropped. Removed `module/ranger.module.sh`, `module/config/ranger/rifle.conf`,
+  and `test/unit/module/ranger_spec.bats`; dropped the `_install_ranger` helper
+  (plus its `ranger_devicons` / `ranger-zoxide` / `ranger-fzf-filter` plugin
+  wiring) from `module/setup_small_tools.sh` and the `ranger` package +
+  `ranger_devicons` steps from `small-tools/install.sh` / `remove.sh`; removed
+  the ranger usage snippets from the READMEs and the obsolete ranger `r()`
+  cd-on-exit note from `TODO.md` (yazi already returns the last cwd on exit).
+  Regenerated `doc/module/INDEX.md` (39 -> 38 modules) and updated the PRD
+  module table. This is a **catalog-only drop**: no removal module runs
+  `apt remove ranger` at deploy time, so already-installed copies are left in
+  place for the user to uninstall manually if desired.
+
 ## [v0.1.0-rc3] - 2026-06-23
 
 ### Added

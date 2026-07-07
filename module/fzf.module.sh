@@ -204,7 +204,12 @@ _fzf_fetch_and_install() {
         ${_sudo} rm -rf "${INSTALL_DIR}"
     fi
     ${_sudo} mkdir -p "${INSTALL_DIR}"
-    ${_sudo} tar -C "${INSTALL_DIR}" -xzf "${_tmp}"
+    # SR-02: traversal-guarded, --no-same-owner extraction (fzf tarball is flat,
+    # so strip 0). Shared helper from lib/module_helper.sh.
+    if ! _module_safe_tar_extract "${_tmp}" "${INSTALL_DIR}" 0 "${_sudo}"; then
+        rm -f "${_tmp}"
+        return 1
+    fi
     rm -f "${_tmp}"
     ${_sudo} ln -sfn "${INSTALL_DIR}/${BIN_PATH_IN_TAR}" "${BIN_LINK}"
     FZF_RESOLVED_VERSION="${_ver}"

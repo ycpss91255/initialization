@@ -62,9 +62,6 @@ if [ -f "/ect/ssh/sshd_config" ]; then
         '/etc/ssh/sshd_config'
 fi
 
-# Remove ranger plugins 'ranger_devicons'
-rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons
-
 # purge 'small tools' related packages
 sudo apt purge -y \
     bashtop \
@@ -93,7 +90,6 @@ sudo apt purge -y \
     openssh-client \
     openssh-server \
     powerstat \
-    ranger \
     tig \
     tealdeer \
     tmux \

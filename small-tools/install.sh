@@ -82,7 +82,6 @@ sudo apt install -y --no-install-recommends \
     openssh-client \
     openssh-server \
     powerstat \
-    ranger \
     tig \
     tldr \
     tmux \
@@ -173,14 +172,6 @@ sudo systemctl enable ssh && \
 sudo systemctl restart ssh && \
 
 pip install pynvim
-
-# NOTE: .config/ranger/rc.conf set preview_images true
-# delete old ranger_devicons, avoid problems
-rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
-# Install ranger plugins 'ranger_devicons'
-git clone --depth 1 \
-    https://github.com/alexanderjeurissen/ranger_devicons \
-    /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 
 # print Success or failure message
 printf "\033[1;37;42mSmall tools install successfully.\033[0m\n" || \

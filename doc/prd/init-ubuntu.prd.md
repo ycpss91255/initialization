@@ -272,7 +272,6 @@ cd initialization && ./setup_ubuntu_tui.sh   # 或 ./setup_ubuntu.sh install --r
 |---|---|---|---|---|
 | `vscode.module.sh` | `module/setup_vscode.sh` | VS Code(從 recommended 降級) | curl | editor |
 | `yazi.module.sh` | `module/submodules/yazi.sh` | TUI file manager | — | filemgr |
-| `ranger.module.sh` | `module/config/ranger/rifle.conf` | ranger 檔案管理 | — | filemgr |
 | `lnav.module.sh` | `module/config/lnav_pkg/` | log navigator | — | logs |
 | `qmk-firmware.module.sh` | `module/setup_qmk_firmware.sh` | QMK 韌體開發環境 | git, build-essential | hardware |
 | `anydesk.module.sh` | `module/anydesk.sh` | AnyDesk 遠端桌面(`SUPPORTED_PLATFORMS=("desktop")`,Q49) | curl | remote |

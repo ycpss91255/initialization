@@ -3,7 +3,7 @@
 
 # Module Index
 
-42 modules. Columns come from each module's metadata block
+43 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -34,6 +34,7 @@ to the module source.
 | [jq](../../module/jq.module.sh) | base | cli core | jq — command-line JSON processor (apt jq package) |
 | [lazydocker](../../module/lazydocker.module.sh) | optional | cli-essentials | lazydocker — terminal UI (TUI) for Docker and docker compose |
 | [lazygit](../../module/lazygit.module.sh) | optional | cli-essentials | lazygit — terminal UI for git commands |
+| [libreoffice](../../module/libreoffice.module.sh) | optional | office gui | LibreOffice office suite (fresh releases via ppa:libreoffice/ppa) |
 | [lnav](../../module/lnav.module.sh) | optional | logs | lnav — log file navigator for the terminal (apt package + lnav_pkg config bundle) |
 | [neovim](../../module/neovim.module.sh) | recommended | editor cli | Neovim editor + nvimdots personal config |
 | [notion](../../module/notion.module.sh) | optional | notes | Notion desktop app (unofficial notion-electron .deb client) |

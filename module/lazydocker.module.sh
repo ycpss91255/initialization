@@ -196,7 +196,11 @@ _lazydocker_fetch_and_install() {
         sudo rm -rf "${INSTALL_DIR}"
     fi
     sudo mkdir -p "${INSTALL_DIR}"
-    sudo tar -C "${INSTALL_DIR}" --strip-components="${STRIP_COMPONENTS}" -xzf "${_tmp}"
+    # SR-02: traversal-guarded, --no-same-owner extraction (shared helper).
+    if ! _module_safe_tar_extract "${_tmp}" "${INSTALL_DIR}" "${STRIP_COMPONENTS}" sudo; then
+        rm -f "${_tmp}"
+        return 1
+    fi
     rm -f "${_tmp}"
     sudo ln -sfn "${INSTALL_DIR}/${BIN_PATH_IN_TAR}" "${BIN_LINK}"
 

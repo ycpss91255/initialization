@@ -249,7 +249,7 @@ setup_ubuntu install trash-maintenance
   [] sudo apt install cifs-utils autofs (driver)
   [] sudo apt install smbclient (check tool)
     - smbclient -L <IP> -U <USER>
-[] libreoffice
+[x] libreoffice  # module/libreoffice.module.sh (issue #312)
   - sudo add-apt-repository ppa:libreoffice/ppa
 [] claude code
   [x] pipx install claude-monitor  # module/claude-monitor.module.sh (issue #315)

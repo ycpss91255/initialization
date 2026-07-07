@@ -78,6 +78,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   from `pipx list --short` (falls back to `pipx-managed`). Auto-registered by
   the `*.module.sh` registry scan; covered by
   `test/unit/module/claude-monitor_spec.bats`.
+- **LibreOffice module** (`module/libreoffice.module.sh`, issue #312): a v2
+  contract module riding the apt archetype. Installs LibreOffice via the
+  upstream `ppa:libreoffice/ppa` (explicit repository choice — tracks the
+  fresh point releases rather than the distro-archive version frozen into a
+  given Ubuntu release); the PPA is added on install and removed on purge, and
+  `~/.config/libreoffice` is cleared on purge only. Desktop-only:
+  `SUPPORTED_PLATFORMS=("desktop")` and `is_recommended()` never pre-ticks on
+  headless server / WSL / SBC form factors. Covered by
+  `test/unit/module/libreoffice_spec.bats`.
 - **`tmuxp` module — apt to pipx migration** (`module/tmuxp.module.sh`, issue
   #313): tmuxp is now a first-class custom-archetype module installed via
   user-level `pipx install tmuxp` (newer upstream release + venv isolation)

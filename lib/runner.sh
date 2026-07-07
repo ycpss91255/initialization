@@ -220,6 +220,21 @@ _runner_run_phase() {
         # shellcheck source=/dev/null  # module path is dynamic; static resolution impossible — https://www.shellcheck.net/wiki/SC1090
         source "${_file}"
         if ! declare -F "${_phase}" >/dev/null 2>&1; then
+            # doctor() is OPTIONAL (ADR-0002 / ADR-0009): a module that ships no
+            # override falls back to is_installed — the promise every
+            # template/*.template.sh makes ("Without it, doctor falls back to
+            # is_installed."). module_default_doctor wraps is_installed with a
+            # log_warn; use it when the parent sourced module_helper.sh, else
+            # call is_installed directly. Every OTHER phase still hard-fails.
+            if [[ "${_phase}" == "doctor" ]]; then
+                local _fallback_rc=0
+                if declare -F module_default_doctor >/dev/null 2>&1; then
+                    module_default_doctor || _fallback_rc=$?
+                elif declare -F is_installed >/dev/null 2>&1; then
+                    is_installed || _fallback_rc=$?
+                fi
+                exit "${_fallback_rc}"
+            fi
             log_error "[${_name}] module does not define ${_phase}() — aborting"
             exit 1
         fi

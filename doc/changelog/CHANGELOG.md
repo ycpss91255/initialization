@@ -32,6 +32,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   bindings are unchanged.
 ### Fixed
 
+- **`small-tools/install.sh` tealdeer cache seeding no longer aborts the
+  installer** (issue #263): `tldr --update` sat inside the long `&&` chain, so a
+  broken-ZIP failure from tealdeer's own downloader short-circuited the chain and
+  silently skipped every later step (tpm clone, tmux config, tmux-powerline, ssh
+  setup, ranger plugins). The cache update is now decoupled and non-fatal, with a
+  curl + unzip fallback into the real `~/.cache/tealdeer/tldr-pages` cache. Also
+  drops the dead `~/.local/share/tldr` handling and the always-true
+  `[ -n "<literal>" ]` guards (now real `[ -d ]` path tests), pins the `tealdeer`
+  package (not the mismatched `tldr` apt package), adds `unzip`, and installs the
+  fish `tldr` completion where fish actually scans (`~/.config/fish/completions`).
+  `small-tools/remove.sh` mirrors the cache-path/package fix.
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`
   is unset** (linux-review F1, CRITICAL): `lib/general.sh` `backup_file` called
   `log_fatal` — an `exit 1` a caller's `|| true` cannot catch — whenever

@@ -300,17 +300,3 @@ cc-statusline 的 README 建議 `statusLine.command` 寫 `node ${CLAUDE_PLUGIN_R
 依賴：`gio`（GNOME, Ubuntu 預裝）、`python3`。
 
 https://gist.github.com/coodoo/4ccb8e9ab3f5b586f9beb8b7ef5f6d75
-
-- KVM stack
-# 裝 KVM stack
-sudo apt install qemu-kvm libvirt-daemon-system libvirt-clients \
-                 bridge-utils virt-manager ovmf
-
-# 把你自己加進 libvirt / kvm group
-sudo usermod -aG libvirt,kvm $USER
-
-# 登出再登入（或 newgrp libvirt）
-
-# 驗證
-virsh list --all    # 應該能跑，不報錯
-kvm-ok              # 應該說 "KVM acceleration can be used"

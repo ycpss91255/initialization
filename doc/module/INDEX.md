@@ -3,7 +3,7 @@
 
 # Module Index
 
-39 modules. Columns come from each module's metadata block
+40 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -31,6 +31,7 @@ to the module source.
 | [htop](../../module/htop.module.sh) | base | monitor | htop — interactive process viewer (apt htop package) |
 | [jetson-stats](../../module/jetson-stats.module.sh) | optional | hardware | jetson-stats — jtop monitor TUI for NVIDIA Jetson (iGPU, nvpmodel, clocks, fan) |
 | [jq](../../module/jq.module.sh) | base | cli core | jq — command-line JSON processor (apt jq package) |
+| [kvm](../../module/kvm.module.sh) | optional | virtualization vm | KVM / libvirt / QEMU virtualization stack + virt-manager |
 | [lazydocker](../../module/lazydocker.module.sh) | optional | cli-essentials | lazydocker — terminal UI (TUI) for Docker and docker compose |
 | [lazygit](../../module/lazygit.module.sh) | optional | cli-essentials | lazygit — terminal UI for git commands |
 | [lnav](../../module/lnav.module.sh) | optional | logs | lnav — log file navigator for the terminal (apt package + lnav_pkg config bundle) |

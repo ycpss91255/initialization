@@ -72,6 +72,62 @@ EOF
     refute_output --partial "synthetic"
 }
 
+@test "read_user_messages: min_index skips messages at/before the boundary line" {
+    local f="${FIXTURE_DIR}/indexed.jsonl"
+    cat > "${f}" <<'EOF'
+{"type":"user","message":{"role":"user","content":"before boundary"}}
+{"type":"assistant","message":{"role":"assistant","content":"boundary line"}}
+{"type":"user","message":{"role":"user","content":"after boundary"}}
+EOF
+    # Boundary at line 2 -> only line 3 (index 3) survives.
+    run read_user_messages "${f}" 2
+    assert_success
+    assert_output "after boundary"
+    refute_output --partial "before boundary"
+}
+
+# ── _last_publish_line_index (per-draft scoping boundary) ─────────────────────
+
+@test "_last_publish_line_index: no prior publish -> 0" {
+    local f="${FIXTURE_DIR}/nopublish.jsonl"
+    cat > "${f}" <<'EOF'
+{"type":"user","message":{"role":"user","content":"approve issue"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"gh issue view 34"}}]}}
+EOF
+    run _last_publish_line_index "${f}" "issue"
+    assert_success
+    assert_output "0"
+}
+
+@test "_last_publish_line_index: returns line of last matching-kind create" {
+    local f="${FIXTURE_DIR}/withpublish.jsonl"
+    cat > "${f}" <<'EOF'
+{"type":"user","message":{"role":"user","content":"approve issue"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"gh issue create --title a --body-file /tmp/a.md"}}]}}
+{"type":"user","message":{"role":"user","content":"thanks"}}
+EOF
+    run _last_publish_line_index "${f}" "issue"
+    assert_success
+    assert_output "2"
+}
+
+@test "_last_publish_line_index: a prior PR create does not move the issue boundary" {
+    local f="${FIXTURE_DIR}/crosskind.jsonl"
+    cat > "${f}" <<'EOF'
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"gh pr create --body-file /tmp/a.md"}}]}}
+{"type":"user","message":{"role":"user","content":"approve issue"}}
+EOF
+    run _last_publish_line_index "${f}" "issue"
+    assert_success
+    assert_output "0"
+}
+
+@test "_last_publish_line_index: missing file -> 0" {
+    run _last_publish_line_index "${FIXTURE_DIR}/nope.jsonl" "issue"
+    assert_success
+    assert_output "0"
+}
+
 # ── is_review_approved ───────────────────────────────────────────────────────
 
 @test "is_review_approved: 'approve issue' authorizes issue" {
@@ -201,4 +257,47 @@ EOF
     run bash -c "printf '%s' \"\$1\" | '${HOOK_SH}'" _ "${input}"
     assert_success
     assert_output --partial '"permissionDecision": "deny"'
+}
+
+# ── main: per-draft scoping (issue #34: approval scoped to the current draft) ──
+
+@test "main: an approval consumed by a prior issue create does NOT authorize a second, unreviewed issue -> deny" {
+    # Approve once, create issue A, then draft issue B with no fresh approval.
+    cat > "${TRANSCRIPT}" <<'EOF'
+{"type":"user","message":{"role":"user","content":"approve issue"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"gh issue create --title a --body-file /tmp/a.md"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":"drafted issue B"}}
+EOF
+    local input; input="$(_pre_bash_json "gh issue create --title b --body-file /tmp/b.md")"
+    run bash -c "printf '%s' \"\$1\" | '${HOOK_SH}'" _ "${input}"
+    assert_success
+    assert_output --partial '"permissionDecision": "deny"'
+}
+
+@test "main: a fresh approval AFTER the prior create authorizes the next issue -> allow" {
+    cat > "${TRANSCRIPT}" <<'EOF'
+{"type":"user","message":{"role":"user","content":"approve issue"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"gh issue create --title a --body-file /tmp/a.md"}}]}}
+{"type":"user","message":{"role":"user","content":"the second draft is good too, approve issue"}}
+EOF
+    local input; input="$(_pre_bash_json "gh issue create --title b --body-file /tmp/b.md")"
+    run bash -c "printf '%s' \"\$1\" | '${HOOK_SH}'" _ "${input}"
+    assert_success
+    assert_output ""
+}
+
+# ── registration: the hook must actually be wired into settings.json ──────────
+# Issue #34's acceptance criterion is that the hook runs in a live session;
+# an unregistered hook is inert. Guard the wiring so it cannot silently rot.
+
+@test "settings.json: hook is registered as a PreToolUse Bash command" {
+    local settings="${REPO_ROOT}/.claude/settings.json"
+    [[ -r "${settings}" ]] || fail "settings.json not readable: ${settings}"
+    run jq -r '
+        .hooks.PreToolUse[]
+        | select(.matcher == "Bash")
+        | .hooks[].command
+    ' "${settings}"
+    assert_success
+    assert_output --partial "enforce_gh_review_approval.sh"
 }

@@ -78,9 +78,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `enforce_gh_english.sh` (English-only, not approval) left open. Approval is
   read from the system-controlled transcript so it cannot be forged; emergency
   bypass is `ECC_ALLOW_GH_REVIEW=1`. The flow is documented in
-  `.agents/rules/common/development-workflow.md` (+ zh translation). Registering
-  the hook in `.claude/settings.json` is left as a maintainer step (auto-mode
-  blocks the agent from editing its own hook config).
+  `.agents/rules/common/development-workflow.md` (+ zh translation).
+  - **Wired into `.claude/settings.json`** as a PreToolUse/Bash hook so it
+    actually runs in a live session (an unregistered hook is inert); a
+    `settings.json`-registration test guards the wiring against silent rot.
+  - **Per-draft scoping.** Approval is scoped to the current draft, not the
+    whole session: once the agent has already run a `gh <kind> create|edit`, the
+    next publish of the same kind needs a fresh approval that post-dates that
+    prior create (`_last_publish_line_index` finds the boundary; approvals
+    before it are ignored). Previously a single `approve issue` authorized every
+    later `gh issue create` in the session — including a different, unreviewed
+    issue. The boundary is per-kind, so an issue publish never invalidates a pr
+    approval. Covered by `test/unit/hook/enforce_gh_review_approval_spec.bats`.
 - **LibreOffice module** (`module/libreoffice.module.sh`, issue #312): a v2
   contract module riding the apt archetype. Installs LibreOffice via the
   upstream `ppa:libreoffice/ppa` (explicit repository choice — tracks the

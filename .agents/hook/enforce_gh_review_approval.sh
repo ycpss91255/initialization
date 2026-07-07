@@ -29,18 +29,31 @@
 # The canonical tokens stay English so the check is locale-agnostic;
 # locale equivalents may be layered on later.
 #
+# Per-draft scoping (issue #34): approval is scoped to the CURRENT draft,
+# not the whole session. One `approve issue` no longer authorizes every
+# later `gh issue create` — after the agent has already run a
+# `gh <kind> create|edit`, a fresh approval (post-dating that publish) is
+# required for the next one. Otherwise a second, never-reviewed draft
+# would ride in on a stale approval.
+#
 # Modules (each a function with a narrow stdin/stdout/exit contract so it
 # can be exercised in isolation by bats):
-#   - read_user_messages <transcript_path>
-#       Emits every user-typed text message (one per line). Skips
+#   - read_user_messages <transcript_path> [min_index]
+#       Emits every user-typed text message (one per line) on a line whose
+#       1-based index is > min_index (default 0 = whole transcript). Skips
 #       tool_result entries (synthetic content, not user-typed). Missing
 #       or unreadable file -> empty stdout.
+#   - _last_publish_line_index <transcript_path> <kind>
+#       The 1-based line index of the last assistant Bash tool_use that
+#       already ran `gh <kind> create|edit` (the scoping boundary); 0 when
+#       none. Per-kind, so an issue publish never resets a pr approval.
 #   - is_review_approved <kind> <messages_text>
 #       kind is `issue` or `pr`. Exit 0 if the text contains a matching
 #       approval phrase (or the `skip review` escape hatch); exit 1
 #       otherwise.
 #   - main
-#       Orchestrates the two above against PreToolUse JSON stdin.
+#       Orchestrates the above against PreToolUse JSON stdin: computes the
+#       per-draft boundary, reads only the approvals after it, decides.
 #
 # Output contract (per ADR-0007 exit-code-contract convention):
 #   - allow  -> exit 0, no stdout
@@ -52,19 +65,28 @@
 set -uo pipefail
 
 # ── read_user_messages ───────────────────────────────────────────────────────
-# Args: $1 = transcript_path. Stdout: every user-typed text message, one
-# per line, in file order.
+# Args: $1 = transcript_path, $2 = min_index (optional, default 0).
+# Stdout: every user-typed text message on a transcript line whose 1-based
+# index is STRICTLY GREATER than min_index, one per line, in file order.
 # Algorithm: scan JSONL for entries where `.type == "user"` AND
 # `.message.role == "user"` AND `.message.content` is either a plain
 # string or an array containing `type:"text"` block(s) (NOT tool_result,
 # which is synthetic). Concatenate the text blocks of each entry.
+#
+# min_index implements per-draft scoping (issue #34): approvals that
+# predate the boundary line (the last `gh <kind> create|edit` the agent
+# already ran) are ignored, so one approval cannot authorize a later,
+# separately-drafted publish. min_index == 0 -> whole transcript.
 read_user_messages() {
     local transcript_path="${1:-}"
+    local min_index="${2:-0}"
     [[ -z "${transcript_path}" ]] && return 0
     [[ ! -r "${transcript_path}" ]] && return 0
 
-    local line text
+    local line text idx=0
     while IFS= read -r line; do
+        idx=$((idx + 1))
+        (( idx <= min_index )) && continue
         text="$(printf '%s' "${line}" | jq -r '
             select(.type == "user")
             | select(.message.role == "user")
@@ -77,6 +99,47 @@ read_user_messages() {
         ' 2>/dev/null)"
         [[ -n "${text}" ]] && printf '%s\n' "${text}"
     done < "${transcript_path}"
+    return 0
+}
+
+# ── _last_publish_line_index ─────────────────────────────────────────────────
+# Args: $1 = transcript_path, $2 = kind (issue|pr).
+# Stdout: the 1-based transcript line index of the LAST assistant Bash
+# tool_use that already invoked `gh <kind> create|edit` (the boundary
+# after which a fresh approval is required); `0` when there is none, the
+# file is missing/unreadable, or the args are empty.
+#
+# Rationale (issue #34, per-draft review): without a boundary, a single
+# `approve issue` earlier in the session would authorize every later
+# `gh issue create` — including a different, never-reviewed draft. The
+# current (about-to-run) command is NOT in the transcript yet (PreToolUse
+# fires before execution), so only PRIOR publishes are counted. The
+# boundary is per-kind so an issue publish never invalidates a pr
+# approval (and vice versa).
+_last_publish_line_index() {
+    local transcript_path="${1:-}"
+    local kind="${2:-}"
+    if [[ -z "${transcript_path}" || -z "${kind}" || ! -r "${transcript_path}" ]]; then
+        printf '0'
+        return 0
+    fi
+
+    local line idx=0 last=0 cmd
+    while IFS= read -r line; do
+        idx=$((idx + 1))
+        cmd="$(printf '%s' "${line}" | jq -r '
+            select(.type == "assistant")
+            | .message.content
+            | if type == "array" then
+                  ( map(select(.type == "tool_use" and .name == "Bash")
+                        | .input.command // empty) | join("\n") )
+              else empty
+              end
+        ' 2>/dev/null)"
+        [[ -z "${cmd}" ]] && continue
+        [[ "$(_triggering_kind "${cmd}")" == "${kind}" ]] && last=${idx}
+    done < "${transcript_path}"
+    printf '%s' "${last}"
     return 0
 }
 
@@ -158,9 +221,12 @@ main() {
     kind="$(_triggering_kind "${cmd}")"
     [[ -z "${kind}" ]] && return 0
 
-    local transcript_path messages
+    local transcript_path boundary messages
     transcript_path="$(printf '%s' "${input}" | jq -r '.transcript_path // empty' 2>/dev/null)"
-    messages="$(read_user_messages "${transcript_path}")"
+    # Per-draft scoping: only approvals AFTER the last `gh <kind> create|edit`
+    # the agent already ran count for the current publish (issue #34).
+    boundary="$(_last_publish_line_index "${transcript_path}" "${kind}")"
+    messages="$(read_user_messages "${transcript_path}" "${boundary}")"
 
     if is_review_approved "${kind}" "${messages}"; then
         return 0

@@ -304,6 +304,53 @@ EOF
     assert_output --partial "No modules"
 }
 
+# doctor() is OPTIONAL (ADR-0002 / ADR-0009): a module that ships no doctor()
+# override must NOT abort the doctor phase — the Engine promise (all four
+# template/*.template.sh) is that doctor "falls back to is_installed". The
+# runner honors that fallback so the wired `setup_ubuntu doctor` path can run
+# doctor across every installed module regardless of whether each defined one.
+@test "runner_doctor falls back to is_installed when the module has no doctor()" {
+    cat > "${FAKE_MODULE_DIR}/nodoc.module.sh" <<'EOF'
+NAME="nodoc"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+
+install()      { return 0; }
+remove()       { return 0; }
+purge()        { return 0; }
+is_installed() { return 0; }
+EOF
+    _load_engine
+    run runner_doctor nodoc
+    assert_success
+    refute_output --partial "module does not define"
+}
+
+@test "runner_doctor fallback propagates is_installed failure (no doctor())" {
+    cat > "${FAKE_MODULE_DIR}/nodoc-broken.module.sh" <<'EOF'
+NAME="nodoc-broken"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+
+install()      { return 0; }
+remove()       { return 0; }
+purge()        { return 0; }
+is_installed() { return 1; }
+EOF
+    _load_engine
+    run runner_doctor nodoc-broken
+    assert_failure 1
+    refute_output --partial "module does not define"
+}
+
 # ── Sidecar at the phase-invocation layer (refines ADR-0001) ────────────────
 #
 # The runner — not the module's install()/remove() — writes/removes the

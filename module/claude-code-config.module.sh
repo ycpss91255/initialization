@@ -5,11 +5,16 @@
 # Drops the personal Claude Code configuration shipped in
 # module/config/claude/ into ~/.claude/:
 #   settings.json             main Claude Code settings
-#   run-statusline.sh         statusline launcher (executable)
+#   run-ccstatusline.sh       statusline launcher (executable)
 #   settings.statusline.json  statusline-only settings fragment
+# and the ccstatusline widget layout into the XDG config path:
+#   ${XDG_CONFIG_HOME:-~/.config}/ccstatusline/settings.json
 #
-# Template-author home paths (/home/<user>) are rewritten to the current
-# ${HOME} on drop so the config works on any machine/username.
+# The launcher execs the `ccstatusline` binary (sirmalloc/ccstatusline, a
+# global npm CLI); install best-effort provisions it via `npm install -g`
+# (#231, also resolves #116). Template-author home paths (/home/<user>) are
+# rewritten to the current ${HOME} on drop so the config works on any
+# machine/username.
 #
 # Standalone usage:
 #   bash module/claude-code-config.module.sh install [--dry-run]
@@ -62,7 +67,7 @@ SUPPORTS_USER_HOME=true
 RISK_LEVEL="low"
 REBOOT_REQUIRED=false
 INSTALL_TARGET_DEFAULT="user-home"
-TEST_VERIFY_CMD="[[ -s '${HOME}/.claude/settings.json' && -x '${HOME}/.claude/run-statusline.sh' ]]"
+TEST_VERIFY_CMD="[[ -s '${HOME}/.claude/settings.json' && -x '${HOME}/.claude/run-ccstatusline.sh' ]]"
 
 # Engine-consumed metadata: the registry/runner read these post-source, and
 # the i18n arrays are dereferenced indirectly via module_i18n_get. Reference
@@ -82,7 +87,11 @@ CONFIG_MODE="644"
 module_use_config_archetype
 
 # Files dropped into ~/.claude (basename list; mode handled per-file).
-CLAUDE_CONFIG_FILES=("settings.json" "run-statusline.sh" "settings.statusline.json")
+CLAUDE_CONFIG_FILES=("settings.json" "run-ccstatusline.sh" "settings.statusline.json")
+
+# The ccstatusline widget layout is not a ~/.claude file — it lives at the
+# tool's XDG config path. Shipped as module/config/claude/ccstatusline.settings.json.
+CCSTATUSLINE_TEMPLATE="ccstatusline.settings.json"
 
 # ── Overrides (super-call pattern, archetype-cookbook §C) ────────────────────
 # Chain to the config-drop default, then drop the companion files with
@@ -93,6 +102,7 @@ install() {
     module_default_config_install || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _claude_config_drop_files || return $?
+    _ccstatusline_ensure_binary
 }
 
 upgrade() {
@@ -101,19 +111,22 @@ upgrade() {
     module_default_config_upgrade || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
     _claude_config_drop_files || return $?
+    _ccstatusline_ensure_binary
 }
 
 remove() {
     module_default_config_remove || return $?
     [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]] && return 0
-    rm -f "${CONFIG_DEST%/*}/run-statusline.sh" \
-          "${CONFIG_DEST%/*}/settings.statusline.json"
+    rm -f "${CONFIG_DEST%/*}/run-ccstatusline.sh" \
+          "${CONFIG_DEST%/*}/settings.statusline.json" \
+          "$(_ccstatusline_xdg_dest)"
 }
 
 purge() {
     # A config drop has no split between payload and config: purge == remove.
     module_dryrun_guard purge \
-        "rm ${CONFIG_DEST%/*}/{${CLAUDE_CONFIG_FILES[*]}}" && return 0
+        "rm ${CONFIG_DEST%/*}/{${CLAUDE_CONFIG_FILES[*]}} + $(_ccstatusline_xdg_dest)" \
+        && return 0
     remove
 }
 
@@ -140,6 +153,11 @@ is_outdated() {
             return 0
         fi
     done
+    # The XDG-dropped ccstatusline layout drifts independently of ~/.claude.
+    local _xdg; _xdg="$(_ccstatusline_xdg_dest)"
+    [[ -f "${_xdg}" ]] || return 0
+    diff -q <(_claude_config_localize < "${_src}/${CCSTATUSLINE_TEMPLATE}") \
+            "${_xdg}" >/dev/null 2>&1 || return 0
     return 1
 }
 
@@ -150,7 +168,7 @@ doctor() {
         log_warn "[${NAME}] doctor: ~/.claude/settings.json not managed by init_ubuntu"
         return 1
     fi
-    local _launcher="${CONFIG_DEST%/*}/run-statusline.sh"
+    local _launcher="${CONFIG_DEST%/*}/run-ccstatusline.sh"
     if [[ ! -x "${_launcher}" ]]; then
         log_warn "[${NAME}] doctor: ${_launcher} missing or not executable"
         return 1
@@ -178,8 +196,14 @@ _claude_config_localize() {
     sed -E "s#/home/[A-Za-z0-9._-]+#${HOME}#g"
 }
 
-# Drop all CLAUDE_CONFIG_FILES into ~/.claude, localized; launcher is 755,
-# JSON files 644. Idempotent: re-dropping converges to the same content.
+# Absolute path to the ccstatusline widget-layout config (XDG, not ~/.claude).
+_ccstatusline_xdg_dest() {
+    printf '%s/ccstatusline/settings.json' "${XDG_CONFIG_HOME:-${HOME}/.config}"
+}
+
+# Drop all CLAUDE_CONFIG_FILES into ~/.claude plus the ccstatusline layout
+# into its XDG config path, localized; launcher is 755, JSON files 644.
+# Idempotent: re-dropping converges to the same content.
 _claude_config_drop_files() {
     local _src _dest _f
     _src="$(_claude_config_src_dir)"
@@ -197,7 +221,34 @@ _claude_config_drop_files() {
             chmod 644 "${_dest}/${_f}"
         fi
     done
-    log_info "[${NAME}] dropped ${#CLAUDE_CONFIG_FILES[@]} files -> ${_dest}"
+    # ccstatusline reads its layout from the XDG config path, not ~/.claude.
+    if [[ ! -f "${_src}/${CCSTATUSLINE_TEMPLATE}" ]]; then
+        log_warn "[${NAME}] template missing: ${_src}/${CCSTATUSLINE_TEMPLATE}"
+        return 1
+    fi
+    local _xdg; _xdg="$(_ccstatusline_xdg_dest)"
+    mkdir -p "${_xdg%/*}" || return 1
+    _claude_config_localize < "${_src}/${CCSTATUSLINE_TEMPLATE}" > "${_xdg}" || return 1
+    chmod 644 "${_xdg}"
+    log_info "[${NAME}] dropped ${#CLAUDE_CONFIG_FILES[@]} files -> ${_dest}, layout -> ${_xdg}"
+}
+
+# Best-effort provisioning of the `ccstatusline` binary the launcher execs
+# (issue #231: "global binary + XDG config"). Non-fatal: the config drop still
+# succeeds if the binary can't be installed here — the user can run
+# `npm install -g ccstatusline` later. Skipped entirely in the test harness
+# (INIT_UBUNTU_STATUSLINE_NO_BINARY) so no host package install runs under CI.
+_ccstatusline_ensure_binary() {
+    [[ "${INIT_UBUNTU_STATUSLINE_NO_BINARY:-false}" == "true" ]] && return 0
+    command -v ccstatusline >/dev/null 2>&1 && return 0
+    if command -v npm >/dev/null 2>&1; then
+        log_info "[${NAME}] provisioning statusline binary: npm install -g ccstatusline"
+        npm install -g ccstatusline >/dev/null 2>&1 \
+            || log_warn "[${NAME}] 'npm install -g ccstatusline' failed; install it manually"
+    else
+        log_warn "[${NAME}] npm not found; install the statusline binary with 'npm install -g ccstatusline'"
+    fi
+    return 0
 }
 
 # ── Standalone footer ───────────────────────────────────────────────────────

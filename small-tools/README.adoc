@@ -162,9 +162,6 @@ sudo arp-scan --interface=<DERVICE> --localnet
 # powerstat
 sudo powerstat
 
-# ranger
-ranger [FOLDER_PATH]
-
 # silversearcher-ag
 ag replace grep
 

@@ -392,7 +392,7 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `ranger_devicons` steps from `small-tools/install.sh` / `remove.sh`; removed
   the ranger usage snippets from the READMEs and the obsolete ranger `r()`
   cd-on-exit note from `TODO.md` (yazi already returns the last cwd on exit).
-  Regenerated `doc/module/INDEX.md` (39 -> 38 modules) and updated the PRD
+  Regenerated `doc/module/INDEX.md` (44 -> 43 modules) and updated the PRD
   module table. This is a **catalog-only drop**: no removal module runs
   `apt remove ranger` at deploy time, so already-installed copies are left in
   place for the user to uninstall manually if desired.

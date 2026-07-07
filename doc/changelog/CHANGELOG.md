@@ -22,6 +22,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **GitHub issue/PR review-approval hook** (`.claude/hook/enforce_gh_review_approval.sh`,
+  issue #34): a PreToolUse (Bash) hook that denies `gh issue create|edit` and
+  `gh pr create|edit` until the session transcript contains an explicit user
+  approval phrase — `approve issue` / `issue ok` for issues, `approve pr` /
+  `pr ok` for PRs, or `skip review` as the explicit opt-out. This enforces the
+  draft-in-zh-TW → user review → translate-to-English → create flow so the user
+  sees the draft before it lands on a public, indexed repo, closing the gap that
+  `enforce_gh_english.sh` (English-only, not approval) left open. Approval is
+  read from the system-controlled transcript so it cannot be forged; emergency
+  bypass is `ECC_ALLOW_GH_REVIEW=1`. The flow is documented in
+  `.agents/rules/common/development-workflow.md` (+ zh translation). Registering
+  the hook in `.claude/settings.json` is left as a maintainer step (auto-mode
+  blocks the agent from editing its own hook config).
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,

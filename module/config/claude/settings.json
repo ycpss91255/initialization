@@ -8,21 +8,10 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "__HOME__/.claude/run-statusline.sh",
+    "command": "__HOME__/.claude/run-ccstatusline.sh",
     "refreshInterval": 30
   },
-  "extraKnownMarketplaces": {
-    "cc-statusline": {
-      "source": {
-        "source": "github",
-        "repo": "NYCU-Chung/cc-statusline"
-      }
-    }
-  },
   "language": "zh-TW",
-  "enabledPlugins": {
-    "cc-statusline@cc-statusline": true
-  },
   "theme": "dark",
   "verbose": false,
   "model": "sonnet"

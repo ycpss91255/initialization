@@ -68,6 +68,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`claude-monitor` module** (`module/claude-monitor.module.sh`, issue #315):
+  a new custom-archetype module that installs the `claude-monitor` Claude Code
+  usage-monitor TUI via `pipx` (user-home scope, no sudo except the one-time
+  pipx bootstrap via apt when absent). Implements the full ADR-0002 ten-function
+  lifecycle: `pipx install/upgrade/uninstall`, `is_installed` via the on-PATH
+  shim or `pipx list`, `is_outdated` via `pipx runpip ... list --outdated`, and
+  a `doctor` that checks the launcher answers `--version`. Sidecar version comes
+  from `pipx list --short` (falls back to `pipx-managed`). Auto-registered by
+  the `*.module.sh` registry scan; covered by
+  `test/unit/module/claude-monitor_spec.bats`.
 - **LibreOffice module** (`module/libreoffice.module.sh`, issue #312): a v2
   contract module riding the apt archetype. Installs LibreOffice via the
   upstream `ppa:libreoffice/ppa` (explicit repository choice — tracks the

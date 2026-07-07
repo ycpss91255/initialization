@@ -252,7 +252,7 @@ setup_ubuntu install trash-maintenance
 [x] libreoffice  # module/libreoffice.module.sh (issue #312)
   - sudo add-apt-repository ppa:libreoffice/ppa
 [] claude code
-  [] pipx install claude-monitor
+  [x] pipx install claude-monitor  # module/claude-monitor.module.sh (issue #315)
 - tmuxp
   [] sudo apt remove tmuxp python3-libtmux
   [] pipx install tmuxp

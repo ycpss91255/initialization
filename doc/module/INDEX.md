@@ -3,7 +3,7 @@
 
 # Module Index
 
-43 modules. Columns come from each module's metadata block
+44 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -15,6 +15,7 @@ to the module source.
 | [build-essential](../../module/build-essential.module.sh) | base | build | build-essential — C/C++ compiler toolchain metapackage (gcc, g++, make) |
 | [claude-code-config](../../module/claude-code-config.module.sh) | optional | agent config dotfile | Personal Claude Code settings (~/.claude: settings.json + statusline) |
 | [claude-code](../../module/claude-code.module.sh) | optional | agent | Anthropic Claude Code CLI agent (official native installer, self-updating) |
+| [claude-monitor](../../module/claude-monitor.module.sh) | optional | agent cli | claude-monitor — real-time Claude Code token/cost usage monitor TUI (pipx) |
 | [codex](../../module/codex.module.sh) | optional | agent | codex — OpenAI Codex CLI coding agent |
 | [curl](../../module/curl.module.sh) | base | http | curl — command-line tool for transferring data with URLs (apt curl package) |
 | [docker](../../module/docker.module.sh) | recommended | container devops | Docker Engine + Compose plugin |

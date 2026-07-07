@@ -2,24 +2,6 @@
 
 [] add clean ai agent log and session
 
-• 可以用 ranger 的 --choosedir 功能，退出時把最後目錄寫到暫存檔，再讓 shell cd 過去。
-
-  範例（bash/zsh）：
-
-  # 放到 ~/.bashrc 或 ~/.zshrc
-  r() {
-    local tempfile
-    tempfile="$(mktemp -t ranger-cd.XXXXXX)"
-    ranger --choosedir="$tempfile" "$@"
-    if [ -f "$tempfile" ]; then
-      local dir
-      dir="$(cat "$tempfile")"
-      rm -f "$tempfile"
-      [ -n "$dir" ] && cd "$dir"
-    fi
-  }
-
-  之後用 r 進入 ranger，按 q 退出就會切到 ranger 最後所在路徑。
 ## 修復筆電合蓋黑畫面
 
 1. 進入 TTY 終端：在黑畫面按 `Ctrl + Alt + F2`，輸入帳號密碼登入

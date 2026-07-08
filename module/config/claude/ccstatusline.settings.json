@@ -1,0 +1,56 @@
+{
+  "version": 3,
+  "lines": [
+    [
+      { "id": "1",  "type": "current-working-dir", "color": "blue",       "metadata": { "fishStyle": "true" } },
+      { "id": "2",  "type": "separator" },
+      { "id": "10", "type": "git-branch",           "color": "magenta",    "metadata": { "hideNoGit": "true" } },
+      { "id": "11", "type": "separator" },
+      { "id": "12", "type": "git-changes",          "color": "yellow",     "metadata": { "hideNoGit": "true" } },
+      { "id": "48", "type": "separator" },
+      { "id": "3",  "type": "model",                "color": "cyan",       "rawValue": true },
+      { "id": "4",  "type": "custom-text",          "color": "brightBlack","customText": " (" },
+      { "id": "5",  "type": "thinking-effort",      "color": "cyan",       "rawValue": true },
+      { "id": "47", "type": "custom-text",          "color": "brightBlack","customText": ")" },
+      { "id": "6",  "type": "separator" },
+      { "id": "31", "type": "custom-text",          "color": "brightBlack","customText": "Total: " },
+      { "id": "15", "type": "tokens-total",         "color": "white",      "rawValue": true },
+      { "id": "32", "type": "custom-text",          "color": "brightBlack","customText": " (" },
+      { "id": "30", "type": "session-cost",         "color": "green",      "rawValue": true },
+      { "id": "33", "type": "custom-text",          "color": "brightBlack","customText": ")" }
+    ],
+    [
+      { "id": "28", "type": "custom-text",          "color": "brightBlack","customText": "Context: " },
+      { "id": "17", "type": "context-percentage",   "color": "white",      "rawValue": true },
+      { "id": "34", "type": "custom-text",          "color": "brightBlack","customText": " (" },
+      { "id": "25", "type": "compaction-counter",   "color": "yellow",     "metadata": { "format": "number" } },
+      { "id": "35", "type": "custom-text",          "color": "brightBlack","customText": ")" },
+      { "id": "45", "type": "separator" },
+      { "id": "36", "type": "custom-text",          "color": "brightBlack","customText": "Usage: 5h " },
+      { "id": "37", "type": "session-usage",        "color": "yellow",     "rawValue": true },
+      { "id": "49", "type": "custom-text",          "color": "cyan",       "customText": " ↻ " },
+      { "id": "19", "type": "reset-timer",          "color": "cyan",       "rawValue": true },
+      { "id": "38", "type": "custom-text",          "color": "brightBlack","customText": " · 7d " },
+      { "id": "21", "type": "weekly-usage",         "color": "yellow",     "rawValue": true },
+      { "id": "50", "type": "custom-text",          "color": "cyan",       "customText": " ↻ " },
+      { "id": "41", "type": "weekly-reset-timer",   "color": "cyan",       "rawValue": true }
+    ],
+    []
+  ],
+  "flexMode": "full",
+  "compactThreshold": 60,
+  "colorLevel": 2,
+  "inheritSeparatorColors": false,
+  "globalBold": false,
+  "gitCacheTtlSeconds": 5,
+  "minimalistMode": false,
+  "powerline": {
+    "enabled": false,
+    "separators": [""],
+    "separatorInvertBackground": [false],
+    "startCaps": [],
+    "endCaps": [],
+    "autoAlign": false,
+    "continueThemeAcrossLines": false
+  }
+}

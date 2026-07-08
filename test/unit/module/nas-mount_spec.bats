@@ -428,12 +428,53 @@ _scratch_paths() {
 
 # ── Idempotency ──────────────────────────────────────────────────────────────
 
-@test "install short-circuits when is_installed returns 0 (idempotency)" {
+@test "install re-checks autofs wiring when drivers already present (no early skip)" {
     _load_module
+    _scratch_paths
     is_installed() { return 0; }
+    _mock_have_sudo
+    _mock_sudo_record
     run install
     assert_success
-    assert_output --partial "already installed"
+    # Packages present -> the apt install step is skipped ...
+    assert_output --partial "drivers present"
+    run cat "${MOCK_SUDO_LOG}"
+    refute_output --partial "apt-get install -y cifs-utils"
+    # ... but install still falls through to the wiring flow (documented
+    # POST_INSTALL_MESSAGE re-run path). With no NAS env it is a no-op hint.
+    run install
+    assert_success
+    assert_output --partial "automounter not wired"
+}
+
+@test "re-run install wires autofs when drivers already installed + NAS env set" {
+    # Regression for the review finding: once the apt packages exist,
+    # install() must NOT short-circuit before _nas_wire_autofs — the
+    # documented 're-run install to wire the autofs mount' flow.
+    _load_module
+    is_installed() { return 0; }
+    _mock_have_sudo
+    _mock_sudo_record
+    _scratch_paths
+    INIT_UBUNTU_NAS_HOST=nas.example.lan
+    INIT_UBUNTU_NAS_SHARE=media
+    INIT_UBUNTU_NAS_USER=someuser
+    mkdir -p "$(dirname "${INIT_UBUNTU_NAS_CREDENTIALS}")"
+    printf 'username=someuser\npassword=secret\n' > "${INIT_UBUNTU_NAS_CREDENTIALS}"
+    chmod 644 "${INIT_UBUNTU_NAS_CREDENTIALS}"
+    run install
+    assert_success
+    assert_output --partial "drivers present"
+    # apt install must NOT run again since the packages are present.
+    run cat "${MOCK_SUDO_LOG}"
+    refute_output --partial "apt-get install -y cifs-utils"
+    # The autofs maps ARE written despite the packages already being installed.
+    run cat "${NAS_MASTER_MAP}"
+    assert_output --partial "${INIT_UBUNTU_NAS_MOUNT_BASE}"
+    assert_output --partial "${NAS_MAP_FILE}"
+    run cat "${NAS_MAP_FILE}"
+    assert_output --partial "fstype=cifs"
+    assert_output --partial "://nas.example.lan/media"
 }
 
 # ── upgrade ──────────────────────────────────────────────────────────────────

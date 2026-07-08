@@ -118,14 +118,24 @@ is_installed() {
 
 install() {
     module_dryrun_guard install "apt-install ${APT_PKGS[*]} + optional autofs NAS wiring" && return 0
-    module_skip_if_installed && return 0
 
-    have_sudo_access 2>/dev/null \
-        || { log_error "[${NAME}] sudo required for ${NAME} install"; return 1; }
+    # Install the apt drivers only when they are missing, but ALWAYS fall
+    # through to the autofs wiring. The wiring is the acceptance criterion of
+    # #311, and POST_INSTALL_MESSAGE tells the user to "re-run install to wire
+    # the autofs mount" once the NAS env is set — that re-run must not be a
+    # no-op just because the packages are already present. _nas_wire_autofs is
+    # itself idempotent (it rewrites the same maps) and a documented no-op when
+    # the NAS parameters are absent.
+    if is_installed; then
+        log_info "[${NAME}] drivers present; (re)checking autofs wiring"
+    else
+        have_sudo_access 2>/dev/null \
+            || { log_error "[${NAME}] sudo required for ${NAME} install"; return 1; }
 
-    log_info "[${NAME}] apt-get update + install ${APT_PKGS[*]}"
-    sudo apt-get update
-    sudo apt-get install -y "${APT_PKGS[@]}"
+        log_info "[${NAME}] apt-get update + install ${APT_PKGS[*]}"
+        sudo apt-get update
+        sudo apt-get install -y "${APT_PKGS[@]}"
+    fi
 
     _nas_wire_autofs
 }

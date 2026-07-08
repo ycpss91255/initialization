@@ -20,6 +20,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Changed
+
+- **`claude-ls` session helper enumerates directory-type sessions and emits
+  per-session metadata** (`module/config/fish/_claude_sessions.py`, issue #161):
+  the helper now visits UUID-named session *directories* (subagent runs with
+  `subagents/*.meta.json` + `subagents/agent-*.jsonl` but no top-level
+  `<uuid>.jsonl`), enriching cwd / model / timestamps / size / message count
+  from the subagent transcripts, and every record — file-type and
+  directory-type alike — now carries `last_epoch`, `message_count`,
+  `size_bytes`, `model`, and `cwd` for the `-l` detail view. File-type
+  (`*.jsonl`) sessions are unchanged and deduped by session id so nothing is
+  double-counted. The test image (`dockerfile/Dockerfile.test-tools`) gains
+  `python3` so the helper can be unit-tested under the Docker-only gate.
+
 ### Security
 
 - **Hardened the github-release fetch/extract path** (`lib/module_helper.sh`

@@ -82,6 +82,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`kvm` module — libvirt/QEMU virtualization stack** (`module/kvm.module.sh`,
+  issue #310): a new apt-archetype module installing `qemu-kvm`,
+  `libvirt-daemon-system`, `libvirt-clients`, `bridge-utils`, `virt-manager`,
+  and `ovmf`, then adding the invoking user to the `libvirt` + `kvm` groups.
+  `install()` overrides the archetype to run the group-add after apt;
+  `doctor()` probes `virsh list --all` reachability plus `kvm-ok`
+  acceleration; `POST_INSTALL_MESSAGE` notes the re-login / `newgrp libvirt`
+  requirement. `CATEGORY=optional`, recommended only on desktop/server bare
+  metal. Replaces the manual snippet that previously lived in `TODO.md`.
 - **GitHub issue/PR review-approval hook** (`.claude/hook/enforce_gh_review_approval.sh`,
   issue #34): a PreToolUse (Bash) hook that denies `gh issue create|edit` and
   `gh pr create|edit` until the session transcript contains an explicit user

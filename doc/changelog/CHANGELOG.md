@@ -82,6 +82,37 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`kvm` module — libvirt/QEMU virtualization stack** (`module/kvm.module.sh`,
+  issue #310): a new apt-archetype module installing `qemu-kvm`,
+  `libvirt-daemon-system`, `libvirt-clients`, `bridge-utils`, `virt-manager`,
+  and `ovmf`, then adding the invoking user to the `libvirt` + `kvm` groups.
+  `install()` overrides the archetype to run the group-add after apt;
+  `doctor()` probes `virsh list --all` reachability plus `kvm-ok`
+  acceleration; `POST_INSTALL_MESSAGE` notes the re-login / `newgrp libvirt`
+  requirement. `CATEGORY=optional`, recommended only on desktop/server bare
+  metal. Replaces the manual snippet that previously lived in `TODO.md`.
+- **GitHub issue/PR review-approval hook** (`.claude/hook/enforce_gh_review_approval.sh`,
+  issue #34): a PreToolUse (Bash) hook that denies `gh issue create|edit` and
+  `gh pr create|edit` until the session transcript contains an explicit user
+  approval phrase — `approve issue` / `issue ok` for issues, `approve pr` /
+  `pr ok` for PRs, or `skip review` as the explicit opt-out. This enforces the
+  draft-in-zh-TW → user review → translate-to-English → create flow so the user
+  sees the draft before it lands on a public, indexed repo, closing the gap that
+  `enforce_gh_english.sh` (English-only, not approval) left open. Approval is
+  read from the system-controlled transcript so it cannot be forged; emergency
+  bypass is `ECC_ALLOW_GH_REVIEW=1`. The flow is documented in
+  `.agents/rules/common/development-workflow.md` (+ zh translation).
+  - **Wired into `.claude/settings.json`** as a PreToolUse/Bash hook so it
+    actually runs in a live session (an unregistered hook is inert); a
+    `settings.json`-registration test guards the wiring against silent rot.
+  - **Per-draft scoping.** Approval is scoped to the current draft, not the
+    whole session: once the agent has already run a `gh <kind> create|edit`, the
+    next publish of the same kind needs a fresh approval that post-dates that
+    prior create (`_last_publish_line_index` finds the boundary; approvals
+    before it are ignored). Previously a single `approve issue` authorized every
+    later `gh issue create` in the session — including a different, unreviewed
+    issue. The boundary is per-kind, so an issue publish never invalidates a pr
+    approval. Covered by `test/unit/hook/enforce_gh_review_approval_spec.bats`.
 - **`claude-monitor` module** (`module/claude-monitor.module.sh`, issue #315):
   a new custom-archetype module that installs the `claude-monitor` Claude Code
   usage-monitor TUI via `pipx` (user-home scope, no sudo except the one-time
@@ -273,6 +304,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   package (not the mismatched `tldr` apt package), adds `unzip`, and installs the
   fish `tldr` completion where fish actually scans (`~/.config/fish/completions`).
   `small-tools/remove.sh` mirrors the cache-path/package fix.
+- **Claude Code settings templates ship no hardcoded `/home/<user>` paths**
+  (#100): `module/config/claude/settings.json` and `settings.statusline.json`
+  now carry a `__HOME__` sentinel for the `statusLine.command` path instead of
+  a template-author home prefix, and the machine-specific, fnm-Node-version-
+  pinned `sandbox.seccomp.applyPath` field is dropped (Claude Code locates the
+  seccomp helper itself). `module/claude-code-config.module.sh`
+  `_claude_config_localize` now resolves the `__HOME__` sentinel to the current
+  `$HOME` on drop, replacing the over-broad `/home/<user>` rewrite that could
+  clobber legitimate foreign paths (linux-review F16). Covered by unit tests in
+  `test/unit/module/claude-code-config_spec.bats`.
 - **fish no longer leaks focus-event sequences (`ESC[I` / `^[[I`) into external
   commands** (#164): under tmux (`focus-events on`) + fish 4.x, fish injects a
   focus-in sequence around command launch (fish-shell#12232) that a plain shell

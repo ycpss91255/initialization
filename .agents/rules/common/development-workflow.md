@@ -42,3 +42,33 @@ The Feature Implementation Workflow describes the development pipeline: research
    - Resolve any merge conflicts
    - Ensure branch is up to date with target branch
    - Only request review after these checks pass
+
+## GitHub Issue / PR Review Approval (mandatory before `gh ... create`)
+
+`gh issue create|edit` and `gh pr create|edit` publish content to a
+public, indexed repo. The user must see and approve the draft BEFORE it
+lands. Enforced by `.claude/hook/enforce_gh_review_approval.sh`
+(PreToolUse on Bash), which denies these commands until the session
+transcript contains an explicit user approval phrase -- the same
+transcript-based approval discipline as
+`enforce_shellcheck_disable_approval.sh`.
+
+Default flow:
+
+1. Write the draft in the user's working language (zh-TW) to a local
+   file, e.g. `/tmp/<slug>.zh.md`.
+2. Show the path (and/or a short summary) and ask the user to review it.
+3. After the user approves, translate the approved content to English.
+4. Run `gh issue create` / `gh pr create` with the English `--body-file`.
+   English-only enforcement (`enforce_gh_english.sh`) still runs.
+
+Approval phrases (case-insensitive; any one is enough):
+
+- `approve issue` / `issue ok` -> authorizes `gh issue create|edit`
+- `approve pr` / `pr ok` -> authorizes `gh pr create|edit`
+- `skip review` -> the explicit opt-out; authorizes either kind when the
+  user says to go straight to create ("just open the issue" style).
+
+The canonical tokens stay English so the hook check is locale-agnostic.
+Emergency bypass (leaves an audit trail in shell history):
+`ECC_ALLOW_GH_REVIEW=1`.

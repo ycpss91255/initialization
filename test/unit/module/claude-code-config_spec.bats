@@ -323,6 +323,24 @@ TMUX
     assert_output "WIDTH=unset"
 }
 
+@test "repo template settings.json ships no hardcoded /home path (#100)" {
+    # AC-1: the source template must carry no template-author home prefix.
+    run grep -n "/home/" "${MODULE_DIR}/config/claude/settings.json"
+    assert_failure
+}
+
+@test "repo template settings.statusline.json ships no hardcoded /home path (#100)" {
+    run grep -n "/home/" "${MODULE_DIR}/config/claude/settings.statusline.json"
+    assert_failure
+}
+
+@test "repo template settings.json pins no fnm node-version seccomp path (#100)" {
+    # The old sandbox.seccomp.applyPath pinned a specific fnm-managed Node
+    # version; it must not ship as a static, machine-specific value.
+    run grep -nE "seccomp|node-versions" "${MODULE_DIR}/config/claude/settings.json"
+    assert_failure
+}
+
 # ── Config-content fidelity to the #231 final consolidated files ─────────────
 # Per the qmk/codex/yazi precedent: assert on the shipped template content, not
 # on runtime behavior. These lock the maintainer-verified regex/values so a
@@ -416,15 +434,27 @@ _ccs_json="${MODULE_DIR}/config/claude/ccstatusline.settings.json"
     assert_success
 }
 
-@test "install localizes template-author home paths to the current HOME" {
+@test "install substitutes the __HOME__ placeholder to the current HOME (#100)" {
     _load_module
     install
-    # No foreign /home/<user> prefix survives; statusLine points at this HOME.
-    run grep -RE "/home/[A-Za-z0-9._-]+/" "${HOME}/.claude/settings.json"
-    assert_output --partial "${HOME}"
+    # statusLine resolves to this HOME; no placeholder or foreign /home/<user>
+    # prefix survives in either dropped file.
+    run grep -F "${HOME}/.claude/run-ccstatusline.sh" "${HOME}/.claude/settings.json"
+    assert_success
+    run grep -F "__HOME__" "${HOME}/.claude/settings.json"
+    assert_failure
     run grep -q "/home/yunchien" "${HOME}/.claude/settings.json"
     assert_failure
+    run grep -F "__HOME__" "${HOME}/.claude/settings.statusline.json"
+    assert_failure
     run grep -q "/home/yunchien" "${HOME}/.claude/settings.statusline.json"
+    assert_failure
+}
+
+@test "install drops settings.json free of any pinned node-version path (#100)" {
+    _load_module
+    install
+    run grep -nE "node-versions" "${HOME}/.claude/settings.json"
     assert_failure
 }
 

@@ -271,6 +271,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **Claude Code settings templates ship no hardcoded `/home/<user>` paths**
+  (#100): `module/config/claude/settings.json` and `settings.statusline.json`
+  now carry a `__HOME__` sentinel for the `statusLine.command` path instead of
+  a template-author home prefix, and the machine-specific, fnm-Node-version-
+  pinned `sandbox.seccomp.applyPath` field is dropped (Claude Code locates the
+  seccomp helper itself). `module/claude-code-config.module.sh`
+  `_claude_config_localize` now resolves the `__HOME__` sentinel to the current
+  `$HOME` on drop, replacing the over-broad `/home/<user>` rewrite that could
+  clobber legitimate foreign paths (linux-review F16). Covered by unit tests in
+  `test/unit/module/claude-code-config_spec.bats`.
 - **fish no longer leaks focus-event sequences (`ESC[I` / `^[[I`) into external
   commands** (#164): under tmux (`focus-events on`) + fish 4.x, fish injects a
   focus-in sequence around command launch (fish-shell#12232) that a plain shell

@@ -8,15 +8,10 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "/home/yunchien/.claude/run-ccstatusline.sh",
+    "command": "__HOME__/.claude/run-ccstatusline.sh",
     "refreshInterval": 30
   },
   "language": "zh-TW",
-  "sandbox": {
-    "seccomp": {
-      "applyPath": "/home/yunchien/.local/share/fnm/node-versions/v22.19.0/installation/lib/node_modules/@anthropic-ai/sandbox-runtime/vendor/seccomp/x64/apply-seccomp"
-    }
-  },
   "theme": "dark",
   "verbose": false,
   "model": "sonnet"

@@ -1,7 +1,7 @@
 {
   "statusLine": {
     "type": "command",
-    "command": "/home/yunchien/.claude/run-ccstatusline.sh",
+    "command": "__HOME__/.claude/run-ccstatusline.sh",
     "refreshInterval": 30
   }
 }

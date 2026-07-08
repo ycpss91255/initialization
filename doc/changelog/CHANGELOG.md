@@ -22,6 +22,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`f5-split-dns` tool** (`tool/f5-split-dns/`, issue #146): a per-user opt-in
+  tool that pins the company DNS server plus a `~<COMPANY_DOMAIN>` routing domain
+  onto the F5 BIG-IP Edge VPN interface (`tun0`) via `resolvectl`, so
+  load-balanced internal hosts (e.g. the mail server) resolve to in-tunnel
+  addresses instead of their public A records. Ships `f5-split-dns.sh` (reads
+  `$F5_SPLIT_DNS_CONF` from a per-install systemd drop-in; no secrets, no
+  hardcoded username), a `f5-split-dns.service` oneshot unit bound to the
+  `tun0` device (`WantedBy`/`BindsTo`, so it applies on connect and auto-clears
+  on disconnect), a `config.example` template (real values live only in the
+  uncommitted per-user `~/.config/f5-split-dns/config`), an `install.sh` that
+  derives the config path from `$SUDO_USER`, and a `README.adoc`. Behavior is
+  pinned by `test/unit/f5_split_dns_spec.bats` (stubs `resolvectl`/`ip`/`logger`
+  on PATH; the `tool/` tree is a declared shellcheck-out-of-scope surface).
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,

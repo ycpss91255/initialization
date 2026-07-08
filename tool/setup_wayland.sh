@@ -4,8 +4,8 @@ set -euo pipefail
 shopt -s inherit_errexit &>/dev/null || true
 
 SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-source "${SCRIPT_PATH}/../function/logger.sh"
-source "${SCRIPT_PATH}/../function/general.sh"
+source "${SCRIPT_PATH}/../lib/logger.sh"
+source "${SCRIPT_PATH}/../lib/general.sh"
 
 if ! have_sudo_access; then
     log_fatal "No sudo access. Cannot configure Wayland."

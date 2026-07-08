@@ -30,6 +30,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+- **`custom-hosts-sync` module** (`module/custom-hosts-sync.module.sh` +
+  `module/config/custom-hosts-sync/`, issue #145): keeps custom `/etc/hosts`
+  name->IP entries from being reverted by the F5 BIG-IP Edge VPN client
+  (`svpn`), which snapshots `/etc/hosts` on connect and restores it wholesale
+  on disconnect/reboot. A systemd `.path` unit watches `/etc/hosts` and the
+  user master list (`~/.config/hosts-custom/hosts.custom`) and re-merges the
+  master list into an idempotent managed block whenever either changes, so a
+  revert is corrected within seconds and edits to the master list apply on
+  save. The sync script writes only when content actually changes (never loops
+  on its own inotify event) and leaves the F5 gateway line untouched. The
+  committed script and `.path` unit carry a `__USER_HOME__` placeholder that
+  `install()` substitutes with the real `$HOME` at deploy time, so no username
+  is hardcoded in version control. Optional module, `svpn`-gated
+  `is_recommended`.
 ### Fixed
 
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`

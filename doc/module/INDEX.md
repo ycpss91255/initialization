@@ -3,7 +3,7 @@
 
 # Module Index
 
-39 modules. Columns come from each module's metadata block
+40 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -17,6 +17,7 @@ to the module source.
 | [claude-code](../../module/claude-code.module.sh) | optional | agent | Anthropic Claude Code CLI agent (official native installer, self-updating) |
 | [codex](../../module/codex.module.sh) | optional | agent | codex — OpenAI Codex CLI coding agent |
 | [curl](../../module/curl.module.sh) | base | http | curl — command-line tool for transferring data with URLs (apt curl package) |
+| [custom-hosts-sync](../../module/custom-hosts-sync.module.sh) | optional | network vpn hosts | Keep custom /etc/hosts entries from being reverted by the F5 VPN (svpn) |
 | [docker](../../module/docker.module.sh) | recommended | container devops | Docker Engine + Compose plugin |
 | [eza](../../module/eza.module.sh) | optional | cli-essentials | Modern ls replacement (eza) + shell alias ls='eza' |
 | [fdfind](../../module/fdfind.module.sh) | optional | cli-essentials | fd (fdfind) — fast, user-friendly alternative to find (apt fd-find) |

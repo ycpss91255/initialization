@@ -1,0 +1,10 @@
+[Unit]
+Description=Re-apply custom hosts when /etc/hosts or the master list changes
+
+[Path]
+PathChanged=/etc/hosts
+PathChanged=__USER_HOME__/.config/hosts-custom/hosts.custom
+Unit=custom-hosts-sync.service
+
+[Install]
+WantedBy=multi-user.target

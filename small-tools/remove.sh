@@ -41,8 +41,9 @@ rm -rf /home/"${USER_NAME}"/.config/fish
 # delete 'fzf' configuration file
 rm -rf /home/"${USER_NAME}"/.fzf
 
-# delete tldr folder
-rm -rf /home/"${USER_NAME}"/.local/share/tldr
+# delete tealdeer cache and the fish tldr completion
+rm -rf /home/"${USER_NAME}"/.cache/tealdeer
+rm -f /home/"${USER_NAME}"/.config/fish/completions/tldr.fish
 
 # delete 'tmux' configuration file
 rm -rf /home/"${USER_NAME}"/.tmux/plugins/tpm /home/"${USER_NAME}"/.tmux.conf
@@ -90,7 +91,7 @@ sudo apt purge -y \
     openssh-server \
     powerstat \
     tig \
-    tldr \
+    tealdeer \
     tmux \
     tmuxinator \
     tree \

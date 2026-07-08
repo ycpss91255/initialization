@@ -293,6 +293,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **`small-tools/install.sh` tealdeer cache seeding no longer aborts the
+  installer** (issue #263): `tldr --update` sat inside the long `&&` chain, so a
+  broken-ZIP failure from tealdeer's own downloader short-circuited the chain and
+  silently skipped every later step (tpm clone, tmux config, tmux-powerline, ssh
+  setup, ranger plugins). The cache update is now decoupled and non-fatal, with a
+  curl + unzip fallback into the real `~/.cache/tealdeer/tldr-pages` cache. Also
+  drops the dead `~/.local/share/tldr` handling and the always-true
+  `[ -n "<literal>" ]` guards (now real `[ -d ]` path tests), pins the `tealdeer`
+  package (not the mismatched `tldr` apt package), adds `unzip`, and installs the
+  fish `tldr` completion where fish actually scans (`~/.config/fish/completions`).
+  `small-tools/remove.sh` mirrors the cache-path/package fix.
 - **Claude Code settings templates ship no hardcoded `/home/<user>` paths**
   (#100): `module/config/claude/settings.json` and `settings.statusline.json`
   now carry a `__HOME__` sentinel for the `statusLine.command` path instead of

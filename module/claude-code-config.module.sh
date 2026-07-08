@@ -12,9 +12,10 @@
 #
 # The launcher execs the `ccstatusline` binary (sirmalloc/ccstatusline, a
 # global npm CLI); install best-effort provisions it via `npm install -g`
-# (#231, also resolves #116). Template-author home paths (/home/<user>) are
-# rewritten to the current ${HOME} on drop so the config works on any
-# machine/username.
+# (#231, also resolves #116). The templates carry no real home path: the
+# `__HOME__` sentinel marks the spots that must be resolved to the current
+# ${HOME} on drop, so the config works on any machine/username
+# (issue #100 / linux-review F16).
 #
 # Standalone usage:
 #   bash module/claude-code-config.module.sh install [--dry-run]
@@ -190,10 +191,13 @@ _claude_config_src_dir() {
     printf '%s/config/claude' "${MODULE_DIR:-${BASH_SOURCE[0]%/*}}"
 }
 
-# Rewrite template-author home prefixes (/home/<user>) to the current $HOME
-# so absolute paths inside the settings work on any machine. Stream filter.
+# Resolve the `__HOME__` sentinel to the current $HOME so absolute paths inside
+# the settings work on any machine/username. Anchoring on an explicit sentinel
+# (rather than matching every /home/<user>) keeps the rewrite from clobbering
+# any legitimate foreign path a template might carry (linux-review F16).
+# Stream filter. ($HOME on Ubuntu has no '#', so the s#...# delimiter is safe.)
 _claude_config_localize() {
-    sed -E "s#/home/[A-Za-z0-9._-]+#${HOME}#g"
+    sed "s#__HOME__#${HOME}#g"
 }
 
 # Absolute path to the ccstatusline widget-layout config (XDG, not ~/.claude).

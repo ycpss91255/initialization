@@ -91,6 +91,28 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   acceleration; `POST_INSTALL_MESSAGE` notes the re-login / `newgrp libvirt`
   requirement. `CATEGORY=optional`, recommended only on desktop/server bare
   metal. Replaces the manual snippet that previously lived in `TODO.md`.
+- **GitHub issue/PR review-approval hook** (`.claude/hook/enforce_gh_review_approval.sh`,
+  issue #34): a PreToolUse (Bash) hook that denies `gh issue create|edit` and
+  `gh pr create|edit` until the session transcript contains an explicit user
+  approval phrase — `approve issue` / `issue ok` for issues, `approve pr` /
+  `pr ok` for PRs, or `skip review` as the explicit opt-out. This enforces the
+  draft-in-zh-TW → user review → translate-to-English → create flow so the user
+  sees the draft before it lands on a public, indexed repo, closing the gap that
+  `enforce_gh_english.sh` (English-only, not approval) left open. Approval is
+  read from the system-controlled transcript so it cannot be forged; emergency
+  bypass is `ECC_ALLOW_GH_REVIEW=1`. The flow is documented in
+  `.agents/rules/common/development-workflow.md` (+ zh translation).
+  - **Wired into `.claude/settings.json`** as a PreToolUse/Bash hook so it
+    actually runs in a live session (an unregistered hook is inert); a
+    `settings.json`-registration test guards the wiring against silent rot.
+  - **Per-draft scoping.** Approval is scoped to the current draft, not the
+    whole session: once the agent has already run a `gh <kind> create|edit`, the
+    next publish of the same kind needs a fresh approval that post-dates that
+    prior create (`_last_publish_line_index` finds the boundary; approvals
+    before it are ignored). Previously a single `approve issue` authorized every
+    later `gh issue create` in the session — including a different, unreviewed
+    issue. The boundary is per-kind, so an issue publish never invalidates a pr
+    approval. Covered by `test/unit/hook/enforce_gh_review_approval_spec.bats`.
 - **`claude-monitor` module** (`module/claude-monitor.module.sh`, issue #315):
   a new custom-archetype module that installs the `claude-monitor` Claude Code
   usage-monitor TUI via `pipx` (user-home scope, no sudo except the one-time

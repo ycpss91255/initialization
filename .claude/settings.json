@@ -42,6 +42,10 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/enforce_gh_review_approval.sh"
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PROJECT_DIR}/.claude/hook/remind_ci_auto_merge.sh"
           }
         ]

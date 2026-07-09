@@ -22,6 +22,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`resolve-publish.sh` DaVinci Resolve re-encoder** (`tool/davinci_resolve/resolve-publish.sh`,
+  issue #269): a standalone helper that transcodes Resolve Free exports (AV1 /
+  DNxHR) to H.264 (default, CRF 18) or H.265 (`-c h265`) via ffmpeg, since
+  Resolve Free on Linux cannot export H.264/H.265 directly. Supports `-q CRF`
+  and `-o OUTDIR`, writes `<stem>_<codec>.mp4` (audio re-encoded to AAC 192k),
+  validates codec/CRF/`-o`/encoder availability up front, removes partial or
+  zero-byte outputs on failure, and keeps processing the remaining inputs when
+  one fails (final exit 1). The encoder-availability probe captures
+  `ffmpeg -encoders` before grepping it, avoiding a `set -o pipefail` +
+  `grep -q` SIGPIPE false-negative that would spuriously report a present
+  encoder as missing.
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,

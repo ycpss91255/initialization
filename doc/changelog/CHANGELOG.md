@@ -82,7 +82,7 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
-- **`docker-tools/set-address-pool.sh`** (`script/docker-tools/set-address-pool.sh`,
+- **`docker-tool/set-address-pool.sh`** (`script/docker-tool/set-address-pool.sh`,
   issue #270): a standalone root-only config tool that pins Docker's
   `default-address-pools` in `/etc/docker/daemon.json` to `172.16.0.0/12`
   sliced into `/24` blocks (4096 concurrent subnets, base/size overridable as

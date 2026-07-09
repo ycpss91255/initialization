@@ -7,8 +7,8 @@
 # pool avoids both the overflow and the resulting range jump.
 #
 # Usage:
-#   sudo script/docker-tools/set-address-pool.sh                 # 172.16.0.0/12, /24
-#   sudo script/docker-tools/set-address-pool.sh 172.16.0.0/12 24
+#   sudo script/docker-tool/set-address-pool.sh                 # 172.16.0.0/12, /24
+#   sudo script/docker-tool/set-address-pool.sh 172.16.0.0/12 24
 #
 # DOCKER_DAEMON_JSON_PATH overrides the daemon.json location (tests point it
 # at a scratch file); it defaults to the real /etc/docker/daemon.json.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # test/unit/script/set_address_pool_spec.bats
 #
-# Tests for `script/docker-tools/set-address-pool.sh` (issue #270): the
+# Tests for `script/docker-tool/set-address-pool.sh` (issue #270): the
 # standalone config tool that pins Docker's default-address-pools in
 # daemon.json to 172.16.0.0/12 sliced into /24 blocks, avoiding the silent
 # overflow into 192.168.0.0/16 under heavy docker-compose churn.
@@ -16,7 +16,7 @@ load "${BATS_TEST_DIRNAME}/../../helper/common"
 
 setup() {
     setup_test_env
-    SCRIPT="${REPO_ROOT}/script/docker-tools/set-address-pool.sh"
+    SCRIPT="${REPO_ROOT}/script/docker-tool/set-address-pool.sh"
     DAEMON_JSON="${BATS_TEST_TMPDIR}/etc/docker/daemon.json"
     export DOCKER_DAEMON_JSON_PATH="${DAEMON_JSON}"
 }

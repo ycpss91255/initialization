@@ -154,6 +154,47 @@ _mock_fisher_and_chsh() {
     [[ -f "${MODULE_DIR}/config/fish/fish_plugins" ]]
 }
 
+# ── ctop.fish tool wrapper (issue #271) ──────────────────────────────────────
+# The Ubuntu-packaged ctop is broken on this host (cgroup v2 lookup + a
+# termbox panic under tmux-256color). The repo ships a fish function that
+# wraps the upstream binary and overrides $TERM for the call only.
+
+@test "fish module ships the ctop.fish tool function" {
+    [[ -f "${MODULE_DIR}/config/fish/functions/ctop.fish" ]]
+}
+
+@test "ctop.fish defines a ctop function wrapping ctop" {
+    local _f="${MODULE_DIR}/config/fish/functions/ctop.fish"
+    grep -Eq '^function ctop' "${_f}"
+    grep -q -- '--wraps' "${_f}"
+    grep -Eq 'end[[:space:]]*$' "${_f}"
+}
+
+@test "ctop.fish overrides TERM to a termbox-safe value for the call" {
+    local _f="${MODULE_DIR}/config/fish/functions/ctop.fish"
+    grep -q 'TERM=screen-256color' "${_f}"
+}
+
+@test "ctop.fish escalates with sudo -E to preserve the TERM override" {
+    local _f="${MODULE_DIR}/config/fish/functions/ctop.fish"
+    grep -q 'sudo -E' "${_f}"
+}
+
+@test "ctop.fish dispatches to the absolute binary path (not 'command ctop')" {
+    # sudo has no concept of the fish `command` builtin; `sudo -E command
+    # ctop` fails with 'command: command not found'. The absolute path also
+    # avoids the function recursing into itself.
+    local _f="${MODULE_DIR}/config/fish/functions/ctop.fish"
+    grep -q '/usr/local/bin/ctop' "${_f}"
+    run grep -q 'command ctop' "${_f}"
+    assert_failure
+}
+
+@test "ctop.fish forwards caller arguments via \$argv" {
+    local _f="${MODULE_DIR}/config/fish/functions/ctop.fish"
+    grep -q "\$argv" "${_f}"
+}
+
 # ── Metadata sanity ──────────────────────────────────────────────────────────
 
 @test "fish module declares NAME=fish" {

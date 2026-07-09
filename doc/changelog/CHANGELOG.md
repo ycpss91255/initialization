@@ -30,6 +30,25 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+
+### Changed
+
+- **Product spec restructured from a 17-section traditional PRD into the
+  7-section `/to-spec` shape** (`doc/prd/init-ubuntu.prd.md`): rewritten in
+  place as a retrospective living spec (Problem Statement, Solution, User
+  Stories, Implementation Decisions, Testing Decisions, Out of Scope, Further
+  Notes) plus a same-file "Reference Appendix (may drift)". The module catalog
+  is de-enumerated to categories + environment-aware recommendation rules
+  (concrete list is live via `setup_ubuntu list`); converged decisions now
+  point to ADRs by number rather than restating the old Open-Questions
+  narrative; concrete artifacts (subcommand/exit-code/flag tables, TUI
+  wireframes, metadata shape, state/config schema) are demoted to the
+  Reference Appendix. Testing Decisions is realigned to the test-pyramid
+  review and reframes coverage as an enforced merge rule: diff/patch coverage
+  >= 90% on changed lines as a PR required check, plus the existing main-total
+  ratchet raised toward >= 90%. The deep module contract stays in
+  `doc/module-spec.md` (pointed to, not duplicated). Content kept in zh-TW.
+
 ### Fixed
 
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`

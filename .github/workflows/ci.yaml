@@ -122,6 +122,13 @@ jobs:
       # #28): narrow PR matrices merge to a structurally low number, so
       # they get a report-only gate.
       full: ${{ steps.select.outputs.full }}
+      # Dynamic core-shard count (ADR-0028). `vars.CI_CORE_SHARDS` (default 8)
+      # is the SINGLE knob; core_shards is the 0-based index array the
+      # test-unit-core matrix consumes via fromJSON, core_shard_count the
+      # matching total passed to ci.sh as CORE_SHARD_COUNT. Bumping the repo
+      # variable rebalances the core kcov floor without editing this workflow.
+      core_shards: ${{ steps.core_shards.outputs.core_shards }}
+      core_shard_count: ${{ steps.core_shards.outputs.core_shard_count }}
     steps:
       - uses: actions/checkout@v4
       - id: select
@@ -133,6 +140,20 @@ jobs:
             --event "${EVENT_NAME}" \
             --changed "${CHANGED_FILTERS:-[]}" \
             | tee -a "$GITHUB_OUTPUT"
+      - id: core_shards
+        env:
+          # Single override (any environment); defaults to the time-weighted
+          # core-shard floor (ADR-0028). Non-numeric / <1 values fall back to 8.
+          CI_CORE_SHARDS: ${{ vars.CI_CORE_SHARDS }}
+        run: |
+          n="${CI_CORE_SHARDS:-8}"
+          case "${n}" in ''|*[!0-9]*) n=8 ;; esac
+          [ "${n}" -lt 1 ] && n=8
+          arr="$(seq 0 "$((n - 1))" | sed 's/.*/"&"/' | paste -sd, -)"
+          {
+            echo "core_shards=[${arr}]"
+            echo "core_shard_count=${n}"
+          } | tee -a "$GITHUB_OUTPUT"
 
   # ── Build test-tools image once (issue #26) ────────────────────────────────
   # Always runs (no path filter) because lint runs on every PR, including
@@ -223,15 +244,19 @@ jobs:
         run: TEST_TOOLS_PREBUILT=1 just -f justfile.ci lint
 
   # ── Unit tests: core sub-shard matrix (non-module specs; #31 + #28 + #226) ─
-  # Engine / lib / hook / script / template specs, split into a 4-way
-  # round-robin matrix (issue #226) so the ~1000 non-module specs run as
-  # FOUR parallel kcov jobs instead of one ~242s serial shard. ci.sh's
-  # `--module core-<N>` partitions the sorted core spec list round-robin
-  # (CORE_SHARD_COUNT=4); each shard writes coverage/shard-core-<N>, and the
-  # coverage-merge job consumes coverage/shard-* unchanged. Smaller shards
-  # also lower kcov ptrace fork-density (mitigates the intermittent deadlock
-  # seen on the full core shard). Skipped on doc-only changes and on PRs
-  # that only touch modules.
+  # Engine / lib / hook / script / template specs, split into an N-way
+  # TIME-WEIGHTED matrix (issue #226; ADR-0028). The count is dynamic —
+  # discover.core_shard_count from vars.CI_CORE_SHARDS (default 8) — so the
+  # matrix fans out via fromJSON(discover.core_shards) instead of a hardcoded
+  # list. ci.sh's `--module core-<N>` partitions the sorted core spec list by
+  # greedy-LPT over test/ci-shard-weights.tsv (measured per-spec seconds), so
+  # each shard's WALL TIME approaches total/N rather than only its spec count
+  # being balanced — the old round-robin left a heavy shard ~30 % above the
+  # rest. Each shard writes coverage/shard-core-<N>, and the coverage-merge
+  # job consumes coverage/shard-* unchanged. Smaller shards also lower kcov
+  # ptrace fork-density (mitigates the intermittent deadlock seen on the full
+  # core shard). Skipped on doc-only changes and on PRs that only touch
+  # modules.
   #
   # Issue #28: bats runs ONCE, under kcov (`just -f justfile.ci
   # coverage-unit`) — these jobs are both the unit-test gate and the
@@ -248,14 +273,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        core-shard: ['0', '1', '2', '3']
+        # Dynamic core-shard index list (ADR-0028): discover derives it from
+        # vars.CI_CORE_SHARDS (default 8). fromJSON turns the emitted
+        # `["0","1",...]` string into the matrix dimension.
+        core-shard: ${{ fromJSON(needs.discover.outputs.core_shards) }}
     runs-on: ubuntu-latest
     # Headroom for ci.sh's in-shard kcov retry (KCOV_BATS_TIMEOUT~180s x
     # KCOV_BATS_ATTEMPTS=2 ~= 6 min worst case) so a retried hang fails with
     # a TAP-visible _die rather than a GitHub job cancel.
     timeout-minutes: 15
     env:
-      CORE_SHARD_COUNT: '4'
+      # Must equal the matrix's total so ci.sh partitions into the same N.
+      CORE_SHARD_COUNT: ${{ needs.discover.outputs.core_shard_count }}
     steps:
       - uses: actions/checkout@v4
       - name: download kcov-tools image artifact

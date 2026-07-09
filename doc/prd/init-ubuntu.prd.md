@@ -763,7 +763,7 @@ lifecycle,只有 archetype D(custom)需作者自寫;覆寫用 super-call pattern
       },
       "local": {
         "install_target_resolved": "user-home",
-        "user_home_root": "/home/cyc/.local/lib/init_ubuntu/neovim"
+        "user_home_root": "/home/<user>/.local/lib/init_ubuntu/neovim"
       }
     }
   }

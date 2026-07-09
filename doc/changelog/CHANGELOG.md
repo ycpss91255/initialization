@@ -22,6 +22,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Shell completion for `setup_ubuntu`** (issue #166): a Bash completion
+  script (`module/config/bash/setup_ubuntu.bash`, `complete -F _setup_ubuntu`)
+  and a fish completion (`module/config/fish/completions/setup_ubuntu.fish`,
+  `complete -c setup_ubuntu`). Level 1 completes subcommands and global flags;
+  the module-taking subcommands (`install` / `remove` / `purge` / `upgrade` /
+  `verify` / `show`) complete module NAMES derived live from
+  `setup_ubuntu list`, so completion always tracks the registry. `just install
+  <TAB>` is intentionally not covered — `just` completes recipe names, not
+  recipe args; run `setup_ubuntu install <TAB>` directly.
 - **tmux keybindings + continuum auto-restore** (`module/config/tmux/tmux.conf`):
   a no-prefix `M-m` zoom toggle (`resize-pane -Z`, issue #265); arrow-key mirrors
   for every `hjkl` binding — `M-Arrow` resize, `prefix + Arrow` swap window/pane,

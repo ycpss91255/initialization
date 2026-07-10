@@ -43,8 +43,9 @@ rm -rf /home/"${USER_NAME}"/.config/fish
 # delete 'fzf' configuration file
 rm -rf /home/"${USER_NAME}"/.fzf
 
-# delete tldr folder
-rm -rf /home/"${USER_NAME}"/.local/share/tldr
+# delete tealdeer cache and the fish tldr completion
+rm -rf /home/"${USER_NAME}"/.cache/tealdeer
+rm -f /home/"${USER_NAME}"/.config/fish/completions/tldr.fish
 
 # delete 'tmux' configuration file
 rm -rf /home/"${USER_NAME}"/.tmux/plugins/tpm /home/"${USER_NAME}"/.tmux.conf
@@ -62,9 +63,6 @@ if [ -f "/ect/ssh/sshd_config" ]; then
         -e 's/#\s*\(X11UseLocalhost yes\)# \1/' \
         '/etc/ssh/sshd_config'
 fi
-
-# Remove ranger plugins 'ranger_devicons'
-rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons
 
 # purge 'small tools' related packages
 sudo apt purge -y \
@@ -94,9 +92,8 @@ sudo apt purge -y \
     openssh-client \
     openssh-server \
     powerstat \
-    ranger \
     tig \
-    tldr \
+    tealdeer \
     tmux \
     tmuxinator \
     tree \

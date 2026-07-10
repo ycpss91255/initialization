@@ -1,0 +1,8 @@
+# Custom hosts list -- edit ONLY this file.
+# Location: ~/.config/hosts-custom/hosts.custom
+# Synced into /etc/hosts on save by custom-hosts-sync.service.
+
+# <internal-ip> <name>   (examples below use RFC 5737 / RFC 1918 documentation ranges)
+10.0.0.10 host.example-a
+10.0.0.11 host.example-b
+192.0.2.50 host.example-c

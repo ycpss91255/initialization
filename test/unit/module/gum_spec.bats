@@ -24,12 +24,16 @@ setup() {
     # does — so is_installed reflects ONLY the scratch BIN_LINK, regardless of
     # what binaries the image bakes. No production change; mirrors the
     # integration-side isolation.
+    # SR-01: the offline seam only activates under the dedicated test-mode flag
+    # (INIT_UBUNTU_TEST_MODE=1). Production never sets it, so setting the fixture
+    # dir alone can no longer swap the payload.
+    export INIT_UBUNTU_TEST_MODE=1
     export INIT_UBUNTU_TEST_GH_FIXTURE_DIR="${INIT_UBUNTU_TEST_SCRATCH}/gh-fixture"
     mkdir -p "${INIT_UBUNTU_TEST_GH_FIXTURE_DIR}"
 }
 
 teardown() {
-    unset INIT_UBUNTU_TEST_GH_FIXTURE_DIR
+    unset INIT_UBUNTU_TEST_GH_FIXTURE_DIR INIT_UBUNTU_TEST_MODE
     teardown_test_env
 }
 

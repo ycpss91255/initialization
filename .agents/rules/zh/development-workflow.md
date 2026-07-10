@@ -42,3 +42,28 @@
    - 解决任何合并冲突
    - 确保分支已与目标分支同步
    - 仅在这些检查通过后请求审查
+
+## GitHub Issue / PR 审查批准（`gh ... create` 前必需）
+
+`gh issue create|edit` 与 `gh pr create|edit` 会把内容发布到一个公开且被
+索引的仓库。用户必须在内容落地之前看到并批准草稿。由
+`.claude/hook/enforce_gh_review_approval.sh`（Bash 的 PreToolUse）强制执行：
+在会话记录（transcript）包含明确的用户批准短语之前，拒绝这些命令 --
+与 `enforce_shellcheck_disable_approval.sh` 相同的基于记录的批准机制。
+
+默认流程：
+
+1. 用用户的工作语言（zh-TW）把草稿写到本地文件，例如 `/tmp/<slug>.zh.md`。
+2. 展示该路径（以及／或简短摘要），请用户审查。
+3. 用户批准后，把批准的内容翻译为英文。
+4. 用英文的 `--body-file` 运行 `gh issue create` / `gh pr create`。
+   英文强制检查（`enforce_gh_english.sh`）仍会运行。
+
+批准短语（大小写不敏感；任意一个即可）：
+
+- `approve issue` / `issue ok` -> 授权 `gh issue create|edit`
+- `approve pr` / `pr ok` -> 授权 `gh pr create|edit`
+- `skip review` -> 显式跳过；当用户表示直接开 issue／PR 时授权两种。
+
+规范 token 保持英文，使钩子检查与语言无关。
+应急绕过（会在 shell 历史留下审计痕迹）：`ECC_ALLOW_GH_REVIEW=1`。

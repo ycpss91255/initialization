@@ -27,6 +27,11 @@ fi
 # add apt repository for 'fish'
 sudo apt-add-repository -y ppa:fish-shell/release-3 && \
 
+# add apt repository for 'fastfetch' (not in Ubuntu 24.04 "noble" repos; the
+# apt package only lands in Ubuntu 25.04+ / Debian 13+). On 25.04+ the PPA is
+# harmless. See https://github.com/fastfetch-cli/fastfetch for release notes.
+sudo add-apt-repository -y ppa:zhangsongcui3371/fastfetch && \
+
 # Update the package lists
 sudo apt update && \
 
@@ -76,7 +81,7 @@ sudo apt install -y --no-install-recommends \
     git-lfs \
     jq \
     ncdu \
-    neofetch \
+    fastfetch \
     net-tools \
     nmap \
     openssh-client \

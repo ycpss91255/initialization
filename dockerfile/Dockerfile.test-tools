@@ -140,8 +140,7 @@ RUN apk add --no-cache \
         file \
         tar \
         openssl \
-        openssh \
-        python3
+        openssh
 
 # bats core + extensions (bats-support / bats-assert / bats-mock)
 COPY --from=bats-src /opt/bats /opt/bats
@@ -185,8 +184,7 @@ RUN bash --version >/dev/null && \
     (whiptail --version 2>&1 | head -1 >/dev/null || true) && \
     gum --version >/dev/null && \
     fzf --version >/dev/null && \
-    expect -v >/dev/null && \
-    python3 --version >/dev/null
+    expect -v >/dev/null
 
 WORKDIR /source
 ENTRYPOINT ["/bin/bash"]

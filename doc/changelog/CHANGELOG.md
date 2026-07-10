@@ -82,6 +82,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **auto-power-profile tool** (`tool/battery/`, issue #260): switches the
+  power-profiles-daemon profile from the current power source -- `performance`
+  on AC, `balanced` on battery above 25%, `power-saver` at or below 25%
+  (`THRESHOLD=25` at the top of the decision script). Two triggers cover both
+  cases: a udev `power_supply` rule for instant AC plug/unplug, and a
+  `OnUnitActiveSec=2min` systemd timer for the battery threshold crossing. The
+  decision script only calls `powerprofilesctl set` when the target differs
+  from the current profile and logs each real switch via
+  `logger -t auto-power-profile`. `install-auto-power-profile.sh` self-elevates
+  with sudo and installs the script, unit, timer, and udev rule; nothing holds
+  a username or home path (power state is read from `/sys/class/power_supply`,
+  overridable via `$POWER_SUPPLY_ROOT` for tests).
 - **`nas-mount` module — CIFS/SMB NAS auto-mount** (`module/nas-mount.module.sh`,
   issue #311): installs the mount driver (`cifs-utils`), the on-demand
   automounter (`autofs`), and the discovery/check tool (`smbclient`). When the

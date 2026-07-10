@@ -1,0 +1,87 @@
+#!/bin/bash
+# auto-power-profile — pick a power-profiles-daemon profile from the power source.
+#
+#   On AC            -> performance
+#   On battery >25%  -> balanced
+#   On battery <=25% -> power-saver
+#
+# power-profiles-daemon (powerprofilesctl) does not switch profiles by power
+# source on its own; this script does. It is driven by two triggers:
+#   - a udev power_supply rule (instant on AC plug/unplug), and
+#   - a systemd timer every 2 minutes (catches the battery threshold crossing).
+#
+# It only calls `powerprofilesctl set` when the target differs from the current
+# profile, so the timer is cheap and does not spam the daemon. Each real switch
+# is logged via `logger -t auto-power-profile` (view: journalctl -t
+# auto-power-profile).
+set -u
+
+# Battery-charge cutoff between balanced and power-saver, in percent. Edit this
+# and re-run install-auto-power-profile.sh to change it.
+THRESHOLD=25
+
+# Sysfs root for power-supply devices; overridable so the decision logic can be
+# exercised against a fake tree in tests without touching the host.
+PSDIR="${POWER_SUPPLY_ROOT:-/sys/class/power_supply}"
+
+# True when any Mains-type supply reports online=1 (i.e. running on AC).
+on_ac() {
+    local type_file supply online_file supply_type online_state
+    for type_file in "${PSDIR}"/*/type; do
+        [ -r "${type_file}" ] || continue
+        read -r supply_type < "${type_file}" || continue
+        [ "${supply_type}" = "Mains" ] || continue
+        supply="${type_file%/type}"
+        online_file="${supply}/online"
+        [ -r "${online_file}" ] || continue
+        read -r online_state < "${online_file}" || continue
+        [ "${online_state}" = "1" ] && return 0
+    done
+    return 1
+}
+
+# Print the first Battery-type capacity percent found; return 1 if none.
+battery_capacity() {
+    local type_file supply cap_file supply_type capacity
+    for type_file in "${PSDIR}"/*/type; do
+        [ -r "${type_file}" ] || continue
+        read -r supply_type < "${type_file}" || continue
+        [ "${supply_type}" = "Battery" ] || continue
+        supply="${type_file%/type}"
+        cap_file="${supply}/capacity"
+        [ -r "${cap_file}" ] || continue
+        read -r capacity < "${cap_file}" || continue
+        printf '%s\n' "${capacity}"
+        return 0
+    done
+    return 1
+}
+
+main() {
+    local target detail capacity current
+
+    if on_ac; then
+        target="performance"
+        detail="ac"
+    else
+        capacity="$(battery_capacity || true)"
+        if [ -n "${capacity}" ] && [ "${capacity}" -le "${THRESHOLD}" ]; then
+            target="power-saver"
+        else
+            target="balanced"
+        fi
+        detail="battery ${capacity:-n/a}%"
+    fi
+
+    current="$(powerprofilesctl get 2>/dev/null || true)"
+    [ "${current}" = "${target}" ] && exit 0
+
+    if powerprofilesctl set "${target}"; then
+        logger -t auto-power-profile \
+            "switched ${current:-unknown} -> ${target} (${detail})"
+    else
+        logger -t auto-power-profile "failed to set profile: ${target}"
+    fi
+}
+
+main "$@"

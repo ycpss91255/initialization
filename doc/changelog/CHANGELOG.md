@@ -20,6 +20,28 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Added
+
+- **Template-first bootstrap libraries for tools and hooks** (`lib/tool_bootstrap.sh`,
+  `lib/hook_bootstrap.sh`): two shared bootstraps so `tool/<name>.sh` and
+  `.claude/hook/<name>.sh` scripts "expand from one template" — each sources a
+  bootstrap and shrinks to its unique logic instead of re-implementing the same
+  header. `lib/tool_bootstrap.sh` (always-act, `set -euo pipefail` +
+  `inherit_errexit`, ADR-0007) exposes `tool_bootstrap` (strict mode +
+  LIB_DIR/REPO_ROOT + logger), `tool_main` (the `--help`/`--dry-run`/unknown-arg
+  CLI, 0=ok / 2=usage-error), `tool_is_dry_run`, `tool_ensure_line` (grep-guarded
+  idempotent, dry-run-aware edit), and `tool_run` (dry-run-aware executor that
+  refuses host package installs — hard rule #2). `lib/hook_bootstrap.sh`
+  (exit-code-contract, `set -uo pipefail`, ADR-0007) exposes `hook_bootstrap`,
+  `hook_read_input` / `hook_field` / `hook_command` (stdin JSON parsing),
+  `hook_allow` (exit 0), `hook_block` (`[hook:<name>] BLOCKED — ...` on stderr +
+  exit 2), and `hook_context` (non-blocking additionalContext). `template/tool.template.sh`
+  is refactored into a thin skeleton over the bootstrap, and new
+  `template/hook.template.sh`, `template/test-tool.template.bats`, and
+  `template/test-hook.template.bats` complete the stamp-out set. Unit specs
+  `test/unit/tool_bootstrap_spec.bats` and `test/unit/hook_bootstrap_spec.bats`
+  pin the public API through real behavior. See ADR-0029 (2026-07-10 update).
+
 ### Changed
 
 - **`install`/`remove`/`purge` now hard-error on `--force` and `--with-orphans`

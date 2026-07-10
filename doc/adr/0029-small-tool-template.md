@@ -71,6 +71,23 @@ and this ADR all state: one-offs use this template; anything **reusable** is
 promoted to a module via one of the `module-*` archetype templates (PRD
 §6.5/§6.6). A `tool/` script must not grow into a pseudo-module.
 
+## Update (2026-07-10): shared bootstrap extraction
+
+The boilerplate the skeleton used to carry inline — strict mode, LIB_DIR /
+REPO_ROOT resolution, the logger source + shims, the `--help/--dry-run/unknown`
+argument parser, and the grep-guarded idempotent edit — is now extracted into
+`lib/tool_bootstrap.sh` (public API `tool_bootstrap` / `tool_main` /
+`tool_is_dry_run` / `tool_ensure_line` / `tool_run`). `template/tool.template.sh`
+is now a THIN skeleton that sources the bootstrap, defines `usage()` + `do_work()`,
+and calls `tool_main "$@"`. The `set -euo pipefail` guarantee and the grep-guard
+still hold — they moved from the template into the bootstrap, where
+`test/unit/tool_bootstrap_spec.bats` exercises them directly (the template spec
+now asserts the thin skeleton delegates to the bootstrap). The `--help/-n/unknown`
++ dry-run + idempotency contract is unchanged. A matching test skeleton lives at
+`template/test-tool.template.bats`. This is the tool half of the template-first
+"expand from one bootstrap" foundation; the hook half is `lib/hook_bootstrap.sh`
++ `template/hook.template.sh`.
+
 ## Consequences
 
 - New one-off tools are consistent, self-documenting (`--help`), previewable

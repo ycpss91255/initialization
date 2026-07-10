@@ -3,6 +3,19 @@
 - **Status:** Accepted
 - **Date:** 2026-05-21
 
+> **Pending TUI decision — partially shipped, richer agent schema
+> deferred.** The full agent-facing wrapper schema below (the top-level
+> envelope with `schema_version` / `scope` / `filters` / `count` /
+> `generated_at`, and the rich per-module record) is NOT what ships. The
+> shipped `list --json` is a **reduced TUI feed**: a `{"items":[...]}`
+> document where each item carries only `name`, `category`, `tags`,
+> `supported_platforms`, `description`, and `recommended` — no envelope,
+> no metadata fields, and none of the state/computed fields (`installed`,
+> `outdated`, `manual`, `depends_on`, `version_provided`, etc.). The
+> richer agent-wrapper schema (and AC-58 through AC-61) is **Deferred
+> until the TUI direction is settled**. Treat everything below as the
+> intended agent schema, not current output.
+
 ## Context
 
 PRD §7.2 lists `--json` on the `list` subcommand but does not

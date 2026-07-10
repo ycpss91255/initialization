@@ -132,6 +132,10 @@ Rejected.
 
 ### Migration applied in the commit that lands this ADR
 
+> **NOTE: These plural renames were later REVERTED.** ADR-0021 (folder naming
+> all-singular) supersedes this ADR and restored the all-singular convention,
+> so the renames listed below no longer reflect the current tree.
+
 Renamed:
 `doc/` → `docs/`,
 `doc/agent/` → `docs/agents/`,

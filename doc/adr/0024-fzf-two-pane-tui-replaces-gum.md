@@ -66,11 +66,12 @@ longer applies because the premise it rejected (modal widgets) is gone.
    recommended-preselection (PRD D4) and cross-level accumulation work
    despite fzf's limitation.
 5. **The two frontends share one data layer; only rendering + navigation is
-   split** (see ADR-0026 for the file boundary). The CLI-fork helpers
-   (`list/detect/show --json`), the selection accumulator, i18n resolution,
-   and preference reads are shared; `render-fzf` and `render-whiptail` are
-   the only divergent modules. A single entry script detects the tier and
-   dispatches.
+   split** (see the Consequences section below for the file boundary). The
+   CLI-fork helpers (`list/detect/show --json`), the selection accumulator,
+   i18n resolution, and preference reads are shared; the divergence is the
+   fzf renderer in its own module (`lib/tui_render_fzf.sh`) versus the
+   whiptail rendering folded into `lib/tui_backend.sh`. A single entry
+   script detects the tier and dispatches.
 6. **Tier resolution** replaces gum>whiptail detection: prefer the fzf tier
    when `fzf` is present; offer to install it when absent and interactive
    (fork `setup_ubuntu install fzf`, same consent rule as the old
@@ -127,8 +128,10 @@ longer applies because the premise it rejected (modal widgets) is gone.
 - **A new `module/fzf.module.sh`** (github-release static binary, multi-arch
   per ADR-0017) replaces `module/gum.module.sh` as the on-demand rich-tier
   install. gum's module is removed from TUI scope.
-- **`lib/tui_backend.sh` is restructured** into a shared data layer plus
-  `render-fzf` / `render-whiptail` modules; all gum adapters are deleted.
+- **`lib/tui_backend.sh` is restructured** into a shared data layer with the
+  whiptail rendering folded in, plus a separate fzf renderer module
+  (`lib/tui_render_fzf.sh`); there is no separate render-whiptail module. All
+  gum adapters are deleted.
 - **Testing**: the AC-10 dual-backend smoke now targets fzf + whiptail (fzf
   added to the test-tools image, gum removed); the G4 grep gate, the
   `TUI_CLI` recording-mock seam, and the per-screen entries producers are

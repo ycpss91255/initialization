@@ -22,6 +22,36 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **`install`/`remove`/`purge` now hard-error on `--force` and `--with-orphans`
+  instead of silently ignoring them** (`lib/dispatcher_lifecycle.sh`): both flags
+  carry destructive intent, and their real semantics (ADR-0012 soft/hard filter,
+  ADR-0010 forward-dep orphan scan) are design-accepted but not built. Rather
+  than accept a destructive-intent flag and no-op it, the dispatcher now exits 2
+  with a clear "not yet implemented" message. Other unbuilt lifecycle flags
+  (`--base` / `--recommended` / `--all-base` / `--category=` / `--install-target=`
+  / `--profile=`) keep their non-destructive stub-warn behavior. Covered by new
+  `test/unit/dispatcher_spec.bats` cases.
+- **Retired the dead apt-essentials state migration and freeze machinery**
+  (`lib/state_migrate.sh`, `lib/state.sh`): the `0.1.0 -> 0.2.0` apt-essentials
+  split migration (and its ADR-0011 `frozen_pkgs` / `frozen_platform` handling)
+  was removed — schema 0.1.0 was never released, so no on-disk state carries it,
+  and no live module uses freeze. The forward-only migration FRAMEWORK (ADR-0008:
+  chain + mandatory backup + replay + atomic write) is kept intact and now ships
+  with no migration hops, ready for the first real future migration. Specs
+  (`state_migrate_spec.bats`, `state_interface_spec.bats`) now exercise the
+  framework with a synthetic in-shell hop instead of the retired one.
+
+### Documentation
+
+- **ADR honest-marking + back-link sweep** (`doc/adr/`): adopted the convention
+  that "Accepted" means implemented and every design-accepted-but-unbuilt
+  decision carries a visible Deferred marker. Reconciled ADRs 0001, 0003, 0005,
+  0006, 0007, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0022,
+  0024, 0025, and 0027 with the shipped code (Deferred markers, back-links,
+  renamed `file` secrets backend to `encrypted-file`, recalibrated the bash->
+  Python triggers from LOC to qualitative, corrected AC-43, fixed the ADR-0024
+  cross-reference, and more).
+
 - **Restored the merged unit-coverage AC-17 gate above 80%** (`test/unit/module/custom-hosts-sync_spec.bats`,
   `test/unit/config_spec.bats`, `test/unit/state_io_spec.bats`,
   `test/unit/tui_backend_branches_spec.bats`, plus `kcov-exclude` markers in

@@ -14,15 +14,17 @@
 `init_ubuntu` has two distinct families of shell scripts:
 
 1. **Exit-code-contract scripts** — they decide an outcome and report it
-   through stdout / stderr / exit code, then the caller acts on it. The
-   `.claude/hook/*.sh` PreToolUse hooks (`enforce_gh_body_file.sh`,
-   `enforce_gh_english.sh`, `check_changelog_drift.sh`,
-   `remind_main_sync.sh`, `enforce_semver_tag_via_script.sh`,
-   `check_main_fresh_before_worktree.sh`, `remind_ci_auto_merge.sh`) and
-   `.claude/script/release-tag.sh` fall in this group. They must reach
-   `main()` `return` / `exit <code>` with a deliberate value — Claude
-   Code reads the exit code (and `permissionDecision` JSON) to decide
-   allow vs deny.
+   through stdout / stderr / exit code, then the caller acts on it. This
+   group covers the `.claude/hook/*.sh` PreToolUse hooks (such as
+   `enforce_gh_body_file.sh`, `enforce_gh_english.sh`,
+   `check_changelog_drift.sh`, `remind_main_sync.sh`,
+   `enforce_semver_tag_via_script.sh`,
+   `check_main_fresh_before_worktree.sh`, `remind_ci_auto_merge.sh`, and
+   other hooks added since under `.claude/hook/`) plus
+   `.claude/script/release-tag.sh` — the list is illustrative, not a
+   closed set. They must reach `main()` `return` / `exit <code>` with a
+   deliberate value — Claude Code reads the exit code (and
+   `permissionDecision` JSON) to decide allow vs deny.
 
 2. **Always-act scripts** — they perform side effects and want any
    intermediate failure to abort the whole run. Module action phases

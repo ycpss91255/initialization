@@ -163,6 +163,42 @@ _load_engine() {
     assert_output --partial "stubbed"
 }
 
+@test "dispatcher_dispatch install --force HARD-ERRORS with exit 2 (not silently ignored)" {
+    # ADR-0012: the --force soft/hard-filter semantics are not built. Rather
+    # than silently no-op a destructive-intent flag, the dispatcher rejects it.
+    _load_engine
+    run dispatcher_dispatch install noop --force
+    assert_failure 2
+    assert_output --partial "--force"
+    assert_output --partial "not yet implemented"
+}
+
+@test "dispatcher_dispatch install --force is rejected even with --dry-run" {
+    # The honest rejection fires during flag parsing, before dry-run planning:
+    # a destructive-intent flag must never be silently accepted.
+    _load_engine
+    run dispatcher_dispatch install noop --force --dry-run
+    assert_failure 2
+    assert_output --partial "not yet implemented"
+}
+
+@test "dispatcher_dispatch install --with-orphans HARD-ERRORS with exit 2" {
+    # ADR-0010: the forward-dep orphan scan is not built; the flag hard-errors
+    # instead of silently no-op'ing.
+    _load_engine
+    run dispatcher_dispatch install noop --with-orphans
+    assert_failure 2
+    assert_output --partial "--with-orphans"
+    assert_output --partial "not yet implemented"
+}
+
+@test "dispatcher_dispatch purge --with-orphans HARD-ERRORS with exit 2" {
+    _load_engine
+    run dispatcher_dispatch purge noop --with-orphans
+    assert_failure 2
+    assert_output --partial "not yet implemented"
+}
+
 @test "dispatcher_dispatch install nonexistent returns exit 2 (resolver unknown)" {
     _load_engine
     run dispatcher_dispatch install nonexistent

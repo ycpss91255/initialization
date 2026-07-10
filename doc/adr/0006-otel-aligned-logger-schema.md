@@ -1,6 +1,7 @@
 # ADR-0006: OTel-aligned structured logger schema
 
-- **Status:** Accepted (decision only; implementation tracked by #8)
+- **Status:** Accepted — **partially implemented** (see the shipped-vs-deferred
+  marker below)
 - **Date:** 2026-05-16
 - **Refs:**
   - Project author's observability playbook
@@ -9,6 +10,31 @@
   - OpenTelemetry Semantic Conventions — https://opentelemetry.io/docs/specs/semconv/
   - W3C Trace Context — https://www.w3.org/TR/trace-context/
   - lnav JSON log format — https://docs.lnav.org/en/latest/formats.html
+
+> **Shipped vs deferred (reconciled 2026-07 against `lib/logger.sh`):**
+>
+> **Shipped:**
+> - The OTel-aligned event schema (`timestamp` / `severity_text` / `body` /
+>   nested `attributes`), emitted by `log_event`.
+> - `trace_id` (session-level, from `$INIT_UBUNTU_TRACE_ID`) and `span_id`
+>   (module × lifecycle, from `$INIT_UBUNTU_SPAN_ID`).
+> - Log retention: `logger_prune_logs` prunes the JSONL log directory
+>   oldest-first, keeping at most `INIT_UBUNTU_LOG_RETENTION_FILES`
+>   (**default 100 files**) and dropping files older than
+>   `INIT_UBUNTU_LOG_RETENTION_DAYS` (**default 30 days**); both are
+>   env-overridable and the active log file is never deleted.
+>
+> **Deferred / not built:**
+> - **Per-session log-FILE output.** `log_event` (and the retention pruner)
+>   append to `${INIT_UBUNTU_LOG_FILE}` only when that variable is set — but
+>   it is **never assigned in production** (`setup_ubuntu.sh` / `lib/*.sh`
+>   never set it; only the bats suite does). So `log_event` no-ops in normal
+>   use and **no JSONL is written**. The per-session
+>   `<trace_id>.jsonl` file + `latest` symlink layout was not wired up.
+> - **`log_info` / `log_warn` / `log_error` → JSONL bridge.** The mirror
+>   call exists in `_logger_print` but is gated on the same unset
+>   `INIT_UBUNTU_LOG_FILE`, so text-logger output never reaches JSONL in
+>   production.
 
 ## Context
 
@@ -113,13 +139,29 @@ no UUID overhead per event.
 
 ### Log file rotation
 
-`${INIT_UBUNTU_LOG_FILE}` legacy global is replaced with
+> **Partially shipped.** Retention pruning shipped (see below); the
+> per-session `<trace_id>.jsonl` + `latest`-symlink **file output is
+> Deferred / not built** — `${INIT_UBUNTU_LOG_FILE}` is never assigned in
+> production, so no file is written outside tests.
+
+The `${INIT_UBUNTU_LOG_FILE}` legacy global was to be replaced with
 `${XDG_STATE_HOME}/init_ubuntu/logs/<trace_id>.jsonl` — one file per
-session. A `latest` symlink keeps a stable path for `tail -f` users.
-Old jsonl files retained per a `INIT_UBUNTU_LOG_RETENTION_DAYS`
-config (default 30).
+session, with a `latest` symlink for `tail -f` users. **As shipped**,
+`log_event` still writes to `${INIT_UBUNTU_LOG_FILE}` when set and no-ops
+otherwise, and that variable is never set in production.
+
+Retention (**shipped**): `logger_prune_logs` keeps at most
+`INIT_UBUNTU_LOG_RETENTION_FILES` (**default 100 files**) and drops files
+older than `INIT_UBUNTU_LOG_RETENTION_DAYS` (**default 30 days**), pruning
+oldest-first; both are env-overridable and the active log file is never
+deleted.
 
 ### Bridge: `log_info` / `log_warn` / `log_error` → JSONL too
+
+> **Deferred / not built (in production).** The mirror call exists in
+> `_logger_print`, but it is gated on `${INIT_UBUNTU_LOG_FILE}` being set,
+> which never happens outside tests — so text-logger output does not reach
+> JSONL in normal use.
 
 The text loggers gain a JSONL mirror call: every `log_info "[name]
 msg"` also emits `log_event info <name> message msg="..."` so the
@@ -190,17 +232,21 @@ there's no benefit to reinventing.
 
 ### Migration plan
 
-Tracked by issue #8. Phases:
+Tracked by issue #8. Phases (status reconciled 2026-07):
 
-1. **Schema rename + nest payload** + `service.name` / `service.lang`
-   / `code.*` SemConv fields. Update all existing `log_event`
-   callers in `lib/`. Update `test/unit/logger_spec.bats` expected
-   shapes.
-2. **`trace_id` + `span_id` propagation.** Generate at
+1. **[shipped] Schema rename + nest payload** + `service.name` /
+   `service.lang` / `code.*` SemConv fields. Update all existing
+   `log_event` callers in `lib/`. Update `test/unit/logger_spec.bats`
+   expected shapes.
+2. **[shipped] `trace_id` + `span_id` propagation.** Generate at
    `setup_ubuntu.sh` entry, inherit via env. Update
    `_runner_run_phase` to manage span lifecycle.
-3. **Per-session log file rotation** + `latest` symlink.
-4. **`doc/guide/log-queries.md`** with lnav format + jq snippets.
+3. **[deferred] Per-session log file rotation** + `latest` symlink —
+   retention pruning shipped, but the per-session file output is gated on
+   the never-assigned `${INIT_UBUNTU_LOG_FILE}`, so it does not run in
+   production.
+4. **[deferred] `doc/guide/log-queries.md`** with lnav format + jq
+   snippets (moot until JSONL is actually written in production).
 
 Implementation gated on PRs #4 / #6 / #7 merging first (to avoid
 CHANGELOG and `lib/runner.sh` merge conflicts).

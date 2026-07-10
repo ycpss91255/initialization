@@ -61,8 +61,17 @@
 #
 # Bypass: ECC_ALLOW_GH_REVIEW=1 env var -> allow silently (leaves an
 # audit trail in shell history).
+#
+# Template-first (ADR-0029): sources lib/hook_bootstrap.sh for set -uo pipefail
+# (ADR-0007 exit-code-contract) + input reading (hook_read_input / hook_command).
+# The per-draft transcript scoping, approval-phrase matching, and
+# permissionDecision=deny emission are this hook's unique logic and are unchanged.
+# The isolated modules stay independently source-able for bats (main runs only as
+# the entrypoint, below).
 
-set -uo pipefail
+# shellcheck source=../../lib/hook_bootstrap.sh
+source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
+hook_bootstrap "enforce-gh-review-approval"
 
 # ── read_user_messages ───────────────────────────────────────────────────────
 # Args: $1 = transcript_path, $2 = min_index (optional, default 0).
@@ -211,10 +220,10 @@ main() {
         return 0
     fi
 
-    local input cmd
-    input="$(cat)"
+    hook_read_input
+    local input="${HOOK_INPUT}" cmd
     [[ -z "${input}" ]] && return 0
-    cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
+    cmd="$(hook_command)"
     [[ -z "${cmd}" ]] && return 0
 
     local kind

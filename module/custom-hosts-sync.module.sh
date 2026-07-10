@@ -159,6 +159,44 @@ verify() {
     module_default_verify
 }
 
+# is_outdated: any deployed file drifted from its repo template. The script and
+# path unit carry the __USER_HOME__ substitution applied at install time, so
+# compare against the same localized rendering; the service unit is verbatim.
+is_outdated() {
+    is_installed || return 1
+    local _home="${HOME}"
+    diff -q <(sed "s#__USER_HOME__#${_home}#g" "${CHS_SRC_DIR}/sync-custom-hosts") \
+            "${CHS_SCRIPT}" >/dev/null 2>&1 || return 0
+    diff -q "${CHS_SRC_DIR}/custom-hosts-sync.service" \
+            "${CHS_SERVICE}" >/dev/null 2>&1 || return 0
+    diff -q <(sed "s#__USER_HOME__#${_home}#g" "${CHS_SRC_DIR}/custom-hosts-sync.path") \
+            "${CHS_PATH_UNIT}" >/dev/null 2>&1 || return 0
+    return 1
+}
+
+# doctor: runtime health — installed, sync script executable + syntactically
+# valid, and (best-effort) the systemd path unit is active. Read-only advisory:
+# doctor never mutates, so a stopped path unit only warns.
+doctor() {
+    if ! is_installed; then
+        log_warn "[${NAME}] doctor: custom-hosts-sync not installed"
+        return 1
+    fi
+    if [[ ! -x "${CHS_SCRIPT}" ]]; then
+        log_warn "[${NAME}] doctor: ${CHS_SCRIPT} missing or not executable"
+        return 1
+    fi
+    if ! bash -n "${CHS_SCRIPT}" 2>/dev/null; then
+        log_warn "[${NAME}] doctor: ${CHS_SCRIPT} has bash syntax errors"
+        return 1
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl is-active --quiet custom-hosts-sync.path 2>/dev/null \
+            || log_warn "[${NAME}] doctor: custom-hosts-sync.path is not active"
+    fi
+    return 0
+}
+
 # ── Standalone footer ───────────────────────────────────────────────────────
 if [[ "${MODULE_STANDALONE:-false}" == "true" ]]; then
     module_standalone_main "$@"

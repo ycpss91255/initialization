@@ -3,7 +3,7 @@
 
 # Module Index
 
-45 modules. Columns come from each module's metadata block
+46 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -39,6 +39,7 @@ to the module source.
 | [lazygit](../../module/lazygit.module.sh) | optional | cli-essentials | lazygit — terminal UI for git commands |
 | [libreoffice](../../module/libreoffice.module.sh) | optional | office gui | LibreOffice office suite (fresh releases via ppa:libreoffice/ppa) |
 | [lnav](../../module/lnav.module.sh) | optional | logs | lnav — log file navigator for the terminal (apt package + lnav_pkg config bundle) |
+| [nas-mount](../../module/nas-mount.module.sh) | optional | network storage | NAS CIFS/SMB auto-mount (cifs-utils + autofs + smbclient) |
 | [neovim](../../module/neovim.module.sh) | recommended | editor cli | Neovim editor + nvimdots personal config |
 | [notion](../../module/notion.module.sh) | optional | notes | Notion desktop app (unofficial notion-electron .deb client) |
 | [nvidia-driver](../../module/nvidia-driver.module.sh) | optional | gpu nvidia hardware | NVIDIA proprietary driver (auto-detected recommended version via ubuntu-drivers) |

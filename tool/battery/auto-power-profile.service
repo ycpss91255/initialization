@@ -1,0 +1,14 @@
+[Unit]
+Description=Pick a power profile from the current power source (AC/battery)
+# Only meaningful once power-profiles-daemon is up.
+After=power-profiles-daemon.service
+Wants=power-profiles-daemon.service
+
+[Service]
+Type=oneshot
+# Runs the decision script once; it is a no-op unless the target profile
+# differs from the current one.
+ExecStart=/usr/local/bin/auto-power-profile
+
+[Install]
+WantedBy=multi-user.target

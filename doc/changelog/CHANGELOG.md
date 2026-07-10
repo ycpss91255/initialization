@@ -22,6 +22,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Restored the merged unit-coverage AC-17 gate above 80%** (`test/unit/module/custom-hosts-sync_spec.bats`,
+  `test/unit/config_spec.bats`, `test/unit/state_io_spec.bats`,
+  `test/unit/tui_backend_branches_spec.bats`, plus `kcov-exclude` markers in
+  `lib/config.sh` / `lib/state_io.sh` / `lib/tui_backend.sh`): merged unit
+  coverage had slipped to 79.89% after narrow-matrix PR merges landed
+  undercovered code (those runs report coverage but do not enforce the gate).
+  New behavioral unit tests exercise the previously-untested lifecycle of the
+  `custom-hosts-sync` module (`detect` / `upgrade` / `remove` / `purge` /
+  `verify` / `is_outdated` / `doctor`, network + systemd boundary stubbed) —
+  taking that module from 57.9% to ~94% — and cover the library source-guard
+  and jq-unavailable branches of `lib/config.sh` / `lib/state_io.sh` and the
+  `lib/tui_backend.sh` source guard. The awk/jq program bodies in those three
+  libs are wrapped in the repo's existing `kcov-exclude` markers because kcov
+  cannot trace lines executed inside an awk/jq subprocess (it counts every such
+  string-literal line as never-hit, the same artifact the i18n data tables are
+  already excluded for) — their behaviour stays covered through the public
+  interface. Also regenerated the drifted module count in `doc/module/INDEX.md`
+  (45 -> 46) that a prior narrow-matrix merge left stale.
 - **`claude-ls` session helper enumerates directory-type sessions and emits
   per-session metadata** (`module/config/fish/_claude_sessions.py`, issue #161):
   the helper now visits UUID-named session *directories* (subagent runs with
@@ -93,6 +111,78 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `ffmpeg -encoders` before grepping it, avoiding a `set -o pipefail` +
   `grep -q` SIGPIPE false-negative that would spuriously report a present
   encoder as missing.
+- **`docker-tool/set-address-pool.sh`** (`script/docker-tool/set-address-pool.sh`,
+  issue #270): a standalone root-only config tool that pins Docker's
+  `default-address-pools` in `/etc/docker/daemon.json` to `172.16.0.0/12`
+  sliced into `/24` blocks (4096 concurrent subnets, base/size overridable as
+  args). Docker's built-in pool is only 15 `/16` blocks and, once exhausted
+  under heavy `docker-compose` churn, silently overflows into `192.168.0.0/16`
+  — surprising anyone monitoring the host's network. The script backs up the
+  existing `daemon.json` (`.bak.<timestamp>`), merges via `jq` preserving other
+  keys (e.g. `runtimes`), validates the candidate with `dockerd --validate`
+  before it ever touches the live file (leaving the original untouched on
+  failure), cleans up its scratch file via `trap ... EXIT`, and prints — but
+  does not run — the `systemctl restart docker` step so the operator can check
+  restart policies first. `DOCKER_DAEMON_JSON_PATH` overrides the target path
+  for testing. Covered by `test/unit/script/set_address_pool_spec.bats`.
+- **`claude-ls` follows `ls` conventions** (`module/config/fish/functions/claude-ls.fish`,
+  issue #163): quiet + current-folder by default (`$PWD` mapped to Claude's
+  `/`->`-` project encoding), with `-a`/`--all` restoring the all-projects view
+  and `-l`/`--long` adding the full 36-char UUID plus a `N msg · size · model ·
+  age` detail line (model has the `claude-` prefix stripped; age is relative).
+  Short flags bundle (`-la`/`-al`); `-a` group headers now show the session's
+  real `cwd` instead of the lossy encoded project name; roots and fork children
+  sort most-recent-first; an empty current folder prints a `No sessions found`
+  hint; the per-line `cwd` and trailing `Total:` line were dropped. Supersedes
+  #128 and #137. The test image now bundles `python3`
+  (`dockerfile/Dockerfile.test-tools`) so the renderer is exercised end-to-end.
+- **`resolve-convert` tool** (`tool/davinci_resolve/resolve-convert.sh`, issue
+  #267): a standalone converter that transcodes H.264/AAC clips to DNxHR HQ +
+  PCM `.mov` so DaVinci Resolve Free on Linux (which ships no H.264/H.265/AAC
+  decode licenses) can import phone/screen-recording footage. Accepts single
+  files or directories (batch: `mp4/mov/mkv/avi/m4v`), writes
+  `<stem>_resolve.mov` beside each source or into a `-o DIR` target, is
+  idempotent (skips sources that already have a `_resolve.mov` counterpart and
+  never re-feeds outputs as inputs), and cleans up partial/empty outputs on
+  ffmpeg failure or interrupt. The `ffmpeg` binary is overridable via
+  `FFMPEG_BIN` for testing.
+- **auto-power-profile tool** (`tool/battery/`, issue #260): switches the
+  power-profiles-daemon profile from the current power source -- `performance`
+  on AC, `balanced` on battery above 25%, `power-saver` at or below 25%
+  (`THRESHOLD=25` at the top of the decision script). Two triggers cover both
+  cases: a udev `power_supply` rule for instant AC plug/unplug, and a
+  `OnUnitActiveSec=2min` systemd timer for the battery threshold crossing. The
+  decision script only calls `powerprofilesctl set` when the target differs
+  from the current profile and logs each real switch via
+  `logger -t auto-power-profile`. `install-auto-power-profile.sh` self-elevates
+  with sudo and installs the script, unit, timer, and udev rule; nothing holds
+  a username or home path (power state is read from `/sys/class/power_supply`,
+  overridable via `$POWER_SUPPLY_ROOT` for tests).
+- **`nas-mount` module — CIFS/SMB NAS auto-mount** (`module/nas-mount.module.sh`,
+  issue #311): installs the mount driver (`cifs-utils`), the on-demand
+  automounter (`autofs`), and the discovery/check tool (`smbclient`). When the
+  site-specific NAS parameters are supplied at runtime via environment
+  (`INIT_UBUNTU_NAS_HOST` / `_SHARE` / `_USER`, optional `_PASSWORD` /
+  `_MOUNT_BASE` / `_CREDENTIALS`), `install` wires an autofs indirect map so the
+  share mounts on access; otherwise it installs the packages and prints a hint.
+  Credentials stay out of the repo — an existing credentials file is reused or
+  one is generated from `INIT_UBUNTU_NAS_PASSWORD`, always forced to
+  `chmod 600`; no host/user/password is ever hardcoded. `verify` smoke-tests
+  `mount.cifs` + `smbclient`; `remove`/`purge` unwire the maps (purge also wipes
+  the credentials). Never auto-selected in Quick Setup (needs site credentials).
+- **`f5-split-dns` tool** (`tool/f5-split-dns/`, issue #146): a per-user opt-in
+  tool that pins the company DNS server plus a `~<COMPANY_DOMAIN>` routing domain
+  onto the F5 BIG-IP Edge VPN interface (`tun0`) via `resolvectl`, so
+  load-balanced internal hosts (e.g. the mail server) resolve to in-tunnel
+  addresses instead of their public A records. Ships `f5-split-dns.sh` (reads
+  `$F5_SPLIT_DNS_CONF` from a per-install systemd drop-in; no secrets, no
+  hardcoded username), a `f5-split-dns.service` oneshot unit bound to the
+  `tun0` device (`WantedBy`/`BindsTo`, so it applies on connect and auto-clears
+  on disconnect), a `config.example` template (real values live only in the
+  uncommitted per-user `~/.config/f5-split-dns/config`), an `install.sh` that
+  derives the config path from `$SUDO_USER`, and a `README.adoc`. Behavior is
+  pinned by `test/unit/f5_split_dns_spec.bats` (stubs `resolvectl`/`ip`/`logger`
+  on PATH; the `tool/` tree is a declared shellcheck-out-of-scope surface).
 - **`kvm` module — libvirt/QEMU virtualization stack** (`module/kvm.module.sh`,
   issue #310): a new apt-archetype module installing `qemu-kvm`,
   `libvirt-daemon-system`, `libvirt-clients`, `bridge-utils`, `virt-manager`,
@@ -268,6 +358,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+- **`custom-hosts-sync` module** (`module/custom-hosts-sync.module.sh` +
+  `module/config/custom-hosts-sync/`, issue #145): keeps custom `/etc/hosts`
+  name->IP entries from being reverted by the F5 BIG-IP Edge VPN client
+  (`svpn`), which snapshots `/etc/hosts` on connect and restores it wholesale
+  on disconnect/reboot. A systemd `.path` unit watches `/etc/hosts` and the
+  user master list (`~/.config/hosts-custom/hosts.custom`) and re-merges the
+  master list into an idempotent managed block whenever either changes, so a
+  revert is corrected within seconds and edits to the master list apply on
+  save. The sync script writes only when content actually changes (never loops
+  on its own inotify event) and leaves the F5 gateway line untouched. The
+  committed script and `.path` unit carry a `__USER_HOME__` placeholder that
+  `install()` substitutes with the real `$HOME` at deploy time, so no username
+  is hardcoded in version control. Optional module, `svpn`-gated
+  `is_recommended`.
 - **Module-iterating contract-conformance meta-test**
   (`test/unit/module/contract_conformance_spec.bats`): a single meta-test that
   DISCOVERS every `module/*.module.sh` dynamically (so new/edited modules are

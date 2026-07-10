@@ -33,6 +33,24 @@ _set_fake_catalog() {
     printf '%s\n' "$@" > "${INIT_UBUNTU_TEST_SCRATCH}/fake-catalog"
 }
 
+# ── library-guard + jq-availability branches ─────────────────────────────────
+
+@test "executing state_io.sh directly warns that it is a library (source guard)" {
+    run bash "${LIB_DIR}/state_io.sh"
+    assert_success
+    assert_output --partial "library"
+}
+
+@test "state_io_export errors clearly when jq is unavailable" {
+    _load_state_io
+    mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/emptybin"
+    # Empty PATH hides jq from `command -v jq`; `command` is a builtin.
+    PATH="${INIT_UBUNTU_TEST_SCRATCH}/emptybin" run state_io_export \
+        "${INIT_UBUNTU_TEST_SCRATCH}/out.json"
+    assert_failure 1
+    assert_output --partial "jq not found"
+}
+
 # ── export ──────────────────────────────────────────────────────────────────
 
 @test "state_io_export with empty state writes an empty modules list" {

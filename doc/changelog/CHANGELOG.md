@@ -63,6 +63,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Migrated the remaining five top-level one-off tools onto
+  `lib/tool_bootstrap.sh`** (`tool/copy_neovim_local_config.sh`,
+  `tool/dual_system_time_sync.sh`, `tool/setup_terminal_font_size.sh`,
+  `tool/setup_wayland.sh`, `tool/sync_config.sh`; ADR-0029): each now sources the
+  shared bootstrap and shrinks to `usage()` + `do_work()`, gaining the always-act
+  strict mode (`set -euo pipefail` + `inherit_errexit`) and the standard CLI
+  (`--help` -> exit 0, unknown arg -> exit 2, `--dry-run` mutates nothing). All
+  mutations route through `tool_run`/`tool_ensure_line` so `--dry-run` is honored
+  and edits are grep-guarded/idempotent, which structurally fixes the pre-existing
+  bugs (missing `set -u`, blind `mv`/`cp`, no `--help`, unconditional interactive
+  `read`). `dual_system_time_sync.sh` **no longer performs a host package install**
+  (the old `apt-get install -y ntpdate` violated hard rule #2): `ntpdate` is now a
+  documented prerequisite and the tool fails fast with guidance when it is absent.
+  `sync_config.sh` keeps its own `status`/`pull`/`push` dispatcher (`tool_main`'s
+  flat parser cannot accept bare subcommands) while still sourcing the bootstrap
+  and honouring the outward contract. Each tool gains a bats spec under
+  `test/unit/tool/`, and all five are removed from the
+  `tool_hook_conformance_spec.bats` migration-debt allowlist (now empty for tools).
 - **Remaining 13 Claude hooks migrated onto `lib/hook_bootstrap.sh`**
   (`.agents/hook/`): every hook now sources the shared bootstrap and shrinks to
   its unique decision logic (`hook_read_input` / `hook_command` / `hook_field`

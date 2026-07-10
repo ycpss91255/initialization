@@ -42,11 +42,6 @@ load "${BATS_TEST_DIRNAME}/../helper/common"
 # ── Migration debt ledger (SHRINKS as files migrate) ─────────────────────────
 # Newline-delimited basenames of files NOT yet migrated onto their bootstrap.
 ALLOWLIST_TOOLS="
-copy_neovim_local_config.sh
-dual_system_time_sync.sh
-setup_terminal_font_size.sh
-setup_wayland.sh
-sync_config.sh
 "
 
 # Empty: all hooks are migrated onto lib/hook_bootstrap.sh and enforced.

@@ -7,6 +7,14 @@ idempotent work, and `set -euo pipefail`.
 
 See also: [ADR-0029](../adr/0029-small-tool-template.md).
 
+The template is a **thin skeleton over a shared bootstrap**: it sources
+`lib/tool_bootstrap.sh` (public API `tool_bootstrap` / `tool_main` /
+`tool_is_dry_run` / `tool_ensure_line` / `tool_run`), then only defines
+`usage()` + `do_work()` and calls `tool_main "$@"`. The strict mode, path
+resolution, logger, argument parsing, and grep-guarded idempotent edit all live
+in the bootstrap, so a tool carries near-zero boilerplate. The hook counterpart
+is `lib/hook_bootstrap.sh` + `template/hook.template.sh`.
+
 ## When to use it (and when NOT to)
 
 Use this template when the script is a genuine **one-off**: a personal host
@@ -52,21 +60,23 @@ and modules read the same way from a script or a CI gate.
 - **No host package installs** — a one-off tool must never `apt-get`/`dpkg`/
   `snap` install on the host (repo hard rule #2). If you need a package, it is a
   module, not a tool.
-- **Optional logger** — prefer `lib/logger.sh` for `log_info/log_warn/log_error`;
-  the skeleton falls back to minimal stderr shims if the logger is unavailable.
+- **Optional logger** — the bootstrap sources `lib/logger.sh` for
+  `log_info/log_warn/log_error`, falling back to minimal stderr shims if the
+  logger is unavailable (a tool copied out of the repo).
 
 ## How to author one
 
 ```bash
 cp template/tool.template.sh tool/<your-name>.sh   # kebab-case name
 # 1. Fill in TOOL_NAME + TOOL_SUMMARY and the usage() body.
-# 2. Replace do_work() with the real, grep-guarded, dry-run-aware work.
+# 2. Replace do_work() with the real, grep-guarded, dry-run-aware work
+#    (use tool_ensure_line / tool_run; read tool_is_dry_run when you branch).
 # 3. Add a spec (see below) with the 3 canonical cases.
 ```
 
 ## How to test
 
-Copy `test/unit/tool_template_spec.bats` as the starting point and adapt the
+Copy `template/test-tool.template.bats` as the starting point and adapt the
 three canonical cases to your tool:
 
 1. `--help` exits `0` and prints usage.

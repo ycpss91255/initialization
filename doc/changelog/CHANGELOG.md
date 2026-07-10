@@ -20,7 +20,59 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Added
+
+- **Template-first bootstrap libraries for tools and hooks** (`lib/tool_bootstrap.sh`,
+  `lib/hook_bootstrap.sh`): two shared bootstraps so `tool/<name>.sh` and
+  `.claude/hook/<name>.sh` scripts "expand from one template" — each sources a
+  bootstrap and shrinks to its unique logic instead of re-implementing the same
+  header. `lib/tool_bootstrap.sh` (always-act, `set -euo pipefail` +
+  `inherit_errexit`, ADR-0007) exposes `tool_bootstrap` (strict mode +
+  LIB_DIR/REPO_ROOT + logger), `tool_main` (the `--help`/`--dry-run`/unknown-arg
+  CLI, 0=ok / 2=usage-error), `tool_is_dry_run`, `tool_ensure_line` (grep-guarded
+  idempotent, dry-run-aware edit), and `tool_run` (dry-run-aware executor that
+  refuses host package installs — hard rule #2). `lib/hook_bootstrap.sh`
+  (exit-code-contract, `set -uo pipefail`, ADR-0007) exposes `hook_bootstrap`,
+  `hook_read_input` / `hook_field` / `hook_command` (stdin JSON parsing),
+  `hook_allow` (exit 0), `hook_block` (`[hook:<name>] BLOCKED — ...` on stderr +
+  exit 2), and `hook_context` (non-blocking additionalContext). `template/tool.template.sh`
+  is refactored into a thin skeleton over the bootstrap, and new
+  `template/hook.template.sh`, `template/test-tool.template.bats`, and
+  `template/test-hook.template.bats` complete the stamp-out set. Unit specs
+  `test/unit/tool_bootstrap_spec.bats` and `test/unit/hook_bootstrap_spec.bats`
+  pin the public API through real behavior. See ADR-0029 (2026-07-10 update).
+
 ### Changed
+
+- **`install`/`remove`/`purge` now hard-error on `--force` and `--with-orphans`
+  instead of silently ignoring them** (`lib/dispatcher_lifecycle.sh`): both flags
+  carry destructive intent, and their real semantics (ADR-0012 soft/hard filter,
+  ADR-0010 forward-dep orphan scan) are design-accepted but not built. Rather
+  than accept a destructive-intent flag and no-op it, the dispatcher now exits 2
+  with a clear "not yet implemented" message. Other unbuilt lifecycle flags
+  (`--base` / `--recommended` / `--all-base` / `--category=` / `--install-target=`
+  / `--profile=`) keep their non-destructive stub-warn behavior. Covered by new
+  `test/unit/dispatcher_spec.bats` cases.
+- **Retired the dead apt-essentials state migration and freeze machinery**
+  (`lib/state_migrate.sh`, `lib/state.sh`): the `0.1.0 -> 0.2.0` apt-essentials
+  split migration (and its ADR-0011 `frozen_pkgs` / `frozen_platform` handling)
+  was removed — schema 0.1.0 was never released, so no on-disk state carries it,
+  and no live module uses freeze. The forward-only migration FRAMEWORK (ADR-0008:
+  chain + mandatory backup + replay + atomic write) is kept intact and now ships
+  with no migration hops, ready for the first real future migration. Specs
+  (`state_migrate_spec.bats`, `state_interface_spec.bats`) now exercise the
+  framework with a synthetic in-shell hop instead of the retired one.
+
+### Documentation
+
+- **ADR honest-marking + back-link sweep** (`doc/adr/`): adopted the convention
+  that "Accepted" means implemented and every design-accepted-but-unbuilt
+  decision carries a visible Deferred marker. Reconciled ADRs 0001, 0003, 0005,
+  0006, 0007, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0022,
+  0024, 0025, and 0027 with the shipped code (Deferred markers, back-links,
+  renamed `file` secrets backend to `encrypted-file`, recalibrated the bash->
+  Python triggers from LOC to qualitative, corrected AC-43, fixed the ADR-0024
+  cross-reference, and more).
 
 - **Restored the merged unit-coverage AC-17 gate above 80%** (`test/unit/module/custom-hosts-sync_spec.bats`,
   `test/unit/config_spec.bats`, `test/unit/state_io_spec.bats`,

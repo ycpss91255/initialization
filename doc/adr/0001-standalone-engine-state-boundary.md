@@ -1,5 +1,7 @@
 # Standalone Mode writes single-module state; Engine Mode writes orchestration state
 
+> **Refined by ADR-0027** (sidecar write relocated to the phase-invocation layer).
+
 A Module can run in two modes: `bash module/<m>.module.sh <phase>` (Standalone)
 or `setup_ubuntu <phase> <m>` (Engine). We split state-writing along the
 "single-Module fact vs cross-Module orchestration" line: **Standalone writes the

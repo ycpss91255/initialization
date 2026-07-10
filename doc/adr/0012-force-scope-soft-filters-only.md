@@ -3,6 +3,16 @@
 - **Status:** Accepted
 - **Date:** 2026-05-20
 
+> **Deferred — design-accepted, not built in 0.1.0.** The `--force`
+> soft/hard filter-scope semantics described below are NOT implemented.
+> The one shipped fact: `--force` and `--with-orphans` now **hard-error
+> with exit 2** and a clear "flag not yet implemented" message — they no
+> longer silently no-op. So the destructive-filter behaviour (soft
+> override vs. hard capability rejection, `DETECT_OVERRIDE`, exit codes
+> 3/4/5) is Deferred, but the flags are honestly rejected rather than
+> silently accepted. Treat everything below as the intended design, not
+> current behaviour.
+
 ## Context
 
 PRD §7.2 lists `--force` on `install`, and §15.3 says it "skips all

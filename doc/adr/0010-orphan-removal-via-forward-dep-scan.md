@@ -2,6 +2,8 @@
 
 - **Status:** Accepted
 - **Date:** 2026-05-20
+- **Related:** ADR-0018 (state.json synced/local split — the fields below
+  now live under a nested `synced` sub-object)
 
 ## Context
 
@@ -23,26 +25,41 @@ Two candidate state representations exist:
 
 ### State shape
 
+Per ADR-0018 the installed-module fields (`manual`, `depends_on`,
+`version_provided`, `installed_at`, `installed_by`) live under a `synced`
+sub-object; a sibling `local` sub-object holds host-specific facts that never
+propagate across machines. The orphan algorithm reads only the `synced` half.
+
 ```json
 {
   "installed": {
     "neovim": {
-      "version_provided": "v0.10.2",
-      "installed_at": "2026-05-13T14:25:01+08:00",
-      "manual": true,
-      "depends_on": ["fzf", "lazygit", "ripgrep", "fdfind", "fnm"]
+      "synced": {
+        "version_provided": "v0.10.2",
+        "installed_at": "2026-05-13T14:25:01+08:00",
+        "manual": true,
+        "depends_on": ["fzf", "lazygit", "ripgrep", "fdfind", "fnm"]
+      },
+      "local": {
+        "install_target_resolved": "user-home"
+      }
     },
     "fzf": {
-      "version_provided": "v0.50.0",
-      "installed_at": "2026-05-13T14:20:11+08:00",
-      "manual": false,
-      "depends_on": []
+      "synced": {
+        "version_provided": "v0.50.0",
+        "installed_at": "2026-05-13T14:20:11+08:00",
+        "manual": false,
+        "depends_on": []
+      },
+      "local": {
+        "install_target_resolved": "user-home"
+      }
     }
   }
 }
 ```
 
-`depends_on` is the **snapshot** of `DEPENDS_ON` from the module's
+`synced.depends_on` is the **snapshot** of `DEPENDS_ON` from the module's
 metadata at install time. Engine writes it. Standalone mode does not
 (ADR-0001 — standalone never touches state.json).
 
@@ -91,6 +108,13 @@ subset of `metadata.DEPENDS_ON` — surfaces the `--no-deps` install
 to the user later.
 
 ### Orphan algorithm
+
+> **Implementation status.** The forward-dependency orphan **scan** described
+> below remains **Deferred / not built**. What shipped is the honest
+> rejection: `remove --with-orphans` (and `purge --with-orphans`) now
+> **HARD-ERRORS with exit 2** and a clear "flag not yet implemented" message
+> rather than silently no-op-ing. The algorithm below is the design the scan
+> will follow once built.
 
 ```
 purge_with_orphans(targets):

@@ -96,3 +96,20 @@ functional requirement.
   host). The user-facing `justfile` runs the real installer, which is the
   intended use for a USER on their own machine — user-facing ≠
   agent-facing.
+
+> **Back-annotation (post-migration).** The retired `make` was originally
+> left in the docker-hook whitelist as a safe first token; it has since
+> been removed — `make` is gone from the repo, so keeping the token only
+> risked green-lighting a stray `make` invocation. The whitelist now
+> carries `just` (and `docker`) but not `make`.
+
+> **Back-annotation (kcov image lane, issue #226).** A SECOND
+> content-keyed image lane was added after this ADR for the coverage
+> path: `justfile.ci` bakes a `kcov-tools` image
+> (`dockerfile/Dockerfile.kcov-tools`, tag resolved by
+> `script/ci/resolve_kcov_tools_tag.sh`, `KCOV_TOOLS_IMAGE` env override)
+> with a `build-kcov-tools` recipe and a hidden `_ensure-kcov-image` dep
+> (parallel to `_ensure-image` / `TEST_TOOLS_PREBUILT`, gated by
+> `KCOV_TOOLS_PREBUILT=1`). `coverage` / per-shard `coverage-unit` run in
+> that image so kcov is baked in rather than installed per run. The
+> mechanics mirror the test-tools image lane described in Decision 3.

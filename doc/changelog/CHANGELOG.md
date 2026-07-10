@@ -100,6 +100,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`claude-ls` follows `ls` conventions** (`module/config/fish/functions/claude-ls.fish`,
+  issue #163): quiet + current-folder by default (`$PWD` mapped to Claude's
+  `/`->`-` project encoding), with `-a`/`--all` restoring the all-projects view
+  and `-l`/`--long` adding the full 36-char UUID plus a `N msg · size · model ·
+  age` detail line (model has the `claude-` prefix stripped; age is relative).
+  Short flags bundle (`-la`/`-al`); `-a` group headers now show the session's
+  real `cwd` instead of the lossy encoded project name; roots and fork children
+  sort most-recent-first; an empty current folder prints a `No sessions found`
+  hint; the per-line `cwd` and trailing `Total:` line were dropped. Supersedes
+  #128 and #137. The test image now bundles `python3`
+  (`dockerfile/Dockerfile.test-tools`) so the renderer is exercised end-to-end.
 - **`resolve-convert` tool** (`tool/davinci_resolve/resolve-convert.sh`, issue
   #267): a standalone converter that transcodes H.264/AAC clips to DNxHR HQ +
   PCM `.mov` so DaVinci Resolve Free on Linux (which ships no H.264/H.265/AAC

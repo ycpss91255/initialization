@@ -1,0 +1,9 @@
+# Per-user config for f5-split-dns (sourced by /usr/local/sbin/f5-split-dns.sh).
+# Copy to ~/.config/f5-split-dns/config and fill in real values.
+# This is per-user and opt-in: install the tool only on accounts that need it.
+
+# Internal company DNS server (reachable once the F5 VPN is up)
+INTERNAL_DNS_IP="<INTERNAL_DNS_IP>"
+
+# DNS domain to resolve via the internal DNS above (no leading "~")
+COMPANY_DOMAIN="<COMPANY_DOMAIN>"

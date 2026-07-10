@@ -121,6 +121,7 @@ _state_io_modules_array() {
     local _names_json
     _names_json="$(printf '%s\n' "${_names[@]}" | jq -R . | jq -s .)"
 
+    # kcov-exclude-start (jq program body: kcov cannot trace lines executed inside the jq subprocess; behaviour is covered via the state_io_export specs)
     jq --argjson names "${_names_json}" '
         .installed
         | to_entries
@@ -128,6 +129,7 @@ _state_io_modules_array() {
         | sort_by(.key)
         | map({ name: .key, synced: (.value.synced // {}) })
     ' "${_state_path}"
+    # kcov-exclude-end
 }
 
 # ── Public: export ──────────────────────────────────────────────────────────
@@ -192,6 +194,7 @@ state_io_export() {
     local _user="${USER:-unknown}"
     local _ts; _ts="$(_state_io_iso8601)"
 
+    # kcov-exclude-start (jq -n assembly: the jq program body is not traceable through the jq subprocess; covered via the state_io_export payload-field specs)
     jq -n \
         --arg version "${STATE_IO_SCHEMA_VERSION}" \
         --arg host "${_host}" \
@@ -206,6 +209,7 @@ state_io_export() {
             modules: $modules,
             include_config: false
         }' > "${_out}"
+    # kcov-exclude-end
 }
 
 # ── Public: read payload → list module names ───────────────────────────────
@@ -256,6 +260,7 @@ state_io_import_plan() {
     # version_provided / depends_on; `manual` is sticky to true. Only the
     # payload's `synced` sections are ever read — a smuggled `local`
     # section is ignored by construction.
+    # kcov-exclude-start (jq conflict-resolution program: the jq body is not traceable through the jq subprocess; every action arm is covered via the import-plan specs)
     jq --argjson L "${_local_installed}" --argjson known "${_known_json}" '
         (.modules // [] | map({key: .name, value: (.synced // {})}) | from_entries) as $R
         | (($L | keys) + ($R | keys) | unique) as $names
@@ -299,6 +304,7 @@ state_io_import_plan() {
               end
           ]
     ' "${_in}"
+    # kcov-exclude-end
 }
 
 # ── Public: import apply ─────────────────────────────────────────────────────

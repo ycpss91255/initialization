@@ -22,6 +22,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Restored the merged unit-coverage AC-17 gate above 80%** (`test/unit/module/custom-hosts-sync_spec.bats`,
+  `test/unit/config_spec.bats`, `test/unit/state_io_spec.bats`,
+  `test/unit/tui_backend_branches_spec.bats`, plus `kcov-exclude` markers in
+  `lib/config.sh` / `lib/state_io.sh` / `lib/tui_backend.sh`): merged unit
+  coverage had slipped to 79.89% after narrow-matrix PR merges landed
+  undercovered code (those runs report coverage but do not enforce the gate).
+  New behavioral unit tests exercise the previously-untested lifecycle of the
+  `custom-hosts-sync` module (`detect` / `upgrade` / `remove` / `purge` /
+  `verify` / `is_outdated` / `doctor`, network + systemd boundary stubbed) —
+  taking that module from 57.9% to ~94% — and cover the library source-guard
+  and jq-unavailable branches of `lib/config.sh` / `lib/state_io.sh` and the
+  `lib/tui_backend.sh` source guard. The awk/jq program bodies in those three
+  libs are wrapped in the repo's existing `kcov-exclude` markers because kcov
+  cannot trace lines executed inside an awk/jq subprocess (it counts every such
+  string-literal line as never-hit, the same artifact the i18n data tables are
+  already excluded for) — their behaviour stays covered through the public
+  interface. Also regenerated the drifted module count in `doc/module/INDEX.md`
+  (45 -> 46) that a prior narrow-matrix merge left stale.
 - **`claude-ls` session helper enumerates directory-type sessions and emits
   per-session metadata** (`module/config/fish/_claude_sessions.py`, issue #161):
   the helper now visits UUID-named session *directories* (subagent runs with

@@ -3,7 +3,7 @@
 
 # Module Index
 
-45 modules. Columns come from each module's metadata block
+46 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.

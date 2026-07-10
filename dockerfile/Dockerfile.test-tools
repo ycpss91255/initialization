@@ -114,9 +114,12 @@ RUN apk add --no-cache curl xz && \
 #                        sshd + sftp-server for the sync-receiver compose
 #                        service (profile sync-e2e) — both run this image
 #   - python3            [init_ubuntu addition] the fish claude-ls/claude-rm
-#                        helpers shell out to a repo-shipped python script
-#                        (module/config/fish/_claude_sessions.py, issue #161);
-#                        the interpreter is needed to unit-test that helper
+#                        helpers render the Claude session list via python3
+#                        (module/config/fish/_claude_sessions.py, issue #161;
+#                        claude-ls flags/columns/sort, issue #163); their unit
+#                        specs drive the real functions so the renderer is
+#                        exercised end-to-end rather than mocked, which needs
+#                        the interpreter present in the image
 FROM alpine:latest
 RUN apk add --no-cache \
         bash \
@@ -127,6 +130,7 @@ RUN apk add --no-cache \
         make \
         just \
         fish \
+        python3 \
         dialog ncurses-terminfo \
         newt \
         gum \
@@ -136,8 +140,7 @@ RUN apk add --no-cache \
         file \
         tar \
         openssl \
-        openssh \
-        python3
+        openssh
 
 # bats core + extensions (bats-support / bats-assert / bats-mock)
 COPY --from=bats-src /opt/bats /opt/bats
@@ -176,12 +179,12 @@ RUN bash --version >/dev/null && \
     just --version >/dev/null && \
     fish --version >/dev/null && \
     fish -c 'functions -q fishtape; or exit 1' && \
+    python3 --version >/dev/null && \
     (dialog --version 2>&1 | head -1 >/dev/null || true) && \
     (whiptail --version 2>&1 | head -1 >/dev/null || true) && \
     gum --version >/dev/null && \
     fzf --version >/dev/null && \
-    expect -v >/dev/null && \
-    python3 --version >/dev/null
+    expect -v >/dev/null
 
 WORKDIR /source
 ENTRYPOINT ["/bin/bash"]

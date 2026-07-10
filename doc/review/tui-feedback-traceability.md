@@ -219,7 +219,7 @@ in the feedback are all the whiptail Fallback tier.
 
 ## Round 2
 
-### Item 12 — Quick Setup entry: show Ubuntu version + platform + arch + hardware (neofetch-style)
+### Item 12 — Quick Setup entry: show Ubuntu version + platform + arch + hardware (fastfetch-style)
 
 - Decision: environment snapshot in Quick Setup.
 - Code: `setup_ubuntu_tui.sh:802-812` `_tui_screen_quick_setup` Step 1/4 renders
@@ -228,7 +228,7 @@ in the feedback are all the whiptail Fallback tier.
   `tui_system_summary` (`lib/tui_backend.sh:1223-1232`) emits only os id+version,
   gpu model/vendor, desktop, session_type as ONE line
   (e.g. `Ubuntu 24.04 / NVIDIA RTX 4090 / GNOME / x11`). It does NOT include
-  `arch`, `cpu.vendor`, or `board`, and is not a neofetch-style multi-field table.
+  `arch`, `cpu.vendor`, or `board`, and is not a fastfetch-style multi-field table.
 - Test: partial. `harness/smoke_flow_fzf.exp` asserts `Form factor: desktop`
   appears in Quick Setup (via `tui_smoke_spec.bats:142`), but NOT os version, NOT
   arch, NOT hardware. `test/unit/tui_backend_spec.bats`
@@ -354,16 +354,19 @@ in the feedback are all the whiptail Fallback tier.
 - Verdict: FIXED+TESTED. Minor gap: no gpg-specific empty-list assertion (the
   gpg empty path uses the same shared function tested for token + ssh).
 
-### Item 18 — System Info: full hardware (neofetch-like); 1-3s wait normal?; override doesn't show OLD detected value; Run screen "由 ? 連帶安裝"
+### Item 18 — System Info: full hardware (fastfetch-like); 1-3s wait normal?; override doesn't show OLD detected value; Run screen "由 ? 連帶安裝"
 
 Four sub-points; audited separately.
 
-- 18a Full hardware / neofetch-like: `_tui_screen_system_info`
+- 18a Full hardware / fastfetch-like: `_tui_screen_system_info`
   (`setup_ubuntu_tui.sh:391`) forks `setup_ubuntu detect` (text), whose table
   includes `arch`, `cpu.vendor`, `gpu.vendor`, `gpu.model`, `board`,
   `form_factor`, virt/wsl. So hardware fields ARE shown, but it is the raw
-  `detect` table, not a fuller neofetch-style breakdown (no CPU model, RAM, or
+  `detect` table, not a fuller fastfetch-style breakdown (no CPU model, RAM, or
   disk). PARTIAL; and no test drives this screen.
+  - Tooling note (issue #325): the reference system-info tool is now
+    `fastfetch` (the archived neofetch is retired). The planned tmux status-bar
+    system-info popup should bind to `fastfetch`, not neofetch, once implemented.
 - 18b 1-3s wait: NOT eliminated. System Info re-forks `setup_ubuntu detect`
   fresh on every entry (`:391`) — running the full probe (lspci /
   systemd-detect-virt) again — instead of reusing the cached
@@ -405,7 +408,7 @@ Four sub-points; audited separately.
 | 9  | Environment auto-detected on TUI open | FIXED+TESTED |
 | 10 | Review dependency provenance | FIXED+TESTED |
 | 11 | Full detail + dependencies per item | FIXED+TESTED |
-| 12 | Quick Setup neofetch-style env | PARTIAL |
+| 12 | Quick Setup fastfetch-style env | PARTIAL |
 | 13 | apt-essentials split + one-per-line + detail UX | PARTIAL |
 | 14 | Recommended count repeat + D4 preselect | FIXED+TESTED |
 | 15 | i18n label alignment (基礎工具 vs Base 模組) | NOT-FIXED |
@@ -461,7 +464,7 @@ Total: 18.
 3. Item 18b: should System Info reuse `tui_broker_detect_json` (render the text
    table from the cached JSON) to remove the re-probe wait, or is re-detection on
    the System Info screen intentional (fresh reading)?
-4. Item 18c / Item 12: is a fuller neofetch-style hardware panel (CPU model, RAM,
+4. Item 18c / Item 12: is a fuller fastfetch-style hardware panel (CPU model, RAM,
    disk) in scope for 0.1.0, or is the current `detect` field set the accepted
    surface? The override-shows-old-value ask (18c) is small (interpolate the
    detected form_factor into `override_question`).

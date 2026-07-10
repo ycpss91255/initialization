@@ -193,8 +193,8 @@ git config --global core.editor "editor"
 # jq
 cat <JSON_PATH> | jq '.'
 
-# neofetch
-neofetch
+# fastfetch
+fastfetch
 
 # net-tools
 ifconfig
@@ -477,8 +477,8 @@ git config --global core.editor "editor"
 # jq
 cat <JSON_PATH> | jq '.'
 
-# neofetch
-neofetch
+# fastfetch
+fastfetch
 
 # gpustat
 gpustat

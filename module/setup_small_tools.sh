@@ -65,7 +65,6 @@ function _install_normal_pkgs() {
 
         "net-tools"
         "ncdu"
-        "neofetch"
         "tree"
         "silversearcher-ag"
         "xdg-utils"
@@ -336,7 +335,21 @@ function _install_obs() {
     apt_pkg_manager --install -- "obs-studio"
 }
 
+function _install_fastfetch() {
+    # fastfetch is the maintained replacement for the archived upstream tool it
+    # supersedes (issue #325). It is NOT in the Ubuntu 24.04 "noble"
+    # repositories: the apt package only lands in Ubuntu 25.04+ / Debian 13+.
+    # Add the maintained PPA when apt cannot see the package yet; on 25.04+ it
+    # is already available and the PPA step is skipped.
+    log_info "Install fastfetch..."
+    if ! apt-cache show fastfetch &>/dev/null; then
+        exec_cmd "sudo add-apt-repository -y ppa:zhangsongcui3371/fastfetch"
+    fi
+    apt_pkg_manager --install -- "fastfetch"
+}
+
 _install_normal_pkgs
+_install_fastfetch
 _install_submodule_tool
 _install_ssh_pkgs
 _install_git_pkgs

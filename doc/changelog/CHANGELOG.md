@@ -30,6 +30,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+
+### Changed
+
+- **`fastfetch` replaces the archived `neofetch`** (issue #325): the small-tools
+  tooling (`small-tools/install.sh`, `small-tools/remove.sh`,
+  `module/setup_small_tools.sh`) now installs/removes `fastfetch`, the actively
+  maintained drop-in system-info tool, instead of the retired upstream. Because
+  `fastfetch` is not in the Ubuntu 24.04 "noble" repositories (the apt package
+  only lands in Ubuntu 25.04+ / Debian 13+), the tooling adds the maintained
+  `ppa:zhangsongcui3371/fastfetch` PPA; the README records the PPA path, the
+  native `apt` path for 25.04+, and the `.deb` GitHub-release fallback. Docs and
+  the TUI System Info wording no longer name the retired neofetch as the
+  reference tool.
+
 ### Fixed
 
 - **`backup_file` no longer aborts config re-runs/upgrades when `BACKUP_DIR`

@@ -113,12 +113,13 @@ RUN apk add --no-cache curl xz && \
 #                        ssh/scp client for the sender ci container AND
 #                        sshd + sftp-server for the sync-receiver compose
 #                        service (profile sync-e2e) — both run this image
-#   - python3            [init_ubuntu addition] the claude-ls fish tool
-#                        (module/config/fish/functions/claude-ls.fish, #163)
-#                        renders its session list with an inline python3
-#                        program; its unit spec drives the real function so
-#                        the renderer (flags, columns, sort) is exercised
-#                        end-to-end rather than mocked
+#   - python3            [init_ubuntu addition] the fish claude-ls/claude-rm
+#                        helpers render the Claude session list via python3
+#                        (module/config/fish/_claude_sessions.py, issue #161;
+#                        claude-ls flags/columns/sort, issue #163); their unit
+#                        specs drive the real functions so the renderer is
+#                        exercised end-to-end rather than mocked, which needs
+#                        the interpreter present in the image
 FROM alpine:latest
 RUN apk add --no-cache \
         bash \
@@ -139,7 +140,8 @@ RUN apk add --no-cache \
         file \
         tar \
         openssl \
-        openssh
+        openssh \
+        python3
 
 # bats core + extensions (bats-support / bats-assert / bats-mock)
 COPY --from=bats-src /opt/bats /opt/bats
@@ -183,7 +185,8 @@ RUN bash --version >/dev/null && \
     (whiptail --version 2>&1 | head -1 >/dev/null || true) && \
     gum --version >/dev/null && \
     fzf --version >/dev/null && \
-    expect -v >/dev/null
+    expect -v >/dev/null && \
+    python3 --version >/dev/null
 
 WORKDIR /source
 ENTRYPOINT ["/bin/bash"]

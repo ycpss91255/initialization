@@ -15,9 +15,13 @@ function claude-rm --description 'Trash Claude Code session(s) by customTitle or
 
         set -l found
 
-        # 1. Try exact customTitle match first (only .jsonl files have titles)
+        # 1. Try exact customTitle match first (only .jsonl files have titles).
+        #    Scan the first 50 lines, matching _claude_sessions.py: fork /
+        #    resumed sessions carry customTitle on a later line (line 1 is
+        #    leafUuid / permissionMode / a file-history snapshot), so a
+        #    first-line-only read misses them (issue #33).
         for f in ~/.claude/projects/*/*.jsonl
-            set -l title (head -1 $f 2>/dev/null | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('customTitle',''))" 2>/dev/null)
+            set -l title (head -50 $f 2>/dev/null | grep -m1 '"customTitle"' | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('customTitle',''))" 2>/dev/null)
             if test -n "$title"; and test "$title" = "$target"
                 set -l base (string replace -r '\.jsonl$' '' $f)
                 if not contains -- $base $found

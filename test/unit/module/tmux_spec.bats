@@ -408,13 +408,24 @@ _TMUX_CONF() { printf '%s' "${MODULE_DIR}/config/tmux/tmux.conf"; }
 
 # ── Config drop (module-specific) ────────────────────────────────────────────
 
-@test "install drops the repo tmux.conf to HOME/.tmux.conf" {
+@test "install drops the repo tmux.conf to HOME/.config/tmux/tmux.conf (XDG, issue #138)" {
     _use_scratch_home
     _load_module
     _mock_apt_defaults
     install
-    [[ -f "${HOME}/.tmux.conf" ]]
-    diff -q "${MODULE_DIR}/config/tmux/tmux.conf" "${HOME}/.tmux.conf"
+    [[ -f "${HOME}/.config/tmux/tmux.conf" ]]
+    diff -q "${MODULE_DIR}/config/tmux/tmux.conf" "${HOME}/.config/tmux/tmux.conf"
+}
+
+@test "issue #138: install writes the XDG path, not the legacy HOME/.tmux.conf" {
+    _use_scratch_home
+    _load_module
+    _mock_apt_defaults
+    install
+    # The reload binding inside tmux.conf sources the XDG path; the install
+    # target must match it so the repo and host stop diverging.
+    [[ -f "${HOME}/.config/tmux/tmux.conf" ]]
+    [[ ! -e "${HOME}/.tmux.conf" ]]
 }
 
 @test "install copies the tmux-powerline bundle under HOME/.tmux" {
@@ -426,16 +437,18 @@ _TMUX_CONF() { printf '%s' "${MODULE_DIR}/config/tmux/tmux.conf"; }
     [[ -f "${HOME}/.tmux/tmux-powerline/config.sh" ]]
 }
 
-@test "install backs up a pre-existing HOME/.tmux.conf to BACKUP_DIR" {
+@test "install backs up a pre-existing HOME/.config/tmux/tmux.conf to BACKUP_DIR" {
     _use_scratch_home
     _load_module
     _mock_apt_defaults
     _use_backup_dir
-    printf '# user-local tweaks\n' > "${HOME}/.tmux.conf"
+    mkdir -p "${HOME}/.config/tmux"
+    printf '# user-local tweaks\n' > "${HOME}/.config/tmux/tmux.conf"
     install
-    [[ -f "${BACKUP_DIR}/.tmux.conf" ]]
-    [[ "$(cat "${BACKUP_DIR}/.tmux.conf")" == "# user-local tweaks" ]]
-    diff -q "${MODULE_DIR}/config/tmux/tmux.conf" "${HOME}/.tmux.conf"
+    # backup_file copies by basename into BACKUP_DIR.
+    [[ -f "${BACKUP_DIR}/tmux.conf" ]]
+    [[ "$(cat "${BACKUP_DIR}/tmux.conf")" == "# user-local tweaks" ]]
+    diff -q "${MODULE_DIR}/config/tmux/tmux.conf" "${HOME}/.config/tmux/tmux.conf"
 }
 
 @test "install warns but succeeds when the config source dir is missing" {
@@ -448,14 +461,15 @@ _TMUX_CONF() { printf '%s' "${MODULE_DIR}/config/tmux/tmux.conf"; }
     [[ ! -e "${HOME}/.tmux.conf" ]]
 }
 
-@test "upgrade re-drops the config over a locally modified HOME/.tmux.conf" {
+@test "upgrade re-drops the config over a locally modified HOME/.config/tmux/tmux.conf" {
     _use_scratch_home
     _load_module
     _mock_apt_defaults
     _use_backup_dir
-    printf '# drifted local copy\n' > "${HOME}/.tmux.conf"
+    mkdir -p "${HOME}/.config/tmux"
+    printf '# drifted local copy\n' > "${HOME}/.config/tmux/tmux.conf"
     upgrade
-    diff -q "${MODULE_DIR}/config/tmux/tmux.conf" "${HOME}/.tmux.conf"
+    diff -q "${MODULE_DIR}/config/tmux/tmux.conf" "${HOME}/.config/tmux/tmux.conf"
 }
 
 @test "purge removes every CONFIG_PATHS entry (archetype + tmux data)" {

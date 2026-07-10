@@ -3,7 +3,7 @@
 
 # Module Index
 
-39 modules. Columns come from each module's metadata block
+44 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -15,6 +15,7 @@ to the module source.
 | [build-essential](../../module/build-essential.module.sh) | base | build | build-essential — C/C++ compiler toolchain metapackage (gcc, g++, make) |
 | [claude-code-config](../../module/claude-code-config.module.sh) | optional | agent config dotfile | Personal Claude Code settings (~/.claude: settings.json + statusline) |
 | [claude-code](../../module/claude-code.module.sh) | optional | agent | Anthropic Claude Code CLI agent (official native installer, self-updating) |
+| [claude-monitor](../../module/claude-monitor.module.sh) | optional | agent cli | claude-monitor — real-time Claude Code token/cost usage monitor TUI (pipx) |
 | [codex](../../module/codex.module.sh) | optional | agent | codex — OpenAI Codex CLI coding agent |
 | [curl](../../module/curl.module.sh) | base | http | curl — command-line tool for transferring data with URLs (apt curl package) |
 | [docker](../../module/docker.module.sh) | recommended | container devops | Docker Engine + Compose plugin |
@@ -27,22 +28,26 @@ to the module source.
 | [gemini](../../module/gemini.module.sh) | optional | agent | gemini — Google Gemini CLI coding agent (npm install via fnm-managed Node.js) |
 | [git-config](../../module/git-config.module.sh) | recommended | config git dotfile | Personal ~/.gitconfig (aliases, delta diff, rebase pull, ...) |
 | [git](../../module/git.module.sh) | base | vcs | git — distributed version control system (apt git package) |
+| [glow](../../module/glow.module.sh) | optional | cli-essentials | glow — render markdown on the CLI (yazi markdown-preview dependency) |
 | [gum](../../module/gum.module.sh) | optional | cli-essentials tui | gum — a tool for glamorous shell scripts (preferred modern TUI backend) |
 | [htop](../../module/htop.module.sh) | base | monitor | htop — interactive process viewer (apt htop package) |
 | [jetson-stats](../../module/jetson-stats.module.sh) | optional | hardware | jetson-stats — jtop monitor TUI for NVIDIA Jetson (iGPU, nvpmodel, clocks, fan) |
 | [jq](../../module/jq.module.sh) | base | cli core | jq — command-line JSON processor (apt jq package) |
+| [kvm](../../module/kvm.module.sh) | optional | virtualization vm | KVM / libvirt / QEMU virtualization stack + virt-manager |
 | [lazydocker](../../module/lazydocker.module.sh) | optional | cli-essentials | lazydocker — terminal UI (TUI) for Docker and docker compose |
 | [lazygit](../../module/lazygit.module.sh) | optional | cli-essentials | lazygit — terminal UI for git commands |
+| [libreoffice](../../module/libreoffice.module.sh) | optional | office gui | LibreOffice office suite (fresh releases via ppa:libreoffice/ppa) |
 | [lnav](../../module/lnav.module.sh) | optional | logs | lnav — log file navigator for the terminal (apt package + lnav_pkg config bundle) |
 | [neovim](../../module/neovim.module.sh) | recommended | editor cli | Neovim editor + nvimdots personal config |
 | [notion](../../module/notion.module.sh) | optional | notes | Notion desktop app (unofficial notion-electron .deb client) |
 | [nvidia-driver](../../module/nvidia-driver.module.sh) | optional | gpu nvidia hardware | NVIDIA proprietary driver (auto-detected recommended version via ubuntu-drivers) |
 | [qmk-firmware](../../module/qmk-firmware.module.sh) | optional | hardware | QMK firmware dev environment — qmk CLI (pipx) + toolchain + qmk_firmware checkout |
-| [ranger](../../module/ranger.module.sh) | optional | filemgr | ranger — console file manager with vi key bindings + managed rifle.conf opener rules |
 | [ripgrep](../../module/ripgrep.module.sh) | optional | cli-essentials | ripgrep (rg) — fast, recursive grep alternative (apt ripgrep package) |
 | [shell](../../module/shell.module.sh) | recommended | shell core | Shell session basics: ssh client, keychain, xclip |
 | [ssh-config](../../module/ssh-config.module.sh) | optional | config ssh dotfile | Personal ~/.ssh/config templates (per-host alias and key map) |
 | [tmux](../../module/tmux.module.sh) | recommended | terminal multiplexer | Terminal multiplexer + powerline config |
+| [tmuxp](../../module/tmuxp.module.sh) | optional | terminal session | tmuxp — tmux session manager (freeze/restore sessions from YAML), pipx-managed |
+| [trash-maintenance](../../module/trash-maintenance.module.sh) | optional | maintenance trash cron | Daily trash cleanup: age + size cap (single source of truth vs GNOME auto-delete) |
 | [unzip](../../module/unzip.module.sh) | base | archive | unzip — extractor for .zip archives (apt unzip package) |
 | [vim](../../module/vim.module.sh) | base | editor | vim — Vi IMproved terminal text editor (apt vim package) |
 | [vscode](../../module/vscode.module.sh) | optional | editor | Visual Studio Code — Microsoft's GUI code editor (Microsoft apt repo) |

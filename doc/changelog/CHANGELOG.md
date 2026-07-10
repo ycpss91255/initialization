@@ -94,6 +94,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   with sudo and installs the script, unit, timer, and udev rule; nothing holds
   a username or home path (power state is read from `/sys/class/power_supply`,
   overridable via `$POWER_SUPPLY_ROOT` for tests).
+- **`nas-mount` module — CIFS/SMB NAS auto-mount** (`module/nas-mount.module.sh`,
+  issue #311): installs the mount driver (`cifs-utils`), the on-demand
+  automounter (`autofs`), and the discovery/check tool (`smbclient`). When the
+  site-specific NAS parameters are supplied at runtime via environment
+  (`INIT_UBUNTU_NAS_HOST` / `_SHARE` / `_USER`, optional `_PASSWORD` /
+  `_MOUNT_BASE` / `_CREDENTIALS`), `install` wires an autofs indirect map so the
+  share mounts on access; otherwise it installs the packages and prints a hint.
+  Credentials stay out of the repo — an existing credentials file is reused or
+  one is generated from `INIT_UBUNTU_NAS_PASSWORD`, always forced to
+  `chmod 600`; no host/user/password is ever hardcoded. `verify` smoke-tests
+  `mount.cifs` + `smbclient`; `remove`/`purge` unwire the maps (purge also wipes
+  the credentials). Never auto-selected in Quick Setup (needs site credentials).
 - **`f5-split-dns` tool** (`tool/f5-split-dns/`, issue #146): a per-user opt-in
   tool that pins the company DNS server plus a `~<COMPANY_DOMAIN>` routing domain
   onto the F5 BIG-IP Edge VPN interface (`tun0`) via `resolvectl`, so
@@ -282,6 +294,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+- **`custom-hosts-sync` module** (`module/custom-hosts-sync.module.sh` +
+  `module/config/custom-hosts-sync/`, issue #145): keeps custom `/etc/hosts`
+  name->IP entries from being reverted by the F5 BIG-IP Edge VPN client
+  (`svpn`), which snapshots `/etc/hosts` on connect and restores it wholesale
+  on disconnect/reboot. A systemd `.path` unit watches `/etc/hosts` and the
+  user master list (`~/.config/hosts-custom/hosts.custom`) and re-merges the
+  master list into an idempotent managed block whenever either changes, so a
+  revert is corrected within seconds and edits to the master list apply on
+  save. The sync script writes only when content actually changes (never loops
+  on its own inotify event) and leaves the F5 gateway line untouched. The
+  committed script and `.path` unit carry a `__USER_HOME__` placeholder that
+  `install()` substitutes with the real `$HOME` at deploy time, so no username
+  is hardcoded in version control. Optional module, `svpn`-gated
+  `is_recommended`.
 - **Module-iterating contract-conformance meta-test**
   (`test/unit/module/contract_conformance_spec.bats`): a single meta-test that
   DISCOVERS every `module/*.module.sh` dynamically (so new/edited modules are

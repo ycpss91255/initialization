@@ -2,24 +2,6 @@
 
 [] add clean ai agent log and session
 
-• 可以用 ranger 的 --choosedir 功能，退出時把最後目錄寫到暫存檔，再讓 shell cd 過去。
-
-  範例（bash/zsh）：
-
-  # 放到 ~/.bashrc 或 ~/.zshrc
-  r() {
-    local tempfile
-    tempfile="$(mktemp -t ranger-cd.XXXXXX)"
-    ranger --choosedir="$tempfile" "$@"
-    if [ -f "$tempfile" ]; then
-      local dir
-      dir="$(cat "$tempfile")"
-      rm -f "$tempfile"
-      [ -n "$dir" ] && cd "$dir"
-    fi
-  }
-
-  之後用 r 進入 ranger，按 q 退出就會切到 ranger 最後所在路徑。
 ## 修復筆電合蓋黑畫面
 
 1. 進入 TTY 終端：在黑畫面按 `Ctrl + Alt + F2`，輸入帳號密碼登入
@@ -176,20 +158,31 @@ ExecStart=/usr/bin/gnome-keyring-daemon --foreground --components=secrets --cont
 `rm` 在 fish 走 `trash-put`（`module/config/fish/functions/rm.fish`），垃圾桶 trash-cli 沒有原生容量上限，需要靠排程清理。
 
 ### 維護腳本
-`tool/trash-maintenance.sh`：
-1. `trash-empty -f $MAX_DAYS` 砍掉超過 N 天的項目
+現在由 v2 module `module/trash-maintenance.module.sh` 管理（原 `tool/trash-maintenance.sh`
+已移除，module 為唯一來源）。install 會把修正過的腳本
+`module/config/trash-maintenance/trash-maintenance.sh` 部署到 `~/.local/bin/`、寫入
+每日 crontab，並 disable GNOME 自帶的 trash auto-delete（見下）。
+
+腳本邏輯：
+1. `trash-empty $MAX_DAYS` 砍掉超過 N 天的項目（#277：不再傳 `-f` — 舊版 trash-cli
+   0.17.x 根本沒有這個選項會直接報錯，新版則等同 no-op）
 2. 若 `~/.local/share/Trash/files` 仍超過 `$MAX_GB`，從 `info/*.trashinfo` 的 mtime 最舊的開始砍直到低於上限
-3. 預設 `MAX_DAYS=90`、`MAX_GB=50`，可用環境變數覆蓋
+3. 預設 `MAX_DAYS=90`、`MAX_GB=30`，可用環境變數覆蓋（#277：預設由 50 降為 30）
+
+> #277 另一個修正：`current_kb()` 過去在 `du` 遇到 permission-denied 子路徑時會非
+> 0 退出，配合 `set -euo pipefail` 讓整個腳本在容量比較前就中止（size cap 完全沒
+> 執行到）。現在會擷取 `du` 印出的部分總量並吞掉失敗的 exit code（缺值時預設 0），
+> 保證一定會跑到 size-cap 比較與逐出迴圈。
 
 ### 部署位置
-| 機器 | 腳本 | 排程 | 額外 |
+| 機器 | 部署 | 排程 | 額外 |
 |---|---|---|---|
-| local (這台) | `~/.local/bin/trash-maintenance.sh` → repo symlink | crontab 每日 03:00 | GNOME Privacy 也開了 90 天 auto-delete（`gsettings set org.gnome.desktop.privacy {remove-old-trash-files true, old-files-age uint32 90}`）|
-| `core.yunchien-server` | `~/.local/bin/trash-maintenance.sh`（實體 copy）| crontab 每日 03:00 | 無 GUI，純靠 cron |
+| local (這台) | `setup_ubuntu install trash-maintenance`（部署 `~/.local/bin/trash-maintenance.sh`）| crontab 每日 03:00 | GNOME 自帶 trash auto-delete 由 module 明確 **關閉**（`remove-old-trash-files false`），避免第二條清理路徑（#275）|
+| `core.yunchien-server` | 同上（無 GUI，gsettings 部分自動略過）| crontab 每日 03:00 | 無 GUI，純靠 cron |
 
-兩邊 cron 一致：
+兩邊 cron 一致（由 module 寫入，帶 `# init_ubuntu:trash-maintenance` 標記）：
 ```
-0 3 * * * $HOME/.local/bin/trash-maintenance.sh >> $HOME/.local/state/trash-maintenance.log 2>&1
+0 3 * * * $HOME/.local/bin/trash-maintenance.sh >> $HOME/.local/state/trash-maintenance.log 2>&1 # init_ubuntu:trash-maintenance
 ```
 
 ### 手動驗證 / 操作
@@ -197,8 +190,8 @@ ExecStart=/usr/bin/gnome-keyring-daemon --foreground --components=secrets --cont
 # 看目前大小（files/ = 真實垃圾，info/ = metadata，expunged/ = 砍不掉的殘骸）
 du -sh ~/.local/share/Trash/{files,info,expunged}
 
-# 立刻跑一次（dry-run 看會做什麼）
-MAX_GB=50 MAX_DAYS=90 bash -x ~/.local/bin/trash-maintenance.sh
+# 立刻跑一次（bash -x 看會做什麼；不要再傳 -f）
+MAX_GB=30 MAX_DAYS=90 bash -x ~/.local/bin/trash-maintenance.sh
 
 # 看 cron 紀錄
 tail -f ~/.local/state/trash-maintenance.log
@@ -222,17 +215,14 @@ sudo apt-get install -y trash-cli
 mkdir -p ~/.config/fish/functions
 cp module/config/fish/functions/rm.fish ~/.config/fish/functions/
 
-# 3. 部署維護腳本（headless 機器用 copy；有 repo 的機器可 symlink）
-mkdir -p ~/.local/bin ~/.local/state
-cp tool/trash-maintenance.sh ~/.local/bin/
-chmod +x ~/.local/bin/trash-maintenance.sh
+# 3. 部署 + 排程維護腳本，並（有 GNOME 的話）關閉 GNOME 自帶 auto-delete
+#    ── 一步到位：install 會部署 ~/.local/bin/trash-maintenance.sh、寫入每日
+#       crontab，並 disable org.gnome.desktop.privacy remove-old-trash-files。
+setup_ubuntu install trash-maintenance
+#    或單檔獨立執行：bash module/trash-maintenance.module.sh install
 
-# 4. 安裝 crontab
-(crontab -l 2>/dev/null; echo "0 3 * * * \$HOME/.local/bin/trash-maintenance.sh >> \$HOME/.local/state/trash-maintenance.log 2>&1") | crontab -
-
-# 5.（有 GNOME 的話）開 Privacy 90 天 auto-delete
-gsettings set org.gnome.desktop.privacy remove-old-trash-files true
-gsettings set org.gnome.desktop.privacy old-files-age 'uint32 90'
+# 注意：GNOME 自帶的 trash auto-delete 現在是**關閉**的（#275），讓
+# module 成為 trash 保留策略的唯一來源；不要再手動開 remove-old-trash-files。
 ```
 
 ## ADD items
@@ -241,10 +231,10 @@ gsettings set org.gnome.desktop.privacy old-files-age 'uint32 90'
   [] sudo apt install cifs-utils autofs (driver)
   [] sudo apt install smbclient (check tool)
     - smbclient -L <IP> -U <USER>
-[] libreoffice
+[x] libreoffice  # module/libreoffice.module.sh (issue #312)
   - sudo add-apt-repository ppa:libreoffice/ppa
 [] claude code
-  [] pipx install claude-monitor
+  [x] pipx install claude-monitor  # module/claude-monitor.module.sh (issue #315)
 - tmuxp
   [] sudo apt remove tmuxp python3-libtmux
   [] pipx install tmuxp
@@ -300,17 +290,3 @@ cc-statusline 的 README 建議 `statusLine.command` 寫 `node ${CLAUDE_PLUGIN_R
 依賴：`gio`（GNOME, Ubuntu 預裝）、`python3`。
 
 https://gist.github.com/coodoo/4ccb8e9ab3f5b586f9beb8b7ef5f6d75
-
-- KVM stack
-# 裝 KVM stack
-sudo apt install qemu-kvm libvirt-daemon-system libvirt-clients \
-                 bridge-utils virt-manager ovmf
-
-# 把你自己加進 libvirt / kvm group
-sudo usermod -aG libvirt,kvm $USER
-
-# 登出再登入（或 newgrp libvirt）
-
-# 驗證
-virsh list --all    # 應該能跑，不報錯
-kvm-ok              # 應該說 "KVM acceleration can be used"

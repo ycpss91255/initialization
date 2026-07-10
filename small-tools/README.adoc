@@ -162,9 +162,6 @@ sudo arp-scan --interface=<DERVICE> --localnet
 # powerstat
 sudo powerstat
 
-# ranger
-ranger [FOLDER_PATH]
-
 # silversearcher-ag
 ag replace grep
 
@@ -172,8 +169,10 @@ ag replace grep
 tig [--all]
 tig status
 
-# tldr
+# tldr (tealdeer client)
 tldr <COMMAND>
+# language override: capital -L (lowercase -l is --list); code uses '_' e.g. zh_TW
+tldr -L zh <COMMAND>
 
 # tree
 tree [FOLDER_PATH]

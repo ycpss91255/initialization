@@ -107,9 +107,6 @@ nmap <IP>/<MASK>
 # powerstat
 sudo powerstat
 
-# ranger
-ranger [FOLDER_PATH]
-
 # silversearcher-ag
 ag 取代 grep
 
@@ -117,8 +114,10 @@ ag 取代 grep
 tig [--all]
 tig status
 
-# tldr
+# tldr (tealdeer 用戶端)
 tldr <COMMAND>
+# 語言參數為大寫 -L（小寫 -l 是 --list）；代碼用底線，例如 zh_TW
+tldr -L zh <COMMAND>
 
 # tree
 tree [FOLDER_PATH]

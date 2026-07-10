@@ -1,0 +1,15 @@
+[Unit]
+Description=Split-DNS for the internal domain over F5 VPN (tun0)
+# Only meaningful while tun0 exists; stop when the interface goes away.
+After=sys-subsystem-net-devices-tun0.device
+BindsTo=sys-subsystem-net-devices-tun0.device
+
+[Service]
+Type=oneshot
+# $F5_SPLIT_DNS_CONF is provided by a per-install drop-in (10-config-path.conf),
+# so the user's config path is derived at install time, never hardcoded here.
+ExecStart=/usr/local/sbin/f5-split-dns.sh tun0
+
+[Install]
+# Key line: start this service every time the tun0 interface is created.
+WantedBy=sys-subsystem-net-devices-tun0.device

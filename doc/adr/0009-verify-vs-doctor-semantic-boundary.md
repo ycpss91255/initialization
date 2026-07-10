@@ -1,7 +1,39 @@
 # ADR-0009: verify is post-install acceptance, doctor is runtime health
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-07-10)
 - **Date:** 2026-05-20
+
+## Amendment (2026-07-10) — the shipped-and-real model
+
+A 2026-07-10 design consolidation pinned the model that actually ships. It
+keeps the core split (verify = post-install acceptance, doctor = on-demand
+runtime health) but **replaces the offline/online elaboration below with a
+simpler, real contract**:
+
+- **`doctor()` default** (`module_default_doctor`) = `is_installed` **AND**
+  (if `TEST_VERIFY_CMD` is set) `TEST_VERIFY_CMD`; either failing returns
+  non-zero. It reuses verify's acceptance probe as the read-only, offline
+  runtime-health baseline. Modules with a **real runtime surface** (daemon,
+  group membership, config validity, e.g. `docker`) **override** `doctor()`
+  with genuine checks.
+- **`verify()` default** (`module_default_verify`) is unchanged: `is_installed`
+  + optional `TEST_VERIFY_CMD`, run inside the install/upgrade chain.
+- **`setup_ubuntu doctor <module>`** (and `bash module/<name>.module.sh
+  doctor`) runs that per-module runtime-health `doctor()`.
+- **`setup_ubuntu doctor`** with **no module argument** is a different thing:
+  the engine dispatcher's system **state-vs-host DRIFT report** (existing
+  behavior), not a fan-out of every module's `doctor()`.
+
+**NOT ADOPTED (superseded by the above):** the "### `doctor()` — runtime
+health" two-layer local/network split, the "### Offline default" section with
+its `INIT_UBUNTU_DOCTOR_ONLINE` / `--online` flag, the network-check code
+block, and **exit code 7** for a network-check failure. These were an
+elaboration that never shipped; `doctor` is read-only and offline by contract
+(no network calls, no `--online` mode, no exit 7). The `doctor() { verify; }`
+default in "### Default and override rule" is likewise superseded by the
+`is_installed` + `TEST_VERIFY_CMD` default above. Everything from "## Context"
+down is retained verbatim as the historical rationale for the boundary; treat
+the superseded pieces as history, not contract.
 
 ## Context
 
@@ -54,6 +86,10 @@ Pin the two functions to distinct purposes.
     - Daemon outbound connectivity (e.g. docker pull dry-run).
 
 ### Offline default
+
+> **SUPERSEDED (see Amendment 2026-07-10):** `--online` / exit-7 / the
+> network-check layer were NOT adopted. `doctor` is offline and read-only by
+> contract, full stop. The rest of this section is historical.
 
 `setup_ubuntu doctor` defaults to offline mode. Network checks are
 skipped. The engine sets `INIT_UBUNTU_DOCTOR_ONLINE=false` before

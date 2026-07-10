@@ -438,6 +438,37 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+- **Module-spec outward-interface sections** (`doc/module-spec.md` §11): the
+  authoritative fast-expand contract for the other template types — `tool/`
+  (sources `lib/tool_bootstrap.sh`), `.claude/hook/` (sources
+  `lib/hook_bootstrap.sh`), `lib/`, and bats `test/` — spelling out each type's
+  outward interface (args, exit codes, strict-mode, side-effect rules, required
+  test coverage). `tool_bootstrap.sh` / `hook_bootstrap.sh` are marked
+  forward-looking (the defined target interface the template-first program will
+  implement, not yet shipped).
+
+### Changed
+
+- **`doctor` default now runs `is_installed` AND `TEST_VERIFY_CMD`**
+  (`lib/module_helper.sh` `module_default_doctor`): the archetype default
+  runtime-health check reuses verify's acceptance probe (was `is_installed`
+  only), so `setup_ubuntu doctor <module>` and `bash module/<name>.module.sh
+  doctor` fail when the tool is installed but not runnable. Read-only and
+  offline by contract; modules with a real runtime surface still override
+  `doctor()`. TDD unit coverage added in `test/unit/module_helper_spec.bats`;
+  the archetype-default doctor specs for `batcat` / `build-essential` /
+  `ranger` / `vscode` were reconciled to the new contract (not weakened).
+- **`doc/module-spec.md` §4.1 finalized to "10 lifecycle functions, all
+  mandatory"** (ADR-0002), replacing the stale "5 mandatory + 5 optional"
+  framing; new §4.1.1 pins the verify-vs-doctor boundary and the per-module vs
+  no-arg (drift report) `doctor` distinction; stale `update` → `upgrade` and
+  "6 lifecycle" → all-8-defaultable references corrected to match the shipped
+  archetype macros (ADR-0027).
+- **ADR-0002 / ADR-0009 aligned to the shipped model**: ADR-0002 gains a
+  back-link to ADR-0027 and an updated `doctor`-default consequence; ADR-0009
+  is amended to the real doctor contract (`is_installed` + `TEST_VERIFY_CMD`;
+  override for a runtime surface; no-arg = drift report) and explicitly marks
+  its earlier offline/online + `--online` + exit-7 elaboration as NOT ADOPTED.
 
 ### Changed
 

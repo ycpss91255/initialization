@@ -182,8 +182,9 @@ _assert_phase_dry_run_all() {
 
 @test "template smoke: doctor has archetype-appropriate exit code" {
     # apt / github-release / config inherit module_default_doctor via the macro
-    # (is_installed + warn); on a not-installed smoke fixture it returns 1. The
-    # custom template leaves doctor commented out → CLI returns 2.
+    # (is_installed + TEST_VERIFY_CMD); on a not-installed smoke fixture
+    # is_installed fails first, so it returns 1. The custom template leaves
+    # doctor commented out → CLI returns 2.
     local _arch
     for _arch in "${ARCHETYPES[@]}"; do
         run bash "$(_smoke "${_arch}")" doctor

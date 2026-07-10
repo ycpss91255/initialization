@@ -606,6 +606,7 @@ tui_plan_deps() {
 tui_plan_provenance() {
     local _json="$1" _plan="$2"
     shift 2
+    # kcov-exclude-start (jq transitive-dependency provenance program: not traceable through the jq subprocess; covered by the tui_plan_provenance / review specs)
     jq -r --arg sel " $* " --arg plan "${_plan}" '
         (reduce .items[] as $m ({}; .[$m.name] = ($m.depends_on // []))) as $deps
         | def transitive($n):
@@ -626,6 +627,7 @@ tui_plan_provenance() {
             | "\($node)\treq:\($by // "?")"
           end
     ' <<<"${_json}"
+    # kcov-exclude-end
 }
 
 # Render a provenance map (tui_plan_provenance output) into human lines using
@@ -666,25 +668,31 @@ tui_summary_text() {
 # Non-empty categories present in the payload, canonical order (Q44:
 # empty CATEGORYs — experimental today — never reach the main menu).
 tui_categories() {
+    # kcov-exclude-start (jq program body: not traceable through the jq subprocess; covered by the tui_categories specs)
     jq -r --argjson order "${TUI_CATEGORY_ORDER}" '
         ([.items[].category] | unique) as $present
         | $order | map(select(. as $c | $present | index($c))) | .[]
     ' <<<"$1"
+    # kcov-exclude-end
 }
 
 # "<installed-count> <total>" for one category.
 tui_category_stats() {
+    # kcov-exclude-start (jq program body: not traceable through the jq subprocess; covered by the tui_category_stats specs)
     jq -r --arg c "$2" '
         [.items[] | select(.category == $c)]
         | "\([.[] | select(.installed == true)] | length) \(length)"
     ' <<<"$1"
+    # kcov-exclude-end
 }
 
 # Module names in one category, alphabetical (ADR-0019 sort order).
 tui_modules_in_category() {
+    # kcov-exclude-start (jq program body: not traceable through the jq subprocess; covered by the tui_modules_in_category specs)
     jq -r --arg c "$2" '
         [.items[] | select(.category == $c) | .name] | sort | .[]
     ' <<<"$1"
+    # kcov-exclude-end
 }
 
 # ── Sub-category structure (TAGS[0] grouping — shared between tiers) ──────────
@@ -695,10 +703,12 @@ tui_modules_in_category() {
 # both tiers consume (ADR-0024 D10) — tui_fzf_subtags is a thin wrapper.
 #   tui_subtags <list_json> <category>
 tui_subtags() {
+    # kcov-exclude-start (jq program body: not traceable through the jq subprocess; covered by the tui_subtags specs)
     jq -r --arg c "$2" '
         [.items[] | select(.category == $c) | (.tags[0] // "other")]
         | unique | sort | .[]
     ' <<<"$1"
+    # kcov-exclude-end
 }
 
 # How many distinct TAGS[0] buckets a category has (drives the "drill-down vs
@@ -715,10 +725,12 @@ tui_subtag_count() {
 #   tui_category_sel_stats <list_json> <category> <selected>
 tui_category_sel_stats() {
     local _sel=" ${3:-} "
+    # kcov-exclude-start (jq program body: not traceable through the jq subprocess; covered by the tui_category_sel_stats specs)
     jq -r --arg c "$2" --arg sel "${_sel}" '
         [.items[] | select(.category == $c)]
         | "\([.[] | .name as $n | select($sel | contains(" " + $n + " "))] | length) \(length)"
     ' <<<"$1"
+    # kcov-exclude-end
 }
 
 # "<selected> <total>" for one sub-category bucket (the sub-category menu row
@@ -726,20 +738,24 @@ tui_category_sel_stats() {
 #   tui_subcategory_sel_stats <list_json> <category> <subtag> <selected>
 tui_subcategory_sel_stats() {
     local _sel=" ${4:-} "
+    # kcov-exclude-start (jq program body: not traceable through the jq subprocess; covered by the tui_subcategory_sel_stats specs)
     jq -r --arg c "$2" --arg t "$3" --arg sel "${_sel}" '
         [.items[] | select(.category == $c) | select((.tags[0] // "other") == $t)]
         | "\([.[] | .name as $n | select($sel | contains(" " + $n + " "))] | length) \(length)"
     ' <<<"$1"
+    # kcov-exclude-end
 }
 
 # Module names in one (category, subtag) bucket, alphabetical — the page-replace
 # scope for the drill-down leaf.
 #   tui_modules_in_subcategory <list_json> <category> <subtag>
 tui_modules_in_subcategory() {
+    # kcov-exclude-start (jq program body: not traceable through the jq subprocess; covered by the tui_modules_in_subcategory specs)
     jq -r --arg c "$2" --arg t "$3" '
         [.items[] | select(.category == $c) | select((.tags[0] // "other") == $t) | .name]
         | sort | .[]
     ' <<<"$1"
+    # kcov-exclude-end
 }
 
 # Pure recommended pre-selection set (PRD D4): the is_recommended module names
@@ -781,6 +797,7 @@ tui_recommended_preselect_modules() {
 # sub-category drill-down leaf, ADR-0024 D10) — "" yields the whole category.
 tui_checklist_entries() {
     local _json="$1" _cat="$2" _selected=" ${3:-} " _subtag="${4:-}"
+    # kcov-exclude-start (jq basic-first ranking program: not traceable through the jq subprocess; grouping/rank/selection behaviour is covered by the tui_checklist_entries specs)
     jq -r --arg c "$2" --arg sel "${_selected}" --arg sub "${_subtag}" '
         # Direct forward deps per module name (over the WHOLE payload — a base
         # module is typically depended on from OTHER categories).
@@ -825,6 +842,7 @@ tui_checklist_entries() {
           + "\t"
           + (if ($sel | contains(" " + $n + " ")) then "on" else "off" end)
     ' <<<"$1"
+    # kcov-exclude-end
 }
 
 # ── In-memory selection accumulator (Q43) ────────────────────────────────────
@@ -937,6 +955,7 @@ tui_effective_form_factor() {
 #   _tui_qs_entries <list_json> category <category> <form>
 #   _tui_qs_entries <list_json> tag <tag> <form>
 _tui_qs_entries() {
+    # kcov-exclude-start (jq §15.3 filter-pipeline program: not traceable through the jq subprocess; the platform/enabled/recommended tri-state is covered by the tui_quick_setup specs)
     jq -r --arg key "$2" --arg v "$3" --arg f "$4" '
         [.items[]
          | select(if $key == "category"
@@ -949,6 +968,7 @@ _tui_qs_entries() {
         | "\(.name)\t\(.description)\t"
           + (if .enabled == true or .recommended == true then "on" else "off" end)
     ' <<<"$1"
+    # kcov-exclude-end
 }
 
 # §8.2.1 Step 2: recommended-category modules surviving the filter pipeline.
@@ -978,6 +998,7 @@ tui_qs_tag_entries() { _tui_qs_entries "$1" tag "$2" "$3"; }
 tui_installed_entries() {
     local _state="$1" _list="$2" _mode="${3:-flat}"
     local _marker; _marker="$(i18n_t TUI_BACKEND_I18N detail_unregistered_marker)"
+    # kcov-exclude-start (jq installed-rows program: not traceable through the jq subprocess; flat/grouped + unregistered-marker behaviour is covered by the tui_installed_entries specs)
     jq -r --argjson list "${_list}" --arg mode "${_mode}" --arg mark "${_marker}" '
         ([$list.items[]? | {key: .name, value: (.tags[0] // "other")}]
          | from_entries) as $tagof
@@ -999,6 +1020,7 @@ tui_installed_entries() {
           else "\(.name)\t\(.version)\(.at)\($suffix)"
           end
     ' <<<"${_state}"
+    # kcov-exclude-end
 }
 
 # Argv for an Update / Remove / Purge fork, one arg per line (G4 — same
@@ -1085,12 +1107,14 @@ tui_manage_confirm_text() {
 #   _tui_detail_field <show_json> <jq-path>
 _tui_detail_field() {
     local _none; _none="$(i18n_t TUI_BACKEND_I18N detail_none)"
+    # kcov-exclude-start (jq field-formatting program: not traceable through the jq subprocess; array-join / (none) placeholder is covered by the tui_detail specs)
     jq -r --arg none "${_none}" "
         ($2) as \$v
         | if (\$v | type) == \"array\"
           then (if (\$v | length) == 0 then \$none else (\$v | join(\", \")) end)
           else (\$v // \$none)
           end" <<<"$1"
+    # kcov-exclude-end
 }
 
 # Read-only detail text for a REGISTERED module, built from a forked
@@ -1221,6 +1245,7 @@ tui_help_text() {
 # §8.1 header line from a detect --json payload, e.g.
 # "Ubuntu 24.04 / NVIDIA RTX 4090 / GNOME / x11". Null fields are skipped.
 tui_system_summary() {
+    # kcov-exclude-start (jq header-assembly program: not traceable through the jq subprocess; covered by the tui_system_summary specs)
     jq -r '
         [ (((.os.id // "unknown") | (.[0:1] | ascii_upcase) + .[1:])
             + " " + (.os.version // "?")),
@@ -1229,6 +1254,7 @@ tui_system_summary() {
           .session_type ]
         | map(select(. != null and . != "")) | join(" / ")
     ' <<<"$1"
+    # kcov-exclude-end
 }
 
 # ── Backend rendering wrappers (dispatcher → _tui_<widget>_whiptail) ──────────

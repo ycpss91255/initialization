@@ -96,6 +96,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   does not run — the `systemctl restart docker` step so the operator can check
   restart policies first. `DOCKER_DAEMON_JSON_PATH` overrides the target path
   for testing. Covered by `test/unit/script/set_address_pool_spec.bats`.
+- **`f5-split-dns` tool** (`tool/f5-split-dns/`, issue #146): a per-user opt-in
+  tool that pins the company DNS server plus a `~<COMPANY_DOMAIN>` routing domain
+  onto the F5 BIG-IP Edge VPN interface (`tun0`) via `resolvectl`, so
+  load-balanced internal hosts (e.g. the mail server) resolve to in-tunnel
+  addresses instead of their public A records. Ships `f5-split-dns.sh` (reads
+  `$F5_SPLIT_DNS_CONF` from a per-install systemd drop-in; no secrets, no
+  hardcoded username), a `f5-split-dns.service` oneshot unit bound to the
+  `tun0` device (`WantedBy`/`BindsTo`, so it applies on connect and auto-clears
+  on disconnect), a `config.example` template (real values live only in the
+  uncommitted per-user `~/.config/f5-split-dns/config`), an `install.sh` that
+  derives the config path from `$SUDO_USER`, and a `README.adoc`. Behavior is
+  pinned by `test/unit/f5_split_dns_spec.bats` (stubs `resolvectl`/`ip`/`logger`
+  on PATH; the `tool/` tree is a declared shellcheck-out-of-scope surface).
 - **`kvm` module — libvirt/QEMU virtualization stack** (`module/kvm.module.sh`,
   issue #310): a new apt-archetype module installing `qemu-kvm`,
   `libvirt-daemon-system`, `libvirt-clients`, `bridge-utils`, `virt-manager`,
@@ -271,6 +284,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+- **`custom-hosts-sync` module** (`module/custom-hosts-sync.module.sh` +
+  `module/config/custom-hosts-sync/`, issue #145): keeps custom `/etc/hosts`
+  name->IP entries from being reverted by the F5 BIG-IP Edge VPN client
+  (`svpn`), which snapshots `/etc/hosts` on connect and restores it wholesale
+  on disconnect/reboot. A systemd `.path` unit watches `/etc/hosts` and the
+  user master list (`~/.config/hosts-custom/hosts.custom`) and re-merges the
+  master list into an idempotent managed block whenever either changes, so a
+  revert is corrected within seconds and edits to the master list apply on
+  save. The sync script writes only when content actually changes (never loops
+  on its own inotify event) and leaves the F5 gateway line untouched. The
+  committed script and `.path` unit carry a `__USER_HOME__` placeholder that
+  `install()` substitutes with the real `$HOME` at deploy time, so no username
+  is hardcoded in version control. Optional module, `svpn`-gated
+  `is_recommended`.
 - **Module-iterating contract-conformance meta-test**
   (`test/unit/module/contract_conformance_spec.bats`): a single meta-test that
   DISCOVERS every `module/*.module.sh` dynamically (so new/edited modules are

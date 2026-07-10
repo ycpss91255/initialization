@@ -110,8 +110,8 @@ is_recommended() {
     ! is_installed
 }
 
-# doctor: inherits module_default_doctor (is_installed + warn); the binary
-# --version check is covered by verify (TEST_VERIFY_CMD).
+# doctor: inherits module_default_doctor (is_installed + TEST_VERIFY_CMD); the
+# binary --version runtime probe is shared with verify (TEST_VERIFY_CMD).
 
 # ── Private helpers ─────────────────────────────────────────────────────────
 

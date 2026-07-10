@@ -497,16 +497,17 @@ _mock_apt_list() {
     assert_success
 }
 
-@test "doctor (inherited default) tracks is_installed only, not the binary" {
-    # vscode now inherits module_default_doctor (is_installed + warn); the
-    # code --version probe moved to verify (TEST_VERIFY_CMD), so an empty PATH
-    # no longer fails doctor while is_installed succeeds.
+@test "doctor (inherited default) fails when installed but the runtime check fails" {
+    # vscode inherits module_default_doctor: is_installed AND TEST_VERIFY_CMD
+    # (ADR-0009 shipped model). Installed but the `code --version` runtime probe
+    # failing (empty PATH) -> doctor fails.
     _load_module
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
-    mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/empty-bin"
-    PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-bin" run doctor
-    assert_success
+    TEST_VERIFY_CMD="false"
+    run doctor
+    assert_failure
+    assert_output --partial "runtime check failed"
 }
 
 @test "is_outdated returns zero when apt reports code upgradable" {

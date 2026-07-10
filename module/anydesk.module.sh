@@ -117,7 +117,7 @@ is_recommended() {
 }
 
 # doctor: inherits module_default_doctor from the archetype macro (is_installed
-# + warn). The binary --version check is covered by verify (TEST_VERIFY_CMD).
+# + TEST_VERIFY_CMD runtime probe, shared with verify).
 
 # ── Private helpers ─────────────────────────────────────────────────────────
 

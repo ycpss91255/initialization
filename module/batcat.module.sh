@@ -113,7 +113,7 @@ is_recommended() {
     ! is_installed
 }
 
-# doctor: inherits module_default_doctor (is_installed + warn).
+# doctor: inherits module_default_doctor (is_installed + TEST_VERIFY_CMD).
 
 # ── Private helpers ─────────────────────────────────────────────────────────
 

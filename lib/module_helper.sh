@@ -178,15 +178,24 @@ module_default_verify() {
     fi
 }
 
-# Default doctor (ADR-0002 / ADR-0009): baseline runtime health = is_installed,
-# log_warn on failure. ~20 archetype modules hand-wrote exactly this pattern;
-# the macros now wire it by default. Modules with a runtime surface (daemon,
-# group requirement, metadata self-check, Sidecar-drift detection) MUST still
-# override doctor() after the archetype macro — late-binding lets them.
+# Default doctor (ADR-0002 / ADR-0009): baseline runtime health =
+# is_installed AND (if declared) TEST_VERIFY_CMD. This mirrors the verify
+# default (module_default_verify) so `setup_ubuntu doctor <module>` reuses
+# the same acceptance probe as post-install verify, plus is_installed. It is
+# read-only/offline (no Sidecar heal, no network). Modules with a real
+# runtime surface (daemon, group requirement, config validity, metadata /
+# Sidecar-drift self-check) MUST still override doctor() after the archetype
+# macro with genuine checks — bash late-binding lets them.
 module_default_doctor() {
     if ! is_installed 2>/dev/null; then
         log_warn "[${NAME:-?}] doctor: not installed"
         return 1
+    fi
+    if [[ -n "${TEST_VERIFY_CMD:-}" ]]; then
+        if ! bash -c "${TEST_VERIFY_CMD}"; then
+            log_warn "[${NAME:-?}] doctor: runtime check failed: ${TEST_VERIFY_CMD}"
+            return 1
+        fi
     fi
     return 0
 }

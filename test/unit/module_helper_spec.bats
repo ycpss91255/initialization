@@ -417,6 +417,28 @@ EOF
     assert_output --partial "doctor: not installed"
 }
 
+@test "module_default_doctor runs TEST_VERIFY_CMD and passes when it succeeds" {
+    is_installed() { return 0; }
+    TEST_VERIFY_CMD="true"
+    run module_default_doctor
+    assert_success
+}
+
+@test "module_default_doctor fails when TEST_VERIFY_CMD fails even though installed" {
+    is_installed() { return 0; }
+    TEST_VERIFY_CMD="false"
+    run module_default_doctor
+    assert_failure
+    assert_output --partial "doctor: runtime check failed"
+}
+
+@test "module_default_doctor passes when installed and no TEST_VERIFY_CMD declared" {
+    is_installed() { return 0; }
+    unset TEST_VERIFY_CMD 2>/dev/null || true
+    run module_default_doctor
+    assert_success
+}
+
 # ── _module_sidecar_after_phase (the phase-invocation wrapper) ───────────────
 
 @test "_module_sidecar_after_phase install writes the sidecar via module_provided_version" {

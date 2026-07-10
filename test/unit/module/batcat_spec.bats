@@ -456,21 +456,32 @@ _scratch_home() {
 }
 
 @test "doctor passes when installed and batcat answers --version" {
+    # doctor default (ADR-0009) = is_installed + TEST_VERIFY_CMD. The runtime
+    # probe runs in a fresh `bash -c`, so it needs a REAL binary on PATH (a
+    # shell-function mock is invisible to the subshell).
     _load_module
     is_installed() { return 0; }
-    batcat() { printf 'bat 0.24.0\n'; }
-    run doctor
+    local _bin="${INIT_UBUNTU_TEST_SCRATCH}/bin"
+    mkdir -p "${_bin}"
+    printf '#!/usr/bin/env bash\nprintf "bat 0.24.0\\n"\n' > "${_bin}/batcat"
+    chmod +x "${_bin}/batcat"
+    PATH="${_bin}:${PATH}" run doctor
     assert_success
 }
 
-@test "doctor (inherited default) passes when installed, fails when not" {
-    # batcat now inherits module_default_doctor (is_installed + warn). The
-    # binary --version check moved to verify (TEST_VERIFY_CMD), so doctor's
-    # pass/fail tracks is_installed only.
+@test "doctor (inherited default) fails when installed but the runtime check fails" {
+    # batcat inherits module_default_doctor: is_installed AND TEST_VERIFY_CMD
+    # (ADR-0009 shipped model). Installed but the runtime probe failing -> fail.
     _load_module
     is_installed() { return 0; }
+    TEST_VERIFY_CMD="false"
     run doctor
-    assert_success
+    assert_failure
+    assert_output --partial "runtime check failed"
+}
+
+@test "doctor (inherited default) fails when not installed" {
+    _load_module
     is_installed() { return 1; }
     run doctor
     assert_failure

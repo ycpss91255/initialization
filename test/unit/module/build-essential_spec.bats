@@ -376,14 +376,17 @@ _mock_apt_list() {
     assert_success
 }
 
-@test "doctor (inherited default) tracks is_installed only" {
-    # build-essential now inherits module_default_doctor (is_installed + warn);
-    # the gcc --version probe moved to verify (TEST_VERIFY_CMD).
+@test "doctor (inherited default) runs is_installed AND TEST_VERIFY_CMD" {
+    # build-essential inherits module_default_doctor: is_installed AND the
+    # TEST_VERIFY_CMD runtime probe (ADR-0009 shipped model). Installed but the
+    # probe failing -> fail; not installed -> fail.
     _load_module
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
+    TEST_VERIFY_CMD="false"
     run doctor
-    assert_success
+    assert_failure
+    assert_output --partial "runtime check failed"
     MOCK_IS_INSTALLED_RC=1
     _mock_is_installed
     run doctor

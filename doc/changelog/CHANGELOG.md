@@ -22,6 +22,25 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Scaffold generator + conformance meta-test for the template-first tool/hook
+  layer** (`script/scaffold.sh`, `just new-tool`/`just new-hook`,
+  `test/unit/tool_hook_conformance_spec.bats`): a dev-side authoring generator
+  stamps a new one-off tool (`tool/<name>.sh`) or Claude hook
+  (`.agents/hook/<name>.sh`) plus its matching bats spec from the canonical
+  templates, so new scripts start template-first (sourcing the shared bootstrap)
+  instead of hand-rolled. It has `--help` and rejects misuse with exit 2; the
+  stamped script passes the outward contract and the stamped spec passes as a
+  stub out of the box (both proven in `test/unit/scaffold_spec.bats`, including
+  nested-bats runs of the stamped stubs). A new conformance meta-test discovers
+  every managed `tool/*.sh` and `.agents/hook/*.sh` and asserts each sources its
+  bootstrap and satisfies the outward contract; unmigrated files are quarantined
+  in a documented, self-cleaning allowlist that can only shrink (migrating a
+  file forces removing its allowlist entry, or the self-cleaning test goes red).
+  Three files migrated as the proof batch: `.agents/hook/remind_no_emoji.sh`
+  (advisory reminder -> `hook_context`), `.agents/hook/test-must-use-docker.sh`
+  (enforcement -> `hook_read_input`/`hook_block`/`hook_allow`), and
+  `tool/copy_gnome_terminal_config.sh` (one-off -> `tool_bootstrap`/`tool_main`/
+  `do_work`, which also resolves the linux-review F26 finding). See ADR-0029.
 - **Template-first bootstrap libraries for tools and hooks** (`lib/tool_bootstrap.sh`,
   `lib/hook_bootstrap.sh`): two shared bootstraps so `tool/<name>.sh` and
   `.claude/hook/<name>.sh` scripts "expand from one template" — each sources a

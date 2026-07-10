@@ -1,0 +1,81 @@
+= auto-power-profile
+:toc: right
+
+Switch the power-profiles-daemon profile automatically from the current power
+source, with a battery-level fallback. `power-profiles-daemon`
+(`powerprofilesctl`) is manual by design -- it does not change the profile when
+you plug or unplug AC. This tool does.
+
+See issue #260 for the full problem statement.
+
+== Decision
+
+[cols="2,2", options="header"]
+|===
+| State | Profile
+| On AC | `performance`
+| On battery, charge > 25% | `balanced`
+| On battery, charge <= 25% | `power-saver`
+|===
+
+The cutoff is `THRESHOLD=25` at the top of the decision script; edit it and
+re-run the installer to change it.
+
+== Why two triggers
+
+A udev `power_supply` rule fires on AC plug/unplug for an instant switch, but it
+does not fire while running on battery as the charge slowly drops past 25%. A
+systemd timer re-evaluates every 2 minutes to catch that crossing. Together:
+instant response to AC events plus bounded latency on the battery threshold.
+
+The decision script calls `powerprofilesctl set` only when the target profile
+differs from the current one, so the timer is cheap and does not spam the
+daemon. Each real switch is logged via `logger -t auto-power-profile`
+(view with `journalctl -t auto-power-profile`).
+
+== Files
+
+[cols="2,3", options="header"]
+|===
+| Path (in repo) | Role
+| `auto-power-profile` | Decision script (`THRESHOLD=25` at top). Installed to `/usr/local/bin/`, 0755, root.
+| `auto-power-profile.service` | oneshot unit that runs the script. Installed to `/etc/systemd/system/`, 0644, root.
+| `auto-power-profile.timer` | `OnUnitActiveSec=2min` re-evaluation. Installed to `/etc/systemd/system/`, 0644, root.
+| `99-auto-power-profile.rules` | udev rule; instant switch on AC plug/unplug. Installed to `/etc/udev/rules.d/`, 0644, root.
+| `install-auto-power-profile.sh` | Installer; self-elevates with sudo, derives the invoking user from `$SUDO_USER`.
+|===
+
+Nothing here holds a username or a home path: the tool is system-wide and the
+decision reads power state from sysfs (`/sys/class/power_supply`).
+
+== Install / remove
+
+[source, shell]
+----
+bash install-auto-power-profile.sh          # install + enable (self-elevates)
+bash install-auto-power-profile.sh remove   # uninstall
+----
+
+The installer checks for root itself; if missing it re-runs via `sudo` and
+prompts for the password -- no need to prepend `sudo` manually.
+
+== Verify
+
+[source, shell]
+----
+systemctl is-enabled auto-power-profile.timer
+systemctl list-timers auto-power-profile.timer
+journalctl -t auto-power-profile | tail
+powerprofilesctl get
+----
+
+== Notes / tunables
+
+* Threshold lives in `THRESHOLD=25` at the top of the decision script.
+* Removal leaves the current profile untouched (set it manually with
+  `powerprofilesctl set balanced` if desired).
+* Depends on `power-profiles-daemon` (Ubuntu 22.04+ ships it). Not compatible
+  with running TLP at the same time on the same knobs.
+* The tool is authoritative: a manual profile change that disagrees with the
+  computed target is reverted on the next timer tick or AC event. To hold a
+  manual override, `sudo systemctl stop auto-power-profile.timer`.

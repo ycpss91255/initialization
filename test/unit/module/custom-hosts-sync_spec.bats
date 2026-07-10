@@ -296,6 +296,226 @@ _run_sync() {
     [[ "$(cat "${HOSTS_FILE}")" == "${_before}" ]]
 }
 
+# ── detect(): systemctl gate ─────────────────────────────────────────────────
+
+@test "detect succeeds when systemctl is on PATH" {
+    _load_module
+    local _bin="${INIT_UBUNTU_TEST_SCRATCH}/detectbin"
+    mkdir -p "${_bin}"
+    printf '#!/usr/bin/env bash\n' > "${_bin}/systemctl"
+    chmod +x "${_bin}/systemctl"
+    PATH="${_bin}:${PATH}" run detect
+    assert_success
+}
+
+@test "detect fails when systemctl is absent (no systemd)" {
+    _load_module
+    PATH="${INIT_UBUNTU_TEST_SCRATCH}/emptybin" run detect
+    assert_failure
+}
+
+# ── is_recommended: already-installed short-circuit ──────────────────────────
+
+@test "is_recommended is false when the module is already installed" {
+    _load_module
+    _mock_is_installed
+    MOCK_IS_INSTALLED_RC=0 run is_recommended
+    assert_failure
+}
+
+# ── upgrade() ────────────────────────────────────────────────────────────────
+
+@test "upgrade in dry-run mode is a no-op" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run upgrade
+    assert_success
+    assert_output --partial "DRY-RUN"
+}
+
+@test "upgrade re-deploys the tracked files with the real HOME substituted" {
+    _load_module
+    _use_scratch_home
+    _mock_have_sudo
+    _mock_sudo_record
+    MOCK_SUDO_ACCESS_RC=0 run upgrade
+    assert_success
+    # Re-deployed script + units; placeholder gone.
+    run cat "${MOCK_TEE_DIR}/sync-custom-hosts"
+    assert_success
+    refute_output --partial "__USER_HOME__"
+    run cat "${MOCK_SUDO_LOG}"
+    assert_output --partial "systemctl enable --now custom-hosts-sync.path"
+}
+
+@test "upgrade without sudo access fails with a clear error" {
+    _load_module
+    _mock_have_sudo
+    MOCK_SUDO_ACCESS_RC=1 run upgrade
+    assert_failure
+    assert_output --partial "sudo required"
+}
+
+# ── remove() real path ───────────────────────────────────────────────────────
+
+@test "remove on a clean container short-circuits (not installed)" {
+    _load_module
+    run remove
+    assert_success
+    assert_output --partial "not installed"
+}
+
+@test "remove disables the units and deletes the deployed files" {
+    _load_module
+    _mock_is_installed
+    _mock_have_sudo
+    _mock_sudo_record
+    MOCK_IS_INSTALLED_RC=0 MOCK_SUDO_ACCESS_RC=0 run remove
+    assert_success
+    run cat "${MOCK_SUDO_LOG}"
+    assert_output --partial "systemctl disable --now custom-hosts-sync.path"
+    assert_output --partial "systemctl disable --now custom-hosts-sync.service"
+    assert_output --partial "rm -f /etc/systemd/system/custom-hosts-sync.path"
+}
+
+@test "remove without sudo access fails with a clear error" {
+    _load_module
+    _mock_is_installed
+    _mock_have_sudo
+    MOCK_IS_INSTALLED_RC=0 MOCK_SUDO_ACCESS_RC=1 run remove
+    assert_failure
+    assert_output --partial "sudo required"
+}
+
+# ── purge() real path ────────────────────────────────────────────────────────
+
+@test "purge removes the units and wipes the user master directory" {
+    _load_module
+    _use_scratch_home
+    _mock_is_installed
+    _mock_have_sudo
+    _mock_sudo_record
+    mkdir -p "${HOME}/.config/hosts-custom"
+    printf '10.0.0.1 keep.me\n' > "${HOME}/.config/hosts-custom/hosts.custom"
+    MOCK_IS_INSTALLED_RC=0 MOCK_SUDO_ACCESS_RC=0 run purge
+    assert_success
+    [[ ! -d "${HOME}/.config/hosts-custom" ]]
+}
+
+# ── verify() ─────────────────────────────────────────────────────────────────
+
+@test "verify fails on a clean container (sync script absent)" {
+    _load_module
+    run verify
+    assert_failure
+}
+
+# ── is_outdated() ────────────────────────────────────────────────────────────
+
+# Point the deployed-file globals at scratch paths so drift can be simulated
+# without touching /usr/local/bin or /etc.
+_stage_deployed() {
+    local _stage="${INIT_UBUNTU_TEST_SCRATCH}/deployed"
+    mkdir -p "${_stage}"
+    CHS_SCRIPT="${_stage}/sync-custom-hosts"
+    CHS_SERVICE="${_stage}/custom-hosts-sync.service"
+    CHS_PATH_UNIT="${_stage}/custom-hosts-sync.path"
+    # Render the committed templates the same way _chs_deploy_files does.
+    sed "s#__USER_HOME__#${HOME}#g" "${CHS_SRC}/sync-custom-hosts" > "${CHS_SCRIPT}"
+    chmod 0755 "${CHS_SCRIPT}"
+    cp "${CHS_SRC}/custom-hosts-sync.service" "${CHS_SERVICE}"
+    sed "s#__USER_HOME__#${HOME}#g" "${CHS_SRC}/custom-hosts-sync.path" > "${CHS_PATH_UNIT}"
+}
+
+@test "is_outdated returns nonzero when the module is not installed" {
+    _load_module
+    run is_outdated
+    assert_failure
+}
+
+@test "is_outdated is false when deployed files match the committed templates" {
+    _load_module
+    _use_scratch_home
+    _stage_deployed
+    run is_outdated
+    assert_failure
+}
+
+@test "is_outdated is true when the deployed sync script has drifted" {
+    _load_module
+    _use_scratch_home
+    _stage_deployed
+    printf '\n# drift\n' >> "${CHS_SCRIPT}"
+    run is_outdated
+    assert_success
+}
+
+# ── doctor() ─────────────────────────────────────────────────────────────────
+
+@test "doctor warns and fails when the module is not installed" {
+    _load_module
+    run doctor
+    assert_failure
+    assert_output --partial "not installed"
+}
+
+@test "doctor fails when the sync script is missing or not executable" {
+    _load_module
+    _mock_is_installed
+    CHS_SCRIPT="${INIT_UBUNTU_TEST_SCRATCH}/not-there"
+    MOCK_IS_INSTALLED_RC=0 run doctor
+    assert_failure
+    assert_output --partial "not executable"
+}
+
+@test "doctor fails when the sync script has bash syntax errors" {
+    _load_module
+    _mock_is_installed
+    CHS_SCRIPT="${INIT_UBUNTU_TEST_SCRATCH}/broken-sync"
+    printf '#!/usr/bin/env bash\nif then fi\n' > "${CHS_SCRIPT}"
+    chmod +x "${CHS_SCRIPT}"
+    MOCK_IS_INSTALLED_RC=0 run doctor
+    assert_failure
+    assert_output --partial "syntax errors"
+}
+
+# Put a fake `systemctl` on PATH whose `is-active` subcommand exits with the
+# given code (a PATH stub, not a shell function, so it does not trip SC2032 on
+# the module's `sudo systemctl` call sites).
+_stub_systemctl() {
+    local _bin="${INIT_UBUNTU_TEST_SCRATCH}/sctlbin"
+    mkdir -p "${_bin}"
+    cat > "${_bin}/systemctl" <<EOF
+#!/usr/bin/env bash
+[[ "\$1" == "is-active" ]] && exit ${1}
+exit 0
+EOF
+    chmod +x "${_bin}/systemctl"
+    printf '%s' "${_bin}"
+}
+
+@test "doctor warns but succeeds when the path unit is not active" {
+    _load_module
+    _mock_is_installed
+    CHS_SCRIPT="${INIT_UBUNTU_TEST_SCRATCH}/ok-sync"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "${CHS_SCRIPT}"
+    chmod +x "${CHS_SCRIPT}"
+    local _bin; _bin="$(_stub_systemctl 1)"   # is-active -> inactive (nonzero)
+    MOCK_IS_INSTALLED_RC=0 PATH="${_bin}:${PATH}" run doctor
+    assert_success
+    assert_output --partial "not active"
+}
+
+@test "doctor succeeds cleanly when the path unit is active" {
+    _load_module
+    _mock_is_installed
+    CHS_SCRIPT="${INIT_UBUNTU_TEST_SCRATCH}/ok-sync"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "${CHS_SCRIPT}"
+    chmod +x "${CHS_SCRIPT}"
+    local _bin; _bin="$(_stub_systemctl 0)"   # is-active -> active
+    MOCK_IS_INSTALLED_RC=0 PATH="${_bin}:${PATH}" run doctor
+    assert_success
+}
+
 # ── Standalone CLI (AC-25) ───────────────────────────────────────────────────
 
 @test "standalone info runs and prints the module name" {

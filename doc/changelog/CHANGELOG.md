@@ -100,6 +100,17 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`resolve-publish.sh` DaVinci Resolve re-encoder** (`tool/davinci_resolve/resolve-publish.sh`,
+  issue #269): a standalone helper that transcodes Resolve Free exports (AV1 /
+  DNxHR) to H.264 (default, CRF 18) or H.265 (`-c h265`) via ffmpeg, since
+  Resolve Free on Linux cannot export H.264/H.265 directly. Supports `-q CRF`
+  and `-o OUTDIR`, writes `<stem>_<codec>.mp4` (audio re-encoded to AAC 192k),
+  validates codec/CRF/`-o`/encoder availability up front, removes partial or
+  zero-byte outputs on failure, and keeps processing the remaining inputs when
+  one fails (final exit 1). The encoder-availability probe captures
+  `ffmpeg -encoders` before grepping it, avoiding a `set -o pipefail` +
+  `grep -q` SIGPIPE false-negative that would spuriously report a present
+  encoder as missing.
 - **`docker-tool/set-address-pool.sh`** (`script/docker-tool/set-address-pool.sh`,
   issue #270): a standalone root-only config tool that pins Docker's
   `default-address-pools` in `/etc/docker/daemon.json` to `172.16.0.0/12`

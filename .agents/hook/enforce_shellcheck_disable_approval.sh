@@ -35,8 +35,16 @@
 #   - deny   -> exit 0, emit permissionDecision JSON on stdout
 #
 # Bypass: ECC_ALLOW_SHELLCHECK_DISABLE=1 env var -> allow silently.
+#
+# Template-first (ADR-0029): sources lib/hook_bootstrap.sh for set -uo pipefail
+# (ADR-0007 exit-code-contract) + input reading (hook_read_input). The transcript
+# scan, disable-diffing, approval matching, and permissionDecision=deny emission
+# are this hook's unique logic and are unchanged. The isolated modules stay
+# independently source-able for bats (main runs only as the entrypoint, below).
 
-set -uo pipefail
+# shellcheck source=../../lib/hook_bootstrap.sh
+source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
+hook_bootstrap "enforce-shellcheck-disable-approval"
 
 # ── read_latest_user_message ─────────────────────────────────────────────────
 # Args: $1 = transcript_path. Stdout: latest user-typed text message.
@@ -186,8 +194,8 @@ main() {
         return 0
     fi
 
-    local input
-    input="$(cat)"
+    hook_read_input
+    local input="${HOOK_INPUT}"
     [[ -z "${input}" ]] && return 0
 
     local tool

@@ -22,13 +22,20 @@
 #   - `git push <remote>` without a v-tag refspec (normal branch push)
 #
 # Refs: issue ycpss91255-docker/docker_harness#106.
+#
+# Template-first (ADR-0029): sources lib/hook_bootstrap.sh for set -uo pipefail
+# (ADR-0007 exit-code-contract) + input reading (hook_read_input / hook_command).
+# The tag/push detection (skip list + create/push/--tags forms) and the
+# permissionDecision=deny emission are this hook's unique logic and are unchanged.
 
-set -uo pipefail
+# shellcheck source=../../lib/hook_bootstrap.sh
+source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
+hook_bootstrap "enforce-semver-tag-via-script"
 
 main() {
-  local input cmd
-  input="$(cat)"
-  cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
+  hook_read_input
+  local cmd
+  cmd="$(hook_command)"
   [[ -z "${cmd}" ]] && return 0
 
   # Skip listing forms.

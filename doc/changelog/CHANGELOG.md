@@ -81,6 +81,25 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   and honouring the outward contract. Each tool gains a bats spec under
   `test/unit/tool/`, and all five are removed from the
   `tool_hook_conformance_spec.bats` migration-debt allowlist (now empty for tools).
+- **Remaining 13 Claude hooks migrated onto `lib/hook_bootstrap.sh`**
+  (`.agents/hook/`): every hook now sources the shared bootstrap and shrinks to
+  its unique decision logic (`hook_read_input` / `hook_command` / `hook_field`
+  for stdin JSON; `hook_allow` / `hook_block` / `hook_context` for the outward
+  contract) instead of re-implementing the `set -uo pipefail` + `cat` + `jq`
+  header. Migrated: `check_changelog_drift`, `check_main_fresh_before_worktree`,
+  `enforce_gh_body_file`, `enforce_gh_english`, `enforce_gh_issue_template`,
+  `enforce_gh_review_approval`, `enforce_long_job_timeout`,
+  `enforce_semver_tag_via_script`, `enforce_shellcheck_disable_approval`,
+  `remind_ci_auto_merge`, `remind_main_sync`, `remind_workflow_tdd`, and
+  `worktree_create`. Externally observable behavior is unchanged (same block
+  conditions, exit codes, and messages / `permissionDecision` JSON) — every
+  existing hook spec under `test/unit/hook/` passes unchanged. All 13 are removed
+  from the `ALLOWLIST_HOOKS` ledger in `test/unit/tool_hook_conformance_spec.bats`
+  (now empty), so the conformance meta-test enforces the template-first shape on
+  every hook. `worktree_create` gains a no-op guard for misrouted tool-use
+  payloads (a `.tool_name`-bearing JSON, e.g. the conformance empty-command
+  probe) so it allows instead of erroring; a real WorktreeCreate payload never
+  carries `.tool_name`, so its behavior is unchanged. See ADR-0029.
 - **`install`/`remove`/`purge` now hard-error on `--force` and `--with-orphans`
   instead of silently ignoring them** (`lib/dispatcher_lifecycle.sh`): both flags
   carry destructive intent, and their real semantics (ADR-0012 soft/hard filter,

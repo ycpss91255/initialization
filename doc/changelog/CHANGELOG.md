@@ -100,6 +100,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **Shell completion for `setup_ubuntu`** (issue #166): a Bash completion
+  script (`module/config/bash/setup_ubuntu.bash`, `complete -F _setup_ubuntu`)
+  and a fish completion (`module/config/fish/completions/setup_ubuntu.fish`,
+  `complete -c setup_ubuntu`). Level 1 completes subcommands and global flags;
+  the module-taking subcommands (`install` / `remove` / `purge` / `upgrade` /
+  `verify` / `show`) complete module NAMES derived live from
+  `setup_ubuntu list`, so completion always tracks the registry. `just install
+  <TAB>` is intentionally not covered — `just` completes recipe names, not
+  recipe args; run `setup_ubuntu install <TAB>` directly.
 - **`resolve-publish.sh` DaVinci Resolve re-encoder** (`tool/davinci_resolve/resolve-publish.sh`,
   issue #269): a standalone helper that transcodes Resolve Free exports (AV1 /
   DNxHR) to H.264 (default, CRF 18) or H.265 (`-c h265`) via ffmpeg, since

@@ -1,0 +1,5 @@
+# Re-evaluate the power profile instantly on AC plug/unplug.
+# power_supply "change" events fire when the Mains adapter goes online/offline;
+# start the oneshot service so the profile switches without waiting for the
+# 2-minute timer. RUN+= is non-blocking (systemctl --no-block).
+SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ACTION=="change", RUN+="/bin/systemctl --no-block start auto-power-profile.service"

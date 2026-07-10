@@ -50,7 +50,7 @@ _cmd="$(_extract_cmd "${_stdin_payload}")"
 # like "host bats" or "apt-get install".
 _first_tok="${_cmd%%[[:space:]]*}"
 case "${_first_tok}" in
-    git|gh|docker|just|make|grep|find|ls|cat|sed|awk|tr|sort|uniq|wc|head|tail|\
+    git|gh|docker|just|grep|find|ls|cat|sed|awk|tr|sort|uniq|wc|head|tail|\
     cd|pwd|true|false|echo|printf|test|chmod|chown|mkdir|rm|cp|mv|ln|touch|\
     stat|file|which|command|type|tee|date|env|export|unset|history|jq|\
     python3|python|node|npm|pnpm|yarn|cargo|rustc|go|hadolint|shellcheck|\

@@ -163,6 +163,42 @@ _load_engine() {
     assert_output --partial "stubbed"
 }
 
+@test "dispatcher_dispatch install --force HARD-ERRORS with exit 2 (not silently ignored)" {
+    # ADR-0012: the --force soft/hard-filter semantics are not built. Rather
+    # than silently no-op a destructive-intent flag, the dispatcher rejects it.
+    _load_engine
+    run dispatcher_dispatch install noop --force
+    assert_failure 2
+    assert_output --partial "--force"
+    assert_output --partial "not yet implemented"
+}
+
+@test "dispatcher_dispatch install --force is rejected even with --dry-run" {
+    # The honest rejection fires during flag parsing, before dry-run planning:
+    # a destructive-intent flag must never be silently accepted.
+    _load_engine
+    run dispatcher_dispatch install noop --force --dry-run
+    assert_failure 2
+    assert_output --partial "not yet implemented"
+}
+
+@test "dispatcher_dispatch install --with-orphans HARD-ERRORS with exit 2" {
+    # ADR-0010: the forward-dep orphan scan is not built; the flag hard-errors
+    # instead of silently no-op'ing.
+    _load_engine
+    run dispatcher_dispatch install noop --with-orphans
+    assert_failure 2
+    assert_output --partial "--with-orphans"
+    assert_output --partial "not yet implemented"
+}
+
+@test "dispatcher_dispatch purge --with-orphans HARD-ERRORS with exit 2" {
+    _load_engine
+    run dispatcher_dispatch purge noop --with-orphans
+    assert_failure 2
+    assert_output --partial "not yet implemented"
+}
+
 @test "dispatcher_dispatch install nonexistent returns exit 2 (resolver unknown)" {
     _load_engine
     run dispatcher_dispatch install nonexistent
@@ -302,6 +338,40 @@ _load_engine() {
     _load_engine
     state_record_install noop true
     dispatcher_dispatch list --installed --json | jq -e '.installed.noop.synced.manual == true' > /dev/null
+}
+
+# ── F2: installed VERSION column is single-sourced from the Sidecar ──────────
+# (doc/review/architecture-review.md F2 + module-template-audit) The Sidecar
+# records the RESOLVED version (e.g. 0.44.1); state.json only keeps the static
+# VERSION_PROVIDED literal (often "latest"). list --installed must display the
+# resolved Sidecar version so users see what is really installed.
+
+@test "list --installed shows resolved Sidecar version, not static version_provided (F2)" {
+    _load_engine
+    # shellcheck source=../../lib/module_helper.sh
+    source "${LIB_DIR}/module_helper.sh"
+    # state.json keeps the static literal the module declared ("latest")…
+    state_record_install noop true latest
+    # …while the Sidecar holds the version actually resolved at install time.
+    module_sidecar_write noop 0.44.1
+
+    run dispatcher_dispatch list --installed
+    assert_success
+    assert_output --partial "0.44.1"
+    refute_output --partial "latest"
+}
+
+@test "list --installed falls back to version_provided when no Sidecar exists" {
+    _load_engine
+    # shellcheck source=../../lib/module_helper.sh
+    source "${LIB_DIR}/module_helper.sh"
+    # Installed before the Sidecar existed (or a module that writes none):
+    # no versions/<name> file, so the state literal is the only source.
+    state_record_install noop true v1.2.3
+
+    run dispatcher_dispatch list --installed
+    assert_success
+    assert_output --partial "v1.2.3"
 }
 
 # ── import / export conflict pipeline (issue #43, ADR-0013) ─────────────────
@@ -1204,6 +1274,99 @@ EOF
     assert_failure 1
     assert_output --partial "absent"
     assert_output --partial "DRIFTED"
+}
+
+# ── doctor: Engine invokes the per-module doctor() override (F1, ADR-0002/0009)
+#
+# The architecture-review F1 gap: `setup_ubuntu doctor` only ran the state-drift
+# report and NEVER called a module's doctor() override, though all four
+# templates promise the Engine calls it. These specs pin the wired behavior:
+# the drift report is AUGMENTED with each installed module's own doctor().
+
+@test "doctor invokes the installed module's doctor() override (F1 wiring)" {
+    cat > "${FAKE_MODULE_DIR}/docmod.module.sh" <<'EOF'
+NAME="docmod"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+is_installed() { return 0; }
+doctor() { echo "DOCTOR-OVERRIDE-RAN" >&2; return 0; }
+EOF
+    _load_engine
+    state_record_install docmod true v1
+    run dispatcher_dispatch doctor
+    assert_success
+    # Both halves are present: the drift report AND the module doctor().
+    assert_output --partial "consistent"
+    assert_output --partial "DOCTOR-OVERRIDE-RAN"
+}
+
+@test "doctor <module> scopes the doctor() run to just that module" {
+    cat > "${FAKE_MODULE_DIR}/doc-a.module.sh" <<'EOF'
+NAME="doc-a"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+is_installed() { return 0; }
+doctor() { echo "DOCTOR-A-RAN" >&2; return 0; }
+EOF
+    cat > "${FAKE_MODULE_DIR}/doc-b.module.sh" <<'EOF'
+NAME="doc-b"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+is_installed() { return 0; }
+doctor() { echo "DOCTOR-B-RAN" >&2; return 0; }
+EOF
+    _load_engine
+    state_record_install doc-a true v1
+    state_record_install doc-b true v1
+    run dispatcher_dispatch doctor doc-a
+    assert_success
+    assert_output --partial "DOCTOR-A-RAN"
+    refute_output --partial "DOCTOR-B-RAN"
+}
+
+@test "doctor returns exit 1 when a module's doctor() fails (RC propagation)" {
+    cat > "${FAKE_MODULE_DIR}/sick.module.sh" <<'EOF'
+NAME="sick"
+CATEGORY="optional"
+TAGS=()
+SUPPORTED_UBUNTU=()
+SUPPORTED_PLATFORMS=()
+DEPENDS_ON=()
+CONFLICTS_WITH=()
+install() { return 0; }
+# is_installed passes (drift report is clean) but the health self-check fails,
+# so the failure must come from the doctor() override, not the drift report.
+is_installed() { return 0; }
+doctor() { echo "SICK-DOCTOR-FAILED" >&2; return 1; }
+EOF
+    _load_engine
+    state_record_install sick true v1
+    run dispatcher_dispatch doctor
+    assert_failure 1
+    assert_output --partial "consistent"
+    assert_output --partial "SICK-DOCTOR-FAILED"
+}
+
+@test "doctor rejects an unknown module argument with exit 2" {
+    _load_engine
+    run dispatcher_dispatch doctor no-such-module
+    assert_failure 2
+    assert_output --partial "unknown module"
 }
 
 # ── i18n: human-readable strings localize under INIT_UBUNTU_LANG (#185) ──────

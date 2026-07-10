@@ -3,6 +3,15 @@
 - **Status:** Accepted
 - **Date:** 2026-05-20
 
+> **Partial note — `--include-user-local-modules` is Deferred until
+> built.** The flag is advertised (help text / diff hint) but currently
+> **returns exit 2 (not built)** — it does not yet rsync user-local
+> module files. When it IS built, it must carry a trust warning about
+> transferring **executable** user-local modules: running untrusted
+> module code pulled from another host is a security risk, so the flag
+> must remain opt-in and warn before `--apply`. The rest of this ADR's
+> sync conflict-resolution model is otherwise as described.
+
 ## Context
 
 PRD §16 describes the happy path for `setup_ubuntu sync` (push and

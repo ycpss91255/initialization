@@ -1,0 +1,82 @@
+= f5-split-dns
+:toc: right
+
+Route an internal company domain's DNS lookups to the internal DNS server over
+the F5 BIG-IP Edge VPN (tun0), so load-balanced internal hosts (e.g. the mail
+server) resolve to addresses that route through the tunnel instead of their
+public records.
+
+See issue #146 for the full problem statement.
+
+== Why
+
+With the VPN up, `systemd-resolved` may still send an internal hostname to a
+non-company resolver, which returns the host's public A record. That public IP
+is outside the split-tunnel route set, so the company firewall drops the
+traffic and connections time out. Forcing `*.<COMPANY_DOMAIN>` to the internal
+DNS over tun0 makes the same name resolve to an internal, in-tunnel address.
+
+A whole-domain route (not a single `/etc/hosts` entry) is used because the
+internal mail host is load-balanced across several internal IPs; the internal
+DNS always returns a currently-valid one.
+
+== Files
+
+[cols="2,3", options="header"]
+|===
+| Path (in repo) | Role
+| `f5-split-dns.sh` | Apply split-DNS; reads `$F5_SPLIT_DNS_CONF`. Installed to `/usr/local/sbin/`, 0755, root.
+| `f5-split-dns.service` | oneshot unit bound to the tun0 device. Installed to `/etc/systemd/system/`, 0644, root.
+| `config.example` | Placeholder template; copied to the per-user config.
+| `install.sh` | Installs the above and derives the per-user config path from `$SUDO_USER`.
+|===
+
+Secrets and the username are never committed. The real values live only in
+`~/.config/f5-split-dns/config` (per-user, opt-in). The installer writes the
+derived config path into a systemd drop-in
+(`/etc/systemd/system/f5-split-dns.service.d/10-config-path.conf`,
+`Environment=F5_SPLIT_DNS_CONF=...`), so nothing in the committed `.sh` /
+`.service` contains a home path or a username.
+
+== Lifecycle
+
+`WantedBy=sys-subsystem-net-devices-tun0.device` starts the service every time
+tun0 is created (VPN connect, resume from sleep, reboot).
+`BindsTo=...tun0.device` stops it when tun0 disappears (VPN disconnect), so
+`systemd-resolved` drops the per-link config automatically -- no stale DNS.
+
+connect -> apply, disconnect -> auto-clear, reconnect -> re-apply.
+
+== Install
+
+[source, shell]
+----
+sudo bash install.sh
+# then edit the real values:
+$EDITOR ~/.config/f5-split-dns/config      # INTERNAL_DNS_IP, COMPANY_DOMAIN
+sudo systemctl restart f5-split-dns.service
+----
+
+== Verify
+
+[source, shell]
+----
+# While the VPN is connected:
+systemctl is-enabled f5-split-dns.service
+cat /etc/systemd/system/f5-split-dns.service.d/10-config-path.conf
+journalctl -t f5-split-dns | tail
+resolvectl status tun0 | grep -E 'DNS Servers|DNS Domain'
+getent hosts <MAIL_HOST>        # internal IP(s), not the public one
+----
+
+== Remove
+
+[source, shell]
+----
+sudo systemctl disable --now f5-split-dns.service
+sudo rm -f /usr/local/sbin/f5-split-dns.sh \
+           /etc/systemd/system/f5-split-dns.service \
+           /etc/systemd/system/f5-split-dns.service.d/10-config-path.conf
+sudo systemctl daemon-reload
+# ~/.config/f5-split-dns/config is per-user; remove it manually if desired
+----

@@ -7,25 +7,30 @@
 USER_NAME=${1:-"$USER"}
 SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 
-# delete old tldr folder or unknown file, avoid problems
-if [ -n "/home/${USER_NAME}/.local/share/tldr" ]; then
-    rm -rf /home/"${USER_NAME}"/.local/share/tldr
+# delete old tealdeer cache or unknown file, avoid problems
+if [ -d "/home/${USER_NAME}/.cache/tealdeer" ]; then
+    rm -rf "/home/${USER_NAME}/.cache/tealdeer"
 fi
 
-if [ -z "/home/"${USER_NAME}"/.local/share" ]; then
-    mkdir -p /home/"${USER_NAME}"/.local/share
+if [ ! -d "/home/${USER_NAME}/.local/share" ]; then
+    mkdir -p "/home/${USER_NAME}/.local/share"
 fi
 
-if [ -z "/home/"${USER_NAME}"/.config/fish" ]; then
-    mkdir -p /home/"${USER_NAME}"/.config/fish
+if [ ! -d "/home/${USER_NAME}/.config/fish" ]; then
+    mkdir -p "/home/${USER_NAME}/.config/fish"
 fi
 
-if [ -n "/home/"${USER_NAME}"/.fzf" ]; then
-    rm -rf /home/"${USER_NAME}"/.fzf
+if [ -d "/home/${USER_NAME}/.fzf" ]; then
+    rm -rf "/home/${USER_NAME}/.fzf"
 fi
 
 # add apt repository for 'fish'
 sudo apt-add-repository -y ppa:fish-shell/release-3 && \
+
+# add apt repository for 'fastfetch' (not in Ubuntu 24.04 "noble" repos; the
+# apt package only lands in Ubuntu 25.04+ / Debian 13+). On 25.04+ the PPA is
+# harmless. See https://github.com/fastfetch-cli/fastfetch for release notes.
+sudo add-apt-repository -y ppa:zhangsongcui3371/fastfetch && \
 
 # Update the package lists
 sudo apt update && \
@@ -76,21 +81,21 @@ sudo apt install -y --no-install-recommends \
     git-lfs \
     jq \
     ncdu \
-    neofetch \
+    fastfetch \
     net-tools \
     nmap \
     openssh-client \
     openssh-server \
     powerstat \
-    ranger \
     tig \
-    tldr \
     tmux \
     tmuxp \
     tree \
     silversearcher-ag \
     ssh \
     sshfs \
+    tealdeer \
+    unzip \
     xdg-utils \
     zoxide \
     thefuck \
@@ -140,11 +145,34 @@ fish -c "fisher install \
 cp -r "${SCRIPT_PATH}"/config/fish /home/"${USER_NAME}"/.config/ && \
 
 # switch default shell to fish shell
-sudo chsh -s "$(which fish)" "${USER_NAME}" && \
+sudo chsh -s "$(which fish)" "${USER_NAME}"
 
-# tldr update
-mkdir -p /home/"${USER_NAME}"/.local/share/tldr && \
-tldr --update && \
+# tldr (tealdeer) cache — decoupled from the && chain: a failed cache download
+# is only a cosmetic "nice to have" and must NOT abort the rest of the install.
+# tealdeer 1.6.1 keeps its cache under ~/.cache/tealdeer/tldr-pages (NOT the old
+# node/C client's local-share layout). When tealdeer's own downloader produces
+# a broken ZIP, fall back to fetching the release asset directly and unzipping.
+TLDR_CACHE_DIR="/home/${USER_NAME}/.cache/tealdeer/tldr-pages"
+mkdir -p "${TLDR_CACHE_DIR}"
+if ! tldr --update; then
+    echo "WARN: 'tldr --update' failed; trying release-zip fallback" >&2
+    if curl -fsSL -o /tmp/tldr.zip \
+        https://github.com/tldr-pages/tldr/releases/latest/download/tldr.zip \
+        && unzip -oq /tmp/tldr.zip -d "${TLDR_CACHE_DIR}"; then
+        rm -f /tmp/tldr.zip
+        echo "INFO: tldr cache seeded from release zip" >&2
+    else
+        echo "WARN: tldr cache update failed; run 'tldr --update' later" >&2
+    fi
+fi
+
+# install the tldr fish completion into a dir fish actually scans — the snap
+# fish ignores /usr/share/fish/completions where tealdeer ships it.
+if [ -f /usr/share/fish/completions/tldr.fish ]; then
+    mkdir -p "/home/${USER_NAME}/.config/fish/completions"
+    cp /usr/share/fish/completions/tldr.fish \
+        "/home/${USER_NAME}/.config/fish/completions/tldr.fish"
+fi
 
 # delete old tmux plugin manager, avoid problems
 rm -rf /home/"${USER_NAME}"/.tmux/plugins/tpm && \
@@ -173,14 +201,6 @@ sudo systemctl enable ssh && \
 sudo systemctl restart ssh && \
 
 pip install pynvim
-
-# NOTE: .config/ranger/rc.conf set preview_images true
-# delete old ranger_devicons, avoid problems
-rm -rf /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
-# Install ranger plugins 'ranger_devicons'
-git clone --depth 1 \
-    https://github.com/alexanderjeurissen/ranger_devicons \
-    /home/"${USER_NAME}"/.config/ranger/plugins/ranger_devicons && \
 
 # print Success or failure message
 printf "\033[1;37;42mSmall tools install successfully.\033[0m\n" || \

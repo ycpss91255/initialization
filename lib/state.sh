@@ -74,8 +74,11 @@ if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     return 0 2>/dev/null
 fi
 
-# Bumped to 0.2.0 for ADR-0026 (apt-essentials bundle split into per-tool
-# modules); the forward-only migration lives in lib/state_migrate.sh (ADR-0008).
+# 0.2.0 is the current baseline schema (synced/local split, ADR-0018; per-tool
+# modules, ADR-0026). The 0.1.0 -> 0.2.0 apt-essentials migration was RETIRED:
+# 0.1.0 was never released, so no on-disk state carries it. The forward-only
+# migration FRAMEWORK stays in lib/state_migrate.sh (ADR-0008), ready for the
+# first real future migration; it currently defines no migration hops.
 readonly STATE_SCHEMA_VERSION="0.2.0"
 readonly STATE_INSTALLED_BY_DEFAULT="init_ubuntu@${INIT_UBUNTU_VERSION:-0.1.0-draft}"
 

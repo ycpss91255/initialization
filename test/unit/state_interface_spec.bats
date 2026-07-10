@@ -52,27 +52,44 @@ _state_path() {
     printf '%s/state.json' "${INIT_UBUNTU_STATE_DIR}"
 }
 
-# A v0.1.0 state.json with the apt-essentials bundle entry (the ADR-0026 split
-# input). The interface should migrate this on state_init, never via a separate
-# migrate call.
-_write_v010_with_bundle() {
+# An older-schema state.json (pre-baseline) with one installed module. The
+# interface should migrate this on state_init, never via a separate migrate
+# call. The apt-essentials 0.1.0 -> 0.2.0 hop was retired (0.1.0 was never
+# released), so the framework ships with no live hops — this spec registers a
+# SYNTHETIC hop in-shell to exercise the "migration folded into init" seam
+# generically (the same technique state_migrate_spec.bats uses).
+_write_old_version_file() {
     cat > "$(_state_path)" <<'JSON'
 {
-  "version": "0.1.0",
+  "version": "0.1.9",
   "installed": {
-    "apt-essentials": {
+    "legacy": {
       "synced": {
         "manual": true,
         "depends_on": [],
         "version_provided": "apt-managed",
         "installed_at": "2026-01-02T03:04:05+00:00",
-        "installed_by": "init_ubuntu@0.1.0"
+        "installed_by": "init_ubuntu@0.1.9"
       },
       "local": {"last_verified_at": "2026-01-02T03:04:05+00:00"}
     }
   }
 }
 JSON
+}
+
+# Register a synthetic 0.1.9 -> 0.2.0 hop in THIS shell so state_init's internal
+# state_migrate_run has a hop to replay. The hop adds an observable `migrated`
+# module (version_provided "hop-added") and bumps the version to the baseline.
+_register_synthetic_hop() {
+    STATE_MIGRATE_CHAIN=("0.1.9" "0.2.0")
+    migrate_0_1_9_to_0_2_0() {
+        jq '.version = "0.2.0"
+            | .installed.migrated = {
+                synced: {manual: true, depends_on: [], version_provided: "hop-added"},
+                local: {}
+              }' <<<"$1"
+    }
 }
 
 # ── convergence: one load wires the whole external interface ─────────────────
@@ -92,42 +109,43 @@ JSON
 
 @test "State interface: state_init migrates an old-version file INTERNALLY (no separate migrate call)" {
     _load_state_module
-    _write_v010_with_bundle
+    _register_synthetic_hop
+    _write_old_version_file
 
-    # ONLY the interface is touched — no state_migrate_run here.
+    # ONLY the interface is touched — no state_migrate_run here. state_init
+    # folds the migration in.
     run state_init
     assert_success
 
-    # Observable through the interface: the migrated tools are now installed
-    # and the bundle is gone. (Asserted via state_list_installed, not the file.)
+    # Observable through the interface: the hop's `migrated` module is now
+    # installed alongside the carried-forward `legacy` entry. (Asserted via
+    # state_list_installed, not the file.)
     run state_list_installed
     assert_success
-    assert_line "git"
-    assert_line "vim"
-    assert_line "curl"
-    assert_line "wget"
-    assert_line "jq"
-    refute_line "apt-essentials"
+    assert_line "migrated"
+    assert_line "legacy"
 }
 
 @test "State interface: migrated entries are observable via the field accessor" {
     _load_state_module
-    _write_v010_with_bundle
+    _register_synthetic_hop
+    _write_old_version_file
     state_init
 
     # version_provided / manual surface through state_get_field (the interface),
-    # carrying the ADR-0026 split semantics forward.
-    run state_get_field git version_provided
+    # carrying the migration's output forward.
+    run state_get_field migrated version_provided
     assert_success
-    assert_output "apt-managed"
-    run state_get_field git manual
+    assert_output "hop-added"
+    run state_get_field migrated manual
     assert_success
     assert_output "true"
 }
 
 @test "State interface: init -> migrate -> record -> export round-trips a fresh module" {
     _load_state_module
-    _write_v010_with_bundle
+    _register_synthetic_hop
+    _write_old_version_file
 
     # init folds migration in; then record a brand-new module through the writer.
     state_init
@@ -139,11 +157,11 @@ JSON
     assert_success
     [[ -f "${_out}" ]]
 
-    # The payload carries BOTH the migrated split tools AND the freshly recorded
+    # The payload carries BOTH the migration output AND the freshly recorded
     # module, all via the synced section (ADR-0018: local never ships).
     run jq -r '.modules[].name' "${_out}"
     assert_success
-    assert_line "git"
+    assert_line "migrated"
     assert_line "neovim"
 
     run jq -r '.modules[] | select(.name == "neovim") | .synced.version_provided' "${_out}"

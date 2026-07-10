@@ -99,6 +99,8 @@ engine_lt_run() {
     _base+=" INIT_UBUNTU_STATE_DIR=${ENGINE_LT_STATE}"
     _base+=" INIT_UBUNTU_CONFIG_DIR=${ENGINE_LT_CONFIG}"
     _base+=" BACKUP_DIR=${ENGINE_LT_BACKUP}"
+    # SR-01: the offline github-release seam only activates under this flag.
+    _base+=" INIT_UBUNTU_TEST_MODE=1"
     _base+=" LOG_COLOR=false LOG_LEVEL=INFO"
     run su "${ENGINE_LT_USER}" -c \
         "cd '${REPO_ROOT}' && ${_base} ${_extra} bash setup_ubuntu.sh ${*}"

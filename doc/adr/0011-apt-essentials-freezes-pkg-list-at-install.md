@@ -1,10 +1,19 @@
 # ADR-0011: apt-essentials installs a universal devel pkg list, filtered by compatibility, frozen at install
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0026
 - **Date:** 2026-05-20
 - **Revised:** 2026-05-20 (premise corrected: this repo targets devel
   platforms across all form factors; platform variation is
   compatibility-only, not use-case-based)
+- **Superseded by:** ADR-0026 —
+  `doc/adr/0026-split-apt-essentials-into-per-tool-modules.md`
+
+> **Superseded by ADR-0026.** The `apt-essentials` module described here
+> is gone — it was split into per-tool modules. The freeze machinery
+> (`frozen_pkgs` / `frozen_platform`) is being retired along with it: the
+> dead 0.1.0 -> 0.2.0 `apt-essentials` state migration and its
+> `frozen_pkgs` handling are removed, since 0.1.0 was never released.
+> This ADR is kept for historical rationale only; nothing below is live.
 
 ## Context
 

@@ -35,9 +35,16 @@ installed via the standard archetype C lifecycle.
 | Intent | Command |
 |---|---|
 | Single config bundle | `setup_ubuntu install git-config` |
-| All config bundles in one shot | `setup_ubuntu install --tag=config` |
+| All config bundles in one shot | `setup_ubuntu install --tag=config` (Deferred — see note below) |
 | Single bundle without engine state tracking | `bash module/git-config.module.sh install` (standalone) |
 | Sync config bundles across machines | `setup_ubuntu sync user@host --modules=git-config,fish-config` |
+
+> **Deferred-until-built:** the `install --tag=<t>` batch path is not yet
+> wired. As shipped, `setup_ubuntu install --tag=config` is rejected with
+> exit 2 — `install`'s flag parser treats `--tag=*` as an unknown flag.
+> The batch-install-by-tag path described in this table is a design
+> intent, not current behaviour; single-bundle install
+> (`setup_ubuntu install git-config`) works today.
 
 ### CLI surface after change
 
@@ -97,6 +104,7 @@ TAGS list.
   uniformly with other tagged groups.
 - AC additions:
   - **AC-43:** `setup_ubuntu install --tag=config` installs every
-    module whose `TAGS[0] == "config"` and exits 0.
+    module where `"config"` appears **anywhere** in `TAGS` (not only
+    `TAGS[0]`, which is reserved for TUI grouping) and exits 0.
   - **AC-44:** `setup_ubuntu config load` returns exit code 2
     (unknown subcommand) — the alias is not silently maintained.

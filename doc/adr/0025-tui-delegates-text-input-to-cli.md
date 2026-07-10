@@ -5,6 +5,14 @@
 - **Relates to:** ADR-0024 (fzf two-pane TUI), PRD G4 (TUI = CLI frontend),
   AC-20 (secret values prompted on the tool's own no-echo tty)
 
+> **Deferred — design-accepted, not built in 0.1.0.** The decision below
+> ("the TUI collects no free-form text; input and confirmation are
+> delegated to the forked CLI") is NOT realized. The code still uses
+> `tui_render_input` — the TUI continues to render free-form text input
+> in-widget — so `tui_render_input` was not removed, and the CLI's
+> interactive-when-missing prompt mode was not built. Treat everything
+> below as the intended design, not current behaviour.
+
 ## Context
 
 The fzf rich tier (ADR-0024) does navigation, selection, and live preview,

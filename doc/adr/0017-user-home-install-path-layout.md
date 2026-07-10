@@ -3,6 +3,14 @@
 - **Status:** Accepted
 - **Date:** 2026-05-20
 
+> **Deferred — design-accepted, not shipped in 0.1.0.** The user-home
+> install path layout below (`$HOME/.local/lib/init_ubuntu/<name>/<version>/`,
+> the `current` symlink scheme, the `module_default_user_home_*` helper
+> API, and the sudo-vs-user-home archetype dispatch) is NOT built in
+> 0.1.0. AC-53 / AC-54 / AC-55 describe the intended design, not current
+> behaviour. Treat this ADR as a design record until the user-home path
+> is implemented.
+
 ## Context
 
 PRD §3.3 says user-home install goes to `$HOME/.local/{bin,lib,share}`

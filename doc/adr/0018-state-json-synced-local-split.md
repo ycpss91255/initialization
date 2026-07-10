@@ -3,17 +3,24 @@
 - **Status:** Accepted (amended 2026-06-07 — see [Amendment](#amendment-2026-06-07-export-payload-is-synced-only))
 - **Date:** 2026-05-20
 - **Related:** ADR-0011 (apt-essentials freeze), ADR-0013 (sync conflict),
-  ADR-0017 (user-home install layout)
+  ADR-0017 (user-home install layout), ADR-0026 (split apt-essentials into
+  per-tool modules — apt-essentials no longer exists; examples below use the
+  surviving `docker` module instead)
 
 ## Context
 
 Several fields in `state.json.installed.<m>` are environment-specific
 and should not propagate across machines:
 
-- `frozen_pkgs` / `frozen_platform` (apt-essentials, ADR-0011) — the
-  pkg set this host actually installed.
 - `install_target_resolved` (`sudo` vs `user-home`) — whether the
-  install went through apt or user-home unpack on this host.
+  install went through apt or user-home unpack on this host. This is the
+  canonical live example of a `local` field.
+- `frozen_pkgs` / `frozen_platform` — **historical.** The freeze
+  mechanism originated with apt-essentials (ADR-0011); that bundle was
+  retired by ADR-0026 and the freeze machinery (including the dead
+  `0.1.0 -> 0.2.0` state migration that backfilled these fields) has since
+  been removed — no live module writes `frozen_*`. They are kept below only
+  as a historical illustration of the local-field *concept*.
 - Any future field describing local snapshots (e.g. recovery
   snapshot path, locally chosen mirror).
 
@@ -48,7 +55,7 @@ Restructure `state.json.installed.<m>` into two sub-objects:
       "user_home_root": "/home/cyc/.local/lib/init_ubuntu/neovim"
     }
   },
-  "apt-essentials": {
+  "docker": {
     "synced": {
       "manual": true,
       "depends_on": [],
@@ -57,8 +64,7 @@ Restructure `state.json.installed.<m>` into two sub-objects:
       "installed_by": "init_ubuntu@v0.1.0"
     },
     "local": {
-      "frozen_pkgs": ["git", "vim", "..."],
-      "frozen_platform": "desktop"
+      "install_target_resolved": "sudo"
     }
   }
 }
@@ -79,8 +85,8 @@ in a machine-portable way. It belongs in `local` if it answers
 | `installed_by` | synced |
 | `install_target_resolved` | local |
 | `user_home_root` | local |
-| `frozen_pkgs` (apt-essentials) | local |
-| `frozen_platform` (apt-essentials) | local |
+| `frozen_pkgs` (historical; freeze retired) | local |
+| `frozen_platform` (historical; freeze retired) | local |
 
 ### Sync / import / export semantics
 
@@ -98,10 +104,11 @@ in a machine-portable way. It belongs in `local` if it answers
 
 ### Migration (ADR-0008)
 
-Pre-ADR state.json had a flat shape. The `migrate_<old>_to_<new>`
-function moves existing fields into `synced` and creates empty
-`local: {}` (or backfills `frozen_*` / `install_target_resolved`
-when detectable from filesystem inspection — best-effort).
+Pre-ADR state.json had a flat shape. A `migrate_<old>_to_<new>` hop
+would move existing fields into `synced` and create an empty
+`local: {}`, letting the next run re-derive local fields from the host.
+(The original draft also described best-effort `frozen_*` backfill; that
+belonged to the now-retired freeze concept and no longer applies.)
 
 ## Alternatives considered
 
@@ -130,11 +137,11 @@ when detectable from filesystem inspection — best-effort).
     machine B (no sudo) reinstalls all modules via user-home and
     `local.install_target_resolved = "user-home"` on B even though
     A had `"sudo"`.
-  - **AC-57:** Sync pull from a remote with
-    `apt-essentials.local.frozen_pkgs = [..., systemd-container]`
-    onto a local machine where that pkg isn't installable causes
-    the local install pipeline to apply its own compat filter; the
-    remote's `local` section is never copied verbatim.
+  - **AC-57:** Sync pull from a remote whose `docker.local`
+    carries `install_target_resolved = "sudo"` onto a local
+    (no-sudo) machine never copies that `local` value verbatim; the
+    local install pipeline re-derives its own `install_target_resolved`
+    (e.g. `user-home`). The remote's `local` section is never applied.
 
 ## Amendment (2026-06-07): export payload is synced-only
 

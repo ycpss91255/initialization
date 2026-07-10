@@ -495,23 +495,29 @@ _seed_managed_config() {
 }
 
 @test "doctor passes when installed and ranger answers --version" {
+    # doctor default (ADR-0009) = is_installed + TEST_VERIFY_CMD. The runtime
+    # probe runs in a fresh `bash -c`, so it needs a REAL binary on PATH.
     _load_module
     is_installed() { return 0; }
-    is_installed
-    ranger() { printf 'ranger version: ranger 1.9.3\n'; }
-    ranger --version >/dev/null
-    run doctor
+    is_installed  # call once so ShellCheck sees the mock as reachable (no SC2317)
+    local _bin="${INIT_UBUNTU_TEST_SCRATCH}/bin"
+    mkdir -p "${_bin}"
+    printf '#!/usr/bin/env bash\nprintf "ranger version: ranger 1.9.3\\n"\n' \
+        > "${_bin}/ranger"
+    chmod +x "${_bin}/ranger"
+    PATH="${_bin}:${PATH}" run doctor
     assert_success
 }
 
-@test "doctor (inherited default) tracks is_installed only, not the binary" {
-    # ranger now inherits module_default_doctor (is_installed + warn); the
-    # ranger --version probe moved to verify (TEST_VERIFY_CMD), so an empty
-    # PATH no longer fails doctor as long as is_installed succeeds.
+@test "doctor (inherited default) fails when installed but the runtime check fails" {
+    # ranger inherits module_default_doctor: is_installed AND TEST_VERIFY_CMD
+    # (ADR-0009 shipped model). Installed but the runtime probe failing -> fail.
     _load_module
     eval 'is_installed() { return 0; }'
-    PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-path" run doctor
-    assert_success
+    TEST_VERIFY_CMD="false"
+    run doctor
+    assert_failure
+    assert_output --partial "runtime check failed"
 }
 
 @test "is_outdated returns zero when apt lists ranger as upgradable" {

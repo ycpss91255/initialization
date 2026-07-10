@@ -100,3 +100,17 @@ nvidia-driver *args:
 # Resume the Claude Code session for this repo.
 claude *args:
     ./run_claude.sh {{ args }}
+
+# ── Authoring / scaffolding (script/scaffold.sh) ─────────────────────────────
+# Dev-side authoring tooling (NOT a shipped setup_ubuntu feature): stamp a new
+# one-off tool or Claude hook — plus its matching bats spec — from the canonical
+# templates, so it starts template-first (sources the shared bootstrap) instead
+# of hand-rolled. See doc/adr/0029-small-tool-template.md.
+
+# Scaffold a new one-off tool: `just new-tool <name>` (tool/<name>.sh + spec).
+new-tool name:
+    ./script/scaffold.sh new-tool {{ name }}
+
+# Scaffold a new Claude hook: `just new-hook <name>` (.agents/hook/<name>.sh + spec).
+new-hook name:
+    ./script/scaffold.sh new-hook {{ name }}

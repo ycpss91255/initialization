@@ -358,6 +358,13 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   counterparts (issue #245); and `@continuum-restore 'on'` so the last saved
   session auto-restores on tmux server start (issue #266). Existing `hjkl`
   bindings are unchanged.
+- **`ctop` fish tool wrapper** (`module/config/fish/functions/ctop.fish`):
+  the Ubuntu-packaged `ctop` is broken on cgroup v2 hosts (cannot locate
+  cgroup mountpoints) and the upstream `bcicen/ctop` binary panics in
+  termbox under `$TERM=tmux-256color`. The wrapper overrides `TERM` to a
+  termbox-safe `screen-256color` for the call only, escalates with
+  `sudo -E`, and dispatches to the absolute `/usr/local/bin/ctop` path so
+  plain `ctop` works from any tmux pane (issue #271).
 - **`custom-hosts-sync` module** (`module/custom-hosts-sync.module.sh` +
   `module/config/custom-hosts-sync/`, issue #145): keeps custom `/etc/hosts`
   name->IP entries from being reverted by the F5 BIG-IP Edge VPN client

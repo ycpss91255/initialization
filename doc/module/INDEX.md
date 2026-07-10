@@ -18,6 +18,7 @@ to the module source.
 | [claude-monitor](../../module/claude-monitor.module.sh) | optional | agent cli | claude-monitor — real-time Claude Code token/cost usage monitor TUI (pipx) |
 | [codex](../../module/codex.module.sh) | optional | agent | codex — OpenAI Codex CLI coding agent |
 | [curl](../../module/curl.module.sh) | base | http | curl — command-line tool for transferring data with URLs (apt curl package) |
+| [custom-hosts-sync](../../module/custom-hosts-sync.module.sh) | optional | network vpn hosts | Keep custom /etc/hosts entries from being reverted by the F5 VPN (svpn) |
 | [docker](../../module/docker.module.sh) | recommended | container devops | Docker Engine + Compose plugin |
 | [eza](../../module/eza.module.sh) | optional | cli-essentials | Modern ls replacement (eza) + shell alias ls='eza' |
 | [fdfind](../../module/fdfind.module.sh) | optional | cli-essentials | fd (fdfind) — fast, user-friendly alternative to find (apt fd-find) |

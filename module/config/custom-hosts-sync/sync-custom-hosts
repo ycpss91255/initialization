@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Sync ~/.config/hosts-custom/hosts.custom into the managed block of /etc/hosts.
+# Idempotent: writes only when content actually changes, so it never loops on
+# its own inotify event.
+#
+# __USER_HOME__ is substituted with the real home (derived from $HOME at
+# install time by module/custom-hosts-sync.module.sh). The MASTER / HOSTS
+# defaults may be overridden via the CUSTOM_HOSTS_MASTER / CUSTOM_HOSTS_FILE
+# environment variables (used by the unit tests); production leaves them unset
+# so the substituted __USER_HOME__ path and /etc/hosts are used.
+set -euo pipefail
+MASTER="${CUSTOM_HOSTS_MASTER:-__USER_HOME__/.config/hosts-custom/hosts.custom}"
+HOSTS="${CUSTOM_HOSTS_FILE:-/etc/hosts}"
+BEGIN="# >>> custom-hosts (managed - edit ~/.config/hosts-custom/hosts.custom) >>>"
+END="# <<< custom-hosts (managed) <<<"
+
+[ -r "$MASTER" ] || exit 0
+
+# Everything in /etc/hosts outside the managed block
+stripped="$(awk -v b="$BEGIN" -v e="$END" '$0==b{s=1;next} $0==e{s=0;next} !s' "$HOSTS")"
+master="$(cat "$MASTER")"
+new="$(printf '%s\n\n%s\n%s\n%s' "$stripped" "$BEGIN" "$master" "$END")"
+
+# No change -> do nothing (prevents self-triggered loop)
+[ "$new" = "$(cat "$HOSTS")" ] && exit 0
+
+printf '%s\n' "$new" > "$HOSTS"
+chmod 644 "$HOSTS"

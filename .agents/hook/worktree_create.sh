@@ -13,16 +13,24 @@
 # resulting absolute path on stdout (nothing else). Non-zero exit / empty
 # stdout => Claude falls back to its default behavior.
 #
-# Per ADR-0007 this exit-code-contract hook defaults to `set -uo pipefail`.
+# Template-first (ADR-0029): sources lib/hook_bootstrap.sh for set -uo pipefail
+# (ADR-0007 exit-code-contract) + input reading (hook_read_input / hook_field).
+# The path-safety checks, repo-root resolution, and `git worktree add` (printing
+# only the absolute path on stdout) are this hook's unique logic and are unchanged.
 
-set -uo pipefail
+# shellcheck source=../../lib/hook_bootstrap.sh
+source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
+hook_bootstrap "worktree-create"
 
-_payload="$(cat)"
+hook_read_input
 
-_name=""
-if command -v jq >/dev/null 2>&1; then
-    _name="$(printf '%s' "${_payload}" | jq -r '.name // empty' 2>/dev/null)"
-fi
+# This is a WorktreeCreate hook: the real payload carries `.name` and never a
+# tool-use `.tool_name`. When a tool-use payload is misrouted here (a Bash
+# PreToolUse call, or the conformance meta-test's empty-command probe), this hook
+# does not apply — no-op / allow (exit 0) instead of erroring on the absent name.
+[[ -n "$(hook_field '.tool_name')" ]] && exit 0
+
+_name="$(hook_field '.name')"
 [[ -n "${_name}" ]] || { printf 'worktree_create: missing .name in payload\n' >&2; exit 1; }
 
 # Reject path-trickery in the name (it becomes a directory + branch component).

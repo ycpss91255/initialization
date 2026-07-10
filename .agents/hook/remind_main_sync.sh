@@ -28,8 +28,15 @@
 # Not restricted to `--squash` / `--merge` / `--rebase`; any merge mode
 # triggers it.
 # Skip read-only `gh pr view` / `gh pr checks` etc.
+#
+# Template-first (ADR-0029): sources lib/hook_bootstrap.sh for set -uo pipefail
+# (ADR-0007 exit-code-contract) + input reading (hook_read_input / hook_command).
+# The quote-strip trigger detection + the systemMessage/additionalContext
+# emission are this hook's unique logic and are unchanged.
 
-set -uo pipefail
+# shellcheck source=../../lib/hook_bootstrap.sh
+source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
+hook_bootstrap "remind-main-sync"
 
 # Strip outer-level double-quoted and single-quoted regions so a literal
 # `gh pr merge` inside a commit message / -m argument / heredoc body
@@ -44,9 +51,9 @@ strip_quoted_regions() {
 }
 
 main() {
-  local input cmd cleaned msg variant
-  input="$(cat)"
-  cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
+  hook_read_input
+  local cmd cleaned msg variant
+  cmd="$(hook_command)"
 
   [[ -z "${cmd}" ]] && return 0
 

@@ -22,14 +22,21 @@
 #
 # Non-doc = anything outside `doc/`, not `*.md`, not `.gitignore`/`LICENSE*`.
 # Conservative — better to over-nag (non-blocking) than miss real drift.
+#
+# Template-first (ADR-0029): sources lib/hook_bootstrap.sh for set -uo pipefail
+# (ADR-0007 exit-code-contract) + input reading (hook_read_input / hook_command /
+# hook_field). The staged-diff drift detection + the systemMessage emission are
+# this hook's unique logic and are unchanged.
 
-set -uo pipefail
+# shellcheck source=../../lib/hook_bootstrap.sh
+source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
+hook_bootstrap "check-changelog-drift"
 
 main() {
-  local input cmd cwd work_dir repo_root staged has_code has_changelog msg
-  input="$(cat)"
-  cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
-  cwd="$(printf '%s' "${input}" | jq -r '.cwd // empty' 2>/dev/null)"
+  hook_read_input
+  local cmd cwd work_dir repo_root staged has_code has_changelog msg
+  cmd="$(hook_command)"
+  cwd="$(hook_field '.cwd')"
   [[ -z "${cwd}" ]] && cwd="${PWD}"
 
   [[ -z "${cmd}" ]] && return 0

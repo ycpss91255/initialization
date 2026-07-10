@@ -49,21 +49,8 @@ setup_wayland.sh
 sync_config.sh
 "
 
-ALLOWLIST_HOOKS="
-check_changelog_drift.sh
-check_main_fresh_before_worktree.sh
-enforce_gh_body_file.sh
-enforce_gh_english.sh
-enforce_gh_issue_template.sh
-enforce_gh_review_approval.sh
-enforce_long_job_timeout.sh
-enforce_semver_tag_via_script.sh
-enforce_shellcheck_disable_approval.sh
-remind_ci_auto_merge.sh
-remind_main_sync.sh
-remind_workflow_tdd.sh
-worktree_create.sh
-"
+# Empty: all hooks are migrated onto lib/hook_bootstrap.sh and enforced.
+ALLOWLIST_HOOKS=""
 
 setup() {
     setup_test_env

@@ -100,6 +100,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`docker-tool/set-address-pool.sh`** (`script/docker-tool/set-address-pool.sh`,
+  issue #270): a standalone root-only config tool that pins Docker's
+  `default-address-pools` in `/etc/docker/daemon.json` to `172.16.0.0/12`
+  sliced into `/24` blocks (4096 concurrent subnets, base/size overridable as
+  args). Docker's built-in pool is only 15 `/16` blocks and, once exhausted
+  under heavy `docker-compose` churn, silently overflows into `192.168.0.0/16`
+  — surprising anyone monitoring the host's network. The script backs up the
+  existing `daemon.json` (`.bak.<timestamp>`), merges via `jq` preserving other
+  keys (e.g. `runtimes`), validates the candidate with `dockerd --validate`
+  before it ever touches the live file (leaving the original untouched on
+  failure), cleans up its scratch file via `trap ... EXIT`, and prints — but
+  does not run — the `systemctl restart docker` step so the operator can check
+  restart policies first. `DOCKER_DAEMON_JSON_PATH` overrides the target path
+  for testing. Covered by `test/unit/script/set_address_pool_spec.bats`.
 - **`claude-ls` follows `ls` conventions** (`module/config/fish/functions/claude-ls.fish`,
   issue #163): quiet + current-folder by default (`$PWD` mapped to Claude's
   `/`->`-` project encoding), with `-a`/`--all` restoring the all-projects view

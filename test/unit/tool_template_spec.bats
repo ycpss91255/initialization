@@ -104,12 +104,23 @@ teardown() {
     [[ "${_count}" -eq 1 ]] || { printf 're-run not idempotent: %s marker lines\n' "${_count}" >&2; return 1; }
 }
 
-# ── Contract guardrails baked into the template file ─────────────────────────
+# ── Contract guardrails: the template is a THIN skeleton over the bootstrap ──
+# The strict-mode + grep-guarded-idempotency machinery now lives in the shared
+# lib/tool_bootstrap.sh (exercised in detail by tool_bootstrap_spec.bats); the
+# template must SOURCE it and hand off to tool_main rather than re-implement it.
 
-@test "tool template: declares set -euo pipefail (ADR-0007 always-act)" {
-    grep -qE '^set -euo pipefail$' "${TEMPLATE_DIR}/tool.template.sh"
+@test "tool template: sources the shared lib/tool_bootstrap.sh" {
+    grep -q 'tool_bootstrap.sh' "${TEMPLATE_DIR}/tool.template.sh"
 }
 
-@test "tool template: contains a grep-guarded idempotency check" {
-    grep -q 'grep -qxF' "${TEMPLATE_DIR}/tool.template.sh"
+@test "tool template: dispatches through tool_main" {
+    grep -qE '^tool_main "\$@"$' "${TEMPLATE_DIR}/tool.template.sh"
+}
+
+@test "tool bootstrap: declares set -euo pipefail (ADR-0007 always-act)" {
+    grep -qE '^\s*set -euo pipefail$' "${LIB_DIR}/tool_bootstrap.sh"
+}
+
+@test "tool bootstrap: provides a grep-guarded idempotency helper" {
+    grep -q 'grep -qxF' "${LIB_DIR}/tool_bootstrap.sh"
 }

@@ -30,6 +30,31 @@ chmod +x ./install.sh
 ./install.sh
 ----
 
+[NOTE]
+.fastfetch 安裝方式
+====
+`fastfetch` 不在 Ubuntu 24.04「noble」套件庫中；apt 套件只在 Ubuntu 25.04+ /
+Debian 13+ 才提供。`install.sh` 會加入官方維護的 PPA，讓安裝在 24.04 與所有目標
+架構（含 arm64）皆可運作：
+
+[source, shell]
+----
+# Ubuntu 24.04（及更舊版本）— 透過 PPA（install.sh 的做法）：
+sudo add-apt-repository -y ppa:zhangsongcui3371/fastfetch
+sudo apt update
+sudo apt install -y fastfetch
+
+# Ubuntu 25.04+ / Debian 13+ — 原生 apt 套件：
+sudo apt install -y fastfetch
+
+# 備援（無法使用 PPA 的環境）— 從 GitHub releases 下載 .deb
+# （依主機架構挑選 -amd64 / -aarch64）：
+curl -fsSL -o /tmp/fastfetch.deb \
+  https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.deb
+sudo apt install -y /tmp/fastfetch.deb
+----
+====
+
 == 使用方法
 .監控工具
 [source, shell]
@@ -91,8 +116,8 @@ git config --global core.editor "editor"
 # jq
 cat <JSON_PATH> | jq '.'
 
-# neofetch
-neofetch
+# fastfetch
+fastfetch
 
 # gpustat
 gpustat
@@ -107,9 +132,6 @@ nmap <IP>/<MASK>
 # powerstat
 sudo powerstat
 
-# ranger
-ranger [FOLDER_PATH]
-
 # silversearcher-ag
 ag 取代 grep
 
@@ -117,8 +139,10 @@ ag 取代 grep
 tig [--all]
 tig status
 
-# tldr
+# tldr (tealdeer 用戶端)
 tldr <COMMAND>
+# 語言參數為大寫 -L（小寫 -l 是 --list）；代碼用底線，例如 zh_TW
+tldr -L zh <COMMAND>
 
 # tree
 tree [FOLDER_PATH]

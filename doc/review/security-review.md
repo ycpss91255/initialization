@@ -383,7 +383,7 @@ These areas were examined and found clean (or clean under the threat model):
   `lib/state_migrate.sh`, `setup_ubuntu.sh` entrypoint path resolution.
 - Most modules are pure-apt archetype and clean: build-essential, curl, git, htop,
   jq, ripgrep, fdfind, tmux, unzip, vim, wget, batcat, codex, gemini, and the
-  config-only modules (git-config, ssh-config, shell, ranger, claude-code-config).
+  config-only modules (git-config, ssh-config, shell, claude-code-config).
 
 ---
 

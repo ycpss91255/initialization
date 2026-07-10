@@ -168,6 +168,7 @@ chown -R "${SYNC_USER}:${SYNC_USER}" "${SYNC_HOME}/.config" "${SYNC_HOME}/.local
 # log-only for a static-pattern module but kept for parity with the harness).
 cat > /usr/bin/setup_ubuntu <<EOF
 #!/bin/sh
+export INIT_UBUNTU_TEST_MODE=1
 export INIT_UBUNTU_TEST_GH_FIXTURE_DIR="${GHR_FIXTURE_DIR}"
 export INIT_UBUNTU_TEST_GH_VERSION="${GHR_VERSION}"
 exec /source/setup_ubuntu.sh "\$@"

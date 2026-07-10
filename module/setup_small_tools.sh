@@ -65,7 +65,6 @@ function _install_normal_pkgs() {
 
         "net-tools"
         "ncdu"
-        "neofetch"
         "tree"
         "silversearcher-ag"
         "xdg-utils"
@@ -177,59 +176,13 @@ function _install_monitor_pkgs() {
     exec_cmd "pipx install bpytop"
 }
 
-# TODO: add yazi
-# sudo apt install ffmpegthumbnailer jq
-function _install_ranger() {
-    log_info "Install and configure ranger..."
-    apt_pkg_manager --install -- "pipx"
-    exec_cmd "pipx install ranger-fm"
-
-    local _conf_dir="${HOME}/.config/ranger"
-    local _plugins_dir="${_conf_dir}/plugins"
-    local _rc_file="${_conf_dir}/rc.conf"
-
-    if [[ -d "${_conf_dir}" ]]; then
-        log_info "Backup old ranger configuration (${_conf_dir}) to ${BACKUP_DIR}/ranger"
-        backup_file "${_conf_dir}"
-        exec_cmd "rm -rf \"${_conf_dir}\""
-    fi
-    exec_cmd "mkdir -p \"${_plugins_dir}\""
-
-
-    log_info "Install ranger plugins..."
-    # ranger_devicons
-    log_info "Install ranger_devicons..."
-    exec_cmd "git clone --depth 1 \
-        \"https://github.com/alexanderjeurissen/ranger_devicons\" \
-        \"${_plugins_dir}/ranger_devicons\""
-    # devicons config
-    if ! grep -qxF "default_linemode devicons" "${_rc_file}"; then
-        exec_cmd "echo \"default_linemode devicons\" >> \"${_rc_file}\""
-    fi
-
-    # anger-zoxide
-    log_info "Install ranger-zoxide..."
-    exec_cmd "git clone --depth 1 \
-        \"https://github.com/jchook/ranger-zoxide\" \
-        \"${_plugins_dir}/ranger-zoxide\""
-
-    # ranger-fzf-filter
-    log_info "Install ranger-fzf-filter..."
-    exec_cmd "git clone --depth 1 \
-        \"https://github.com/MuXiu1997/ranger-fzf-filter\" \
-        \"${_plugins_dir}/ranger_fzf_filter\""
-    # fzf config
-    if ! grep -qxF "map f console fzf_filter%space" "${_rc_file}"; then
-        exec_cmd "echo \"map f console fzf_filter%space\" >> \"${_rc_file}\""
-    fi
-}
-
 function _install_tmux() {
-    # tmux and tmuxp
+    # tmux only. tmuxp moved to a pipx-managed module (module/tmuxp.module.sh,
+    # issue #313) for a newer release + venv isolation, so it is no longer
+    # apt-installed here.
     _tmux_pkgs=(
         "xclip"
         "tmux"
-        "tmuxp"
         # tmux-plugins/tmux-logging dependency
         "ansifilter"
         # dep fzf
@@ -336,12 +289,25 @@ function _install_obs() {
     apt_pkg_manager --install -- "obs-studio"
 }
 
+function _install_fastfetch() {
+    # fastfetch is the maintained replacement for the archived upstream tool it
+    # supersedes (issue #325). It is NOT in the Ubuntu 24.04 "noble"
+    # repositories: the apt package only lands in Ubuntu 25.04+ / Debian 13+.
+    # Add the maintained PPA when apt cannot see the package yet; on 25.04+ it
+    # is already available and the PPA step is skipped.
+    log_info "Install fastfetch..."
+    if ! apt-cache show fastfetch &>/dev/null; then
+        exec_cmd "sudo add-apt-repository -y ppa:zhangsongcui3371/fastfetch"
+    fi
+    apt_pkg_manager --install -- "fastfetch"
+}
+
 _install_normal_pkgs
+_install_fastfetch
 _install_submodule_tool
 _install_ssh_pkgs
 _install_git_pkgs
 _install_monitor_pkgs
-_install_ranger
 _install_tmux
 _install_spotify
 _install_vim

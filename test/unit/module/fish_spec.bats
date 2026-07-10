@@ -154,6 +154,72 @@ _mock_fisher_and_chsh() {
     [[ -f "${MODULE_DIR}/config/fish/fish_plugins" ]]
 }
 
+# ── ctop.fish tool wrapper (issue #271) ──────────────────────────────────────
+# The Ubuntu-packaged ctop is broken on this host (cgroup v2 lookup + a
+# termbox panic under tmux-256color). The repo ships a fish function that
+# wraps the upstream binary and overrides $TERM for the call only.
+
+@test "fish module ships the ctop.fish tool function" {
+    [[ -f "${MODULE_DIR}/config/fish/functions/ctop.fish" ]]
+}
+
+@test "ctop.fish defines a ctop function wrapping ctop" {
+    local _f="${MODULE_DIR}/config/fish/functions/ctop.fish"
+    grep -Eq '^function ctop' "${_f}"
+    grep -q -- '--wraps' "${_f}"
+    grep -Eq 'end[[:space:]]*$' "${_f}"
+}
+
+@test "ctop.fish overrides TERM to a termbox-safe value for the call" {
+    local _f="${MODULE_DIR}/config/fish/functions/ctop.fish"
+    grep -q 'TERM=screen-256color' "${_f}"
+}
+
+@test "ctop.fish escalates with sudo -E to preserve the TERM override" {
+    local _f="${MODULE_DIR}/config/fish/functions/ctop.fish"
+    grep -q 'sudo -E' "${_f}"
+}
+
+@test "ctop.fish dispatches to the absolute binary path (not 'command ctop')" {
+    # sudo has no concept of the fish `command` builtin; `sudo -E command
+    # ctop` fails with 'command: command not found'. The absolute path also
+    # avoids the function recursing into itself.
+    local _f="${MODULE_DIR}/config/fish/functions/ctop.fish"
+    grep -q '/usr/local/bin/ctop' "${_f}"
+    run grep -q 'command ctop' "${_f}"
+    assert_failure
+}
+
+@test "ctop.fish forwards caller arguments via \$argv" {
+    local _f="${MODULE_DIR}/config/fish/functions/ctop.fish"
+    grep -q "\$argv" "${_f}"
+}
+
+# ── Issue #164: disable focus reporting during commands ──────────────────────
+# fish injects focus-event sequences (ESC[I / ESC[O, shown as ^[[I) into
+# external commands under tmux (focus-events on) + fish 4.x (fish-shell#12232).
+# A conf.d snippet disables focus reporting on fish_preexec so the sequences
+# stop leaking into interactive scripts, while nvim's FocusGained autoread
+# still works (tmux focus-events stays on).
+
+@test "fish ships the focus-reporting workaround conf.d snippet (#164)" {
+    [[ -f "${MODULE_DIR}/config/fish/conf.d/disable_focus_during_commands.fish" ]]
+}
+
+@test "focus workaround disables focus reporting on fish_preexec (#164)" {
+    local _f="${MODULE_DIR}/config/fish/conf.d/disable_focus_during_commands.fish"
+    run grep -F -- '--on-event fish_preexec' "${_f}"
+    [[ "${status}" -eq 0 ]]
+    run grep -F -- '\e[?1004l' "${_f}"
+    [[ "${status}" -eq 0 ]]
+}
+
+@test "focus workaround references upstream fish-shell#12232 (#164)" {
+    run grep -F -- 'fish-shell/issues/12232' \
+        "${MODULE_DIR}/config/fish/conf.d/disable_focus_during_commands.fish"
+    [[ "${status}" -eq 0 ]]
+}
+
 # ── Metadata sanity ──────────────────────────────────────────────────────────
 
 @test "fish module declares NAME=fish" {
@@ -806,4 +872,46 @@ _mock_fisher_and_chsh() {
     run _load_module
     assert_success
     refute_output --partial "Usage:"
+}
+
+# ── claude-rm customTitle match on fork / resumed sessions (issue #33) ────────
+# The claude-rm helper (config payload dropped by this module) resolves a
+# customTitle to its session file. Fork / resumed sessions put customTitle on a
+# LATER line (line 1 is a leafUuid / permissionMode / file-history snapshot), so
+# a first-line-only scan misses them and reports "No session matched" even
+# though Tab completion — backed by _claude_sessions.py, which scans the first
+# 50 lines — shows the title. The resolver must use the SAME 50-line window as
+# the completion helper. Verified via tracked-config-content assertions
+# (precedent: codex_spec / yazi_spec / qmk-firmware_spec), since the runtime
+# match path depends on python3 (a user-host dependency absent from the
+# Docker test-tools image).
+
+_CLAUDE_RM_FN="${MODULE_DIR}/config/fish/functions/claude-rm.fish"
+_CLAUDE_SESSIONS_PY="${MODULE_DIR}/config/fish/_claude_sessions.py"
+
+@test "claude-rm ships the customTitle resolver function (issue #33)" {
+    [[ -f "${_CLAUDE_RM_FN}" ]]
+    grep -Fq 'function claude-rm' "${_CLAUDE_RM_FN}"
+}
+
+@test "claude-rm scans the first 50 lines for customTitle, not just line 1 (issue #33)" {
+    # The resolver must widen its customTitle scan to the first 50 lines and
+    # select the customTitle line explicitly, so fork / resumed sessions whose
+    # line 1 is leafUuid / permissionMode / a snapshot are still matched.
+    grep -Fq 'head -50 ' "${_CLAUDE_RM_FN}"
+    grep -Fq "grep -m1 '\"customTitle\"'" "${_CLAUDE_RM_FN}"
+}
+
+@test "claude-rm no longer reads only the first line for customTitle (issue #33 regression)" {
+    # Regression guard: the customTitle branch must not pipe a bare
+    # `head -1 $f` straight into the JSON parser (the pre-fix behavior).
+    run grep -F 'head -1 ' "${_CLAUDE_RM_FN}"
+    assert_failure
+}
+
+@test "claude-rm customTitle window matches _claude_sessions.py (issue #33)" {
+    # The completion helper scans the first 50 lines (`if i > 50: break`);
+    # the resolver must stay aligned or completion and resolution disagree —
+    # exactly the issue #33 symptom.
+    grep -Fq 'i > 50' "${_CLAUDE_SESSIONS_PY}"
 }

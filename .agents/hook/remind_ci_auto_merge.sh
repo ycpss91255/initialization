@@ -20,13 +20,20 @@
 #                            which at run time.
 #
 # Non-blocking: always exit 0 (emit additionalContext, never deny).
+#
+# Template-first (ADR-0029): sources lib/hook_bootstrap.sh for set -uo pipefail
+# (ADR-0007 exit-code-contract) + input reading (hook_read_input / hook_command).
+# Trigger detection + the systemMessage/additionalContext emission are this
+# hook's unique logic and are unchanged.
 
-set -uo pipefail
+# shellcheck source=../../lib/hook_bootstrap.sh
+source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
+hook_bootstrap "remind-ci-auto-merge"
 
 main() {
-  local input cmd msg=""
-  input="$(cat)"
-  cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
+  hook_read_input
+  local cmd msg=""
+  cmd="$(hook_command)"
   [[ -z "${cmd}" ]] && return 0
 
   # Dual-watch reminder: a hook can only REMIND — the agent still arms both,

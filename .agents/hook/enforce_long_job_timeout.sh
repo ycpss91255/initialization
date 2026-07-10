@@ -17,35 +17,34 @@
 # (The PreToolUse hook contract here is exit-code based — it cannot rewrite the
 # command — so "enforce" means block-with-guidance, not silent auto-wrap.)
 #
+# Template-first (ADR-0029): sources lib/hook_bootstrap.sh, which supplies
+# set -uo pipefail (ADR-0007 exit-code-contract), HOOK_NAME, hook_read_input,
+# hook_field, and the standard hook_allow (exit 0) / hook_block (exit 2,
+# "[hook:<name>] BLOCKED — ...") decision paths. The long-job classification is
+# this hook's unique logic and is unchanged.
+#
 # Exit codes:
 #   0  → allow
 #   2  → block (Claude shows stderr to the model)
-#
-# Per ADR-0007 this exit-code-contract hook defaults to `set -uo pipefail`.
 
-set -uo pipefail
+# shellcheck source=../../lib/hook_bootstrap.sh
+source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
+hook_bootstrap "long-job-timeout"
 
-_stdin_payload="$(cat)"
+hook_read_input
 
-_json_field() {
-    # $1 = jq filter. Empty when jq is missing or the key is absent/null.
-    if command -v jq >/dev/null 2>&1; then
-        printf '%s' "${_stdin_payload}" | jq -r "${1} // empty" 2>/dev/null
-    fi
-}
-
-_cmd="$(_json_field '.tool_input.command')"
-_bg="$(_json_field '.tool_input.run_in_background')"
-_timeout="$(_json_field '.tool_input.timeout')"
+_cmd="$(hook_command)"
+_bg="$(hook_field '.tool_input.run_in_background')"
+_timeout="$(hook_field '.tool_input.timeout')"
 
 # Nothing to inspect, or jq unavailable (cannot safely classify) — allow.
-[[ -z "${_cmd}" ]] && exit 0
+[[ -z "${_cmd}" ]] && hook_allow
 
 # Safety 1: backgrounded — the harness notifies on completion.
-[[ "${_bg}" == "true" ]] && exit 0
+[[ "${_bg}" == "true" ]] && hook_allow
 
 # Safety 2: an explicit positive Bash timeout param is set.
-[[ "${_timeout}" =~ ^[0-9]+$ && "${_timeout}" -gt 0 ]] && exit 0
+[[ "${_timeout}" =~ ^[0-9]+$ && "${_timeout}" -gt 0 ]] && hook_allow
 
 # Safety 3: the command self-wraps in `timeout`/`gtimeout <duration>` at a
 # command position (start, or after ; | && || ( or `$(`). This must be a GLOBAL
@@ -57,7 +56,7 @@ _timeout="$(_json_field '.tool_input.timeout')"
 # launcher with timeout(1), honor it. (Contract: "self-wrapping with timeout(1)
 # also passes.")
 if [[ "${_cmd}" =~ (^|[[:space:]]|[\;\|\&\(]|\$\()[[:space:]]*g?timeout[[:space:]]+(-[A-Za-z][A-Za-z-]*[[:space:]]+|--[A-Za-z][A-Za-z-]*([[:space:]]+|=)[^[:space:]]+[[:space:]]+)*[0-9] ]]; then
-    exit 0
+    hook_allow
 fi
 
 # ── Known-long foreground command patterns ───────────────────────────────────
@@ -128,12 +127,11 @@ if [[ "${_is_long}" -eq 0 ]]; then
     done <<< "${_clean}"
 fi
 
-[[ "${_is_long}" -eq 0 ]] && exit 0
+[[ "${_is_long}" -eq 0 ]] && hook_allow
 
-printf '[hook:long-job-timeout] BLOCKED — long-running foreground command with no time bound.\n' >&2
-printf '[hook:long-job-timeout] Command: %s\n' "${_cmd}" >&2
-printf '[hook:long-job-timeout] Pick one (the two-safety pattern):\n' >&2
-printf '[hook:long-job-timeout]   1. run_in_background: true   (harness notifies on completion; arm a Monitor watchdog)\n' >&2
-printf '[hook:long-job-timeout]   2. set the Bash "timeout" param, e.g. 600000 (OS reaps a hang at the deadline)\n' >&2
-printf '[hook:long-job-timeout] Self-wrapping the command with the timeout(1) utility also passes.\n' >&2
-exit 2
+hook_block "long-running foreground command with no time bound." \
+    "Command: ${_cmd}" \
+    "Pick one (the two-safety pattern):" \
+    "  1. run_in_background: true   (harness notifies on completion; arm a Monitor watchdog)" \
+    "  2. set the Bash \"timeout\" param, e.g. 600000 (OS reaps a hang at the deadline)" \
+    "Self-wrapping the command with the timeout(1) utility also passes."

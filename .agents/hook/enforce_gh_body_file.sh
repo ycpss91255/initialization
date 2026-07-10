@@ -40,7 +40,14 @@
 #   - `--body-file <real-path>` (canonical form, exactly what we want)
 #   - Non-gh commands
 
-set -uo pipefail
+# Template-first (ADR-0029): sources lib/hook_bootstrap.sh for set -uo pipefail
+# (ADR-0007 exit-code-contract) + input reading (hook_read_input / hook_command).
+# The gh body-file / label / inline-body rule set and its permissionDecision=deny
+# emission are this hook's unique logic and are unchanged.
+
+# shellcheck source=../../lib/hook_bootstrap.sh
+source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
+hook_bootstrap "enforce-gh-body-file"
 
 readonly SHORT_LIMIT=80
 
@@ -146,9 +153,9 @@ deny() {
 }
 
 main() {
-  local input cmd subcmd body len
-  input="$(cat)"
-  cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
+  hook_read_input
+  local cmd subcmd body len
+  cmd="$(hook_command)"
   [[ -z "${cmd}" ]] && return 0
 
   if ! printf '%s' "${cmd}" | grep -qE '(^|[[:space:]&|;])gh[[:space:]]'; then

@@ -37,7 +37,14 @@
 # Companion hooks on the same matcher: enforce_gh_body_file.sh (body-file +
 # label discipline) and enforce_gh_english.sh (English-only).
 
-set -uo pipefail
+# Template-first (ADR-0029): sources lib/hook_bootstrap.sh for set -uo pipefail
+# (ADR-0007 exit-code-contract) + input reading (hook_read_input / hook_command).
+# The form-parsing (required labels), section-state checks, and
+# permissionDecision=deny emission are this hook's unique logic and are unchanged.
+
+# shellcheck source=../../lib/hook_bootstrap.sh
+source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
+hook_bootstrap "enforce-gh-issue-template"
 
 readonly TEMPLATE_REL=".github/ISSUE_TEMPLATE"
 
@@ -136,9 +143,9 @@ main() {
   command -v jq >/dev/null 2>&1 || return 0
   command -v awk >/dev/null 2>&1 || return 0
 
-  local input cmd
-  input="$(cat)"
-  cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
+  hook_read_input
+  local cmd
+  cmd="$(hook_command)"
   [[ -z "${cmd}" ]] && return 0
 
   # Only `gh issue create`.

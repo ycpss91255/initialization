@@ -39,7 +39,16 @@ _dispatcher_lifecycle() {
                 export INIT_UBUNTU_QUIET=true
                 export LOG_LEVEL=WARN
                 ;;
-            --with-orphans|--base|--recommended|--all-base|--category=*|--install-target=*|--force|--profile=*)
+            --force|--with-orphans)
+                # ADR-0012 (--force soft/hard filter) and ADR-0010 (--with-orphans
+                # forward-dep orphan scan) are design-accepted but NOT built. Both
+                # carry destructive intent, so refuse them outright (exit 2) instead
+                # of silently no-op'ing — an unimplemented destructive flag must
+                # never be quietly accepted.
+                printf "[dispatcher] ERROR: %s is not yet implemented; refusing to proceed (this flag carries destructive intent and is not silently ignored)\n" "${_arg}" >&2
+                return 2
+                ;;
+            --base|--recommended|--all-base|--category=*|--install-target=*|--profile=*)
                 printf "[dispatcher] WARN: %s is stubbed; ignoring\n" "${_arg}" >&2
                 ;;
             -*)

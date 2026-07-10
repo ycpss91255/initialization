@@ -34,6 +34,8 @@ fish -c "fisher remove \
     /home/${USER_NAME}/.fzf/uninstall && \
     set -e fish_user_paths"
 sudo add-apt-repository --remove -y ppa:fish-shell/release-3
+# drop the fastfetch PPA added at install time
+sudo add-apt-repository --remove -y ppa:zhangsongcui3371/fastfetch
 
 # delete 'fish' configuration file
 rm -rf /home/"${USER_NAME}"/.config/fish
@@ -84,7 +86,7 @@ sudo apt purge -y \
     fish \
     git-lfs \
     jq \
-    neofetch \
+    fastfetch \
     net-tools \
     nmap \
     openssh-client \

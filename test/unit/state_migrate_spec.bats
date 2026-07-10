@@ -1,12 +1,13 @@
 #!/usr/bin/env bats
-# test/unit/state_migrate_spec.bats — lib/state_migrate.sh (ADR-0008 + ADR-0026)
+# test/unit/state_migrate_spec.bats — lib/state_migrate.sh (ADR-0008)
 #
-# Forward-only schema migration:
-#   - no-op when version == current
-#   - 0.1.0 -> 0.2.0 splits an installed apt-essentials bundle into the five
-#     per-tool modules it actually installed (git/vim/curl/wget/jq), ADR-0026
-#   - mandatory backup (state.json.v<old>.bak + bak.latest symlink), ADR-0008
-#   - refuse unknown / newer-than-tool versions
+# Forward-only schema-migration FRAMEWORK. The apt-essentials 0.1.0 -> 0.2.0
+# hop was retired (0.1.0 was never released), so the framework currently
+# defines NO migration hops. These specs cover the machinery generically:
+#   - no-op when version == current (baseline 0.2.0)
+#   - refuse unknown / newer-than-tool / version-less files (ADR-0008)
+#   - backup + replay + atomic write for a SYNTHETIC hop registered in-shell
+#     (proves the framework still works for the first real future migration)
 
 bats_require_minimum_version 1.5.0
 
@@ -37,39 +38,6 @@ _state_path() {
     printf '%s/state.json' "${INIT_UBUNTU_STATE_DIR}"
 }
 
-# Write a v0.1.0 state.json with an installed apt-essentials bundle entry.
-_write_v010_with_bundle() {
-    cat > "$(_state_path)" <<'JSON'
-{
-  "version": "0.1.0",
-  "installed": {
-    "apt-essentials": {
-      "synced": {
-        "manual": true,
-        "depends_on": [],
-        "version_provided": "apt-managed",
-        "installed_at": "2026-01-02T03:04:05+00:00",
-        "installed_by": "init_ubuntu@0.1.0",
-        "frozen_pkgs": ["git", "vim", "curl", "wget", "jq", "ca-certificates"],
-        "frozen_platform": "rpi-5"
-      },
-      "local": {"last_verified_at": "2026-01-02T03:04:05+00:00"}
-    },
-    "docker": {
-      "synced": {
-        "manual": true,
-        "depends_on": ["apt-essentials"],
-        "version_provided": "27.4.0",
-        "installed_at": "2026-01-02T03:04:05+00:00",
-        "installed_by": "init_ubuntu@0.1.0"
-      },
-      "local": {}
-    }
-  }
-}
-JSON
-}
-
 # ── Smoke ────────────────────────────────────────────────────────────────────
 
 @test "state_migrate.sh parses (bash -n)" {
@@ -82,10 +50,17 @@ JSON
     assert_output --partial "is a library"
 }
 
-@test "state_migrate defines the runner + the 0.1.0->0.2.0 hop" {
+@test "state_migrate defines the runner + the framework helpers (no live hops)" {
     _load_migrate
-    declare -F state_migrate_run >/dev/null
-    declare -F migrate_0_1_0_to_0_2_0 >/dev/null
+    declare -F state_migrate_run          >/dev/null
+    declare -F _state_migrate_chain_index >/dev/null
+    declare -F _state_migrate_backup      >/dev/null
+    # The retired apt-essentials hop must NOT be defined.
+    run declare -F migrate_0_1_0_to_0_2_0
+    assert_failure
+    # The chain is a single baseline entry (no hops).
+    [[ "${#STATE_MIGRATE_CHAIN[@]}" -eq 1 ]]
+    [[ "${STATE_MIGRATE_CHAIN[0]}" == "0.2.0" ]]
 }
 
 # ── no-op / fresh ────────────────────────────────────────────────────────────
@@ -108,156 +83,46 @@ JSON
     [[ -z "$(find "${INIT_UBUNTU_STATE_DIR}" -name 'state.json.v*.bak' 2>/dev/null)" ]]
 }
 
-# ── 0.1.0 -> 0.2.0 apt-essentials split (ADR-0026) ───────────────────────────
+# ── framework: backup + replay + atomic write (synthetic hop) ────────────────
 
-@test "migration bumps the schema version to 0.2.0" {
+@test "framework: state_migrate_run backs up and replays a registered hop" {
+    # The framework is content-free after the apt-essentials hop was retired.
+    # Register a synthetic earlier version + hop IN THIS SHELL to prove the
+    # backup / replay / atomic-write machinery (ADR-0008) still works for the
+    # first real future migration. current == STATE_SCHEMA_VERSION == 0.2.0.
     _load_migrate
-    _write_v010_with_bundle
+    STATE_MIGRATE_CHAIN=("0.1.9" "0.2.0")
+    migrate_0_1_9_to_0_2_0() {
+        jq '.version = "0.2.0" | .installed.marker = {synced:{manual:true}, local:{}}' <<<"$1"
+    }
+    printf '{"version":"0.1.9","installed":{}}\n' > "$(_state_path)"
+    local _orig; _orig="$(cat "$(_state_path)")"
+
     run state_migrate_run
     assert_success
-    run jq -r '.version' "$(_state_path)"
-    assert_output "0.2.0"
-}
 
-@test "migration drops the apt-essentials bundle entry" {
-    _load_migrate
-    _write_v010_with_bundle
-    state_migrate_run
-    run jq -e '.installed | has("apt-essentials")' "$(_state_path)"
-    assert_failure
-}
-
-@test "migration adds git/vim/curl/wget/jq as manual installed entries" {
-    _load_migrate
-    _write_v010_with_bundle
-    state_migrate_run
-    local _tool
-    for _tool in git vim curl wget jq; do
-        run jq -e --arg t "${_tool}" '.installed[$t].synced.manual == true' "$(_state_path)"
-        assert_success
-        run jq -r --arg t "${_tool}" '.installed[$t].synced.version_provided' "$(_state_path)"
-        assert_output "apt-managed"
-        run jq -e --arg t "${_tool}" '.installed[$t].synced.depends_on == []' "$(_state_path)"
-        assert_success
-    done
-}
-
-@test "migration does NOT add build-essential / htop / unzip" {
-    _load_migrate
-    _write_v010_with_bundle
-    state_migrate_run
-    local _tool
-    for _tool in build-essential htop unzip; do
-        run jq -e --arg t "${_tool}" '.installed | has($t)' "$(_state_path)"
-        assert_failure
-    done
-}
-
-@test "migration carries installed_at / installed_by forward to the split tools" {
-    _load_migrate
-    _write_v010_with_bundle
-    state_migrate_run
-    run jq -r '.installed.git.synced.installed_at' "$(_state_path)"
-    assert_output "2026-01-02T03:04:05+00:00"
-    run jq -r '.installed.git.synced.installed_by' "$(_state_path)"
-    assert_output "init_ubuntu@0.1.0"
-}
-
-@test "migration rebuilds each split tool's local sub-object EMPTY" {
-    # ADR-0008 synced-vs-local split: the machine-specific `local` object holds
-    # host-derived facts (resolved targets, last_verified_at) that must NOT
-    # forward-carry. Every split tool entry must land with local == {} so stale
-    # machine state from an earlier (separately-tracked) entry is not preserved.
-    _load_migrate
-    _write_v010_with_bundle
-    state_migrate_run
-    local _tool
-    for _tool in git vim curl wget jq; do
-        run jq -e --arg t "${_tool}" '.installed[$t].local == {}' "$(_state_path)"
-        assert_success
-    done
-}
-
-@test "migration does NOT preserve a pre-existing split tool's stale local" {
-    # A 0.1.0 file that already tracked one of the split tools separately (with
-    # machine-specific local paths) must have that local wiped on migration —
-    # the forward-only shape rebuilds local empty, never carrying poisoned
-    # host paths to a new machine.
-    _load_migrate
-    cat > "$(_state_path)" <<'JSON'
-{
-  "version": "0.1.0",
-  "installed": {
-    "apt-essentials": {
-      "synced": {"manual": true, "depends_on": [], "version_provided": "apt-managed",
-                 "installed_at": "t", "installed_by": "b"},
-      "local": {}
-    },
-    "curl": {
-      "synced": {"manual": true, "depends_on": [], "version_provided": "apt-managed"},
-      "local": {"install_target_resolved": "/old/machine/path"}
-    }
-  }
-}
-JSON
-    state_migrate_run
-    run jq -e '.installed.curl.local == {}' "$(_state_path)"
-    assert_success
-}
-
-@test "migration leaves unrelated entries (docker) intact" {
-    _load_migrate
-    _write_v010_with_bundle
-    state_migrate_run
-    run jq -e '.installed | has("docker")' "$(_state_path)"
-    assert_success
-    run jq -r '.installed.docker.synced.version_provided' "$(_state_path)"
-    assert_output "27.4.0"
-}
-
-@test "migration drops frozen_pkgs / frozen_platform with the bundle" {
-    _load_migrate
-    _write_v010_with_bundle
-    state_migrate_run
-    run jq -e '[.. | objects | select(has("frozen_pkgs"))] | length == 0' "$(_state_path)"
-    assert_success
-}
-
-# ── backup (ADR-0008) ────────────────────────────────────────────────────────
-
-@test "migration writes a state.json.v0.1.0.bak with the pre-migration content" {
-    _load_migrate
-    _write_v010_with_bundle
-    local _orig; _orig="$(cat "$(_state_path)")"
-    state_migrate_run
-    local _bak; _bak="$(_state_path).v0.1.0.bak"
+    # Mandatory backup written with the pre-migration content (ADR-0008).
+    local _bak; _bak="$(_state_path).v0.1.9.bak"
     [[ -f "${_bak}" ]]
     [[ "$(cat "${_bak}")" == "${_orig}" ]]
-}
-
-@test "migration points state.json.bak.latest at the newest backup" {
-    _load_migrate
-    _write_v010_with_bundle
-    state_migrate_run
-    local _latest; _latest="$(_state_path).bak.latest"
-    [[ -L "${_latest}" ]]
-    [[ "$(readlink "${_latest}")" == "state.json.v0.1.0.bak" ]]
-}
-
-# ── idempotency: migrating an already-split (no-bundle) 0.1.0 file ────────────
-
-@test "migration of a 0.1.0 file without apt-essentials only bumps the version" {
-    _load_migrate
-    cat > "$(_state_path)" <<'JSON'
-{"version":"0.1.0","installed":{"git":{"synced":{"manual":true,"depends_on":[],"version_provided":"apt-managed"},"local":{}}}}
-JSON
-    state_migrate_run
+    # bak.latest points at the newest backup.
+    [[ -L "$(_state_path).bak.latest" ]]
+    [[ "$(readlink "$(_state_path).bak.latest")" == "state.json.v0.1.9.bak" ]]
+    # The hop's transform landed via the atomic write.
     run jq -r '.version' "$(_state_path)"
     assert_output "0.2.0"
-    run jq -e '.installed | has("git")' "$(_state_path)"
+    run jq -e '.installed | has("marker")' "$(_state_path)"
     assert_success
-    run jq -e '.installed | keys | length == 1' "$(_state_path)"
-    assert_success
+}
+
+@test "framework: state_migrate_run errors when a chained hop function is missing" {
+    _load_migrate
+    STATE_MIGRATE_CHAIN=("0.1.9" "0.2.0")
+    # No migrate_0_1_9_to_0_2_0 defined -> the replay loop must abort.
+    printf '{"version":"0.1.9","installed":{}}\n' > "$(_state_path)"
+    run state_migrate_run
+    assert_failure
+    assert_output --partial "missing migration step"
 }
 
 # ── refusal paths (ADR-0008) ─────────────────────────────────────────────────
@@ -273,7 +138,7 @@ JSON
 @test "state_migrate_run refuses a newer-than-tool version (no downgrade)" {
     _load_migrate
     # Fake a newer registered version by extending the chain in this shell.
-    STATE_MIGRATE_CHAIN=("0.1.0" "0.2.0" "0.3.0")
+    STATE_MIGRATE_CHAIN=("0.1.9" "0.2.0" "0.3.0")
     printf '{"version":"0.3.0","installed":{}}\n' > "$(_state_path)"
     run state_migrate_run
     assert_failure
@@ -286,16 +151,4 @@ JSON
     run state_migrate_run
     assert_failure
     assert_output --partial "no 'version' field"
-}
-
-# ── direct hop unit (migrate_0_1_0_to_0_2_0) ─────────────────────────────────
-
-@test "migrate_0_1_0_to_0_2_0 is a pure transform on its payload arg" {
-    _load_migrate
-    local _in='{"version":"0.1.0","installed":{"apt-essentials":{"synced":{"manual":true,"depends_on":[],"version_provided":"apt-managed","installed_at":"t","installed_by":"b"},"local":{}}}}'
-    run migrate_0_1_0_to_0_2_0 "${_in}"
-    assert_success
-    echo "${output}" | jq -e '.version == "0.2.0"' >/dev/null
-    echo "${output}" | jq -e '(.installed | has("apt-essentials")) | not' >/dev/null
-    echo "${output}" | jq -e '.installed.curl.synced.manual == true' >/dev/null
 }

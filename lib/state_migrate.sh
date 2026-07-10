@@ -23,8 +23,15 @@
 #     success or no-op, 1 on any failure (the caller treats this as fatal).
 #
 # Migration chain (oldest -> newest):
-#   0.1.0 -> 0.2.0 : split the apt-essentials bundle into per-tool modules
-#                    (ADR-0026). See migrate_0_1_0_to_0_2_0.
+#   0.2.0 : current baseline schema. NO migration hops are defined yet.
+#
+# The apt-essentials 0.1.0 -> 0.2.0 migration (and its ADR-0011 frozen_pkgs /
+# frozen_platform handling) was RETIRED: 0.1.0 was never released, so no
+# on-disk state.json carries it. The forward-only FRAMEWORK below (chain +
+# backup + replay + atomic write, ADR-0008) is kept intact and ready for the
+# first real future migration; adding a hop is: append the new version to
+# STATE_MIGRATE_CHAIN, bump STATE_SCHEMA_VERSION, and define one
+# migrate_<from>_to_<to>() pure-transform function.
 #
 # Dependencies: jq. Sources nothing; relies on STATE_SCHEMA_VERSION and
 # state_get_path / state_validate_file from lib/state.sh (loaded earlier).
@@ -35,8 +42,9 @@ if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
 fi
 
 # Ordered list of schema versions in the migration chain. Each adjacent pair
-# (i, i+1) must have a migrate_<i>_to_<i+1>() function defined below.
-STATE_MIGRATE_CHAIN=("0.1.0" "0.2.0")
+# (i, i+1) must have a migrate_<i>_to_<i+1>() function defined below. Currently
+# a single baseline entry: no hops are defined (see the retirement note above).
+STATE_MIGRATE_CHAIN=("0.2.0")
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -80,65 +88,10 @@ _state_migrate_backup() {
 }
 
 # ── migration steps (one function per hop, ADR-0008 naming) ──────────────────
-
-# migrate_0_1_0_to_0_2_0 <payload-json>
-#   ADR-0026: the apt-essentials bundle becomes per-tool modules. When an
-#   installed `apt-essentials` entry exists, replace it with installed entries
-#   for the five packages the bundle actually installed and that are now
-#   modules (git, vim, curl, wget, jq). build-essential/htop/unzip are NOT
-#   added — the old bundle never installed them. Each replacement is marked
-#   manual=true, depends_on=[], version_provided="apt-managed", carrying the
-#   bundle's installed_at / installed_by forward. The machine-specific `local`
-#   sub-object is rebuilt empty. The old apt-essentials entry (and its
-#   frozen_pkgs / frozen_platform from ADR-0011) is dropped. ca-certificates
-#   stays an untracked system apt package.
 #
-# Reads the payload on stdin-equivalent ($1) and prints the migrated payload.
-# Idempotent: if apt-essentials is absent, the payload passes through with only
-# the version field bumped.
-migrate_0_1_0_to_0_2_0() {
-    local _payload="$1"
-    local _split=("git" "vim" "curl" "wget" "jq")
-    local _split_json
-    _split_json="$(printf '%s\n' "${_split[@]}" | jq -R . | jq -sc .)"
-
-    jq \
-        --argjson split "${_split_json}" \
-        '
-        # Bump schema version regardless.
-        .version = "0.2.0"
-        # Only act when an apt-essentials entry exists.
-        | if (.installed | has("apt-essentials")) then
-            (.installed["apt-essentials"]) as $old
-            | (($old.synced.installed_at) // null) as $at
-            | (($old.synced.installed_by) // null) as $by
-            # Drop the bundle entry.
-            | del(.installed["apt-essentials"])
-            # Add a per-tool entry for each split package. The machine-specific
-            # `local` sub-object is rebuilt EMPTY (the function docstring above /
-            # ADR-0008 synced-vs-local split): `local` holds host-specific facts
-            # (resolved install targets, last_verified_at) that must NOT
-            # forward-carry — they are re-derived on the next run on whatever
-            # host reads the file. Idempotent: an existing entry for a tool is
-            # overwritten with
-            # the same forward-only shape (synced rebuilt, local wiped to {}).
-            | reduce $split[] as $tool (.;
-                .installed[$tool] = {
-                    synced: {
-                        manual: true,
-                        depends_on: [],
-                        version_provided: "apt-managed",
-                        installed_at: $at,
-                        installed_by: $by
-                    },
-                    local: {}
-                }
-              )
-          else
-            .
-          end
-        ' <<<"${_payload}"
-}
+# None defined yet. The apt-essentials 0.1.0 -> 0.2.0 hop was retired (see the
+# header note). A future hop is added here as a pure migrate_<from>_to_<to>()
+# transform that reads the JSON payload as $1 and prints the migrated payload.
 
 # ── runner ───────────────────────────────────────────────────────────────────
 

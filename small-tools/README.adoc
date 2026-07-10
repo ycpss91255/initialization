@@ -30,6 +30,31 @@ chmod +x ./install.sh
 ./install.sh
 ----
 
+[NOTE]
+.fastfetch install method
+====
+`fastfetch` is not in the Ubuntu 24.04 "noble" repositories; the apt package
+only lands in Ubuntu 25.04+ / Debian 13+. `install.sh` adds the maintained PPA
+so the install works on 24.04 and all target arches (incl. arm64):
+
+[source, shell]
+----
+# Ubuntu 24.04 (and older) — via PPA (what install.sh does):
+sudo add-apt-repository -y ppa:zhangsongcui3371/fastfetch
+sudo apt update
+sudo apt install -y fastfetch
+
+# Ubuntu 25.04+ / Debian 13+ — native apt package:
+sudo apt install -y fastfetch
+
+# Fallback (no-PPA environments) — .deb from GitHub releases
+# (pick the arch: -amd64 / -aarch64 to match the host):
+curl -fsSL -o /tmp/fastfetch.deb \
+  https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.deb
+sudo apt install -y /tmp/fastfetch.deb
+----
+====
+
 == Usage
 .Monitor tools
 [source, shell]
@@ -94,8 +119,8 @@ git config --global core.editor "editor"
 # jq
 cat <JSON_PATH> | jq '.'
 
-# neofetch
-neofetch
+# fastfetch
+fastfetch
 
 # net-tools
 ifconfig

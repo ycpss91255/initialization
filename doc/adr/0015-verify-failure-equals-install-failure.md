@@ -5,6 +5,17 @@
 - **Supersedes part of:** PRD §13.2 Q15 ("verify 失敗 → log warn 但
   state.json 照記 installed")
 
+> **Deferred — design-accepted, not built in 0.1.0.** The auto-purge
+> rollback model described below (verify failure automatically calls the
+> module's `purge()` to roll back the install, with `cleanup_start` /
+> `cleanup_done` / `cleanup_failed` events) was NOT built. See "Shipped
+> model (0.1.0)" immediately under Decision for what actually ships:
+> install success writes state; `verify` is an independent phase that
+> never removes state; there is no auto-purge rollback on verify failure.
+> The pipeline pseudocode, the "Side-effect rollback on verify failure"
+> section, and AC-47 / AC-48 all describe the deferred design, not
+> current behaviour.
+
 ## Context
 
 Two overlapping rules emerged from grilling:
@@ -26,6 +37,19 @@ succeeded but the user-facing artefact isn't actually usable
 It is part of the install pipeline, not an optional after-step.
 
 ## Decision
+
+> **Shipped model (0.1.0) — amendment.** What actually ships differs
+> from the auto-purge design below. In the shipped model: a successful
+> `install()` writes `state.json.installed.<m>`. `verify` is an
+> **independent phase** that reports pass/fail and **never removes
+> state**. There is **no auto-purge rollback on verify failure** — a
+> failing verify leaves any install side effects in place and leaves the
+> module recorded in state; the user resolves it manually (re-run
+> `install`, or `purge` explicitly). The ADR's original "verify failure
+> rolls back the install (auto-purge)" model — the pipeline pseudocode,
+> the automatic `purge()` call, and the `cleanup_*` events — was **not
+> built**. The rest of this Decision section preserves the original
+> design for the record.
 
 `verify` failure during the auto-install chain is treated as
 install failure. `state.json.installed.<m>` is not written. Exit

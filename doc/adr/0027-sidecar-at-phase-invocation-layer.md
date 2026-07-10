@@ -1,5 +1,8 @@
 # Sidecar write/remove lives at the phase-invocation layer; archetype macros emit all 10 lifecycle functions
 
+- **Status:** Accepted
+- **Date:** 2026-06-21
+
 This refines two earlier decisions without overturning them:
 
 - **ADR-0001** pinned that the Sidecar is written by BOTH Standalone and Engine

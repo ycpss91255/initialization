@@ -13,7 +13,7 @@ gsettings set org.gnome.desktop.wm.keybindings move-to-side-e "[]"
 gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-left "['<Shift><Super>Left', '<Shift><Super>k']"
 gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-right "['<Shift><Super>Right', '<Shift><Super>j']"
 
-
-# Trash 自動清理（搭配 tool/trash-maintenance.sh 容量上限，見 TODO.md）
-gsettings set org.gnome.desktop.privacy remove-old-trash-files true
-gsettings set org.gnome.desktop.privacy old-files-age 'uint32 90'
+# Trash 保留策略由 module/trash-maintenance.module.sh 統一管理（唯一來源，見 #275）。
+# 該 module 於 install 時會 disable GNOME 自帶的 trash auto-delete
+# (org.gnome.desktop.privacy remove-old-trash-files false)，避免 gsd-housekeeping
+# 與維護腳本互相搶著清同一個目錄；old-files-age 也因此不再設定。

@@ -422,6 +422,37 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Product spec restructured from a 17-section traditional PRD into the
+  7-section `/to-spec` shape** (`doc/prd/init-ubuntu.prd.md`): rewritten in
+  place as a retrospective living spec (Problem Statement, Solution, User
+  Stories, Implementation Decisions, Testing Decisions, Out of Scope, Further
+  Notes) plus a same-file "Reference Appendix (may drift)". The module catalog
+  is de-enumerated to categories + environment-aware recommendation rules
+  (concrete list is live via `setup_ubuntu list`); converged decisions now
+  point to ADRs by number rather than restating the old Open-Questions
+  narrative; concrete artifacts (subcommand/exit-code/flag tables, TUI
+  wireframes, metadata shape, state/config schema) are demoted to the
+  Reference Appendix. Testing Decisions is realigned to the test-pyramid
+  review and reframes coverage as an enforced merge rule: diff/patch coverage
+  >= 90% on changed lines as a PR required check, plus the existing main-total
+  ratchet raised toward >= 90%. The deep module contract stays in
+  `doc/module-spec.md` (pointed to, not duplicated). Content kept in zh-TW.
+  Honesty pass over the restructured spec: several features that were
+  advertised as as-built are corrected to design-accepted-but-not-yet-built
+  and consolidated under a new Out of Scope subsection
+  ("設計已定案、但 0.1.0 尚未實作 / Deferred"), with inline "尚未實作" markers
+  at each mention — `--force` soft/hard filter (ADR-0012, now HARD-ERRORs with
+  exit 2), verify-failure auto-purge rollback (ADR-0015; shipped model: install
+  success writes state, verify is independent and never removes state), secrets
+  `resolved_backend` session-pinning + age layout (ADR-0016; shipped backend is
+  encrypted-file/openssl, precedence pass > gnome-keyring > encrypted-file with
+  an `INIT_UBUNTU_SECRETS_BACKEND` override), user-home install target
+  (ADR-0017), `list --json` agent schema (ADR-0019; shipped output is a reduced
+  TUI feed), TUI no-free-form-text (ADR-0025; TUI still delegates via
+  `tui_render_input`), `sync --include-user-local-modules` (ADR-0013; exit 2),
+  `install --tag=*` batch path (ADR-0014; install rejects `--tag=*`), and
+  per-session structured-log file output + `log_info`→JSONL bridge (ADR-0006;
+  OTel schema ships but no log file is opened in production).
 - **`fastfetch` replaces the archived `neofetch`** (issue #325): the small-tools
   tooling (`small-tools/install.sh`, `small-tools/remove.sh`,
   `module/setup_small_tools.sh`) now installs/removes `fastfetch`, the actively

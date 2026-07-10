@@ -34,9 +34,11 @@
 #
 # KNOWN DEVIATION (flagged for the maintainer, NOT hidden)
 # --------------------------------------------------------
-# Three custom (archetype D) modules — docker, font, nvidia-driver — ship WITHOUT
-# is_outdated()/doctor(). Their own per-module specs bless the absence
-# (docker_spec.bats:698/705, font_spec.bats:256, nvidia-driver_spec.bats:239) and
+# Several custom (archetype D) modules — docker, font, nvidia-driver,
+# trash-maintenance, nas-mount — ship WITHOUT is_outdated()/doctor(). Their own
+# per-module specs bless the absence (e.g. docker_spec.bats:698/705,
+# font_spec.bats:256, nvidia-driver_spec.bats:239, and nas-mount_spec.bats asserts
+# both degrade gracefully to "not implemented, exit 2") and
 # doc/module-spec.md §4.1 still lists these two phases as "optional" — a real
 # inconsistency with ADR-0002 that the maintainer should resolve (either add the
 # two functions to those modules, or reconcile §4.1 back to "5 mandatory + 5
@@ -73,6 +75,8 @@ nvidia-driver:is_outdated
 nvidia-driver:doctor
 trash-maintenance:is_outdated
 trash-maintenance:doctor
+nas-mount:is_outdated
+nas-mount:doctor
 "
 
 # _is_known_gap <module-stem> <function> — is this pair a documented deviation?

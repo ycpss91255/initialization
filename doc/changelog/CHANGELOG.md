@@ -93,6 +93,18 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   hint; the per-line `cwd` and trailing `Total:` line were dropped. Supersedes
   #128 and #137. The test image now bundles `python3`
   (`dockerfile/Dockerfile.test-tools`) so the renderer is exercised end-to-end.
+- **`nas-mount` module — CIFS/SMB NAS auto-mount** (`module/nas-mount.module.sh`,
+  issue #311): installs the mount driver (`cifs-utils`), the on-demand
+  automounter (`autofs`), and the discovery/check tool (`smbclient`). When the
+  site-specific NAS parameters are supplied at runtime via environment
+  (`INIT_UBUNTU_NAS_HOST` / `_SHARE` / `_USER`, optional `_PASSWORD` /
+  `_MOUNT_BASE` / `_CREDENTIALS`), `install` wires an autofs indirect map so the
+  share mounts on access; otherwise it installs the packages and prints a hint.
+  Credentials stay out of the repo — an existing credentials file is reused or
+  one is generated from `INIT_UBUNTU_NAS_PASSWORD`, always forced to
+  `chmod 600`; no host/user/password is ever hardcoded. `verify` smoke-tests
+  `mount.cifs` + `smbclient`; `remove`/`purge` unwire the maps (purge also wipes
+  the credentials). Never auto-selected in Quick Setup (needs site credentials).
 - **`f5-split-dns` tool** (`tool/f5-split-dns/`, issue #146): a per-user opt-in
   tool that pins the company DNS server plus a `~<COMPANY_DOMAIN>` routing domain
   onto the F5 BIG-IP Edge VPN interface (`tun0`) via `resolvectl`, so

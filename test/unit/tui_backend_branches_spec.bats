@@ -120,6 +120,14 @@ EOF
     assert_output --partial "catalog data"
 }
 
+# ── library source guard ─────────────────────────────────────────────────────
+
+@test "executing tui_backend.sh directly warns that it is a library (source guard)" {
+    run bash "${LIB_DIR}/tui_backend.sh"
+    assert_success
+    assert_output --partial "library"
+}
+
 # ── _tui_category_entry defensive default (unknown category) ─────────────────
 
 @test "_tui_category_entry emits nothing for an unknown category (defensive default)" {

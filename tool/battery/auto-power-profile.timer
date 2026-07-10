@@ -1,0 +1,13 @@
+[Unit]
+Description=Re-evaluate the power profile every 2 minutes (battery threshold)
+# The udev rule handles instant AC plug/unplug; this timer catches the slow
+# battery charge crossing the THRESHOLD while running on battery.
+
+[Timer]
+# First run shortly after boot, then every 2 minutes while active.
+OnBootSec=1min
+OnUnitActiveSec=2min
+Unit=auto-power-profile.service
+
+[Install]
+WantedBy=timers.target

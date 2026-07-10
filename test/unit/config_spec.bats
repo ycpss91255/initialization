@@ -242,3 +242,21 @@ _load_config() {
     assert_success
     echo "${output}" | jq -e '. == {}' > /dev/null
 }
+
+# ── library-guard + jq-availability branches ─────────────────────────────────
+
+@test "executing config.sh directly warns that it is a library (source guard)" {
+    run bash "${LIB_DIR}/config.sh"
+    assert_success
+    assert_output --partial "library"
+}
+
+@test "config_show --json errors clearly when jq is unavailable" {
+    _load_config
+    config_set ui.lang en
+    mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/emptybin"
+    # An empty PATH hides jq from `command -v jq`; `command` itself is a builtin.
+    PATH="${INIT_UBUNTU_TEST_SCRATCH}/emptybin" run config_show --json
+    assert_failure
+    assert_output --partial "requires jq"
+}

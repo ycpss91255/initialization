@@ -100,6 +100,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   phase no longer aborts on an unimplemented `doctor()`.
 ### Added
 
+- **`resolve-convert` tool** (`tool/davinci_resolve/resolve-convert.sh`, issue
+  #267): a standalone converter that transcodes H.264/AAC clips to DNxHR HQ +
+  PCM `.mov` so DaVinci Resolve Free on Linux (which ships no H.264/H.265/AAC
+  decode licenses) can import phone/screen-recording footage. Accepts single
+  files or directories (batch: `mp4/mov/mkv/avi/m4v`), writes
+  `<stem>_resolve.mov` beside each source or into a `-o DIR` target, is
+  idempotent (skips sources that already have a `_resolve.mov` counterpart and
+  never re-feeds outputs as inputs), and cleans up partial/empty outputs on
+  ffmpeg failure or interrupt. The `ffmpeg` binary is overridable via
+  `FFMPEG_BIN` for testing.
 - **auto-power-profile tool** (`tool/battery/`, issue #260): switches the
   power-profiles-daemon profile from the current power source -- `performance`
   on AC, `balanced` on battery above 25%, `power-saver` at or below 25%

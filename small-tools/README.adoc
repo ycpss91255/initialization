@@ -3,6 +3,24 @@
 :toc: right
 :imagesdir: images
 
+[WARNING]
+====
+*DEPRECATED (PRD section 6.6 — small-tools retirement path).*
+
+`small-tools/` is superseded by the v2 `setup_ubuntu` engine and its
+`module/*.module.sh` modules, which cover the same tools with a full
+install / upgrade / remove / purge lifecycle. These scripts still run for now
+but receive no new work; removal is scheduled for *0.4.0* (AC-27).
+
+Use the v2 engine instead:
+
+[source, shell]
+----
+./setup_ubuntu.sh install --base      # core base tools
+./setup_ubuntu.sh install <module>    # a specific tool (e.g. fish, tmux)
+----
+====
+
 ---
 link:./README_ch.adoc[繁體中文]
 

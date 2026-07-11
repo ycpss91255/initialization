@@ -20,6 +20,19 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Deprecated
+
+- **Legacy `small-tools/` bundle installers marked DEPRECATED** (PRD section
+  6.6): `small-tools/install.sh`, `small-tools/remove.sh`, and
+  `module/setup_small_tools.sh` now carry a DEPRECATED header block and emit a
+  runtime warning (stderr) when run as a main program, pointing users at the v2
+  engine (`setup_ubuntu install --base` for core tools, `setup_ubuntu install
+  <module>` for a specific tool). The warning is advisory only — it does not
+  change exit behavior and the bundles still run. Both `small-tools/README.adoc`
+  and `small-tools/README_zh.adoc` gained a deprecation banner. Nothing was
+  removed; removal stays scheduled for 0.4.0 (AC-27). Covered by
+  `test/unit/small_tools_deprecation_spec.bats`.
+
 ### Added
 
 - **Scaffold generator + conformance meta-test for the template-first tool/hook

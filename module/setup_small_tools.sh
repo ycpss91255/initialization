@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 
+# =============================================================================
+# DEPRECATED (PRD section 6.6 — small-tools retirement path).
+#
+# This legacy monolithic installer is SUPERSEDED by the v2 `setup_ubuntu`
+# engine and its `module/*.module.sh` modules, which cover the same tools with
+# a full install / upgrade / remove / purge lifecycle. It is kept runnable
+# through the 0.2.0 line and is scheduled for removal in 0.4.0 (AC-27).
+#
+# Use the v2 engine instead:
+#   setup_ubuntu install --base       # core base tools
+#   setup_ubuntu install <module>     # a specific tool (e.g. fish, tmux, vim)
+# =============================================================================
+
 set -euo pipefail
 shopt -s inherit_errexit &>/dev/null || true
 
@@ -36,6 +49,11 @@ source "${FUNCTION_PATH}/logger.sh"
 source "${FUNCTION_PATH}/general.sh"
 
 # main script
+# Runtime deprecation warning (stderr via logger; does not change exit behavior).
+if [[ "${MAIN_FILE}" == "true" ]]; then
+    log_warn "setup_small_tools.sh is DEPRECATED (PRD section 6.6): superseded by the v2 setup_ubuntu engine + module/*.module.sh. Use 'setup_ubuntu install --base' (core) or 'setup_ubuntu install <module>' (specific tool). Removal scheduled for 0.4.0 (AC-27)."
+fi
+
 log_info "Start setup process..."
 
 if ! have_sudo_access; then

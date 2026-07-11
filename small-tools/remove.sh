@@ -1,9 +1,33 @@
 #!/usr/bin/env bash
 
+# =============================================================================
+# DEPRECATED (PRD section 6.6 — small-tools retirement path).
+#
+# This legacy bundle uninstaller is SUPERSEDED by the v2 `setup_ubuntu` engine
+# and its `module/*.module.sh` modules, which expose per-tool remove / purge
+# phases. It is kept runnable through the 0.2.0 line and is scheduled for
+# removal in 0.4.0 (AC-27).
+#
+# Use the v2 engine instead:
+#   ./setup_ubuntu.sh remove <module>       # remove a specific tool
+#   ./setup_ubuntu.sh purge <module>        # remove a tool and its config
+# =============================================================================
+
 # ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
 
 # SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
 USER_NAME=${1:-"$USER"}
+
+# Runtime deprecation warning (stderr only; does not change exit behavior).
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    printf '%s\n' \
+        "WARNING: small-tools/remove.sh is DEPRECATED (PRD section 6.6)." \
+        "  Superseded by the v2 setup_ubuntu engine and module/*.module.sh." \
+        "  Use:  ./setup_ubuntu.sh remove <module>     (remove a tool)" \
+        "        ./setup_ubuntu.sh purge <module>      (remove tool + config)" \
+        "  This bundle still runs; removal is scheduled for 0.4.0 (AC-27)." \
+        >&2
+fi
 
 # get symbolic link
 BAT_FILE=$(readlink -f "/usr/local/bin/bat")

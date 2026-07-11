@@ -1,11 +1,35 @@
 #!/usr/bin/env bash
 
+# =============================================================================
+# DEPRECATED (PRD section 6.6 — small-tools retirement path).
+#
+# This legacy bundle installer is SUPERSEDED by the v2 `setup_ubuntu` engine
+# and its `module/*.module.sh` modules, which cover the same tools with a full
+# install / upgrade / remove / purge lifecycle. It is kept runnable through the
+# 0.2.0 line and is scheduled for removal in 0.4.0 (AC-27).
+#
+# Use the v2 engine instead:
+#   ./setup_ubuntu.sh install --base        # core base tools
+#   ./setup_ubuntu.sh install <module>      # a specific tool (e.g. fish, tmux)
+# =============================================================================
+
 # ${1}: USER NAME. Use the provided username, or default to the current user ($USER).
 # TODO: install eza
 # BUG: "snap" not found (wsl)
 
 USER_NAME=${1:-"$USER"}
 SCRIPT_PATH=$(dirname "$(readlink -f "${0}")")
+
+# Runtime deprecation warning (stderr only; does not change exit behavior).
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    printf '%s\n' \
+        "WARNING: small-tools/install.sh is DEPRECATED (PRD section 6.6)." \
+        "  Superseded by the v2 setup_ubuntu engine and module/*.module.sh." \
+        "  Use:  ./setup_ubuntu.sh install --base      (core base tools)" \
+        "        ./setup_ubuntu.sh install <module>    (a specific tool)" \
+        "  This bundle still runs; removal is scheduled for 0.4.0 (AC-27)." \
+        >&2
+fi
 
 # delete old tealdeer cache or unknown file, avoid problems
 if [ -d "/home/${USER_NAME}/.cache/tealdeer" ]; then

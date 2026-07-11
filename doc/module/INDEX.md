@@ -3,7 +3,7 @@
 
 # Module Index
 
-46 modules. Columns come from each module's metadata block
+48 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -43,6 +43,8 @@ to the module source.
 | [neovim](../../module/neovim.module.sh) | recommended | editor cli | Neovim editor + nvimdots personal config |
 | [notion](../../module/notion.module.sh) | optional | notes | Notion desktop app (unofficial notion-electron .deb client) |
 | [nvidia-driver](../../module/nvidia-driver.module.sh) | optional | gpu nvidia hardware | NVIDIA proprietary driver (auto-detected recommended version via ubuntu-drivers) |
+| [pipx](../../module/pipx.module.sh) | base | python cli | pipx — install and run Python CLI apps in isolated virtualenvs (apt-managed) |
+| [python3](../../module/python3.module.sh) | base | python runtime | python3 — Python 3 runtime + packaging toolchain (pip, dev headers, setuptools) |
 | [qmk-firmware](../../module/qmk-firmware.module.sh) | optional | hardware | QMK firmware dev environment — qmk CLI (pipx) + toolchain + qmk_firmware checkout |
 | [ripgrep](../../module/ripgrep.module.sh) | optional | cli-essentials | ripgrep (rg) — fast, recursive grep alternative (apt ripgrep package) |
 | [shell](../../module/shell.module.sh) | recommended | shell core | Shell session basics: ssh client, keychain, xclip |

@@ -9,9 +9,9 @@
 # archetype D (custom, doc/guide/archetype-cookbook.md §D).
 #
 # pipx runs as the invoking user and drops the launcher under
-# ~/.local/bin, so every phase is user-home (no sudo). The only privileged
-# step is bootstrapping pipx itself when it is absent (apt-get install
-# pipx), mirroring jetson-stats' pipx fallback.
+# ~/.local/bin, so every phase is user-home (no sudo). pipx is DEPENDS_ON
+# (foundation program): the engine installs the pipx module first, so this
+# module assumes pipx is present rather than bootstrapping it inline.
 #
 # Standalone usage:
 #   bash module/claude-monitor.module.sh install [--dry-run]
@@ -57,7 +57,7 @@ declare -gA POST_INSTALL_MESSAGE=(
 declare -gA WARN_MESSAGE=()
 SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")
 SUPPORTED_PLATFORMS=("desktop" "server" "wsl")
-DEPENDS_ON=()
+DEPENDS_ON=("pipx")
 CONFLICTS_WITH=()
 SUPPORTS_USER_HOME=true
 RISK_LEVEL="low"
@@ -101,8 +101,7 @@ is_recommended() {
 }
 
 install() {
-    module_dryrun_guard install \
-        "pipx install ${PIPX_PKG} (bootstraps pipx via apt if absent)" \
+    module_dryrun_guard install "pipx install ${PIPX_PKG}" \
         && return 0
     module_skip_if_installed && return 0
     _claude_monitor_pkg_install || return $?
@@ -192,20 +191,9 @@ _claude_monitor_pipx() {
     pipx "$@"
 }
 
-# Ensure pipx is available. pipx itself is a system prerequisite; when it is
-# absent bootstrap it via apt (the one privileged step). Overridable seam:
-# tests shadow `sudo` / `apt-get` and stub `command`.
-_claude_monitor_ensure_pipx() {
-    command -v pipx >/dev/null 2>&1 && return 0
-    log_info "[${NAME}] pipx not found — installing via apt"
-    have_sudo_access 2>/dev/null \
-        || { log_error "[${NAME}] pipx is missing and sudo is unavailable to install it"; return 1; }
-    sudo apt-get install -y pipx \
-        || { log_error "[${NAME}] failed to install pipx via apt"; return 1; }
-}
-
+# pipx install. pipx is provided by the pipx module (DEPENDS_ON), so no inline
+# bootstrap is needed here.
 _claude_monitor_pkg_install() {
-    _claude_monitor_ensure_pipx || return $?
     log_info "[${NAME}] pipx install ${PIPX_PKG}"
     _claude_monitor_pipx install "${PIPX_PKG}" || {
         log_error "[${NAME}] 'pipx install ${PIPX_PKG}' failed"

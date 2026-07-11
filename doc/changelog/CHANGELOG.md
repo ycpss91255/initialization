@@ -35,6 +35,26 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Five desktop-only modules for the small-tools modularization program:
+  `vlc`, `ibus-rime`, `cheese`, `v4l-utils`,
+  `gnome-shell-extension-manager`** (`module/<name>.module.sh` +
+  `test/unit/module/<name>_spec.bats` each). All five are apt-archetype
+  (`module_use_apt_archetype`) `optional` modules scoped to
+  `SUPPORTED_PLATFORMS=("desktop")`, each installing its named apt package
+  (`vlc`, `ibus-rime`, `cheese`, `v4l-utils`,
+  `gnome-shell-extension-manager`), with module-defined `detect()` and a
+  desktop-gated `is_recommended()` (recommended only on the `desktop` form
+  factor). Each ships a real `doctor()` that goes beyond the dpkg check by
+  verifying the runtime binary actually resolves on PATH — `command -v vlc`,
+  `command -v cheese`, `command -v v4l2-ctl` (binary name differs from the
+  package), `command -v extension-manager` (likewise); `ibus-rime` is a
+  data/engine package with no like-named binary, so its doctor probes the
+  `ibus` framework binary plus the Rime engine data directory. Each declares
+  an en + zh-TW `DESCRIPTION`, `SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")`,
+  and a `TEST_VERIFY_CMD` matching its doctor probe. Both standalone- and
+  engine-invocable; all satisfy the 10-function module contract (ADR-0002,
+  enforced by `test/unit/module/contract_conformance_spec.bats` / #305).
+  `doc/module/INDEX.md` regenerated (69 modules).
 - **Four monitoring modules for the small-tools modularization program:
   `powerstat`, `dstat`, `ifstat`, `nmap`** (`module/<name>.module.sh` +
   `test/unit/module/<name>_spec.bats` each). All four are apt-archetype

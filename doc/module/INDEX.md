@@ -3,7 +3,7 @@
 
 # Module Index
 
-64 modules. Columns come from each module's metadata block
+67 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -13,6 +13,7 @@ to the module source.
 | [anydesk](../../module/anydesk.module.sh) | optional | remote | AnyDesk — remote desktop client (upstream apt repository) |
 | [batcat](../../module/batcat.module.sh) | optional | cli-essentials | bat — cat clone with syntax highlighting (Ubuntu binary: batcat) |
 | [bmon](../../module/bmon.module.sh) | optional | monitoring | bmon — bandwidth monitor (real-time per-interface traffic, apt bmon package) |
+| [bpytop](../../module/bpytop.module.sh) | optional | monitoring cli | bpytop — terminal resource monitor (CPU / memory / disk / network / processes), pipx-managed |
 | [btop](../../module/btop.module.sh) | optional | monitoring | btop — modern resource monitor (CPU / memory / disk / net, apt btop package) |
 | [build-essential](../../module/build-essential.module.sh) | base | build | build-essential — C/C++ compiler toolchain metapackage (gcc, g++, make) |
 | [claude-code-config](../../module/claude-code-config.module.sh) | optional | agent config dotfile | Personal Claude Code settings (~/.claude: settings.json + statusline) |
@@ -34,6 +35,7 @@ to the module source.
 | [git-lfs](../../module/git-lfs.module.sh) | optional | git vcs | git-lfs — Git Large File Storage (versions large files via pointers) |
 | [git](../../module/git.module.sh) | base | vcs | git — distributed version control system (apt git package) |
 | [glow](../../module/glow.module.sh) | optional | cli-essentials | glow — render markdown on the CLI (yazi markdown-preview dependency) |
+| [gpustat](../../module/gpustat.module.sh) | optional | monitoring gpu | gpustat — compact per-GPU status monitor (utilization / memory / temperature), pipx-managed |
 | [gum](../../module/gum.module.sh) | optional | cli-essentials tui | gum — a tool for glamorous shell scripts (preferred modern TUI backend) |
 | [htop](../../module/htop.module.sh) | base | monitor | htop — interactive process viewer (apt htop package) |
 | [ifstat](../../module/ifstat.module.sh) | optional | monitoring | ifstat — report network interface bandwidth statistics (apt ifstat package) |
@@ -63,6 +65,7 @@ to the module source.
 | [shell](../../module/shell.module.sh) | recommended | shell core | Shell session basics: ssh client, keychain, xclip |
 | [ssh-config](../../module/ssh-config.module.sh) | optional | config ssh dotfile | Personal ~/.ssh/config templates (per-host alias and key map) |
 | [sshfs](../../module/sshfs.module.sh) | optional | network filesystem | sshfs — mount a remote filesystem over SSH (FUSE) |
+| [thefuck](../../module/thefuck.module.sh) | optional | shell cli | thefuck — corrects your previous mistyped console command, pipx-managed |
 | [tig](../../module/tig.module.sh) | optional | git vcs tui | tig — text-mode interface for git (log/diff/blame browser) |
 | [tmux](../../module/tmux.module.sh) | recommended | terminal multiplexer | Terminal multiplexer + powerline config |
 | [tmuxp](../../module/tmuxp.module.sh) | optional | terminal session | tmuxp — tmux session manager (freeze/restore sessions from YAML), pipx-managed |

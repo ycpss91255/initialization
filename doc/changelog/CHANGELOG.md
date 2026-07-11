@@ -35,6 +35,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Four monitoring modules for the small-tools modularization program:
+  `powerstat`, `dstat`, `ifstat`, `nmap`** (`module/<name>.module.sh` +
+  `test/unit/module/<name>_spec.bats` each). All four are apt-archetype
+  (`module_use_apt_archetype`) `optional` modules tagged `monitoring`, each
+  installing its like-named apt package (`powerstat`, `dstat`, `ifstat`,
+  `nmap`), with module-defined `detect()`/`is_recommended()` and a real
+  `doctor()` that verifies the tool actually runs: `nmap --version` for nmap,
+  and `command -v <tool>` for powerstat / dstat / ifstat (which ship no clean,
+  non-sampling version flag). Each declares an en + zh-TW `DESCRIPTION`,
+  `SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")`, and a `TEST_VERIFY_CMD`
+  matching its doctor probe. Both standalone- and engine-invocable; all satisfy
+  the 10-function module contract (ADR-0002, enforced by the #305
+  contract-conformance meta-test). `doc/module/INDEX.md` regenerated
+  (58 modules).
 - **Six apt-archetype CLI/utility modules for the small-tools modularization
   program: `tig`, `git-lfs`, `tree`, `ncdu`, `net-tools`, `sshfs`**
   (`module/<name>.module.sh` + `test/unit/module/<name>_spec.bats` each). All

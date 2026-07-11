@@ -58,6 +58,53 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   "24.04" "26.04")`, `VERSION_PROVIDED="pipx-managed"`, and a `TEST_VERIFY_CMD`
   matching its doctor probe, plus the dual-mode standalone/engine entry
   convention. `doc/module/INDEX.md` regenerated (67 modules).
+- **Five desktop-only modules for the small-tools modularization program:
+  `vlc`, `ibus-rime`, `cheese`, `v4l-utils`,
+  `gnome-shell-extension-manager`** (`module/<name>.module.sh` +
+  `test/unit/module/<name>_spec.bats` each). All five are apt-archetype
+  (`module_use_apt_archetype`) `optional` modules scoped to
+  `SUPPORTED_PLATFORMS=("desktop")`, each installing its named apt package
+  (`vlc`, `ibus-rime`, `cheese`, `v4l-utils`,
+  `gnome-shell-extension-manager`), with module-defined `detect()` and a
+  desktop-gated `is_recommended()` (recommended only on the `desktop` form
+  factor). Each ships a real `doctor()` that goes beyond the dpkg check by
+  verifying the runtime binary actually resolves on PATH — `command -v vlc`,
+  `command -v cheese`, `command -v v4l2-ctl` (binary name differs from the
+  package), `command -v extension-manager` (likewise); `ibus-rime` is a
+  data/engine package with no like-named binary, so its doctor probes the
+  `ibus` framework binary plus the Rime engine data directory. Each declares
+  an en + zh-TW `DESCRIPTION`, `SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")`,
+  and a `TEST_VERIFY_CMD` matching its doctor probe. Both standalone- and
+  engine-invocable; all satisfy the 10-function module contract (ADR-0002,
+  enforced by `test/unit/module/contract_conformance_spec.bats` / #305).
+  `doc/module/INDEX.md` regenerated (69 modules).
+- **Six more apt-archetype CLI/utility modules for the small-tools
+  modularization program: `ag`, `asciidoctor`, `xclip`, `xsel`, `ansifilter`,
+  `tealdeer`** (`module/<name>.module.sh` +
+  `test/unit/module/<name>_spec.bats` each). All six are apt-archetype
+  (`module_use_apt_archetype`) `optional` modules that satisfy the 10-function
+  module contract (ADR-0002, enforced by the #305 contract-conformance
+  meta-test) with en + zh-TW i18n, `SUPPORTED_UBUNTU=("22.04" "24.04"
+  "26.04")`, a matching `TEST_VERIFY_CMD`, the dual-mode standalone/engine
+  entry convention, and a real `doctor()` that verifies the tool actually
+  runs:
+  - `ag` — the_silver_searcher fast recursive code search; apt
+    `silversearcher-ag` (binary `ag`); doctor probes `ag --version`.
+  - `asciidoctor` — AsciiDoc text processor; apt `asciidoctor`; doctor probes
+    `asciidoctor --version`.
+  - `xclip` — X11 clipboard CLI; apt `xclip`; `SUPPORTED_PLATFORMS=("desktop")`
+    (needs an X display); doctor probes `command -v xclip`.
+  - `xsel` — X11 selection CLI; apt `xsel`; `SUPPORTED_PLATFORMS=("desktop")`;
+    doctor probes `command -v xsel`.
+  - `ansifilter` — strip/convert ANSI terminal escape codes; apt `ansifilter`;
+    doctor probes `ansifilter --version`.
+  - `tealdeer` — fast Rust tldr client; apt `tealdeer` (binary `tldr`); doctor
+    probes `tldr --version`. Overrides `install()` to seed the page cache with
+    `tldr --update` as a best-effort post-step — a failed cache refresh only
+    warns and never aborts the install (mirrors the small-tools tealdeer fix,
+    issue #263), and a `POST_INSTALL_MESSAGE` tells the user to re-run `tldr
+    --update` if there was no network at install time.
+  `doc/module/INDEX.md` regenerated (60 modules).
 - **Four monitoring modules for the small-tools modularization program:
   `powerstat`, `dstat`, `ifstat`, `nmap`** (`module/<name>.module.sh` +
   `test/unit/module/<name>_spec.bats` each). All four are apt-archetype

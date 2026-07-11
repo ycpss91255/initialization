@@ -3,7 +3,7 @@
 
 # Module Index
 
-75 modules. Columns come from each module's metadata block
+78 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -22,13 +22,16 @@ to the module source.
 | [claude-code-config](../../module/claude-code-config.module.sh) | optional | agent config dotfile | Personal Claude Code settings (~/.claude: settings.json + statusline) |
 | [claude-code](../../module/claude-code.module.sh) | optional | agent | Anthropic Claude Code CLI agent (official native installer, self-updating) |
 | [claude-monitor](../../module/claude-monitor.module.sh) | optional | agent cli | claude-monitor — real-time Claude Code token/cost usage monitor TUI (pipx) |
+| [cmatrix](../../module/cmatrix.module.sh) | optional | novelty fun | cmatrix — falling Matrix digital-rain animation in the terminal |
 | [codex](../../module/codex.module.sh) | optional | agent | codex — OpenAI Codex CLI coding agent |
+| [cowsay](../../module/cowsay.module.sh) | optional | novelty fun | cowsay — render a message as speech from an ASCII cow |
 | [curl](../../module/curl.module.sh) | base | http | curl — command-line tool for transferring data with URLs (apt curl package) |
 | [custom-hosts-sync](../../module/custom-hosts-sync.module.sh) | optional | network vpn hosts | Keep custom /etc/hosts entries from being reverted by the F5 VPN (svpn) |
 | [docker](../../module/docker.module.sh) | recommended | container devops | Docker Engine + Compose plugin |
 | [dstat](../../module/dstat.module.sh) | optional | monitoring | dstat — versatile CPU / disk / net / memory resource statistics (apt dstat package) |
 | [eza](../../module/eza.module.sh) | optional | cli-essentials | Modern ls replacement (eza) + shell alias ls='eza' |
 | [fdfind](../../module/fdfind.module.sh) | optional | cli-essentials | fd (fdfind) — fast, user-friendly alternative to find (apt fd-find) |
+| [figlet](../../module/figlet.module.sh) | optional | novelty fun | figlet — turn text into large ASCII-art banners |
 | [fish](../../module/fish.module.sh) | recommended | shell fish | fish shell 4 + fisher plugins + tide prompt + user config |
 | [fnm](../../module/fnm.module.sh) | optional | cli-essentials | fnm Fast Node Manager (Node.js version manager, user-home install) |
 | [font](../../module/font.module.sh) | recommended | font nerd-font desktop | Nerd Font collection (Hack, FiraCode, JetBrainsMono) |

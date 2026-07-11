@@ -35,6 +35,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Three novelty terminal modules for the small-tools modularization
+  program: `cowsay`, `cmatrix`, `figlet`** (`module/<name>.module.sh` +
+  `test/unit/module/<name>_spec.bats` each). All three are apt-archetype
+  (`module_use_apt_archetype`) `optional` modules tagged `novelty` / `fun`,
+  each installing its named apt package (`cowsay`, `cmatrix`, `figlet`), with
+  module-defined `detect()` and `is_recommended()`. Each ships a real
+  `doctor()` that goes beyond the dpkg check by verifying the runtime binary
+  actually resolves on PATH (`command -v cowsay` / `cmatrix` / `figlet`).
+  Each declares an en + zh-TW `DESCRIPTION`,
+  `SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")`, and a `TEST_VERIFY_CMD`
+  matching its doctor probe. Both standalone- and engine-invocable; all
+  satisfy the 10-function module contract (ADR-0002, enforced by
+  `test/unit/module/contract_conformance_spec.bats` / #305).
+  `doc/module/INDEX.md` regenerated.
 - **Five desktop-only modules for the small-tools modularization program:
   `vlc`, `ibus-rime`, `cheese`, `v4l-utils`,
   `gnome-shell-extension-manager`** (`module/<name>.module.sh` +

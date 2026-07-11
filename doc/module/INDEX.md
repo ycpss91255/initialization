@@ -3,14 +3,17 @@
 
 # Module Index
 
-54 modules. Columns come from each module's metadata block
+60 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
 
 | Module | Category | Tags | Description |
 |---|---|---|---|
+| [ag](../../module/ag.module.sh) | optional | cli search | ag — the_silver_searcher: fast recursive code/text search (grep alternative) |
+| [ansifilter](../../module/ansifilter.module.sh) | optional | cli text | ansifilter — strip or convert ANSI terminal escape codes to text/markup |
 | [anydesk](../../module/anydesk.module.sh) | optional | remote | AnyDesk — remote desktop client (upstream apt repository) |
+| [asciidoctor](../../module/asciidoctor.module.sh) | optional | cli documentation | asciidoctor — AsciiDoc text processor (docs to HTML/DocBook/manpage) |
 | [batcat](../../module/batcat.module.sh) | optional | cli-essentials | bat — cat clone with syntax highlighting (Ubuntu binary: batcat) |
 | [build-essential](../../module/build-essential.module.sh) | base | build | build-essential — C/C++ compiler toolchain metapackage (gcc, g++, make) |
 | [claude-code-config](../../module/claude-code-config.module.sh) | optional | agent config dotfile | Personal Claude Code settings (~/.claude: settings.json + statusline) |
@@ -53,6 +56,7 @@ to the module source.
 | [shell](../../module/shell.module.sh) | recommended | shell core | Shell session basics: ssh client, keychain, xclip |
 | [ssh-config](../../module/ssh-config.module.sh) | optional | config ssh dotfile | Personal ~/.ssh/config templates (per-host alias and key map) |
 | [sshfs](../../module/sshfs.module.sh) | optional | network filesystem | sshfs — mount a remote filesystem over SSH (FUSE) |
+| [tealdeer](../../module/tealdeer.module.sh) | optional | cli documentation | tealdeer — fast Rust tldr client (community man-page examples), binary: tldr |
 | [tig](../../module/tig.module.sh) | optional | git vcs tui | tig — text-mode interface for git (log/diff/blame browser) |
 | [tmux](../../module/tmux.module.sh) | recommended | terminal multiplexer | Terminal multiplexer + powerline config |
 | [tmuxp](../../module/tmuxp.module.sh) | optional | terminal session | tmuxp — tmux session manager (freeze/restore sessions from YAML), pipx-managed |
@@ -62,5 +66,7 @@ to the module source.
 | [vim](../../module/vim.module.sh) | base | editor | vim — Vi IMproved terminal text editor (apt vim package) |
 | [vscode](../../module/vscode.module.sh) | optional | editor | Visual Studio Code — Microsoft's GUI code editor (Microsoft apt repo) |
 | [wget](../../module/wget.module.sh) | base | http | wget — non-interactive network downloader (apt wget package) |
+| [xclip](../../module/xclip.module.sh) | optional | cli clipboard | xclip — command-line interface to the X11 clipboard/selection |
+| [xsel](../../module/xsel.module.sh) | optional | cli clipboard | xsel — command-line X11 selection/clipboard manipulation tool |
 | [yazi](../../module/yazi.module.sh) | optional | filemgr | yazi — blazing-fast TUI file manager + shell alias yz='yazi' |
 | [zoxide](../../module/zoxide.module.sh) | optional | cli-essentials | zoxide smarter cd command (cd is aliased to z) |

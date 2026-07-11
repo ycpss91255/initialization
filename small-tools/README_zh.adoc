@@ -3,6 +3,23 @@
 :toc: right
 :imagesdir: images
 
+[WARNING]
+====
+*已棄用（PRD 第 6.6 節 — small-tools 退場路徑）。*
+
+`small-tools/` 已被 v2 `setup_ubuntu` 引擎與其 `module/*.module.sh` 模組取代；
+模組以完整的 install / upgrade / remove / purge 生命週期涵蓋相同工具。這些腳本
+目前仍可執行，但不再新增功能；移除排程於 *0.4.0*（AC-27）。
+
+請改用 v2 引擎：
+
+[source, shell]
+----
+./setup_ubuntu.sh install --base      # 核心 base 工具
+./setup_ubuntu.sh install <module>    # 特定工具（例如 fish、tmux）
+----
+====
+
 ---
 link:./README.adoc[English]
 

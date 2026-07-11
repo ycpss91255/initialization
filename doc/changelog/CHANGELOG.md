@@ -49,6 +49,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   the 10-function module contract (ADR-0002, enforced by the #305
   contract-conformance meta-test). `doc/module/INDEX.md` regenerated
   (58 modules).
+- **Six monitoring modules for the small-tools modularization program: `btop`,
+  `bmon`, `iftop`, `iotop`, `nmon`, `powertop`** (`module/<name>.module.sh` +
+  `test/unit/module/<name>_spec.bats` each). All are apt-archetype `optional`
+  modules tagged `monitoring`, each installing its like-named apt package
+  (`btop`, `bmon`, `iftop`, `iotop`, `nmon`, `powertop`) via
+  `module_use_apt_archetype`, with module-defined `detect()`/`is_recommended()`
+  and a real `doctor()` that verifies the tool actually runs: `btop --version`
+  for btop, `bmon -V` for bmon, and `command -v <tool>` for iftop / iotop /
+  nmon / powertop (which ship no clean version flag). Each declares an en +
+  zh-TW `DESCRIPTION`, `SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")`, and a
+  `TEST_VERIFY_CMD` matching its doctor probe. Both standalone- and
+  engine-invocable; all satisfy the 10-function module contract (ADR-0002,
+  enforced by `test/unit/module/contract_conformance_spec.bats`).
+  `doc/module/INDEX.md` regenerated (54 modules).
 - **Six apt-archetype CLI/utility modules for the small-tools modularization
   program: `tig`, `git-lfs`, `tree`, `ncdu`, `net-tools`, `sshfs`**
   (`module/<name>.module.sh` + `test/unit/module/<name>_spec.bats` each). All

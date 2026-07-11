@@ -3,7 +3,7 @@
 
 # Module Index
 
-58 modules. Columns come from each module's metadata block
+64 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -12,6 +12,8 @@ to the module source.
 |---|---|---|---|
 | [anydesk](../../module/anydesk.module.sh) | optional | remote | AnyDesk — remote desktop client (upstream apt repository) |
 | [batcat](../../module/batcat.module.sh) | optional | cli-essentials | bat — cat clone with syntax highlighting (Ubuntu binary: batcat) |
+| [bmon](../../module/bmon.module.sh) | optional | monitoring | bmon — bandwidth monitor (real-time per-interface traffic, apt bmon package) |
+| [btop](../../module/btop.module.sh) | optional | monitoring | btop — modern resource monitor (CPU / memory / disk / net, apt btop package) |
 | [build-essential](../../module/build-essential.module.sh) | base | build | build-essential — C/C++ compiler toolchain metapackage (gcc, g++, make) |
 | [claude-code-config](../../module/claude-code-config.module.sh) | optional | agent config dotfile | Personal Claude Code settings (~/.claude: settings.json + statusline) |
 | [claude-code](../../module/claude-code.module.sh) | optional | agent | Anthropic Claude Code CLI agent (official native installer, self-updating) |
@@ -35,6 +37,8 @@ to the module source.
 | [gum](../../module/gum.module.sh) | optional | cli-essentials tui | gum — a tool for glamorous shell scripts (preferred modern TUI backend) |
 | [htop](../../module/htop.module.sh) | base | monitor | htop — interactive process viewer (apt htop package) |
 | [ifstat](../../module/ifstat.module.sh) | optional | monitoring | ifstat — report network interface bandwidth statistics (apt ifstat package) |
+| [iftop](../../module/iftop.module.sh) | optional | monitoring | iftop — display network bandwidth usage by host (apt iftop package) |
+| [iotop](../../module/iotop.module.sh) | optional | monitoring | iotop — per-process disk I/O monitor (apt iotop package) |
 | [jetson-stats](../../module/jetson-stats.module.sh) | optional | hardware | jetson-stats — jtop monitor TUI for NVIDIA Jetson (iGPU, nvpmodel, clocks, fan) |
 | [jq](../../module/jq.module.sh) | base | cli core | jq — command-line JSON processor (apt jq package) |
 | [kvm](../../module/kvm.module.sh) | optional | virtualization vm | KVM / libvirt / QEMU virtualization stack + virt-manager |
@@ -47,10 +51,12 @@ to the module source.
 | [neovim](../../module/neovim.module.sh) | recommended | editor cli | Neovim editor + nvimdots personal config |
 | [net-tools](../../module/net-tools.module.sh) | optional | network cli | net-tools — legacy net utilities (ifconfig/netstat/route/arp) |
 | [nmap](../../module/nmap.module.sh) | optional | monitoring | nmap — network mapper / port scanner for discovery and auditing (apt nmap package) |
+| [nmon](../../module/nmon.module.sh) | optional | monitoring | nmon — system performance monitor (CPU / memory / disk / net, apt nmon package) |
 | [notion](../../module/notion.module.sh) | optional | notes | Notion desktop app (unofficial notion-electron .deb client) |
 | [nvidia-driver](../../module/nvidia-driver.module.sh) | optional | gpu nvidia hardware | NVIDIA proprietary driver (auto-detected recommended version via ubuntu-drivers) |
 | [pipx](../../module/pipx.module.sh) | base | python cli | pipx — install and run Python CLI apps in isolated virtualenvs (apt-managed) |
 | [powerstat](../../module/powerstat.module.sh) | optional | monitoring | powerstat — measures power consumption of a computer (apt powerstat package) |
+| [powertop](../../module/powertop.module.sh) | optional | monitoring | powertop — power consumption diagnostics and monitor (apt powertop package) |
 | [python3](../../module/python3.module.sh) | base | python runtime | python3 — Python 3 runtime + packaging toolchain (pip, dev headers, setuptools) |
 | [qmk-firmware](../../module/qmk-firmware.module.sh) | optional | hardware | QMK firmware dev environment — qmk CLI (pipx) + toolchain + qmk_firmware checkout |
 | [ripgrep](../../module/ripgrep.module.sh) | optional | cli-essentials | ripgrep (rg) — fast, recursive grep alternative (apt ripgrep package) |

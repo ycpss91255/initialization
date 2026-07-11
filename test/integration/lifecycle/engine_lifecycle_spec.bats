@@ -183,10 +183,11 @@ teardown() {
     [[ -f "${ENGINE_LT_HOME}/.ssh/config" ]]
     grep -q "init_ubuntu managed" "${ENGINE_LT_HOME}/.ssh/config"
 
-    # Second install is idempotent (AC-5/6).
+    # Second install is idempotent (AC-5/6). Issue #278: an existing
+    # ~/.ssh/config is authoritative, so the re-run leaves it untouched.
     engine_lt_run "" install ssh-config --no-deps -y
     assert_success
-    assert_output --partial "already installed"
+    assert_output --partial "leaving it untouched"
 
     engine_lt_run "" verify ssh-config
     assert_success
@@ -198,29 +199,28 @@ teardown() {
     [[ ! -f "${ENGINE_LT_HOME}/.ssh/config" ]]
 }
 
-# Regression (linux-review F1): the v2 path never exports BACKUP_DIR. A config
-# module that backs up an existing config on upgrade used to hit
-# `log_fatal "BACKUP_DIR is not set."` — exit 1, uncatchable by the archetype's
-# `|| true`, aborting the whole run on every target. Drive the REAL engine
-# upgrade with BACKUP_DIR forced empty (the last env assignment wins over the
-# helper's default) and prove the run completes and still snapshots the config.
-@test "config: real upgrade does NOT abort when BACKUP_DIR is unset (F1)" {
+# Issue #278: ssh-config's upgrade() no longer overwrites an existing
+# ~/.ssh/config — the local file is authoritative and its live per-host edits
+# must survive an upgrade run verbatim. Because the override never calls
+# backup_file, the linux-review F1 abort (backup_file log_fatal with BACKUP_DIR
+# unset) can no longer fire either. Drive the REAL engine upgrade with
+# BACKUP_DIR forced empty and prove the run completes and preserves the file.
+@test "config: real upgrade preserves the live config and never aborts (issue #278 / F1)" {
     engine_lt_run "" install ssh-config --no-deps -y
     assert_success
     [[ -f "${ENGINE_LT_HOME}/.ssh/config" ]]
 
-    # BACKUP_DIR= empties the helper-injected value → backup_file must default
-    # it into the state dir instead of fatally aborting.
+    # Simulate a live, hand-edited ~/.ssh/config with a real per-host entry.
+    printf '# init_ubuntu managed\nHost my-live-host\n    HostName box.internal\n' \
+        > "${ENGINE_LT_HOME}/.ssh/config"
+
     engine_lt_run "BACKUP_DIR=" upgrade ssh-config -y
     assert_success
     engine_lt_assert_no_wiring_errors
     refute_output --partial "BACKUP_DIR is not set"
-    # Managed config survived the upgrade and the pre-upgrade copy was snapshotted
-    # under the defaulted state-dir backup.
+    # The live edits survived the upgrade untouched (authoritative, no clobber).
     [[ -f "${ENGINE_LT_HOME}/.ssh/config" ]]
-    grep -q "init_ubuntu managed" "${ENGINE_LT_HOME}/.ssh/config"
-    run bash -c "cat '${ENGINE_LT_STATE}'/backup/*/config"
-    assert_success
+    grep -q "^Host my-live-host$" "${ENGINE_LT_HOME}/.ssh/config"
 }
 
 # ── custom archetype (claude-code-config: macro + hand-rolled overrides) ─────

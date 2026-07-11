@@ -3,7 +3,7 @@
 
 # Module Index
 
-70 modules. Columns come from each module's metadata block
+75 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -18,6 +18,7 @@ to the module source.
 | [bmon](../../module/bmon.module.sh) | optional | monitoring | bmon — bandwidth monitor (real-time per-interface traffic, apt bmon package) |
 | [btop](../../module/btop.module.sh) | optional | monitoring | btop — modern resource monitor (CPU / memory / disk / net, apt btop package) |
 | [build-essential](../../module/build-essential.module.sh) | base | build | build-essential — C/C++ compiler toolchain metapackage (gcc, g++, make) |
+| [cheese](../../module/cheese.module.sh) | optional | media | Cheese — GNOME webcam app for photos and videos (apt cheese package) |
 | [claude-code-config](../../module/claude-code-config.module.sh) | optional | agent config dotfile | Personal Claude Code settings (~/.claude: settings.json + statusline) |
 | [claude-code](../../module/claude-code.module.sh) | optional | agent | Anthropic Claude Code CLI agent (official native installer, self-updating) |
 | [claude-monitor](../../module/claude-monitor.module.sh) | optional | agent cli | claude-monitor — real-time Claude Code token/cost usage monitor TUI (pipx) |
@@ -37,8 +38,10 @@ to the module source.
 | [git-lfs](../../module/git-lfs.module.sh) | optional | git vcs | git-lfs — Git Large File Storage (versions large files via pointers) |
 | [git](../../module/git.module.sh) | base | vcs | git — distributed version control system (apt git package) |
 | [glow](../../module/glow.module.sh) | optional | cli-essentials | glow — render markdown on the CLI (yazi markdown-preview dependency) |
+| [gnome-shell-extension-manager](../../module/gnome-shell-extension-manager.module.sh) | optional | gnome desktop | Extension Manager — browse and manage GNOME Shell extensions (binary: extension-manager) |
 | [gum](../../module/gum.module.sh) | optional | cli-essentials tui | gum — a tool for glamorous shell scripts (preferred modern TUI backend) |
 | [htop](../../module/htop.module.sh) | base | monitor | htop — interactive process viewer (apt htop package) |
+| [ibus-rime](../../module/ibus-rime.module.sh) | optional | input-method desktop | Rime input method engine for IBus — pulls in the ibus framework (apt ibus-rime package) |
 | [ifstat](../../module/ifstat.module.sh) | optional | monitoring | ifstat — report network interface bandwidth statistics (apt ifstat package) |
 | [iftop](../../module/iftop.module.sh) | optional | monitoring | iftop — display network bandwidth usage by host (apt iftop package) |
 | [iotop](../../module/iotop.module.sh) | optional | monitoring | iotop — per-process disk I/O monitor (apt iotop package) |
@@ -73,7 +76,9 @@ to the module source.
 | [trash-maintenance](../../module/trash-maintenance.module.sh) | optional | maintenance trash cron | Daily trash cleanup: age + size cap (single source of truth vs GNOME auto-delete) |
 | [tree](../../module/tree.module.sh) | optional | cli filesystem | tree — recursive directory listing as an indented tree |
 | [unzip](../../module/unzip.module.sh) | base | archive | unzip — extractor for .zip archives (apt unzip package) |
+| [v4l-utils](../../module/v4l-utils.module.sh) | optional | media hardware | v4l-utils — Video4Linux tools to inspect and control cameras (binary: v4l2-ctl) |
 | [vim](../../module/vim.module.sh) | base | editor | vim — Vi IMproved terminal text editor (apt vim package) |
+| [vlc](../../module/vlc.module.sh) | optional | media | VLC — cross-platform media player for audio and video (apt vlc package) |
 | [vscode](../../module/vscode.module.sh) | optional | editor | Visual Studio Code — Microsoft's GUI code editor (Microsoft apt repo) |
 | [wget](../../module/wget.module.sh) | base | http | wget — non-interactive network downloader (apt wget package) |
 | [xclip](../../module/xclip.module.sh) | optional | cli clipboard | xclip — command-line interface to the X11 clipboard/selection |

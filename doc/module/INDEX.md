@@ -3,7 +3,7 @@
 
 # Module Index
 
-54 modules. Columns come from each module's metadata block
+60 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -30,6 +30,7 @@ to the module source.
 | [fzf](../../module/fzf.module.sh) | optional | cli-essentials | fzf command-line fuzzy finder (single-binary GitHub release) |
 | [gemini](../../module/gemini.module.sh) | optional | agent | gemini — Google Gemini CLI coding agent (npm install via fnm-managed Node.js) |
 | [git-config](../../module/git-config.module.sh) | recommended | config git dotfile | Personal ~/.gitconfig (aliases, delta diff, rebase pull, ...) |
+| [git-lfs](../../module/git-lfs.module.sh) | optional | git vcs | git-lfs — Git Large File Storage (versions large files via pointers) |
 | [git](../../module/git.module.sh) | base | vcs | git — distributed version control system (apt git package) |
 | [glow](../../module/glow.module.sh) | optional | cli-essentials | glow — render markdown on the CLI (yazi markdown-preview dependency) |
 | [gum](../../module/gum.module.sh) | optional | cli-essentials tui | gum — a tool for glamorous shell scripts (preferred modern TUI backend) |
@@ -44,7 +45,9 @@ to the module source.
 | [libreoffice](../../module/libreoffice.module.sh) | optional | office gui | LibreOffice office suite (fresh releases via ppa:libreoffice/ppa) |
 | [lnav](../../module/lnav.module.sh) | optional | logs | lnav — log file navigator for the terminal (apt package + lnav_pkg config bundle) |
 | [nas-mount](../../module/nas-mount.module.sh) | optional | network storage | NAS CIFS/SMB auto-mount (cifs-utils + autofs + smbclient) |
+| [ncdu](../../module/ncdu.module.sh) | optional | monitor disk tui | ncdu — ncurses disk usage analyzer (TUI) |
 | [neovim](../../module/neovim.module.sh) | recommended | editor cli | Neovim editor + nvimdots personal config |
+| [net-tools](../../module/net-tools.module.sh) | optional | network cli | net-tools — legacy net utilities (ifconfig/netstat/route/arp) |
 | [nmon](../../module/nmon.module.sh) | optional | monitoring | nmon — system performance monitor (CPU / memory / disk / net, apt nmon package) |
 | [notion](../../module/notion.module.sh) | optional | notes | Notion desktop app (unofficial notion-electron .deb client) |
 | [nvidia-driver](../../module/nvidia-driver.module.sh) | optional | gpu nvidia hardware | NVIDIA proprietary driver (auto-detected recommended version via ubuntu-drivers) |
@@ -55,9 +58,12 @@ to the module source.
 | [ripgrep](../../module/ripgrep.module.sh) | optional | cli-essentials | ripgrep (rg) — fast, recursive grep alternative (apt ripgrep package) |
 | [shell](../../module/shell.module.sh) | recommended | shell core | Shell session basics: ssh client, keychain, xclip |
 | [ssh-config](../../module/ssh-config.module.sh) | optional | config ssh dotfile | Personal ~/.ssh/config templates (per-host alias and key map) |
+| [sshfs](../../module/sshfs.module.sh) | optional | network filesystem | sshfs — mount a remote filesystem over SSH (FUSE) |
+| [tig](../../module/tig.module.sh) | optional | git vcs tui | tig — text-mode interface for git (log/diff/blame browser) |
 | [tmux](../../module/tmux.module.sh) | recommended | terminal multiplexer | Terminal multiplexer + powerline config |
 | [tmuxp](../../module/tmuxp.module.sh) | optional | terminal session | tmuxp — tmux session manager (freeze/restore sessions from YAML), pipx-managed |
 | [trash-maintenance](../../module/trash-maintenance.module.sh) | optional | maintenance trash cron | Daily trash cleanup: age + size cap (single source of truth vs GNOME auto-delete) |
+| [tree](../../module/tree.module.sh) | optional | cli filesystem | tree — recursive directory listing as an indented tree |
 | [unzip](../../module/unzip.module.sh) | base | archive | unzip — extractor for .zip archives (apt unzip package) |
 | [vim](../../module/vim.module.sh) | base | editor | vim — Vi IMproved terminal text editor (apt vim package) |
 | [vscode](../../module/vscode.module.sh) | optional | editor | Visual Studio Code — Microsoft's GUI code editor (Microsoft apt repo) |

@@ -49,6 +49,30 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   engine-invocable; all satisfy the 10-function module contract (ADR-0002,
   enforced by `test/unit/module/contract_conformance_spec.bats`).
   `doc/module/INDEX.md` regenerated (54 modules).
+- **Six apt-archetype CLI/utility modules for the small-tools modularization
+  program: `tig`, `git-lfs`, `tree`, `ncdu`, `net-tools`, `sshfs`**
+  (`module/<name>.module.sh` + `test/unit/module/<name>_spec.bats` each). All
+  six are apt-archetype (`module_use_apt_archetype`) `optional` modules that
+  satisfy the 10-function module contract (ADR-0002, enforced by the #305
+  contract-conformance meta-test) and ship a real `doctor()` that verifies the
+  tool actually runs:
+  - `tig` — text-mode interface for git; apt `tig`; `DEPENDS_ON=("git")`;
+    doctor probes `tig --version`.
+  - `git-lfs` — Git Large File Storage; apt `git-lfs`; `DEPENDS_ON=("git")`;
+    overrides `install()` to run the one-time `git lfs install` (global filter
+    registration) as the apt post-step; doctor probes `git lfs version`.
+  - `tree` — recursive directory tree lister; apt `tree`; doctor probes
+    `tree --version`.
+  - `ncdu` — ncurses disk usage analyzer (TUI); apt `ncdu`; doctor probes
+    `ncdu -v`.
+  - `net-tools` — legacy net utilities (ifconfig/netstat/route/arp); apt
+    `net-tools`; doctor probes `command -v ifconfig`.
+  - `sshfs` — mount a remote filesystem over SSH (FUSE); apt `sshfs`; doctor
+    probes `command -v sshfs`.
+  Each carries en + zh-TW i18n descriptions, `SUPPORTED_UBUNTU=("22.04"
+  "24.04" "26.04")`, a matching `TEST_VERIFY_CMD`, and the dual-mode
+  standalone/engine entry convention. `doc/module/INDEX.md` regenerated (54
+  modules).
 - **Foundation modules for the small-tools modularization program: `python3`
   and `pipx`** (`module/python3.module.sh`, `module/pipx.module.sh`, plus
   `test/unit/module/python3_spec.bats` and `test/unit/module/pipx_spec.bats`).

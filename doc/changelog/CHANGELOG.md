@@ -49,6 +49,59 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   satisfy the 10-function module contract (ADR-0002, enforced by
   `test/unit/module/contract_conformance_spec.bats` / #305).
   `doc/module/INDEX.md` regenerated.
+- **Four third-party-repository app modules for the small-tools modularization
+  program: `obs-studio`, `spotify-client`, `thunderbird`, `gping`**
+  (`module/<name>.module.sh` + `test/unit/module/<name>_spec.bats` each). All
+  four are `optional` apt-archetype (`module_use_apt_archetype`) modules that
+  satisfy the 10-function module contract (ADR-0002, #305) with en + zh-TW
+  i18n, `SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")`, a matching
+  `TEST_VERIFY_CMD`, the dual-mode standalone/engine entry convention, and a
+  real `doctor()` that verifies the tool actually resolves on PATH (not just
+  the dpkg check). Each adds a third-party repository and — per the module
+  contract (whatever a module adds, it removes) — tears it back down on
+  `remove()`/`purge()` for a clean uninstall:
+  - `obs-studio` — screen recorder / live streamer via the OBS Project PPA
+    (`ppa:obsproject/obs-studio`); desktop-only; `doctor: command -v obs`.
+  - `spotify-client` — music-streaming client via the upstream Spotify apt
+    repository (dearmored key under `/etc/apt/keyrings` + a
+    `repository.spotify.com` source in `/etc/apt/sources.list.d`);
+    desktop-only; `doctor: command -v spotify`.
+  - `thunderbird` — email client installed as a real `.deb` from the Mozilla
+    Team PPA (`ppa:mozillateam/ppa`) plus an apt pin
+    (`/etc/apt/preferences.d`, priority 1001) that prefers the PPA build over
+    Ubuntu's snap-transition stub on 24.04+; desktop-only;
+    `doctor: command -v thunderbird`.
+  - `gping` — ping with a live terminal graph via the azlux apt repository
+    (`http://packages.azlux.fr/debian/`, dearmored key); not desktop-gated
+    (also recommended on servers); `doctor: gping --version`.
+
+  `--dry-run` performs no repository mutation and no network access on any of
+  the four; the unit specs stub `apt`/`apt-add-repository`/`curl`/`gpg`/`sudo`
+  at the boundary and assert the no-side-effect contract. `doc/module/INDEX.md`
+  regenerated (79 modules).
+- **Three pipx-installed tool modules for the small-tools modularization
+  program: `bpytop`, `gpustat`, `thefuck`** (`module/<name>.module.sh` +
+  `test/unit/module/<name>_spec.bats` each). All three are custom-archetype
+  (archetype D) `optional` modules that `DEPENDS_ON=("pipx")` and install as
+  the invoking user via `pipx install <name>` (no inline pipx bootstrap — the
+  engine installs the `pipx` module first), mirroring the existing
+  `tmuxp` / `claude-monitor` pipx pattern (`pipx install` / `pipx upgrade` /
+  `pipx uninstall`). Each hand-defines all 10 mandatory lifecycle functions
+  (ADR-0002, enforced by `test/unit/module/contract_conformance_spec.bats`,
+  the #305 contract-conformance meta-test) with a real `doctor()`:
+  - `bpytop` — terminal resource monitor; tags `monitoring cli`; doctor probes
+    `bpytop --version`.
+  - `gpustat` — compact per-GPU status monitor; tags `monitoring gpu`; doctor
+    probes `gpustat --version`.
+  - `thefuck` — corrects the previous mistyped console command; tags
+    `shell cli`; doctor probes `command -v thefuck` (a `thefuck --version`
+    check needs the shell alias, so presence on PATH is the reliable signal),
+    and its `POST_INSTALL_MESSAGE` explains the required
+    `eval "$(thefuck --alias)"` shell-rc setup.
+  Each declares an en + zh-TW `DESCRIPTION`, `SUPPORTED_UBUNTU=("22.04"
+  "24.04" "26.04")`, `VERSION_PROVIDED="pipx-managed"`, and a `TEST_VERIFY_CMD`
+  matching its doctor probe, plus the dual-mode standalone/engine entry
+  convention. `doc/module/INDEX.md` regenerated (67 modules).
 - **Five desktop-only modules for the small-tools modularization program:
   `vlc`, `ibus-rime`, `cheese`, `v4l-utils`,
   `gnome-shell-extension-manager`** (`module/<name>.module.sh` +

@@ -3,7 +3,7 @@
 
 # Module Index
 
-78 modules. Columns come from each module's metadata block
+85 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -16,6 +16,7 @@ to the module source.
 | [asciidoctor](../../module/asciidoctor.module.sh) | optional | cli documentation | asciidoctor — AsciiDoc text processor (docs to HTML/DocBook/manpage) |
 | [batcat](../../module/batcat.module.sh) | optional | cli-essentials | bat — cat clone with syntax highlighting (Ubuntu binary: batcat) |
 | [bmon](../../module/bmon.module.sh) | optional | monitoring | bmon — bandwidth monitor (real-time per-interface traffic, apt bmon package) |
+| [bpytop](../../module/bpytop.module.sh) | optional | monitoring cli | bpytop — terminal resource monitor (CPU / memory / disk / network / processes), pipx-managed |
 | [btop](../../module/btop.module.sh) | optional | monitoring | btop — modern resource monitor (CPU / memory / disk / net, apt btop package) |
 | [build-essential](../../module/build-essential.module.sh) | base | build | build-essential — C/C++ compiler toolchain metapackage (gcc, g++, make) |
 | [cheese](../../module/cheese.module.sh) | optional | media | Cheese — GNOME webcam app for photos and videos (apt cheese package) |
@@ -42,6 +43,8 @@ to the module source.
 | [git](../../module/git.module.sh) | base | vcs | git — distributed version control system (apt git package) |
 | [glow](../../module/glow.module.sh) | optional | cli-essentials | glow — render markdown on the CLI (yazi markdown-preview dependency) |
 | [gnome-shell-extension-manager](../../module/gnome-shell-extension-manager.module.sh) | optional | gnome desktop | Extension Manager — browse and manage GNOME Shell extensions (binary: extension-manager) |
+| [gping](../../module/gping.module.sh) | optional | cli-essentials network | gping — ping with a live terminal graph (azlux apt repository) |
+| [gpustat](../../module/gpustat.module.sh) | optional | monitoring gpu | gpustat — compact per-GPU status monitor (utilization / memory / temperature), pipx-managed |
 | [gum](../../module/gum.module.sh) | optional | cli-essentials tui | gum — a tool for glamorous shell scripts (preferred modern TUI backend) |
 | [htop](../../module/htop.module.sh) | base | monitor | htop — interactive process viewer (apt htop package) |
 | [ibus-rime](../../module/ibus-rime.module.sh) | optional | input-method desktop | Rime input method engine for IBus — pulls in the ibus framework (apt ibus-rime package) |
@@ -63,6 +66,7 @@ to the module source.
 | [nmon](../../module/nmon.module.sh) | optional | monitoring | nmon — system performance monitor (CPU / memory / disk / net, apt nmon package) |
 | [notion](../../module/notion.module.sh) | optional | notes | Notion desktop app (unofficial notion-electron .deb client) |
 | [nvidia-driver](../../module/nvidia-driver.module.sh) | optional | gpu nvidia hardware | NVIDIA proprietary driver (auto-detected recommended version via ubuntu-drivers) |
+| [obs-studio](../../module/obs-studio.module.sh) | optional | media gui | OBS Studio — screen recorder / live streamer (ppa:obsproject/obs-studio) |
 | [pipx](../../module/pipx.module.sh) | base | python cli | pipx — install and run Python CLI apps in isolated virtualenvs (apt-managed) |
 | [powerstat](../../module/powerstat.module.sh) | optional | monitoring | powerstat — measures power consumption of a computer (apt powerstat package) |
 | [powertop](../../module/powertop.module.sh) | optional | monitoring | powertop — power consumption diagnostics and monitor (apt powertop package) |
@@ -70,9 +74,12 @@ to the module source.
 | [qmk-firmware](../../module/qmk-firmware.module.sh) | optional | hardware | QMK firmware dev environment — qmk CLI (pipx) + toolchain + qmk_firmware checkout |
 | [ripgrep](../../module/ripgrep.module.sh) | optional | cli-essentials | ripgrep (rg) — fast, recursive grep alternative (apt ripgrep package) |
 | [shell](../../module/shell.module.sh) | recommended | shell core | Shell session basics: ssh client, keychain, xclip |
+| [spotify-client](../../module/spotify-client.module.sh) | optional | media gui | Spotify — music streaming desktop client (upstream apt repository) |
 | [ssh-config](../../module/ssh-config.module.sh) | optional | config ssh dotfile | Personal ~/.ssh/config templates (per-host alias and key map) |
 | [sshfs](../../module/sshfs.module.sh) | optional | network filesystem | sshfs — mount a remote filesystem over SSH (FUSE) |
 | [tealdeer](../../module/tealdeer.module.sh) | optional | cli documentation | tealdeer — fast Rust tldr client (community man-page examples), binary: tldr |
+| [thefuck](../../module/thefuck.module.sh) | optional | shell cli | thefuck — corrects your previous mistyped console command, pipx-managed |
+| [thunderbird](../../module/thunderbird.module.sh) | optional | email gui | Thunderbird — email client as a real .deb (ppa:mozillateam/ppa, not the snap) |
 | [tig](../../module/tig.module.sh) | optional | git vcs tui | tig — text-mode interface for git (log/diff/blame browser) |
 | [tmux](../../module/tmux.module.sh) | recommended | terminal multiplexer | Terminal multiplexer + powerline config |
 | [tmuxp](../../module/tmuxp.module.sh) | optional | terminal session | tmuxp — tmux session manager (freeze/restore sessions from YAML), pipx-managed |

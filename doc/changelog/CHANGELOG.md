@@ -162,6 +162,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Security
 
+- **Stopped version-controlling the personal `~/.ssh/config` and flipped the
+  ssh-config sync direction** (`module/ssh-config.module.sh`,
+  `module/config/ssh_config.template`, `.gitignore`; issue #278). The tracked
+  `module/config/ssh_config` carried real per-host data — internal IPs,
+  usernames, and a plaintext credential — in this public repo. It is now
+  `git rm --cached`-untracked and gitignored so future edits are never pushed;
+  a minimal, documented placeholder stub (`module/config/ssh_config.template`,
+  no real host data) ships in its place for first-run bootstrap. The module now
+  overrides `install()`/`upgrade()` so `~/.ssh/config` is treated as
+  authoritative: neither phase overwrites an existing file (local per-host edits
+  survive an upgrade run), and both bootstrap the stub ONLY when no
+  `~/.ssh/config` exists yet. `module/git-config.module.sh` was assessed and left
+  unchanged — its tracked `module/config/git_config` template is generic (no
+  `[user]` block, hosts, or secrets), so the fix is deliberately scoped to
+  ssh-config. NOTE: the already-public credential remains reachable in git
+  history; rotating it on the affected host and any history scrubbing
+  (`git filter-repo`) are out of scope here and remain the maintainer's call.
+
 - **Hardened the github-release fetch/extract path** (`lib/module_helper.sh`
   plus `module/fzf.module.sh` / `module/yazi.module.sh` /
   `module/lazydocker.module.sh`), per the security review (`doc/review/security-review.md`):

@@ -22,6 +22,12 @@ module/config/fish/completions/*
 module/config/fish/fish_history
 module/config/fish/fish_variables*
 
+# SSH: the live ~/.ssh/config is host/person-specific and holds real host
+# data (IPs, usernames, credentials) — never version-control it (issue #278).
+# The ssh-config module ships module/config/ssh_config.template as the only
+# tracked, safe first-run stub; the real per-machine file stays untracked.
+module/config/ssh_config
+
 # Claude Code local-only settings (machine-specific permission allow-list).
 # Project-wide config (hooks, enabled plugins) lives in tracked .claude/settings.json.
 .claude/settings.local.json

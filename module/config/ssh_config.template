@@ -1,0 +1,16 @@
+# First-run bootstrap stub for ~/.ssh/config.
+#
+# This file ships NO real host data on purpose. The live, authoritative SSH
+# config is ~/.ssh/config on each machine — it accumulates real per-host
+# entries (HostName / User / IdentityFile / ProxyJump ...) over that machine's
+# life. The ssh-config module only drops this stub when ~/.ssh/config does not
+# exist yet; it never overwrites an existing ~/.ssh/config, so local edits
+# always survive an upgrade run. See issue #278 and doc/module-spec.md.
+#
+# Add your own host entries below. Example (replace the placeholders):
+#
+#   Host my-alias
+#       HostName example.internal
+#       User youruser
+#       Port 22
+#       IdentityFile ~/.ssh/id_ed25519

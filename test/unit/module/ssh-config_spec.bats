@@ -135,9 +135,11 @@ _use_backup_dir() {
     [[ "$(module_get_description xx)" == "$(module_get_description en)" ]]
 }
 
-@test "ssh-config declares the overwrite WARN_MESSAGE and key-mode POST_INSTALL_MESSAGE" {
+@test "ssh-config declares the non-clobbering WARN_MESSAGE and key-mode POST_INSTALL_MESSAGE" {
     _load_module
-    [[ "$(module_get_warn_message en)" == *"overwritten"* ]]
+    # Issue #278: an existing ~/.ssh/config is authoritative and NOT overwritten.
+    [[ "$(module_get_warn_message en)" == *"authoritative"* ]]
+    [[ "$(module_get_warn_message en)" != *"overwritten"* ]]
     [[ "$(module_get_post_install_message en)" == *"600"* ]]
     [[ -n "$(module_get_warn_message zh-TW)" ]]
     [[ -n "$(module_get_post_install_message zh-TW)" ]]
@@ -170,10 +172,25 @@ _use_backup_dir() {
     [[ "${CONFIG_DIR_MODE}" == "700" ]]
 }
 
-@test "ssh-config template source lives in module/config/ssh_config and exists" {
+@test "ssh-config template source is the tracked placeholder stub and exists" {
     _load_module
-    [[ "${CONFIG_TEMPLATE_SRC}" == *"/config/ssh_config" ]]
+    # Issue #278: ship only a safe placeholder (config/ssh_config.template),
+    # never the real, host-specific ~/.ssh/config.
+    [[ "${CONFIG_TEMPLATE_SRC}" == *"/config/ssh_config.template" ]]
     [[ -f "${CONFIG_TEMPLATE_SRC}" ]]
+}
+
+@test "ssh-config tracked template carries NO real host data (issue #278)" {
+    _load_module
+    # Every meaningful SSH directive (Host/HostName/User/IdentityFile/Port/
+    # Match/ProxyJump) must be commented out — the stub documents by example
+    # only, so no real IP, username, or credential can ship in the public repo.
+    run grep -nE '^[[:space:]]*(Host|HostName|User|IdentityFile|Port|Match|ProxyJump|RemoteCommand)[[:space:]]' \
+        "${CONFIG_TEMPLATE_SRC}"
+    assert_failure
+    # No IPv4 literals anywhere in the shipped stub.
+    run grep -nE '([0-9]{1,3}\.){3}[0-9]{1,3}' "${CONFIG_TEMPLATE_SRC}"
+    assert_failure
 }
 
 # ── Lifecycle dry-run (AC-12 pattern) ────────────────────────────────────────
@@ -256,7 +273,8 @@ _use_backup_dir() {
     install
     # Line 2 of the drop is line 1 of the shipped template.
     [[ "$(sed -n '2p' "${HOME}/.ssh/config")" == "$(head -n 1 "${CONFIG_TEMPLATE_SRC}")" ]]
-    grep -q "^Host github$" "${HOME}/.ssh/config"
+    # The placeholder stub's documented header lands in the dropped config.
+    grep -q "First-run bootstrap stub" "${HOME}/.ssh/config"
 }
 
 @test "install sets mode 600 on config and 700 on ~/.ssh" {
@@ -266,13 +284,18 @@ _use_backup_dir() {
     [[ "$(stat -c '%a' "${HOME}/.ssh")" == "700" ]]
 }
 
-@test "install overwrites a foreign unmanaged ~/.ssh/config (per WARN_MESSAGE)" {
+@test "install leaves an existing ~/.ssh/config untouched (issue #278 non-clobber)" {
+    # New behavior: ~/.ssh/config is authoritative. install() bootstraps the
+    # stub ONLY when absent; an existing file (even a foreign, unmanaged one)
+    # is preserved verbatim so real per-host edits are never destroyed.
     _load_module
     mkdir -p "${HOME}/.ssh"
-    printf 'Host foreign\n' > "${HOME}/.ssh/config"
-    install
-    [[ "$(head -n 1 "${HOME}/.ssh/config")" == "${CONFIG_MARKER}" ]]
-    run ! grep -q "^Host foreign$" "${HOME}/.ssh/config"
+    printf 'Host foreign\n    HostName example.test\n' > "${HOME}/.ssh/config"
+    local _before; _before="$(cat "${HOME}/.ssh/config")"
+    run install
+    assert_success
+    [[ "$(cat "${HOME}/.ssh/config")" == "${_before}" ]]
+    grep -q "^Host foreign$" "${HOME}/.ssh/config"
 }
 
 @test "install then is_installed returns 0" {
@@ -331,36 +354,42 @@ _use_backup_dir() {
     [[ "$(head -n 1 "${HOME}/.ssh/config")" == "${CONFIG_MARKER}" ]]
 }
 
-@test "upgrade restores drifted config back to the template content" {
+@test "upgrade never overwrites an existing ~/.ssh/config; local edits survive (issue #278)" {
+    # Core #278 fix: ~/.ssh/config is authoritative. A user's real per-host
+    # entries (and the managed marker) must survive an upgrade run verbatim —
+    # the repo template is NEVER pushed back over the live file.
+    _load_module
+    install
+    printf '# init_ubuntu managed\nHost my-live-host\n    HostName box.internal\n' \
+        > "${HOME}/.ssh/config"
+    local _before; _before="$(cat "${HOME}/.ssh/config")"
+    run upgrade
+    assert_success
+    [[ "$(cat "${HOME}/.ssh/config")" == "${_before}" ]]
+    grep -q "^Host my-live-host$" "${HOME}/.ssh/config"
+}
+
+@test "upgrade over an existing config makes no backup (nothing is clobbered)" {
+    # The old archetype backed up before re-dropping the template. The #278
+    # override no longer touches an existing file, so there is nothing to back
+    # up and the configured BACKUP_DIR stays empty.
     _load_module
     _use_backup_dir
     install
-    printf '# init_ubuntu managed\nHost drifted\n' > "${HOME}/.ssh/config"
-    upgrade
-    grep -q "^Host github$" "${HOME}/.ssh/config"
-    run ! grep -q "^Host drifted$" "${HOME}/.ssh/config"
+    run upgrade
+    assert_success
+    [[ ! -e "${BACKUP_DIR}/config" ]]
 }
 
-@test "upgrade backs up the pre-existing config into BACKUP_DIR" {
-    _load_module
-    _use_backup_dir
-    install
-    upgrade
-    [[ -f "${BACKUP_DIR}/config" ]]
-}
-
-@test "upgrade over an existing config does NOT abort when BACKUP_DIR is unset (F1)" {
-    # Regression (linux-review F1): backup_file used to log_fatal (exit 1,
-    # uncatchable by the archetype's `|| true`) with BACKUP_DIR unset — the
-    # v2 path never sets it, so every config re-run/upgrade aborted. It now
-    # defaults BACKUP_DIR into the state dir and the upgrade completes.
+@test "upgrade over an existing config exits 0 with BACKUP_DIR unset (no backup_file path)" {
+    # The non-clobbering override never calls backup_file, so the linux-review
+    # F1 abort (backup_file log_fatal with BACKUP_DIR unset) can no longer fire.
     _load_module
     install
+    local _before; _before="$(cat "${HOME}/.ssh/config")"
     BACKUP_DIR='' run upgrade
     assert_success
-    # The pre-existing config is still snapshotted under the defaulted dir.
-    run bash -c "cat '${INIT_UBUNTU_STATE_DIR}'/backup/*/config"
-    assert_success
+    [[ "$(cat "${HOME}/.ssh/config")" == "${_before}" ]]
 }
 
 # ── remove / purge ───────────────────────────────────────────────────────────
@@ -401,12 +430,12 @@ _use_backup_dir() {
     [[ "$(cat "${HOME}/.ssh/config")" == "${_content1}" ]]
 }
 
-@test "install short-circuits the drop when already installed" {
+@test "install short-circuits the drop when a config already exists" {
     _load_module
     install
     run install
     assert_success
-    assert_output --partial "already installed"
+    assert_output --partial "leaving it untouched"
 }
 
 @test "remove is idempotent — second run still exits 0" {

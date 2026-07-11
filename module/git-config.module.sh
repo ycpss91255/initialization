@@ -46,6 +46,13 @@ INSTALL_TARGET_DEFAULT="user-home"
 TEST_VERIFY_CMD="git config --global --list >/dev/null"
 
 # ── Archetype C — config drop ────────────────────────────────────────────────
+# Issue #278 assessment: the tracked template module/config/git_config carries
+# NO personal data — it is a generic dotfile (defaultBranch, editor/pager,
+# delta + alias defaults) with no [user] name/email, no hosts, no credentials.
+# So it does NOT get the ssh-config treatment (untrack + gitignore + placeholder)
+# and keeps the shared repo-wins archetype semantics unchanged, deliberately
+# scoping the #278 fix to ssh-config so git-config's behavior is not altered
+# incidentally. If a [user] block or any secret is ever added here, revisit.
 CONFIG_TEMPLATE_SRC="${MODULE_DIR:-${BASH_SOURCE[0]%/*}}/config/git_config"
 CONFIG_DEST="${HOME}/.gitconfig"
 CONFIG_MARKER="# init_ubuntu managed"

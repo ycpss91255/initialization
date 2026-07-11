@@ -35,6 +35,29 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Three pipx-installed tool modules for the small-tools modularization
+  program: `bpytop`, `gpustat`, `thefuck`** (`module/<name>.module.sh` +
+  `test/unit/module/<name>_spec.bats` each). All three are custom-archetype
+  (archetype D) `optional` modules that `DEPENDS_ON=("pipx")` and install as
+  the invoking user via `pipx install <name>` (no inline pipx bootstrap — the
+  engine installs the `pipx` module first), mirroring the existing
+  `tmuxp` / `claude-monitor` pipx pattern (`pipx install` / `pipx upgrade` /
+  `pipx uninstall`). Each hand-defines all 10 mandatory lifecycle functions
+  (ADR-0002, enforced by `test/unit/module/contract_conformance_spec.bats`,
+  the #305 contract-conformance meta-test) with a real `doctor()`:
+  - `bpytop` — terminal resource monitor; tags `monitoring cli`; doctor probes
+    `bpytop --version`.
+  - `gpustat` — compact per-GPU status monitor; tags `monitoring gpu`; doctor
+    probes `gpustat --version`.
+  - `thefuck` — corrects the previous mistyped console command; tags
+    `shell cli`; doctor probes `command -v thefuck` (a `thefuck --version`
+    check needs the shell alias, so presence on PATH is the reliable signal),
+    and its `POST_INSTALL_MESSAGE` explains the required
+    `eval "$(thefuck --alias)"` shell-rc setup.
+  Each declares an en + zh-TW `DESCRIPTION`, `SUPPORTED_UBUNTU=("22.04"
+  "24.04" "26.04")`, `VERSION_PROVIDED="pipx-managed"`, and a `TEST_VERIFY_CMD`
+  matching its doctor probe, plus the dual-mode standalone/engine entry
+  convention. `doc/module/INDEX.md` regenerated (67 modules).
 - **Five desktop-only modules for the small-tools modularization program:
   `vlc`, `ibus-rime`, `cheese`, `v4l-utils`,
   `gnome-shell-extension-manager`** (`module/<name>.module.sh` +

@@ -136,9 +136,10 @@ _fake_tmuxp_bin() {
     [[ " ${TAGS[*]} " == *" terminal "* ]]
 }
 
-@test "tmuxp module DEPENDS_ON contains tmux" {
+@test "tmuxp module DEPENDS_ON contains tmux and pipx" {
     _load_module
     [[ " ${DEPENDS_ON[*]} " == *" tmux "* ]]
+    [[ " ${DEPENDS_ON[*]} " == *" pipx "* ]]
 }
 
 @test "tmuxp DESCRIPTION is associative with en + zh-TW entries" {
@@ -341,14 +342,19 @@ _fake_tmuxp_bin() {
     assert_failure
 }
 
-@test "install apt-installs pipx when pipx is missing" {
+# pipx is now a DEPENDS_ON (the engine installs it first) rather than being
+# bootstrapped inline; install() no longer apt-installs pipx. Verify the
+# migration-only sudo path never shells out to install pipx.
+@test "install does not apt-install pipx (pipx is a declared dependency)" {
     _load_module
+    _fake_bin pipx
     MOCK_PIPX_LIST=""
     _mock_pipx
     _mock_sudo
-    # No pipx binary on PATH: ensure_pipx must apt-install it.
-    PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty-bin:${PATH}" install
-    grep -q 'apt-get install -y pipx' "${MOCK_SUDO_LOG}"
+    install
+    grep -q 'install tmuxp' "${MOCK_PIPX_LOG}"
+    run grep -q 'apt-get install -y pipx' "${MOCK_SUDO_LOG}"
+    assert_failure
 }
 
 @test "failed pipx install propagates the failure" {

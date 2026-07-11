@@ -55,7 +55,6 @@ _mock_is_installed() {
 _mock_pipx() {
     MOCK_PIPX_LOG="${INIT_UBUNTU_TEST_SCRATCH}/pipx.log"
     : > "${MOCK_PIPX_LOG}"
-    _claude_monitor_ensure_pipx() { return 0; }
     _claude_monitor_pipx() {
         printf '%s\n' "$*" >> "${MOCK_PIPX_LOG}"
         case "${1:-}" in
@@ -128,9 +127,9 @@ _mock_monitor_bin() {
     [[ " ${TAGS[*]} " == *" cli "* ]]
 }
 
-@test "claude-monitor module DEPENDS_ON is empty" {
+@test "claude-monitor module DEPENDS_ON contains pipx" {
     _load_module
-    [[ "${#DEPENDS_ON[@]}" -eq 0 ]]
+    [[ " ${DEPENDS_ON[*]} " == *" pipx "* ]]
 }
 
 @test "claude-monitor DESCRIPTION is associative with en + zh-TW entries" {
@@ -373,17 +372,6 @@ _mock_monitor_bin() {
     run remove
     assert_success
     [[ ! -s "${MOCK_PIPX_LOG}" ]]
-}
-
-# ── ensure-pipx bootstrap seam ───────────────────────────────────────────────
-
-@test "_claude_monitor_ensure_pipx is a no-op when pipx is on PATH" {
-    _load_module
-    mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/bin"
-    printf '#!/bin/sh\nexit 0\n' > "${INIT_UBUNTU_TEST_SCRATCH}/bin/pipx"
-    chmod +x "${INIT_UBUNTU_TEST_SCRATCH}/bin/pipx"
-    PATH="${INIT_UBUNTU_TEST_SCRATCH}/bin:${PATH}" run _claude_monitor_ensure_pipx
-    assert_success
 }
 
 # ── Sidecar lifecycle (ADR-0001) ─────────────────────────────────────────────

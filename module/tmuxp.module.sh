@@ -10,6 +10,10 @@
 # python3-libtmux`) when apt owns it and sudo is available, so the two never
 # fight over the `tmuxp` name on PATH.
 #
+# pipx is DEPENDS_ON here (foundation program): the engine installs the pipx
+# module first, so install() can assume pipx is present instead of
+# bootstrapping it inline.
+#
 # Standalone usage:
 #   bash module/tmuxp.module.sh install [--dry-run]
 #   bash module/tmuxp.module.sh upgrade / remove / purge / verify
@@ -54,7 +58,7 @@ declare -gA POST_INSTALL_MESSAGE=(
 declare -gA WARN_MESSAGE=()
 SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")
 SUPPORTED_PLATFORMS=("desktop" "server" "wsl")
-DEPENDS_ON=("tmux")
+DEPENDS_ON=("tmux" "pipx")
 CONFLICTS_WITH=()
 SUPPORTS_USER_HOME=true
 RISK_LEVEL="low"
@@ -84,14 +88,15 @@ is_installed() {
     _tmuxp_pipx_owns
 }
 
-# install: migrate an apt-owned tmuxp away, ensure pipx, then pipx install.
+# install: migrate an apt-owned tmuxp away, then pipx install. pipx itself is a
+# declared dependency (DEPENDS_ON), so the engine installs it first — no inline
+# pipx bootstrap here.
 install() {
     module_dryrun_guard install \
         "apt remove ${APT_LEGACY_PKGS[*]} (if apt-owned) -> pipx install ${PIPX_PKG}" \
         && return 0
     module_skip_if_installed && return 0
     _tmuxp_migrate_apt
-    _tmuxp_ensure_pipx || return $?
     _tmuxp_pipx_install || return $?
 }
 
@@ -202,18 +207,6 @@ _tmuxp_migrate_apt() {
     log_info "[${NAME}] migrating: sudo apt-get remove -y ${APT_LEGACY_PKGS[*]}"
     _tmuxp_sudo apt-get remove -y "${APT_LEGACY_PKGS[@]}" \
         || log_warn "[${NAME}] apt removal failed (continuing to pipx install)"
-}
-
-# Ensure pipx exists; apt-install it (sudo) when missing.
-_tmuxp_ensure_pipx() {
-    command -v pipx >/dev/null 2>&1 && return 0
-    if ! have_sudo_access 2>/dev/null; then
-        log_error "[${NAME}] pipx not found and no sudo to install it"
-        return 1
-    fi
-    log_info "[${NAME}] installing pipx via apt"
-    _tmuxp_sudo apt-get install -y pipx \
-        || { log_error "[${NAME}] failed to install pipx"; return 1; }
 }
 
 _tmuxp_pipx_install() {

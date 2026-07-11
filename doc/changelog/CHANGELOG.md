@@ -35,6 +35,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Foundation modules for the small-tools modularization program: `python3`
+  and `pipx`** (`module/python3.module.sh`, `module/pipx.module.sh`, plus
+  `test/unit/module/python3_spec.bats` and `test/unit/module/pipx_spec.bats`).
+  `python3` is an apt-archetype base module installing the Python 3 runtime +
+  packaging toolchain (`python3`, `python3-pip`, `python3-dev`,
+  `python3-setuptools`) with a real `doctor()` that probes `python3 --version`.
+  `pipx` is an apt-archetype base module (`apt-get install pipx`) with the
+  standard `pipx ensurepath` follow-up and a `doctor()` that probes `pipx
+  --version`; it declares `DEPENDS_ON=("python3")`. Both are standalone- and
+  engine-invocable and satisfy the 10-function module contract (ADR-0002).
+  These encode the maintainer's layering — higher-level Python tools DEPEND ON
+  lower-level ones (`python3` <- `pipx` <- `tmuxp` / `claude-monitor`) — so the
+  engine installs the toolchain first. `doc/module/INDEX.md` regenerated (48
+  modules).
 - **Scaffold generator + conformance meta-test for the template-first tool/hook
   layer** (`script/scaffold.sh`, `just new-tool`/`just new-hook`,
   `test/unit/tool_hook_conformance_spec.bats`): a dev-side authoring generator
@@ -76,6 +90,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **`tmuxp` and `claude-monitor` now DEPEND ON the new `pipx` module instead
+  of bootstrapping pipx inline** (`module/tmuxp.module.sh`,
+  `module/claude-monitor.module.sh`). Both gained `pipx` in `DEPENDS_ON`
+  (`tmuxp`: `("tmux" "pipx")`, `claude-monitor`: `("pipx")`) and dropped their
+  duplicated "install pipx via apt if absent" logic (`_tmuxp_ensure_pipx` /
+  `_claude_monitor_ensure_pipx` removed). The engine resolves the dependency
+  and installs pipx first, so each module can assume pipx is present. Their
+  actual tool-install behavior (`pipx install tmuxp` / `pipx install
+  claude-monitor`, plus tmuxp's apt->pipx migration) is unchanged; specs
+  updated to match.
 - **Migrated the remaining five top-level one-off tools onto
   `lib/tool_bootstrap.sh`** (`tool/copy_neovim_local_config.sh`,
   `tool/dual_system_time_sync.sh`, `tool/setup_terminal_font_size.sh`,

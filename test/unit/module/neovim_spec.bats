@@ -383,6 +383,34 @@ _mock_remote() {
     [[ ! -e "${HOME}/.config/nvim" ]]
 }
 
+# ── pynvim python provider (documented provisioning step) ───────────────────
+
+@test "install --dry-run logs the pynvim python-provider step" {
+    _load_module
+    INIT_UBUNTU_DRY_RUN=true run install
+    assert_success
+    assert_output --partial "pynvim"
+}
+
+@test "pynvim provider is best-effort: no-op (exit 0) when apt-get is unavailable" {
+    _load_module
+    PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty" run _provision_pynvim_provider
+    assert_success
+    assert_output --partial "apt-get unavailable"
+}
+
+@test "pynvim provider never aborts install when the package install fails" {
+    _load_module
+    _sandbox_paths
+    _mock_remote
+    # apt-get present but failing (no network) must not fail install().
+    mkdir -p "${INIT_UBUNTU_TEST_SCRATCH}/aptbin"
+    printf '#!/usr/bin/env bash\nexit 1\n' > "${INIT_UBUNTU_TEST_SCRATCH}/aptbin/apt-get"
+    chmod +x "${INIT_UBUNTU_TEST_SCRATCH}/aptbin/apt-get"
+    PATH="${INIT_UBUNTU_TEST_SCRATCH}/aptbin:${PATH}" run install
+    assert_success
+}
+
 # ── Sidecar semantics (ADR-0001 / AC-23 pattern) ────────────────────────────
 
 @test "standalone install never touches state.json (AC-23 pattern)" {

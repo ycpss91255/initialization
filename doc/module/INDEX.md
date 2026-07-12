@@ -3,7 +3,7 @@
 
 # Module Index
 
-85 modules. Columns come from each module's metadata block
+89 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -13,6 +13,7 @@ to the module source.
 | [ag](../../module/ag.module.sh) | optional | cli search | ag — the_silver_searcher: fast recursive code/text search (grep alternative) |
 | [ansifilter](../../module/ansifilter.module.sh) | optional | cli text | ansifilter — strip or convert ANSI terminal escape codes to text/markup |
 | [anydesk](../../module/anydesk.module.sh) | optional | remote | AnyDesk — remote desktop client (upstream apt repository) |
+| [apt-file](../../module/apt-file.module.sh) | optional | cli apt | apt-file — search which apt package provides a given file |
 | [asciidoctor](../../module/asciidoctor.module.sh) | optional | cli documentation | asciidoctor — AsciiDoc text processor (docs to HTML/DocBook/manpage) |
 | [batcat](../../module/batcat.module.sh) | optional | cli-essentials | bat — cat clone with syntax highlighting (Ubuntu binary: batcat) |
 | [bmon](../../module/bmon.module.sh) | optional | monitoring | bmon — bandwidth monitor (real-time per-interface traffic, apt bmon package) |
@@ -67,6 +68,7 @@ to the module source.
 | [notion](../../module/notion.module.sh) | optional | notes | Notion desktop app (unofficial notion-electron .deb client) |
 | [nvidia-driver](../../module/nvidia-driver.module.sh) | optional | gpu nvidia hardware | NVIDIA proprietary driver (auto-detected recommended version via ubuntu-drivers) |
 | [obs-studio](../../module/obs-studio.module.sh) | optional | media gui | OBS Studio — screen recorder / live streamer (ppa:obsproject/obs-studio) |
+| [openssh](../../module/openssh.module.sh) | optional | network | openssh — SSH client + server (provides ssh / scp / sshd) |
 | [pipx](../../module/pipx.module.sh) | base | python cli | pipx — install and run Python CLI apps in isolated virtualenvs (apt-managed) |
 | [powerstat](../../module/powerstat.module.sh) | optional | monitoring | powerstat — measures power consumption of a computer (apt powerstat package) |
 | [powertop](../../module/powertop.module.sh) | optional | monitoring | powertop — power consumption diagnostics and monitor (apt powertop package) |
@@ -74,6 +76,7 @@ to the module source.
 | [qmk-firmware](../../module/qmk-firmware.module.sh) | optional | hardware | QMK firmware dev environment — qmk CLI (pipx) + toolchain + qmk_firmware checkout |
 | [ripgrep](../../module/ripgrep.module.sh) | optional | cli-essentials | ripgrep (rg) — fast, recursive grep alternative (apt ripgrep package) |
 | [shell](../../module/shell.module.sh) | recommended | shell core | Shell session basics: ssh client, keychain, xclip |
+| [snapd](../../module/snapd.module.sh) | optional | packaging cli | snapd — snap package daemon (install and manage snaps) |
 | [spotify-client](../../module/spotify-client.module.sh) | optional | media gui | Spotify — music streaming desktop client (upstream apt repository) |
 | [ssh-config](../../module/ssh-config.module.sh) | optional | config ssh dotfile | Personal ~/.ssh/config templates (per-host alias and key map) |
 | [sshfs](../../module/sshfs.module.sh) | optional | network filesystem | sshfs — mount a remote filesystem over SSH (FUSE) |
@@ -92,6 +95,7 @@ to the module source.
 | [vscode](../../module/vscode.module.sh) | optional | editor | Visual Studio Code — Microsoft's GUI code editor (Microsoft apt repo) |
 | [wget](../../module/wget.module.sh) | base | http | wget — non-interactive network downloader (apt wget package) |
 | [xclip](../../module/xclip.module.sh) | optional | cli clipboard | xclip — command-line interface to the X11 clipboard/selection |
+| [xdg-utils](../../module/xdg-utils.module.sh) | optional | desktop cli | xdg-utils — desktop integration utilities (xdg-open and friends) |
 | [xsel](../../module/xsel.module.sh) | optional | cli clipboard | xsel — command-line X11 selection/clipboard manipulation tool |
 | [yazi](../../module/yazi.module.sh) | optional | filemgr | yazi — blazing-fast TUI file manager + shell alias yz='yazi' |
 | [zoxide](../../module/zoxide.module.sh) | optional | cli-essentials | zoxide smarter cd command (cd is aliased to z) |

@@ -60,10 +60,13 @@ CONFIG_PATHS=(
 )
 module_use_github_release_archetype
 
-# Override install: archetype handles binary, then drop nvimdots config.
+# Override install: archetype handles the binary, then drop nvimdots config,
+# then provision the pynvim python provider (nvimdots' python-based plugins and
+# `:checkhealth provider` expect it — see _provision_pynvim_provider).
 install() {
     module_default_github_release_install || return $?
     _install_nvimdots_config
+    _provision_pynvim_provider
 }
 
 detect() {
@@ -87,6 +90,35 @@ _install_nvimdots_config() {
     mkdir -p "${HOME}/.config"
     cp -r "${_src}" "${HOME}/.config/nvim"
     log_info "[${NAME}] dropped nvim config -> ${HOME}/.config/nvim"
+}
+
+# Provision the pynvim python provider. pynvim is the Python client library
+# Neovim uses for its python3 provider (`:help provider-python`); nvimdots'
+# python-backed plugins and `:checkhealth provider.python` expect it. It is a
+# library, NOT a standalone CLI, so it is intentionally not its own module —
+# it is provisioned here as a documented dependency of the neovim editor via
+# Ubuntu's `python3-pynvim` apt package. Best-effort: a missing apt-get or a
+# failed install only warns (never aborts install() — the editor is fully
+# usable without the python provider; the user can add it later with
+# `sudo apt-get install python3-pynvim` or `:checkhealth`).
+_provision_pynvim_provider() {
+    if [[ "${INIT_UBUNTU_DRY_RUN:-false}" == "true" ]]; then
+        log_info "[${NAME}] [DRY-RUN] would install pynvim (python3-pynvim provider)"
+        return 0
+    fi
+    command -v apt-get >/dev/null 2>&1 || {
+        log_warn "[${NAME}] apt-get unavailable; skipping pynvim provider (install python3-pynvim manually)"
+        return 0
+    }
+    log_info "[${NAME}] provisioning pynvim (python3 provider)..."
+    if command -v sudo >/dev/null 2>&1; then
+        sudo apt-get install -y python3-pynvim >/dev/null 2>&1 || \
+            log_warn "[${NAME}] pynvim install failed; run 'sudo apt-get install python3-pynvim' or ':checkhealth provider' inside nvim"
+    else
+        apt-get install -y python3-pynvim >/dev/null 2>&1 || \
+            log_warn "[${NAME}] pynvim install failed; install python3-pynvim manually"
+    fi
+    return 0
 }
 
 # ── Standalone footer ───────────────────────────────────────────────────────

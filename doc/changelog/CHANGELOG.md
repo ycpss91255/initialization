@@ -35,6 +35,36 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **Four apt modules finishing the small-tools modularization leftovers:
+  `openssh`, `apt-file`, `xdg-utils`, `snapd`** (`module/<name>.module.sh` +
+  `test/unit/module/<name>_spec.bats` each). All four are `optional`
+  apt-archetype (`module_use_apt_archetype`) modules with module-defined
+  `detect()` / `is_recommended()`, an en + zh-TW `DESCRIPTION`,
+  `SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")`, a `TEST_VERIFY_CMD` matching
+  a real `doctor()` probe, and the dual-mode standalone/engine entry
+  convention. Both standalone- and engine-invocable; all satisfy the
+  10-function module contract (ADR-0002, enforced by
+  `test/unit/module/contract_conformance_spec.bats` / #305):
+  - `openssh` — SSH client + server (installs both `openssh-client` and
+    `openssh-server`, providing `ssh` / `scp` / `sshd`); tagged `network`;
+    `doctor: ssh -V`.
+  - `apt-file` — search which apt package provides a given file; `install()`
+    best-effort seeds the contents cache via `apt-file update` (warns, never
+    aborts, on no network); `doctor: command -v apt-file`.
+  - `xdg-utils` — desktop integration utilities (`xdg-open` and friends);
+    `doctor: command -v xdg-open`.
+  - `snapd` — snap package daemon; `doctor: command -v snap`.
+  `doc/module/INDEX.md` regenerated (89 modules).
+- **pynvim python provider provisioning added to the existing `neovim`
+  module** (not a standalone module — pynvim is a Python library, not a CLI).
+  `neovim`'s `install()` now runs a documented best-effort python-provider
+  step that installs Ubuntu's `python3-pynvim` package (needed by nvimdots'
+  python-backed plugins and `:checkhealth provider.python`); it warns rather
+  than aborts when apt-get is unavailable or the install fails, so the editor
+  stays usable without the provider. Covered by new `neovim_spec.bats` cases;
+  existing neovim spec is unchanged and still green. (`bashtop` was
+  intentionally NOT added — it is superseded by the existing `btop` module.)
+
 - **Three novelty terminal modules for the small-tools modularization
   program: `cowsay`, `cmatrix`, `figlet`** (`module/<name>.module.sh` +
   `test/unit/module/<name>_spec.bats` each). All three are apt-archetype

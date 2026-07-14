@@ -35,6 +35,22 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`ntpdate` apt module** (`module/ntpdate.module.sh` +
+  `test/unit/module/ntpdate_spec.bats`). An `optional` apt-archetype
+  (`module_use_apt_archetype`) module installing the legacy `ntpdate` package,
+  with module-defined `detect()` and an always-off `is_recommended()` (legacy
+  special-purpose tool, never part of Quick Setup). It ships a real `doctor()`
+  that goes beyond the dpkg check by verifying the `ntpdate` binary resolves on
+  PATH (`command -v ntpdate`), an en + zh-TW `DESCRIPTION` flagging that
+  ntpdate is legacy (modern systems use systemd-timesyncd) but is needed by the
+  `dual_system_time_sync` one-off tool (ADR-0029),
+  `SUPPORTED_UBUNTU=("22.04" "24.04" "26.04")`, and a matching
+  `TEST_VERIFY_CMD`. Both standalone- and engine-invocable; satisfies the
+  10-function module contract (ADR-0002, enforced by
+  `test/unit/module/contract_conformance_spec.bats` / #305). The
+  `dual_system_time_sync` maintainer note now points users at
+  `setup_ubuntu install ntpdate` (the package it used to install inline is now
+  this module). `doc/module/INDEX.md` regenerated (90 modules).
 - **Four apt modules finishing the small-tools modularization leftovers:
   `openssh`, `apt-file`, `xdg-utils`, `snapd`** (`module/<name>.module.sh` +
   `test/unit/module/<name>_spec.bats` each). All four are `optional`
@@ -353,6 +369,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   framework with a synthetic in-shell hop instead of the retired one.
 
 ### Documentation
+
+- **Reconciled the ADR-0011 / ADR-0026 mixed signal on the per-module freeze**
+  (`doc/adr/0011-apt-essentials-freezes-pkg-list-at-install.md`,
+  `doc/adr/0026-split-apt-essentials-into-per-tool-modules.md`). ADR-0011's
+  superseded banner said the freeze machinery "is being retired" while ADR-0026
+  still said "the ADR-0011 freeze mechanism is retained per module" — a
+  contradiction. Both now state accurately that the per-module freeze
+  (`frozen_pkgs` / `frozen_platform`) was never built into a live module, the
+  dead migration/freeze code was retired in PR #373, and per-module freeze
+  remains a future design option only (no current code depends on it).
 
 - **ADR honest-marking + back-link sweep** (`doc/adr/`): adopted the convention
   that "Accepted" means implemented and every design-accepted-but-unbuilt

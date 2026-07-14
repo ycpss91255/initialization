@@ -3,7 +3,7 @@
 
 # Module Index
 
-89 modules. Columns come from each module's metadata block
+90 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -66,6 +66,7 @@ to the module source.
 | [nmap](../../module/nmap.module.sh) | optional | monitoring | nmap — network mapper / port scanner for discovery and auditing (apt nmap package) |
 | [nmon](../../module/nmon.module.sh) | optional | monitoring | nmon — system performance monitor (CPU / memory / disk / net, apt nmon package) |
 | [notion](../../module/notion.module.sh) | optional | notes | Notion desktop app (unofficial notion-electron .deb client) |
+| [ntpdate](../../module/ntpdate.module.sh) | optional | time | ntpdate — legacy one-shot NTP time sync (used by dual_system_time_sync) |
 | [nvidia-driver](../../module/nvidia-driver.module.sh) | optional | gpu nvidia hardware | NVIDIA proprietary driver (auto-detected recommended version via ubuntu-drivers) |
 | [obs-studio](../../module/obs-studio.module.sh) | optional | media gui | OBS Studio — screen recorder / live streamer (ppa:obsproject/obs-studio) |
 | [openssh](../../module/openssh.module.sh) | optional | network | openssh — SSH client + server (provides ssh / scp / sshd) |

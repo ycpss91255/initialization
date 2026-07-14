@@ -12,8 +12,9 @@
 # guidance when it is missing. All mutations run through tool_run so --dry-run is
 # honored.
 #
-# MAINTAINER NOTE: the dropped `apt-get install ntpdate` should become a proper
-# module if this workflow needs to provision the package itself. tool_run also
+# MAINTAINER NOTE: the dropped `apt-get install ntpdate` now lives in a proper
+# module — module/ntpdate.module.sh. Provision the package with
+# `setup_ubuntu install ntpdate` before running this tool. tool_run also
 # structurally refuses host package installs, so re-adding it here would fail.
 
 # shellcheck source=../lib/tool_bootstrap.sh

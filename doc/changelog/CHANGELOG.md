@@ -479,6 +479,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **`cowsay` doctor/verify no longer falsely fail when cowsay lives at
+  `/usr/games`** (adversarial-review finding): the Debian/Ubuntu `cowsay`
+  package installs its binary at `/usr/games/cowsay`, and `/usr/games` is absent
+  from the default non-login PATH used by `bash -c`, `docker exec ... bash -c`,
+  and cron. The `doctor()` probe and `TEST_VERIFY_CMD` used a bare
+  `command -v cowsay`, so on a correctly-installed cowsay both reported failure
+  while dpkg-based `is_installed` still reported installed — an internally
+  inconsistent `installed=yes / doctor=fail` state. Both probes now try PATH
+  first (`command -v cowsay`) and fall back to the packaged path
+  (`[ -x /usr/games/cowsay ]`, overridable via `COWSAY_GAMES_BIN`); the PATH
+  branch stays first so a PATH-resolvable cowsay still wins. Regression covered
+  by `test/unit/module/cowsay_spec.bats` (doctor + verify pass when cowsay
+  exists only at `/usr/games`, and still fail when absent from both). Only
+  `cowsay` installs under `/usr/games` among landed modules; `cmatrix`
+  (`/usr/bin`) and `figlet` (`/usr/bin`) are unaffected.
 - **`setup_ubuntu doctor` now invokes each module's `doctor()` override**
   (architecture-review F1): previously the Engine `doctor` subcommand ran only
   the state.json-vs-reality drift report and never called a module's `doctor()`,

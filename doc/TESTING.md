@@ -134,9 +134,10 @@ CI 端(issue #28)不再分開跑 test-unit 與 coverage 兩遍:每個
 per-module matrix shard 用 `just -f justfile.ci coverage-unit <name>|core` 在
 kcov 下跑一次 bats(輸出 `coverage/shard-<name>`,上傳 artifact),最後
 `coverage` 聚合 job 用 `just -f justfile.ci coverage-merge` 做 `kcov --merge` 並在
-**聚合結果**上斷言 coverage gate(`COVERAGE_MIN` 可覆寫,預設 66 —
-ratchet 基線,2026-06-07 實測 66.70%;AC-17 的 80% 終值不變,待
-#122/#123 補強 lib/engine specs 後由 #124 翻到 80)。gate 只在
+**聚合結果**上斷言 coverage gate(`COVERAGE_MIN` 可覆寫,預設 84 —
+ratchet 基線 2026-06-07 實測 66.70%,#122/#123 補強 lib/engine specs
+後由 #124 翻到 80(2026-06-17 實測 80.16%),再於 merged 達 84.53%
+(2026-07-12)後棘輪到 84)。gate 只在
 **完整矩陣** run(push to main / shared fan-out)強制;窄矩陣 PR(只跑
 changed shards)因未跑 shard 的檔案仍計入分母而結構性偏低,改為
 report-only(`COVERAGE_ENFORCE=false`,由 discover job 的 `full` 輸出

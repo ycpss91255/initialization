@@ -110,9 +110,9 @@ Per-shard coverage (issue #28; combine with --unit-only / --ci-unit):
                         shard output: coverage/shard-<module|core|all>.
                         Routes to the kcov image (kcov is not available
                         in alpine test-tools). Gate threshold for
-                        --merge-coverage: $COVERAGE_MIN (default 80 —
-                        the AC-17 gate; ratcheted up from the 66 baseline
-                        in #124 once #122/#123 boosted coverage).
+                        --merge-coverage: $COVERAGE_MIN (default 84 —
+                        the AC-17 gate; ratcheted 66 -> 80 in #124, then
+                        80 -> 84 once merged coverage reached 84.53%).
                         $COVERAGE_ENFORCE=0|false makes the gate
                         report-only (CI uses this on narrow PR matrices).
 
@@ -516,12 +516,15 @@ _run_coverage() {
 # (coverage/coverage-shard-<name>).
 #
 # Gate semantics:
-#   - Threshold: $COVERAGE_MIN, default 80 — the AC-17 gate. This was
-#     ratcheted up from the 66 baseline (honest merged number measured
-#     66.70% on 2026-06-07) in #124, after #122 (lib specs), #123 (engine
-#     specs), and #153 (general/dispatcher boost) lifted the merged number
-#     past 80 (measured 80.16% on 2026-06-17). The gate now prevents
-#     regression below AC-17's required floor.
+#   - Threshold: $COVERAGE_MIN, default 84 — the AC-17 gate. Ratchet history:
+#       66 -> 80 in #124: the 66 baseline (honest merged number measured
+#         66.70% on 2026-06-07) was lifted past 80 (measured 80.16% on
+#         2026-06-17) by #122 (lib specs), #123 (engine specs), and #153
+#         (general/dispatcher boost).
+#       80 -> 84: ratcheted after the honest merged number reached 84.53%
+#         (measured 2026-07-12 on main); 84 locks in the gain with a small
+#         margin without failing current main. See prior 66 -> 80 in #124.
+#     The gate prevents regression below AC-17's required floor.
 #   - Enforcement: $COVERAGE_ENFORCE=0|false → report-only (print the
 #     percentage, never fail). CI sets this on narrow-matrix PR runs
 #     (only changed shards ran) because they are structurally low — the
@@ -542,10 +545,10 @@ _merged_coverage_percent() {
 }
 
 _assert_coverage_gate() {
-    # Default 80 = the AC-17 gate, ratcheted up from the 66 baseline in
-    # #124 (merged number reached 80.16% on 2026-06-17). See section
+    # Default 84 = the AC-17 gate, ratcheted 80 -> 84 (honest merged 84.53%
+    # measured 2026-07-12 on main; see prior 66 -> 80 in #124). See section
     # comment above.
-    local _min="${COVERAGE_MIN:-80}"
+    local _min="${COVERAGE_MIN:-84}"
     local _pct
     _pct="$(_merged_coverage_percent)"
     [[ -n "${_pct}" ]] \

@@ -286,6 +286,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **AC-17 merged-coverage gate floor ratcheted 80 -> 84** (`script/ci/ci.sh`
+  `COVERAGE_MIN` default, `justfile.ci` coverage / coverage-merge recipe
+  comments, `test/unit/script/ci_spec.bats`, `doc/TESTING.md`). The honest
+  merged unit coverage on `main` reached 84.53% (measured 2026-07-12 on the
+  main CI coverage job), so a floor of 84 locks in the gains with a small
+  margin without failing current `main` — continuing the ratchet-upward-toward-90
+  policy (prior step 66 -> 80 in #124). `COVERAGE_MIN` and `COVERAGE_ENFORCE`
+  overrides are unchanged.
+
 - **`tmuxp` and `claude-monitor` now DEPEND ON the new `pipx` module instead
   of bootstrapping pipx inline** (`module/tmuxp.module.sh`,
   `module/claude-monitor.module.sh`). Both gained `pipx` in `DEPENDS_ON`

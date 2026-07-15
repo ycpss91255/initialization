@@ -10,10 +10,12 @@
 
 > **Superseded by ADR-0026.** The `apt-essentials` module described here
 > is gone — it was split into per-tool modules. The freeze machinery
-> (`frozen_pkgs` / `frozen_platform`) is being retired along with it: the
-> dead 0.1.0 -> 0.2.0 `apt-essentials` state migration and its
-> `frozen_pkgs` handling are removed, since 0.1.0 was never released.
-> This ADR is kept for historical rationale only; nothing below is live.
+> (`frozen_pkgs` / `frozen_platform`) was retired along with it in PR #373:
+> the dead 0.1.0 -> 0.2.0 `apt-essentials` state migration and its
+> `frozen_pkgs` handling are removed, since 0.1.0 was never released. The
+> per-module freeze that ADR-0026 keeps as a design option was never built
+> into a live module. This ADR is kept for historical rationale only;
+> nothing below is live.
 
 ## Context
 

@@ -51,6 +51,16 @@ own lifecycle and its own `depends_on`.
    platform still freezes `frozen_pkgs` / `frozen_platform`. A module that is
    exactly one apt package needs no freeze (its `is_installed` is a single
    `dpkg -l`).
+
+   > **Clarification (2026-07-14):** in practice the per-module freeze was
+   > never actually built into a live module — every module shipped is either a
+   > single apt package or a custom archetype, none of which resolve to a
+   > platform-dependent *set*. The dead ADR-0011 migration/freeze code
+   > (`frozen_pkgs` / `frozen_platform` state fields + the state-migration path)
+   > was retired in PR #373. Per-module freeze therefore remains a **future
+   > design option only**: if a future module ever needs to pin a
+   > platform-resolved package set, this is the sanctioned mechanism to
+   > reintroduce, but no current code depends on it.
 4. **The compatibility-exclusion concept survives** as per-module platform
    guards (a module simply does not `detect` / install on a platform that
    can't support it) rather than one `INCOMPAT_BY_PLATFORM` map on the bundle.

@@ -69,6 +69,18 @@ _fake_bin() {
     chmod +x "${INIT_UBUNTU_TEST_SCRATCH}/bin/${1}"
 }
 
+# Simulate the Debian/Ubuntu cowsay package location. The real package drops
+# the binary at /usr/games/cowsay, and /usr/games is NOT on the default
+# non-login PATH used by bash -c / docker exec / cron. Tests point the module's
+# COWSAY_GAMES_BIN override at this stub so the probe exercises the packaged
+# path without faking cowsay onto PATH (which masked the original bug).
+_fake_games_cowsay() {
+    local _games="${INIT_UBUNTU_TEST_SCRATCH}/usr-games"
+    mkdir -p "${_games}"
+    printf '#!/usr/bin/env bash\nprintf "the cow says moo\\n"\n' > "${_games}/cowsay"
+    chmod +x "${_games}/cowsay"
+}
+
 # ── Smoke ────────────────────────────────────────────────────────────────────
 
 @test "cowsay module file parses (bash -n)" {
@@ -331,6 +343,29 @@ _fake_bin() {
     assert_success
 }
 
+@test "verify passes via real probe when cowsay exists only at /usr/games" {
+    # verify runs the module's real TEST_VERIFY_CMD through module_default_verify
+    # (bash -c). Set the override before sourcing so it bakes into the probe.
+    # The test image has no cowsay on PATH, so the command -v branch fails and
+    # success must come from the packaged /usr/games location.
+    _fake_games_cowsay
+    COWSAY_GAMES_BIN="${INIT_UBUNTU_TEST_SCRATCH}/usr-games/cowsay"
+    _load_module
+    MOCK_IS_INSTALLED_RC=0
+    _mock_is_installed
+    run verify
+    assert_success
+}
+
+@test "verify fails via real probe when cowsay is absent from PATH and /usr/games" {
+    COWSAY_GAMES_BIN="${INIT_UBUNTU_TEST_SCRATCH}/nope/cowsay"
+    _load_module
+    MOCK_IS_INSTALLED_RC=0
+    _mock_is_installed
+    run verify
+    assert_failure
+}
+
 @test "doctor fails when not installed" {
     _load_module
     MOCK_IS_INSTALLED_RC=1
@@ -339,20 +374,38 @@ _fake_bin() {
     assert_failure
 }
 
-@test "doctor passes when the cowsay probe binary is available" {
+@test "doctor passes when cowsay resolves on PATH (command -v branch)" {
     _load_module
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
     _fake_bin cowsay 'printf "the cow says moo\n"'
-    PATH="${INIT_UBUNTU_TEST_SCRATCH}/bin:${PATH}" run doctor
+    # /usr/games override points nowhere: success must come from the PATH probe.
+    COWSAY_GAMES_BIN="${INIT_UBUNTU_TEST_SCRATCH}/nope/cowsay" \
+        PATH="${INIT_UBUNTU_TEST_SCRATCH}/bin:${PATH}" run doctor
     assert_success
 }
 
-@test "doctor fails when the cowsay probe binary is missing even though installed" {
+@test "doctor passes when cowsay exists only at /usr/games, absent from PATH" {
+    # Regression: the Debian/Ubuntu cowsay package installs /usr/games/cowsay,
+    # and /usr/games is not on the default non-login PATH used by bash -c /
+    # docker exec / cron. A bare `command -v cowsay` probe falsely fails here
+    # while dpkg-based is_installed still reports installed (issue: inconsistent
+    # installed=yes / doctor=fail state).
     _load_module
     MOCK_IS_INSTALLED_RC=0
     _mock_is_installed
-    PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty" run doctor
+    _fake_games_cowsay
+    COWSAY_GAMES_BIN="${INIT_UBUNTU_TEST_SCRATCH}/usr-games/cowsay" \
+        PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty" run doctor
+    assert_success
+}
+
+@test "doctor fails when cowsay is absent from both PATH and /usr/games" {
+    _load_module
+    MOCK_IS_INSTALLED_RC=0
+    _mock_is_installed
+    COWSAY_GAMES_BIN="${INIT_UBUNTU_TEST_SCRATCH}/nope/cowsay" \
+        PATH="${INIT_UBUNTU_TEST_SCRATCH}/empty" run doctor
     assert_failure
 }
 

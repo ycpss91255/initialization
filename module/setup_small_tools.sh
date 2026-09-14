@@ -178,6 +178,7 @@ function _install_monitor_pkgs() {
         "htop"
         "iftop"
         "ifstat"
+        "iw"
         "iotop"
         "powertop"
         "powerstat"

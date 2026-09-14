@@ -211,7 +211,7 @@ export TMUX_POWERLINE_SEG_MODE_INDICATOR_NORMAL_AND_PREFIX_MODE_ENABLED="true"
 export TMUX_POWERLINE_SEG_MODE_INDICATOR_NORMAL_MODE_TEXT="⌨ "
 export TMUX_POWERLINE_SEG_MODE_INDICATOR_NORMAL_MODE_TEXT_COLOR=""
 # Prefix mode text & color overrides. Defaults to "prefix" & the segment foreground color set in the theme used.
-export TMUX_POWERLINE_SEG_MODE_INDICATOR_PREFIX_MODE_TEXT="🔞"
+export TMUX_POWERLINE_SEG_MODE_INDICATOR_PREFIX_MODE_TEXT="PFX "
 export TMUX_POWERLINE_SEG_MODE_INDICATOR_PREFIX_MODE_TEXT_COLOR=""
 # Whether the mouse mode section should be enabled. Should be {"true, "false"}.
 export TMUX_POWERLINE_SEG_MODE_INDICATOR_MOUSE_MODE_ENABLED="false"
@@ -308,7 +308,9 @@ export TMUX_POWERLINE_SEG_TIME_FORMAT="%H:%M"
 # Arguments passed to tmux-mem-cpu-load.
 # See https://github.com/thewtex/tmux-mem-cpu-load for all available options.
 # export TMUX_POWERLINE_SEG_TMUX_MEM_CPU_LOAD_ARGS="-v"
-export TMUX_POWERLINE_SEG_TMUX_MEM_CPU_LOAD_ARGS="-c -q -r 136 -i 1 -v -a 0"
+# -r 236 blends the segment's right edge with the Catppuccin Frappe thm_base
+# (#303446) set in themes/my-theme.sh (nearest xterm-256 index).
+export TMUX_POWERLINE_SEG_TMUX_MEM_CPU_LOAD_ARGS="-c -q -r 236 -i 1 -v -a 0"
 # }
 
 # tmux_session_info.sh {

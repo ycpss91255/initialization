@@ -1,12 +1,26 @@
 # shellcheck shell=bash
-# Default Theme
+# Frappe Theme (Catppuccin) -- https://github.com/catppuccin/catppuccin
+# Palette applied across every segment; round "bubble" separators match the
+# community theme shared upstream in erikw/tmux-powerline#344 (PRs #345/#346).
 # If changes made here does not take effect, then try to re-create the tmux session to force reload.
 
+# Catppuccin Frappe palette.
+thm_mauve="#ca9ee6"
+thm_red="#e78284"
+thm_peach="#ef9f76"
+thm_yellow="#e5c890"
+thm_green="#a6d189"
+thm_teal="#81c8be"
+thm_blue="#8caaee"
+thm_lavender="#babbf1"
+thm_text="#c6d0f5"
+thm_base="#303446"
+
 if patched_font_in_use; then
-    TMUX_POWERLINE_SEPARATOR_LEFT_BOLD=""
-    TMUX_POWERLINE_SEPARATOR_LEFT_THIN=""
-    TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD=""
-    TMUX_POWERLINE_SEPARATOR_RIGHT_THIN=""
+    TMUX_POWERLINE_SEPARATOR_LEFT_BOLD=""
+    TMUX_POWERLINE_SEPARATOR_LEFT_THIN=""
+    TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD=""
+    TMUX_POWERLINE_SEPARATOR_RIGHT_THIN=""
 else
     TMUX_POWERLINE_SEPARATOR_LEFT_BOLD="◀"
     TMUX_POWERLINE_SEPARATOR_LEFT_THIN="❮"
@@ -15,8 +29,8 @@ else
 fi
 
 # See Color formatting section below for details on what colors can be used here.
-TMUX_POWERLINE_DEFAULT_BACKGROUND_COLOR=${TMUX_POWERLINE_DEFAULT_BACKGROUND_COLOR:-'235'}
-TMUX_POWERLINE_DEFAULT_FOREGROUND_COLOR=${TMUX_POWERLINE_DEFAULT_FOREGROUND_COLOR:-'255'}
+TMUX_POWERLINE_DEFAULT_BACKGROUND_COLOR=${TMUX_POWERLINE_DEFAULT_BACKGROUND_COLOR:-"${thm_base}"}
+TMUX_POWERLINE_DEFAULT_FOREGROUND_COLOR=${TMUX_POWERLINE_DEFAULT_FOREGROUND_COLOR:-"${thm_text}"}
 # shellcheck disable=SC2034
 TMUX_POWERLINE_SEG_AIR_COLOR=$(air_color)
 
@@ -102,27 +116,27 @@ fi
 # shellcheck disable=SC1143,SC2128
 if [ -z "$TMUX_POWERLINE_LEFT_STATUS_SEGMENTS" ]; then
     TMUX_POWERLINE_LEFT_STATUS_SEGMENTS=(
-        "tmux_session_info 148 234"
-        "hostname 33 0"
+        "tmux_session_info ${thm_blue} ${thm_base}"
+        "hostname ${thm_mauve} ${thm_base}"
         # "lan_ip 24 255 ${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
         # "wan_ip 24 255"
         # "vpn 24 255 ${TMUX_POWERLINE_SEPARATOR_RIGHT_THIN}"
-        "now_playing 234 37 ${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
-        "mailcount 9 255"
+        "now_playing ${thm_green} ${thm_base} ${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
+        "mailcount ${thm_red} ${thm_base}"
     )
 fi
 
 # shellcheck disable=SC1143,SC2128
 if [ -z "$TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS" ]; then
     TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS=(
-        # "tmux_mem_cpu_load 234 136"
-        "mode_indicator 46 0 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}"
+        # "tmux_mem_cpu_load ${thm_peach} ${thm_base}"
+        "mode_indicator ${thm_yellow} ${thm_base} ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}"
     )
     if compgen -G "/sys/class/power_supply/BAT*" > /dev/null 2>&1; then
-        TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS+=("battery 137 127")
+        TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS+=("battery ${thm_teal} ${thm_base}")
     fi
     TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS+=(
-        "date 235 136 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}"
-        "tmux_mem_cpu_load 234 136 ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD} no_sep_bg_color no_sep_fg_color left_disable separator_disable"
+        "date ${thm_lavender} ${thm_base} ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}"
+        "tmux_mem_cpu_load ${thm_peach} ${thm_base} ${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD} no_sep_bg_color no_sep_fg_color left_disable separator_disable"
     )
 fi

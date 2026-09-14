@@ -514,6 +514,13 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   contract is true. Modules without a `doctor()` override fall back to
   `is_installed` (ADR-0002 / ADR-0009), wired in `lib/runner.sh` so the doctor
   phase no longer aborts on an unimplemented `doctor()`.
+- **`iw` now declared in the small-tools monitor package list** (issue #393):
+  `iw` (the Linux wireless-device configuration tool) was installed on the
+  reference host but absent from `_install_monitor_pkgs()` in
+  `module/setup_small_tools.sh`, so a fresh bootstrap via this repo would not
+  install it. Added `"iw"` alongside the other network tools (`iftop`,
+  `ifstat`). `small-tools/` is deprecated and excluded from CI coverage
+  (`doc/TESTING.md`), so this is a one-line list addition — no new module.
 ### Added
 
 - **Shell completion for `setup_ubuntu`** (issue #166): a Bash completion

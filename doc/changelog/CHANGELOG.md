@@ -302,6 +302,13 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **yazi no longer renders/previews PDFs** (`module/config/yazi/yazi.toml`).
+  Removed the two `{ mime = "application/pdf", run = "pdf" }` rules from the
+  `[plugin]` `preloaders` and `previewers` lists so PDF files fall through to
+  the `{ url = "*", run = "file" }` fallback: basic file info only, no
+  thumbnail or rendered content preview. No `application/pdf` rule remains in
+  the config. User request (not a bug fix); refs #396.
+
 - **AC-17 merged-coverage gate floor ratcheted 80 -> 84** (`script/ci/ci.sh`
   `COVERAGE_MIN` default, `justfile.ci` coverage / coverage-merge recipe
   comments, `test/unit/script/ci_spec.bats`, `doc/TESTING.md`). The honest

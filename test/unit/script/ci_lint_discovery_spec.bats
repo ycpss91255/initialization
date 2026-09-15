@@ -241,3 +241,24 @@ _run_fixture_discovery() {
     refute_line --partial "small-tools/"
     refute_line --partial "tool/"
 }
+
+@test "fixture: git SUCCEEDS but the visible set is EMPTY -> falls back to raw find, prunes still apply" {
+    _make_fixture
+    # Distinct from "no git" / "git fails": git runs fine and exits 0 but
+    # reports nothing visible. Clear the index and ignore everything so
+    # --cached is empty and every --others path is excluded.
+    git -C "${FIXTURE}" rm -r -q --cached . >/dev/null
+    printf '*\n' > "${FIXTURE}/.gitignore"
+    # Sanity: this really is the "success, empty output" branch.
+    run git -C "${FIXTURE}" ls-files --cached --others --exclude-standard -- '*.sh' '*.bash' '*.bats'
+    assert_success
+    assert_output ""
+    # The safety valve must not filter to nothing: raw find (with prunes) wins.
+    _run_fixture_discovery
+    assert_line "lib/tracked.sh"
+    assert_line "lib/untracked.sh"
+    assert_line "lib/forced.local.sh"
+    assert_line ".agents/skills/third-party/template.sh"
+    refute_line --partial "small-tools/"
+    refute_line --partial "tool/"
+}

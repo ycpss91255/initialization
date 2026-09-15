@@ -486,6 +486,24 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **`just -f justfile.ci lint` no longer lints gitignored third-party files**
+  (`script/ci/ci.sh`): `_find_lintable_sh` collected `*.sh`/`*.bash`/`*.bats`
+  with a raw `find`, which also caught machine-local third-party skills
+  installed under `.agents/skills/` (gitignored per the #150 skill-layout
+  block — only the three repo-owned skills are tracked). The lint then failed
+  on files the repo does not own (e.g. `.agents/skills/wizard/template.sh`:
+  `SC2034 RED appears unused`). The file selection now intersects the `find`
+  candidates with the git-visible set
+  (`git ls-files --cached --others --exclude-standard`), so gitignored files
+  are excluded while every repo-owned script — tracked or newly-added-untracked
+  — is still linted; the existing vendored/holding-tree prunes (`small-tools/`,
+  `tool/`, `module/config`, …) are unchanged. The git call scopes
+  `safe.directory` so it works against the in-container `/source` bind mount
+  (owned by the host user, not the in-container root), and falls back to the
+  raw `find` output if git is unavailable so the linter never silently becomes
+  a no-op. Repo-owned ShellCheck targets drop from 360 to 357 (the three
+  machine-local skill scripts). Covered by
+  `test/unit/script/ci_lint_discovery_spec.bats`.
 - **`cowsay` doctor/verify no longer falsely fail when cowsay lives at
   `/usr/games`** (adversarial-review finding): the Debian/Ubuntu `cowsay`
   package installs its binary at `/usr/games/cowsay`, and `/usr/games` is absent

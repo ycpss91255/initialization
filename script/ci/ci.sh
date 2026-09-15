@@ -6,7 +6,10 @@
 #   - Replaced `_log_err` from base's _lib.sh with inline `_die`
 #     (we don't borrow base's docker/_lib.sh per PRD §13.2)
 #   - shellcheck path glob: lint all *.sh under repo; exclude small-tools/
-#     (deprecated, PRD §6.6) and tool/ (one-off script holding area, §6.5)
+#     (deprecated, PRD §6.6) and tool/ (one-off script holding area, §6.5),
+#     and intersect with the git-visible set so gitignored machine-local
+#     third-party files (e.g. installed skills under .agents/skills/, #150)
+#     are never linted (repo-owned tracked/untracked scripts still are)
 #   - Added fish syntax check (`fish -n`) for all *.fish
 #   - Added hadolint on dockerfile/Dockerfile.test-tools
 #   - Removed `--behavioural` mode (no Docker image build per PRD §2)
@@ -148,7 +151,43 @@ EOF
 #   install-nvidia-driver.sh — legacy one-off at repo root
 
 _find_lintable_sh() {
-    find "${REPO_ROOT}" \
+    # File selection = find candidates ∩ git-visible set. The find prunes
+    # below drop vendored/holding trees (small-tools, tool, module/config, …)
+    # that ARE tracked but must not be linted; the git intersection then drops
+    # gitignored machine-local third-party files (e.g. installed skills under
+    # .agents/skills/, refs #150) that find would otherwise catch.
+    #
+    # `git ls-files --cached --others --exclude-standard` = tracked PLUS
+    # untracked-but-NOT-ignored, so a newly-added repo-owned script is still
+    # linted while a gitignored one is excluded. `-c safe.directory` scopes
+    # the ownership-trust to this single call: the /source bind mount is owned
+    # by the host user, not the in-container root, which would otherwise make
+    # git refuse the repo as "dubious ownership".
+    local -A _visible=()
+    local _p
+    while IFS= read -r -d '' _p; do
+        _visible["${_p}"]=1
+    done < <(git -C "${REPO_ROOT}" -c safe.directory="${REPO_ROOT}" \
+        ls-files --cached --others --exclude-standard -z \
+        -- '*.sh' '*.bash' '*.bats' 2>/dev/null)
+
+    # Safety valve: if git is unavailable / this is not a work tree, the
+    # visible set is empty. Do NOT filter to nothing (that would silently make
+    # the linter a no-op — see the fish note below for that failure mode);
+    # fall back to the raw find output so we lint everything rather than skip.
+    local _filter=0
+    if (( ${#_visible[@]} > 0 )); then
+        _filter=1
+    fi
+
+    local _f _rel
+    while IFS= read -r -d '' _f; do
+        if (( _filter )); then
+            _rel="${_f#"${REPO_ROOT}/"}"
+            [[ -n "${_visible[${_rel}]:-}" ]] || continue
+        fi
+        printf '%s\0' "${_f}"
+    done < <(find "${REPO_ROOT}" \
         \( -path "${REPO_ROOT}/.git" -o \
            -path "${REPO_ROOT}/.tmp" -o \
            -path "${REPO_ROOT}/.worktree" -o \
@@ -164,7 +203,7 @@ _find_lintable_sh() {
         ! -path "${REPO_ROOT}/module/setup_*.sh" \
         ! -path "${REPO_ROOT}/module/anydesk.sh" \
         ! -path "${REPO_ROOT}/install-nvidia-driver.sh" \
-        -print0
+        -print0)
 }
 
 # NOTE: fish discovery must NOT prune module/config wholesale like the

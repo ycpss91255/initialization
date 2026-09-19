@@ -90,3 +90,58 @@ _require_python3() {
     [ "${status}" -eq 0 ]
     [ -z "${output}" ]
 }
+
+# ── repository scoping: the rule is this repo's, not the host's ──────────────
+# The same machine hosts sibling repos whose issues / PRs are written in
+# another language, and `gh --repo <other>` for them runs from this cwd. The
+# hook must only guard ycpss91255/initialization: an explicit --repo / -R
+# naming another repo passes through, and so does a cwd outside this checkout.
+# Without either signal (this repo, no --repo) the guard is unchanged.
+
+@test "allows CJK when --repo names another repository" {
+    _require_python3
+    _run_hook 'gh issue create --repo other/repo --title "修复错误" --body "你好世界"'
+    [ "${status}" -eq 0 ]
+    [ -z "${output}" ]
+}
+
+@test "allows CJK when -R names another repository" {
+    _require_python3
+    _run_hook 'gh pr create -R other/repo --title "feat" --body "你好世界"'
+    [ "${status}" -eq 0 ]
+    [ -z "${output}" ]
+}
+
+@test "allows CJK when --repo=<other> (equals form) names another repository" {
+    _require_python3
+    _run_hook 'gh issue comment 7 --repo=other/repo --body "ありがとう"'
+    [ "${status}" -eq 0 ]
+    [ -z "${output}" ]
+}
+
+@test "still denies CJK when --repo names this repository" {
+    _require_python3
+    _run_hook 'gh issue create --repo ycpss91255/initialization --title "bug" --body "你好世界"'
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"deny"* ]]
+}
+
+@test "still denies CJK without --repo inside this repository" {
+    _require_python3
+    _run_hook 'gh issue create --title "bug" --body "你好世界"'
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"deny"* ]]
+}
+
+@test "allows CJK without --repo when cwd is outside this repository" {
+    _require_python3
+    local _elsewhere="${BATS_TEST_TMPDIR}/elsewhere"
+    mkdir -p "${_elsewhere}"
+    git -C "${_elsewhere}" init -q
+    git -C "${_elsewhere}" remote add origin https://github.com/other/repo.git
+    run bash -c 'cd "$3" && printf "%s" "$1" | "$2"' _ \
+        "$(_json 'gh issue create --title "bug" --body "你好世界"')" \
+        "${HOOK_SH}" "${_elsewhere}"
+    [ "${status}" -eq 0 ]
+    [ -z "${output}" ]
+}

@@ -36,6 +36,20 @@
 #   - `gh repo` / `gh api` / other subcommands
 #   - git commit messages (project rule covers issue/PR only)
 #
+# Repository scoping (2026-09-19): the English-only rule is THIS repo's, not
+# the host's. The same machine hosts sibling repos whose issues / PRs are
+# written in another language, and `gh --repo <other>` calls for them run
+# from this cwd (so this PreToolUse hook fires on them). The hook therefore
+# allows early when the command targets another repository:
+#   - `--repo <owner/name>` / `-R <owner/name>` (also `--repo=<owner/name>`)
+#     names a repo other than this one, OR
+#   - no --repo is given and the cwd's git toplevel is not this checkout
+#     (`gh` then targets the cwd's own origin).
+# "This repo" is derived from `git remote get-url origin` of the checkout the
+# hook lives in (GH_ENGLISH_REPO overrides; falls back to the literal
+# ycpss91255/initialization when origin is unreadable). Behaviour for this
+# repo is unchanged.
+#
 # Refs: project rule "GitHub interaction English-only" (2026-05-16
 # session), aligns with ycpss91255-docker/docker_harness convention.
 #
@@ -48,6 +62,65 @@
 source "${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../lib" && pwd -P)}/hook_bootstrap.sh"
 hook_bootstrap "enforce-gh-english"
 
+# ── Repository scoping ───────────────────────────────────────────────────────
+
+# Literal fallback for "this repo" when the checkout's origin cannot be read.
+GH_ENGLISH_REPO_LITERAL="ycpss91255/initialization"
+
+# _repo_slug <ref> — normalise a repository reference to lower-case
+# "owner/name". Accepts what `gh --repo` and `git remote` produce: owner/name,
+# host/owner/name, https:// or ssh:// URLs, git@host:owner/name, an optional
+# trailing .git, and optional surrounding quotes. Prints nothing when no
+# owner/name pair can be found.
+_repo_slug() {
+  local _v="${1:-}" _name _rest _owner
+  _v="${_v#\"}"; _v="${_v%\"}"; _v="${_v#\'}"; _v="${_v%\'}"
+  _v="${_v%/}"
+  _v="${_v%.git}"
+  _v="${_v//://}"
+  _name="${_v##*/}"
+  _rest="${_v%/*}"
+  _owner="${_rest##*/}"
+  [[ -n "${_owner}" && -n "${_name}" && "${_rest}" != "${_v}" ]] || return 0
+  printf '%s/%s' "${_owner,,}" "${_name,,}"
+}
+
+# _this_repo — owner/name of the checkout this hook lives in (REPO_ROOT's
+# origin remote; a linked worktree shares it), else the literal fallback.
+_this_repo() {
+  local _slug
+  _slug="$(_repo_slug "$(git -C "${REPO_ROOT}" remote get-url origin 2>/dev/null)")"
+  printf '%s' "${_slug:-${GH_ENGLISH_REPO_LITERAL}}"
+}
+
+# _target_repo <cmd> — owner/name the gh command targets: an explicit
+# `--repo <ref>` / `-R <ref>` / `--repo=<ref>`, else $GH_REPO, else the origin
+# of the directory the command runs in (a leading `cd <dir> &&`, the payload's
+# .cwd, or $PWD). Prints nothing when the target cannot be determined.
+_target_repo() {
+  local _cmd="$1" _ref="" _dir _cd
+  if [[ "${_cmd}" =~ (^|[[:space:]])(--repo|-R)[[:space:]]+([^[:space:]]+) ]]; then
+    _ref="${BASH_REMATCH[3]}"
+  elif [[ "${_cmd}" =~ (^|[[:space:]])--repo=([^[:space:]]+) ]]; then
+    _ref="${BASH_REMATCH[2]}"
+  elif [[ -n "${GH_REPO:-}" ]]; then
+    _ref="${GH_REPO}"
+  else
+    _dir="$(hook_field '.cwd')"
+    [[ -z "${_dir}" ]] && _dir="${PWD}"
+    if [[ "${_cmd}" =~ (^|[[:space:]\;\&])cd[[:space:]]+([^[:space:]\&\;]+)[[:space:]]*\&\& ]]; then
+      _cd="${BASH_REMATCH[2]}"
+      if [[ "${_cd}" == /* ]]; then
+        _dir="${_cd}"
+      else
+        _dir="${_dir}/${_cd}"
+      fi
+    fi
+    _ref="$(git -C "${_dir}" remote get-url origin 2>/dev/null)"
+  fi
+  _repo_slug "${_ref}"
+}
+
 main() {
   hook_read_input
   local cmd
@@ -56,6 +129,15 @@ main() {
 
   # Trigger pattern: `gh issue create|comment` or `gh pr create|comment`.
   if ! [[ "${cmd}" =~ (^|[[:space:];|&]|\$\()[[:space:]]*gh[[:space:]]+(issue|pr)[[:space:]]+(create|comment)([[:space:]]|$) ]]; then
+    return 0
+  fi
+
+  # Repository scoping: the English-only rule guards THIS repo's artifacts.
+  # A command that demonstrably targets another repository passes through;
+  # an undeterminable target keeps the guard (conservative, unchanged).
+  local target
+  target="$(_target_repo "${cmd}")"
+  if [[ -n "${target}" && "${target}" != "$(_this_repo)" ]]; then
     return 0
   fi
 

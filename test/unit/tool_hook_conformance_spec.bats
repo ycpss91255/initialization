@@ -47,6 +47,19 @@ ALLOWLIST_TOOLS="
 # Empty: all hooks are migrated onto lib/hook_bootstrap.sh and enforced.
 ALLOWLIST_HOOKS=""
 
+# ── Retired hooks ledger (must STAY gone) ────────────────────────────────────
+# Newline-delimited basenames of hooks the project deliberately retired. A
+# retired hook must be neither on disk under .agents/hook/ nor registered in
+# .claude/settings.json, so a stale copy cannot creep back through a merge or
+# a reflexive restore. Add an entry here when a hook is retired (with the
+# policy change that retired it noted in doc/changelog/CHANGELOG.md).
+#   enforce_gh_review_approval.sh — retired 2026-09-19: issues / PRs are
+#     created and merged autonomously once TDD + CI are green; only a release
+#     tag needs the maintainer's explicit consent.
+RETIRED_HOOKS="
+enforce_gh_review_approval.sh
+"
+
 setup() {
     setup_test_env
     export LIB_DIR REPO_ROOT
@@ -211,6 +224,42 @@ _json() { jq -n --arg c "$1" '{tool_name:"Bash", tool_input:{command:$c}}'; }
     done <<< "${ALLOWLIST_HOOKS}"
     [[ -z "${_stale}" ]] || {
         printf 'stale ALLOWLIST_HOOKS entries:\n%s' "${_stale}" >&2
+        return 1
+    }
+}
+
+# ── Retired hooks (must stay gone) ───────────────────────────────────────────
+
+@test "every retired hook is absent from .agents/hook/" {
+    local _base _present=""
+    while IFS= read -r _base; do
+        [[ -n "${_base}" ]] || continue
+        [[ -e "${HOOK_DIR}/${_base}" ]] && \
+            _present+="  ${_base}: still exists under .agents/hook/ — it was retired, delete it"$'\n'
+    done <<< "${RETIRED_HOOKS}"
+    [[ -z "${_present}" ]] || {
+        printf 'retired hooks still on disk:\n%s' "${_present}" >&2
+        return 1
+    }
+}
+
+@test "every retired hook is not registered in .claude/settings.json" {
+    local _settings="${REPO_ROOT}/.claude/settings.json"
+    [[ -r "${_settings}" ]] || {
+        printf 'settings.json not readable: %s\n' "${_settings}" >&2
+        return 1
+    }
+    local _registered _base _wired=""
+    _registered="$(jq -r '
+        [.hooks // {} | .[] | .[] | .hooks[]? | .command // empty] | .[]
+    ' "${_settings}")"
+    while IFS= read -r _base; do
+        [[ -n "${_base}" ]] || continue
+        grep -qF "${_base}" <<< "${_registered}" && \
+            _wired+="  ${_base}: still registered in .claude/settings.json — it was retired, drop the entry"$'\n'
+    done <<< "${RETIRED_HOOKS}"
+    [[ -z "${_wired}" ]] || {
+        printf 'retired hooks still wired into settings.json:\n%s' "${_wired}" >&2
         return 1
     }
 }

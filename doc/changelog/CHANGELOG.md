@@ -35,6 +35,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **tmux-powerline status bar overhaul** (`module/config/tmux/`, refs #302).
+  Ports the live-validated bar into the tracked config: a non-blocking,
+  delta-based shared sampler (`tmux-powerline/lib_stat.sh`) reading `/proc`,
+  `/sys` and `nvidia-smi` once per interval behind a cache + flock so every
+  segment and both `powerline.sh` invocations share one sample; per-metric
+  segments (`mem_pct`, `cpu_pct`, `gpu_pct` with `gpu_pct0..8` symlinks,
+  `net_if` with `net_if0..5` symlinks, `battery`, `disk`, `date`); a
+  structural pile-up guard (`tmux/pl-guard.sh`, flock + timeout so a slow
+  redraw is skipped, not stacked) and responsive width allocation
+  (`tmux/status-length.sh`). Replaces the blocking `tmux_mem_cpu_load`
+  segment (removed). Mail credentials stay externalized via `secrets.sh`
+  (gnome-keyring); no secret is committed. Machine-adaptive: discrete-GPU
+  detection and per-interface network classification work on both maintained
+  machines (dGPU-less laptop and NVIDIA + WireGuard workstation).
 - **`ntpdate` apt module** (`module/ntpdate.module.sh` +
   `test/unit/module/ntpdate_spec.bats`). An `optional` apt-archetype
   (`module_use_apt_archetype`) module installing the legacy `ntpdate` package,
@@ -1113,6 +1127,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Removed
 
+- **`enforce_gh_review_approval.sh` hook retired** (autonomous issue / PR
+  policy, 2026-09-19): issues and PRs are now created and merged by agents
+  once TDD + CI (`ci-passed`) are green; only a release tag still needs the
+  maintainer's explicit consent. The transcript-approval gate from issue #34
+  (`approve issue` / `approve pr` / `skip review` phrases,
+  `ECC_ALLOW_GH_REVIEW=1` bypass) therefore no longer applies. Removed
+  `.agents/hook/enforce_gh_review_approval.sh`, its `.claude/settings.json`
+  PreToolUse Bash registration, and
+  `test/unit/hook/enforce_gh_review_approval_spec.bats`; the "GitHub Issue /
+  PR Review Approval" section of
+  `.agents/rules/{common,zh}/development-workflow.md` is replaced by a short
+  "Autonomous issue / PR policy" section. `test/unit/tool_hook_conformance_spec.bats`
+  gains a `RETIRED_HOOKS` ledger asserting a retired hook is neither on disk
+  nor registered in `settings.json`, so it cannot creep back. The
+  English-only hook (`enforce_gh_english.sh`) is unchanged and still applies.
 - **ranger module** (issue #319, supersedes #61): yazi (#60) is now the daily
   file manager across machines, so the redundant ranger catalog entry is
   dropped. Removed `module/ranger.module.sh`, `module/config/ranger/rifle.conf`,

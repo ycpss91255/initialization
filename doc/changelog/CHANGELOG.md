@@ -1096,6 +1096,21 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Removed
 
+- **`enforce_gh_review_approval.sh` hook retired** (autonomous issue / PR
+  policy, 2026-09-19): issues and PRs are now created and merged by agents
+  once TDD + CI (`ci-passed`) are green; only a release tag still needs the
+  maintainer's explicit consent. The transcript-approval gate from issue #34
+  (`approve issue` / `approve pr` / `skip review` phrases,
+  `ECC_ALLOW_GH_REVIEW=1` bypass) therefore no longer applies. Removed
+  `.agents/hook/enforce_gh_review_approval.sh`, its `.claude/settings.json`
+  PreToolUse Bash registration, and
+  `test/unit/hook/enforce_gh_review_approval_spec.bats`; the "GitHub Issue /
+  PR Review Approval" section of
+  `.agents/rules/{common,zh}/development-workflow.md` is replaced by a short
+  "Autonomous issue / PR policy" section. `test/unit/tool_hook_conformance_spec.bats`
+  gains a `RETIRED_HOOKS` ledger asserting a retired hook is neither on disk
+  nor registered in `settings.json`, so it cannot creep back. The
+  English-only hook (`enforce_gh_english.sh`) is unchanged and still applies.
 - **ranger module** (issue #319, supersedes #61): yazi (#60) is now the daily
   file manager across machines, so the redundant ranger catalog entry is
   dropped. Removed `module/ranger.module.sh`, `module/config/ranger/rifle.conf`,

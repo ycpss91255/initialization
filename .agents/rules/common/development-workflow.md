@@ -43,32 +43,25 @@ The Feature Implementation Workflow describes the development pipeline: research
    - Ensure branch is up to date with target branch
    - Only request review after these checks pass
 
-## GitHub Issue / PR Review Approval (mandatory before `gh ... create`)
+## Autonomous issue / PR policy
 
-`gh issue create|edit` and `gh pr create|edit` publish content to a
-public, indexed repo. The user must see and approve the draft BEFORE it
-lands. Enforced by `.claude/hook/enforce_gh_review_approval.sh`
-(PreToolUse on Bash), which denies these commands until the session
-transcript contains an explicit user approval phrase -- the same
-transcript-based approval discipline as
-`enforce_shellcheck_disable_approval.sh`.
+Issues and PRs are created and merged by agents without a per-item human
+draft approval. The gate is technical, not conversational: a PR merges once
+TDD is done and CI (`ci-passed`) is green -- push, `gh pr create`, arm
+`gh pr merge --auto`, let the aggregator decide. No draft file, no
+approval phrase, no wait for the maintainer.
 
-Default flow:
+The only thing that still needs the maintainer's explicit consent is a
+**release tag** (`.claude/script/release-tag.sh`; see
+`doc/process/release.md`).
 
-1. Write the draft in the user's working language (zh-TW) to a local
-   file, e.g. `/tmp/<slug>.zh.md`.
-2. Show the path (and/or a short summary) and ask the user to review it.
-3. After the user approves, translate the approved content to English.
-4. Run `gh issue create` / `gh pr create` with the English `--body-file`.
-   English-only enforcement (`enforce_gh_english.sh`) still runs.
+What still applies to every `gh issue|pr create|comment`:
 
-Approval phrases (case-insensitive; any one is enough):
+- English-only, emoji-free titles / bodies for this repository's issues
+  and PRs (`enforce_gh_english.sh`).
+- `--body-file` for bodies (`enforce_gh_body_file.sh`) and the issue
+  template (`enforce_gh_issue_template.sh`).
 
-- `approve issue` / `issue ok` -> authorizes `gh issue create|edit`
-- `approve pr` / `pr ok` -> authorizes `gh pr create|edit`
-- `skip review` -> the explicit opt-out; authorizes either kind when the
-  user says to go straight to create ("just open the issue" style).
-
-The canonical tokens stay English so the hook check is locale-agnostic.
-Emergency bypass (leaves an audit trail in shell history):
-`ECC_ALLOW_GH_REVIEW=1`.
+History: the previous transcript-approval gate
+(`enforce_gh_review_approval.sh`, issue #34) was retired on 2026-09-19 --
+see `doc/changelog/CHANGELOG.md`.

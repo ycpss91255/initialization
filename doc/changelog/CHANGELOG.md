@@ -486,6 +486,23 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **`enforce_gh_english.sh` is scoped to this repository**
+  (`.agents/hook/enforce_gh_english.sh`): the same machine now hosts sibling
+  repos whose issues / PRs are written in another language, and their
+  `gh --repo <other>` calls run from this repo's cwd, so this PreToolUse Bash
+  hook fired on them and denied their CJK bodies. The hook now allows early
+  when the `gh issue|pr create|comment` command demonstrably targets another
+  repository: an explicit `--repo <ref>` / `-R <ref>` / `--repo=<ref>`
+  naming a repo other than this one (owner/name, host/owner/name, URL and
+  `.git` forms are normalised, case-insensitively), else `$GH_REPO`, else the
+  origin of the directory the command runs in (a leading `cd <dir> &&`, the
+  payload's `.cwd`, or `$PWD`) resolving to another repo. "This repo" is
+  derived from the checkout's `git remote get-url origin` with a literal
+  `ycpss91255/initialization` fallback. An undeterminable target keeps the
+  guard, and behaviour for this repo is unchanged. Covered by six new cases in
+  `test/unit/hook/enforce_gh_english_spec.bats` (other repo via `--repo`,
+  `-R`, `--repo=`; this repo via `--repo`; no `--repo` inside this repo still
+  denied; no `--repo` from a cwd outside this repo allowed).
 - **`just -f justfile.ci lint` no longer lints gitignored third-party files**
   (`script/ci/ci.sh`): `_find_lintable_sh` collected `*.sh`/`*.bash`/`*.bats`
   with a raw `find`, which also caught machine-local third-party skills

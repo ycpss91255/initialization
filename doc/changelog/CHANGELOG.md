@@ -35,6 +35,20 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **tmux-powerline status bar overhaul** (`module/config/tmux/`, refs #302).
+  Ports the live-validated bar into the tracked config: a non-blocking,
+  delta-based shared sampler (`tmux-powerline/lib_stat.sh`) reading `/proc`,
+  `/sys` and `nvidia-smi` once per interval behind a cache + flock so every
+  segment and both `powerline.sh` invocations share one sample; per-metric
+  segments (`mem_pct`, `cpu_pct`, `gpu_pct` with `gpu_pct0..8` symlinks,
+  `net_if` with `net_if0..5` symlinks, `battery`, `disk`, `date`); a
+  structural pile-up guard (`tmux/pl-guard.sh`, flock + timeout so a slow
+  redraw is skipped, not stacked) and responsive width allocation
+  (`tmux/status-length.sh`). Replaces the blocking `tmux_mem_cpu_load`
+  segment (removed). Mail credentials stay externalized via `secrets.sh`
+  (gnome-keyring); no secret is committed. Machine-adaptive: discrete-GPU
+  detection and per-interface network classification work on both maintained
+  machines (dGPU-less laptop and NVIDIA + WireGuard workstation).
 - **`ntpdate` apt module** (`module/ntpdate.module.sh` +
   `test/unit/module/ntpdate_spec.bats`). An `optional` apt-archetype
   (`module_use_apt_archetype`) module installing the legacy `ntpdate` package,

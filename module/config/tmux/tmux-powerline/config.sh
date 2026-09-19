@@ -30,7 +30,9 @@ export TMUX_POWERLINE_STATUS_VISIBILITY="2"
 export TMUX_POWERLINE_WINDOW_STATUS_LINE=0
 # The status bar refresh interval in seconds.
 # Note that events that force-refresh the status bar (such as window renaming) will ignore this.
-export TMUX_POWERLINE_STATUS_INTERVAL="2"
+# Refresh cadence (the real knob; the plugin applies it on load and overrides
+# any `set -g status-interval` in tmux.conf).
+export TMUX_POWERLINE_STATUS_INTERVAL="5"
 # The location of the window list. Can be {"absolute-centre, centre, left, right"}.
 # Note that "absolute-centre" is only supported on `tmux -V` >= 3.2.
 export TMUX_POWERLINE_STATUS_JUSTIFICATION="centre"
@@ -58,7 +60,9 @@ export TMUX_POWERLINE_SEG_BATTERY_NUM_HEARTS="5"
 
 # date.sh {
 # date(1) format for the date. If you don't, for some reason, like ISO 8601 format you might want to have "%D" or "%m/%d/%Y".
-export TMUX_POWERLINE_SEG_DATE_FORMAT="%y/%m/%d %H:%M %a"
+# Clock + short date. The weekday is intentionally omitted here because the
+# custom date.sh appends a Roman-numeral weekday instead of %a.
+export TMUX_POWERLINE_SEG_DATE_FORMAT="%H:%M %y/%m/%d"
 # }
 
 # date_week.sh {
@@ -208,10 +212,12 @@ export TMUX_POWERLINE_SEG_MAILCOUNT_MAILCHECKRC="$HOME/.mailcheckrc"
 # Whether the normal & prefix mode section should be enabled. Should be {"true, "false"}.
 export TMUX_POWERLINE_SEG_MODE_INDICATOR_NORMAL_AND_PREFIX_MODE_ENABLED="true"
 # Normal mode text & color overrides. Defaults to "normal" & the segment foreground color set in the theme used.
-export TMUX_POWERLINE_SEG_MODE_INDICATOR_NORMAL_MODE_TEXT="⌨ "
+# Trailing space removed so the icon is not double-padded by the pill.
+export TMUX_POWERLINE_SEG_MODE_INDICATOR_NORMAL_MODE_TEXT="⌨"
 export TMUX_POWERLINE_SEG_MODE_INDICATOR_NORMAL_MODE_TEXT_COLOR=""
 # Prefix mode text & color overrides. Defaults to "prefix" & the segment foreground color set in the theme used.
-export TMUX_POWERLINE_SEG_MODE_INDICATOR_PREFIX_MODE_TEXT="🔞"
+# Trailing space removed so the icon is not double-padded by the pill.
+export TMUX_POWERLINE_SEG_MODE_INDICATOR_PREFIX_MODE_TEXT="PFX"
 export TMUX_POWERLINE_SEG_MODE_INDICATOR_PREFIX_MODE_TEXT_COLOR=""
 # Whether the mouse mode section should be enabled. Should be {"true, "false"}.
 export TMUX_POWERLINE_SEG_MODE_INDICATOR_MOUSE_MODE_ENABLED="false"
@@ -308,7 +314,9 @@ export TMUX_POWERLINE_SEG_TIME_FORMAT="%H:%M"
 # Arguments passed to tmux-mem-cpu-load.
 # See https://github.com/thewtex/tmux-mem-cpu-load for all available options.
 # export TMUX_POWERLINE_SEG_TMUX_MEM_CPU_LOAD_ARGS="-v"
-export TMUX_POWERLINE_SEG_TMUX_MEM_CPU_LOAD_ARGS="-c -q -r 136 -i 1 -v -a 0"
+# -r 236 blends the segment's right edge with the Catppuccin Frappe thm_base
+# (#303446) set in themes/my-theme.sh (nearest xterm-256 index).
+export TMUX_POWERLINE_SEG_TMUX_MEM_CPU_LOAD_ARGS="-c -q -r 236 -i 1 -v -a 0"
 # }
 
 # tmux_session_info.sh {

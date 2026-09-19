@@ -43,27 +43,22 @@
    - 确保分支已与目标分支同步
    - 仅在这些检查通过后请求审查
 
-## GitHub Issue / PR 审查批准（`gh ... create` 前必需）
+## 自主 Issue / PR 策略
 
-`gh issue create|edit` 与 `gh pr create|edit` 会把内容发布到一个公开且被
-索引的仓库。用户必须在内容落地之前看到并批准草稿。由
-`.claude/hook/enforce_gh_review_approval.sh`（Bash 的 PreToolUse）强制执行：
-在会话记录（transcript）包含明确的用户批准短语之前，拒绝这些命令 --
-与 `enforce_shellcheck_disable_approval.sh` 相同的基于记录的批准机制。
+Issue 与 PR 由代理自主创建与合并，不再逐项等待人工审批草稿。门槛是技术性
+的而非对话性的：完成 TDD 且 CI（`ci-passed`）为绿后，PR 即可合并 -- 推送、
+`gh pr create`、启用 `gh pr merge --auto`，交由聚合检查决定。不需要草稿文件、
+不需要批准短语、不需要等待维护者。
 
-默认流程：
+唯一仍需维护者明确同意的是**发布标签**（`.claude/script/release-tag.sh`；
+参见 `doc/process/release.md`）。
 
-1. 用用户的工作语言（zh-TW）把草稿写到本地文件，例如 `/tmp/<slug>.zh.md`。
-2. 展示该路径（以及／或简短摘要），请用户审查。
-3. 用户批准后，把批准的内容翻译为英文。
-4. 用英文的 `--body-file` 运行 `gh issue create` / `gh pr create`。
-   英文强制检查（`enforce_gh_english.sh`）仍会运行。
+对每个 `gh issue|pr create|comment` 仍然适用的规则：
 
-批准短语（大小写不敏感；任意一个即可）：
+- 本仓库的 issue / PR 标题与正文必须为纯英文且不含 emoji
+  （`enforce_gh_english.sh`）。
+- 正文使用 `--body-file`（`enforce_gh_body_file.sh`），并遵循 issue 模板
+  （`enforce_gh_issue_template.sh`）。
 
-- `approve issue` / `issue ok` -> 授权 `gh issue create|edit`
-- `approve pr` / `pr ok` -> 授权 `gh pr create|edit`
-- `skip review` -> 显式跳过；当用户表示直接开 issue／PR 时授权两种。
-
-规范 token 保持英文，使钩子检查与语言无关。
-应急绕过（会在 shell 历史留下审计痕迹）：`ECC_ALLOW_GH_REVIEW=1`。
+历史：先前基于会话记录的审批门（`enforce_gh_review_approval.sh`，issue #34）
+已于 2026-09-19 退役 -- 参见 `doc/changelog/CHANGELOG.md`。

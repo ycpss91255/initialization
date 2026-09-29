@@ -204,10 +204,11 @@ EOF
 
 @test "--seed fails loudly when a fetch fails instead of seeding nothing" {
     _fake_gh fail
-    run --separate-stderr "${SCRIPT}" --repo owner/repo --login maintainer \
+    run "${SCRIPT}" --repo owner/repo --login maintainer \
         --state-file "${STATE}" --seed
     assert_failure 1
-    [[ "${stderr}" == *"fetch failed for #5"* ]]
+    assert_output --partial "fetch failed for #5"
+    assert_output --partial "seed aborted: 1 of 1 thread(s) unreadable"
 }
 
 @test "a failed fetch cycle emits a stdout event, so Monitor is not silent" {

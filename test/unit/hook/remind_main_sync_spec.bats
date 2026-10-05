@@ -21,6 +21,22 @@ _run_hook() {
     run bash -c 'printf "%s" "$1" | "$2"' _ "$(_json "$1")" "${HOOK_SH}"
 }
 
+_assert_reminder_has_no_filesystem_side_effects() {
+    local command="$1" variant="$2" cwd message
+    cwd="${INIT_UBUNTU_TEST_SCRATCH}/hook_cwd"
+    mkdir -p "${cwd}"
+
+    run bash -c 'cd -- "$3" && printf "%s" "$1" | "$2"' \
+        _ "$(_json "${command}")" "${HOOK_SH}" "${cwd}"
+
+    [ "${status}" -eq 0 ]
+    [ -z "$(find "${cwd}" -mindepth 1 -print -quit)" ]
+    message="$(printf '%s' "${output}" | jq -er '.systemMessage')"
+    [[ "${message}" == *'See doc/process/worktree.md ("Lifecycle > Cleanup").' ]]
+    printf '%s' "${output}" | jq -e --arg m "${message}" --arg v "${variant}" \
+        '.hookSpecificOutput.additionalContext == ($m + " [variant=" + $v + "]")'
+}
+
 # ── fires: real gh pr merge ──────────────────────────────────────────────────
 
 @test "gh pr merge --auto -> queued variant reminder" {
@@ -35,6 +51,14 @@ _run_hook() {
     [ "${status}" -eq 0 ]
     [[ "${output}" == *"variant=immediate"* ]]
     [[ "${output}" == *"pull --ff-only"* ]]
+}
+
+@test "queued reminder preserves quoted lifecycle reference without creating files" {
+    _assert_reminder_has_no_filesystem_side_effects "gh pr merge --auto --squash 42" "queued"
+}
+
+@test "immediate reminder preserves quoted lifecycle reference without creating files" {
+    _assert_reminder_has_no_filesystem_side_effects "gh pr merge --squash 42" "immediate"
 }
 
 @test "gh pr merge at a command boundary after && still fires" {

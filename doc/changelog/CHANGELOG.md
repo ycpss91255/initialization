@@ -20,6 +20,12 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ## [Unreleased]
 
+### Fixed
+
+- Restore Windows checkout by removing the empty tracked `Cleanup).` artifact
+  and escaping lifecycle-reference quotes in both merge reminders so they no
+  longer create a stray file (refs #409).
+
 ### Deprecated
 
 - **Legacy `small-tools/` bundle installers marked DEPRECATED** (PRD section

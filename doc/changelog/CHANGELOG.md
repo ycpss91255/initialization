@@ -330,7 +330,8 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   `[Timeout]` / `[Rate limited]`) and the compaction counter, and shortened the
   `Context: ` label to `Ctx `. ccstatusline 2.2.19 has no per-plan show/hide
   option, so the layout is fixed at template level. No script or deploy-path
-  change; the existing `claude-code-config` specs only assert `version == 3`.
+  change; the three layout specs in `test/unit/module/claude-code-config_spec.bats`
+  were updated to assert the new rows (and the removed widgets staying out).
 - **yazi no longer renders/previews PDFs** (`module/config/yazi/yazi.toml`).
   Removed the two `{ mime = "application/pdf", run = "pdf" }` rules from the
   `[plugin]` `preloaders` and `previewers` lists so PDF files fall through to

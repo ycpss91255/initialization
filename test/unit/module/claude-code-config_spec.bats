@@ -407,25 +407,30 @@ _ccs_json="${MODULE_DIR}/config/claude/ccstatusline.settings.json"
     assert_success
 }
 
-@test "ccstatusline.settings.json has the two-row layout (+ trailing empty row)" {
-    run jq -e '(.lines | length) == 3
+@test "ccstatusline.settings.json has the two-row layout (no trailing empty row)" {
+    run jq -e '(.lines | length) == 2
                and (.lines[0] | length) > 0
-               and (.lines[1] | length) > 0
-               and (.lines[2] | length) == 0' "${_ccs_json}"
+               and (.lines[1] | length) > 0' "${_ccs_json}"
     assert_success
 }
 
-@test "ccstatusline.settings.json row 1 leads with cwd then git (reordered layout)" {
-    run jq -e '.lines[0][0].type == "current-working-dir"
-               and .lines[0][2].type == "git-branch"' "${_ccs_json}"
+@test "ccstatusline.settings.json row 2 leads with cwd then git (#416)" {
+    run jq -e '.lines[1][0].type == "current-working-dir"
+               and .lines[1][2].type == "git-branch"' "${_ccs_json}"
     assert_success
 }
 
-@test "ccstatusline.settings.json row 2 inlines reset timers (no separate Reset row)" {
-    run jq -e '[.lines[1][].type] as $t
-               | ($t | index("context-percentage")) != null
-               and ($t | index("reset-timer")) != null
-               and ($t | index("weekly-reset-timer")) != null' "${_ccs_json}"
+@test "ccstatusline.settings.json row 1 shows model, context and weekly usage only (#416)" {
+    run jq -e '[.lines[0][].type] as $t
+               | ($t | index("model")) != null
+               and ($t | index("context-percentage")) != null
+               and ($t | index("weekly-usage")) != null
+               and ($t | index("weekly-reset-timer")) != null
+               and ($t | index("session-usage")) == null
+               and ($t | index("reset-timer")) == null
+               and ($t | index("tokens-total")) == null
+               and ($t | index("session-cost")) == null
+               and ($t | index("compaction-counter")) == null' "${_ccs_json}"
     assert_success
 }
 

@@ -322,6 +322,15 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Changed
 
+- **Compact ccstatusline layout** (`module/config/claude/ccstatusline.settings.json`,
+  refs #416). Row 1 is now `model (effort) | Ctx <pct> | Usage: 7d <pct> ↻
+  <reset>` and row 2 is `cwd | git-branch | git-changes`. Dropped the
+  `Total: <tokens> (<cost>)` group, the 5h usage widgets (`session-usage`,
+  `reset-timer`; a Max 20x plan has no 5h window, so they only rendered
+  `[Timeout]` / `[Rate limited]`) and the compaction counter, and shortened the
+  `Context: ` label to `Ctx `. ccstatusline 2.2.19 has no per-plan show/hide
+  option, so the layout is fixed at template level. No script or deploy-path
+  change; the existing `claude-code-config` specs only assert `version == 3`.
 - **yazi no longer renders/previews PDFs** (`module/config/yazi/yazi.toml`).
   Removed the two `{ mime = "application/pdf", run = "pdf" }` rules from the
   `[plugin]` `preloaders` and `previewers` lists so PDF files fall through to

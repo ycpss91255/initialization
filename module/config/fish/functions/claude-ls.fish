@@ -18,7 +18,9 @@ function claude-ls --description 'List Claude Code sessions for current folder (
         end
     end
 
-    set current_project (string replace --all / - $PWD)
+    # Claude Code names a project dir by replacing every non-alphanumeric
+    # char of the cwd with '-' (e.g. arch_drawio -> arch-drawio), not just '/'.
+    set current_project (string replace --all --regex '[^A-Za-z0-9]' - -- $PWD)
 
     python3 ~/.config/fish/_claude_sessions.py | python3 -c "
 import json, os, sys, time

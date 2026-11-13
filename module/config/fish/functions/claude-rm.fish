@@ -16,17 +16,21 @@ function claude-rm --description 'Trash Claude Code session(s) by customTitle or
         set -l found
 
         # 1. Try exact customTitle match first (only .jsonl files have titles).
-        #    Scan the first 50 lines, matching _claude_sessions.py: fork /
-        #    resumed sessions carry customTitle on a later line (line 1 is
-        #    leafUuid / permissionMode / a file-history snapshot), so a
-        #    first-line-only read misses them (issue #33).
-        for f in ~/.claude/projects/*/*.jsonl
-            set -l title (head -50 $f 2>/dev/null | grep -m1 '"customTitle"' | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('customTitle',''))" 2>/dev/null)
-            if test -n "$title"; and test "$title" = "$target"
-                set -l base (string replace -r '\.jsonl$' '' $f)
-                if not contains -- $base $found
-                    set found $found $base
-                end
+        #    Titles come from _claude_sessions.py so claude-ls and claude-rm
+        #    share one rule: the last customTitle in the transcript is the
+        #    current name, wherever it sits in the file. A head-N scan misses
+        #    /branch and renamed sessions whose title record is far from the
+        #    header (issues #33, #419).
+        for base in (python3 ~/.config/fish/_claude_sessions.py | python3 -c "
+import json, sys
+target = sys.argv[1]
+for line in sys.stdin:
+    s = json.loads(line)
+    if s['title'] == target and s['path'].endswith('.jsonl'):
+        print(s['path'][:-len('.jsonl')])
+" $target)
+            if not contains -- $base $found
+                set found $found $base
             end
         end
 

@@ -39,7 +39,7 @@ def session_info_jsonl(path):
         size_bytes = 0
     try:
         with open(path) as fp:
-            for i, line in enumerate(fp):
+            for line in fp:
                 try:
                     d = json.loads(line)
                 except Exception:
@@ -47,11 +47,10 @@ def session_info_jsonl(path):
                 kind = d.get("type")
                 if kind in ("user", "assistant"):
                     message_count += 1
-                # customTitle only lives in the session header, so cap the
-                # title scan at the first 50 lines to stay aligned with
-                # claude-rm.fish's `head -50` window (issue #33); metadata
-                # below keeps accumulating over the whole file.
-                if not title and not (i > 50) and d.get("customTitle"):
+                # customTitle can be (re)written at any point: a /branch or
+                # resumed session carries it past the header, and /rename
+                # appends a new record. The last one is the current name.
+                if d.get("customTitle"):
                     title = d["customTitle"]
                 if not forked_from and isinstance(d.get("forkedFrom"), dict):
                     forked_from = d["forkedFrom"].get("sessionId")

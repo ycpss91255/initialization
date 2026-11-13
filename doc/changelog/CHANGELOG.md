@@ -22,6 +22,16 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Fixed
 
+- **`claude-ls` / `claude-rm` miss sessions with underscore paths or a late
+  rename** (`module/config/fish/`, refs #419). `claude-ls` now derives the
+  project name by replacing every non-alphanumeric char with `-` (Claude Code
+  stores `~/Desktop/arch_drawio` as `...-arch-drawio`), so the current-folder
+  view no longer reports `No sessions found` for such directories.
+  `_claude_sessions.py` now takes the last `customTitle` in a transcript
+  instead of scanning only the first 50 lines, so a `/branch`ed and renamed
+  session shows its current name, and `claude-rm` matches titles through that
+  helper instead of its own `head -50` scan. Covered by the updated
+  `claude-ls_spec.bats` and the new `claude-sessions_spec.bats`.
 - Restore Windows checkout by removing the empty tracked `Cleanup).` artifact
   and escaping lifecycle-reference quotes in both merge reminders so they no
   longer create a stray file (refs #409).

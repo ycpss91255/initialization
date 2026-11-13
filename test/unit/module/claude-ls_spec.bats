@@ -34,12 +34,13 @@ PY
     FIXTURE="${INIT_UBUNTU_TEST_SCRATCH}/sessions.jsonl"
     export FIXTURE
 
-    # A real directory to `cd` into so $PWD (and its `/`->`-` project encoding)
-    # is deterministic.
+    # A real directory to `cd` into so $PWD (and its project encoding) is
+    # deterministic. Claude Code encodes a cwd by replacing every
+    # non-alphanumeric char with `-` (not just `/`).
     CWD_DIR="${INIT_UBUNTU_TEST_SCRATCH}/proj/demo"
     mkdir -p "${CWD_DIR}"
     export CWD_DIR
-    CUR_PROJECT="$(printf '%s' "${CWD_DIR}" | sed 's#/#-#g')"
+    CUR_PROJECT="$(printf '%s' "${CWD_DIR}" | sed 's#[^A-Za-z0-9]#-#g')"
     export CUR_PROJECT
 }
 
@@ -114,6 +115,21 @@ _now() { date +%s; }
     assert_success
     assert_output --partial "No sessions found for: ${CUR_PROJECT}"
     assert_output --partial "-a/--all"
+}
+
+@test "current folder with an underscore matches the hyphenated project dir (#419)" {
+    : > "${FIXTURE}"
+    CWD_DIR="${INIT_UBUNTU_TEST_SCRATCH}/proj/arch_drawio"
+    mkdir -p "${CWD_DIR}"
+    # Claude Code stores this cwd as ...-proj-arch-drawio (underscore -> hyphen).
+    local _proj
+    _proj="$(printf '%s' "${CWD_DIR}" | sed 's#[^A-Za-z0-9]#-#g')"
+    _session "${_proj}" "55555555-5555-5555-5555-555555555555" "review_repo_split" "" "$(_now)"
+
+    _claude_ls
+    assert_success
+    assert_output --partial "review_repo_split"
+    refute_output --partial "No sessions found"
 }
 
 # ── -a/--all: every project, real-path header ────────────────────────────────

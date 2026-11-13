@@ -874,17 +874,18 @@ _mock_fisher_and_chsh() {
     refute_output --partial "Usage:"
 }
 
-# ── claude-rm customTitle match on fork / resumed sessions (issue #33) ────────
+# ── claude-rm customTitle match on fork / resumed sessions (issues #33, #419) ─
 # The claude-rm helper (config payload dropped by this module) resolves a
-# customTitle to its session file. Fork / resumed sessions put customTitle on a
-# LATER line (line 1 is a leafUuid / permissionMode / file-history snapshot), so
-# a first-line-only scan misses them and reports "No session matched" even
-# though Tab completion — backed by _claude_sessions.py, which scans the first
-# 50 lines — shows the title. The resolver must use the SAME 50-line window as
-# the completion helper. Verified via tracked-config-content assertions
-# (precedent: codex_spec / yazi_spec / qmk-firmware_spec), since the runtime
-# match path depends on python3 (a user-host dependency absent from the
-# Docker test-tools image).
+# customTitle to its session file. Fork / resumed / renamed sessions put
+# customTitle on a LATER line (line 1 is a leafUuid / permissionMode /
+# file-history snapshot, and /rename appends a new record at any point), so a
+# first-line-only scan — or any fixed head-N window — misses them and reports
+# "No session matched" even though Tab completion shows the title. Both
+# claude-rm and the completion helper now resolve titles through
+# _claude_sessions.py, where the LAST customTitle in the file wins. These are
+# tracked-config-content guards (precedent: codex_spec / yazi_spec /
+# qmk-firmware_spec); the runtime behaviour is covered by
+# claude-sessions_spec.bats.
 
 _CLAUDE_RM_FN="${MODULE_DIR}/config/fish/functions/claude-rm.fish"
 _CLAUDE_SESSIONS_PY="${MODULE_DIR}/config/fish/_claude_sessions.py"
@@ -894,12 +895,13 @@ _CLAUDE_SESSIONS_PY="${MODULE_DIR}/config/fish/_claude_sessions.py"
     grep -Fq 'function claude-rm' "${_CLAUDE_RM_FN}"
 }
 
-@test "claude-rm scans the first 50 lines for customTitle, not just line 1 (issue #33)" {
-    # The resolver must widen its customTitle scan to the first 50 lines and
-    # select the customTitle line explicitly, so fork / resumed sessions whose
-    # line 1 is leafUuid / permissionMode / a snapshot are still matched.
-    grep -Fq 'head -50 ' "${_CLAUDE_RM_FN}"
-    grep -Fq "grep -m1 '\"customTitle\"'" "${_CLAUDE_RM_FN}"
+@test "claude-rm resolves customTitle through _claude_sessions.py, not a head-N scan (#33, #419)" {
+    # The resolver must ask the shared helper for titles so a title written
+    # anywhere in the transcript (fork / resumed / renamed sessions) matches.
+    grep -Fq '_claude_sessions.py' "${_CLAUDE_RM_FN}"
+    grep -Fq "s['title'] == target" "${_CLAUDE_RM_FN}"
+    run grep -F 'head -50 ' "${_CLAUDE_RM_FN}"
+    assert_failure
 }
 
 @test "claude-rm no longer reads only the first line for customTitle (issue #33 regression)" {
@@ -909,9 +911,12 @@ _CLAUDE_SESSIONS_PY="${MODULE_DIR}/config/fish/_claude_sessions.py"
     assert_failure
 }
 
-@test "claude-rm customTitle window matches _claude_sessions.py (issue #33)" {
-    # The completion helper scans the first 50 lines (`if i > 50: break`);
-    # the resolver must stay aligned or completion and resolution disagree —
-    # exactly the issue #33 symptom.
-    grep -Fq 'i > 50' "${_CLAUDE_SESSIONS_PY}"
+@test "_claude_sessions.py takes the last customTitle with no line window (#419)" {
+    # The old `i > 50` cap hid titles written after the header (a /branch'd
+    # session renamed later), so claude-ls showed the wrong name and claude-rm
+    # could not match it. The helper must keep overwriting `title` with each
+    # customTitle record, so the last (current) name wins.
+    run grep -F 'i > 50' "${_CLAUDE_SESSIONS_PY}"
+    assert_failure
+    grep -Fq 'title = d["customTitle"]' "${_CLAUDE_SESSIONS_PY}"
 }

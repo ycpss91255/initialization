@@ -51,6 +51,25 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`mscorefonts` module — Microsoft core fonts (Times New Roman, Arial, ...)**
+  (`module/mscorefonts.module.sh`). Wraps the apt
+  `ttf-mscorefonts-installer` downloader package. That package only downloads
+  the fonts when the `msttcorefonts/accepted-mscorefonts-eula` debconf answer
+  is `true`; when it is pulled in non-interactively as a dependency (for
+  example by an office suite `.deb`) the answer is `false`, the postinst
+  removes every font and leaves a "License refused." README, so dpkg reports
+  the package as installed while Times New Roman is absent and fontconfig
+  falls back to Liberation Serif. The module therefore (a) judges
+  `is_installed` by the font files, not by dpkg alone, so that broken state
+  is reported as not installed; (b) preseeds the EULA answer, which accepts
+  the Microsoft core fonts EULA on the user's behalf (declared in
+  `WARN_MESSAGE`); and (c) uses `apt-get install --reinstall` when the package
+  is already present so the postinst downloader runs again. `doctor` also
+  checks that `fc-match 'Times New Roman'` resolves to the real font.
+  Desktop-only, optional, never part of Quick Setup. Covered by
+  `test/unit/module/mscorefonts_spec.bats` and verified end to end in an
+  `ubuntu:24.04` container (refused-EULA state reproduced, healed by
+  `install`, idempotent on re-run).
 - **tmux-powerline status bar overhaul** (`module/config/tmux/`, refs #302).
   Ports the live-validated bar into the tracked config: a non-blocking,
   delta-based shared sampler (`tmux-powerline/lib_stat.sh`) reading `/proc`,

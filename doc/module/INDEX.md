@@ -3,7 +3,7 @@
 
 # Module Index
 
-90 modules. Columns come from each module's metadata block
+91 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -59,6 +59,7 @@ to the module source.
 | [lazygit](../../module/lazygit.module.sh) | optional | cli-essentials | lazygit — terminal UI for git commands |
 | [libreoffice](../../module/libreoffice.module.sh) | optional | office gui | LibreOffice office suite (fresh releases via ppa:libreoffice/ppa) |
 | [lnav](../../module/lnav.module.sh) | optional | logs | lnav — log file navigator for the terminal (apt package + lnav_pkg config bundle) |
+| [mscorefonts](../../module/mscorefonts.module.sh) | optional | font desktop | Microsoft core fonts — Times New Roman, Arial, Courier New, ... (apt ttf-mscorefonts-installer) |
 | [nas-mount](../../module/nas-mount.module.sh) | optional | network storage | NAS CIFS/SMB auto-mount (cifs-utils + autofs + smbclient) |
 | [ncdu](../../module/ncdu.module.sh) | optional | monitor disk tui | ncdu — ncurses disk usage analyzer (TUI) |
 | [neovim](../../module/neovim.module.sh) | recommended | editor cli | Neovim editor + nvimdots personal config |

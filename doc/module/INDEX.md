@@ -3,7 +3,7 @@
 
 # Module Index
 
-91 modules. Columns come from each module's metadata block
+92 modules. Columns come from each module's metadata block
 (`NAME` / `CATEGORY` / `TAGS` / `DESCRIPTION[en]`, doc/module-spec.md §3).
 Per-module pages will land in a later milestone; until then each name links
 to the module source.
@@ -29,6 +29,7 @@ to the module source.
 | [cowsay](../../module/cowsay.module.sh) | optional | novelty fun | cowsay — render a message as speech from an ASCII cow |
 | [curl](../../module/curl.module.sh) | base | http | curl — command-line tool for transferring data with URLs (apt curl package) |
 | [custom-hosts-sync](../../module/custom-hosts-sync.module.sh) | optional | network vpn hosts | Keep custom /etc/hosts entries from being reverted by the F5 VPN (svpn) |
+| [docker-rootless](../../module/docker-rootless.module.sh) | optional | container devops security | Rootless Docker for a dedicated non-root account (systemd user service, GPU-ready) |
 | [docker](../../module/docker.module.sh) | recommended | container devops | Docker Engine + Compose plugin |
 | [dstat](../../module/dstat.module.sh) | optional | monitoring | dstat — versatile CPU / disk / net / memory resource statistics (apt dstat package) |
 | [eza](../../module/eza.module.sh) | optional | cli-essentials | Modern ls replacement (eza) + shell alias ls='eza' |

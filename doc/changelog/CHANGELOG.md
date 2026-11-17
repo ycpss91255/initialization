@@ -51,6 +51,23 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
 
 ### Added
 
+- **`docker-rootless` module - rootless Docker for a dedicated non-root
+  account, GPU-ready** (`module/docker-rootless.module.sh`, closes #422).
+  Archetype D. Target account via `DOCKER_ROOTLESS_USER` (default
+  `rootless`): created when missing, refused if it is in the docker/sudo/admin
+  groups. `install` adds `uidmap` + `docker-ce-rootless-extras` (recorded in a
+  marker so `remove` only removes what the module installed), subuid/subgid,
+  linger, an optional `user@<uid>.service` `Delegate=cpu cpuset io memory pids`
+  drop-in (`DOCKER_ROOTLESS_DELEGATE`), runs `dockerd-rootless-setuptool.sh`,
+  and adds a user `docker.service` drop-in (`Restart=on-failure` + wait for
+  `docker.sock`) because `After=user@UID.service` alone is not enough.
+  Advisory checks: AppArmor unprivileged-userns restriction, NVIDIA
+  `nvidia-cdi-refresh` and `no-cgroups`. `remove` stops `user@`/
+  `user-runtime-dir@`, disables linger, `userdel -r`, cleans subuid/subgid,
+  drops the drop-in, daemon-reloads and removes module-installed packages.
+  Coexists with the rootful `docker` module; use `DOCKER_HOST` (rootless
+  socket `/run/user/<uid>/docker.sock`), never `sudo docker`. Spec:
+  `test/unit/module/docker-rootless_spec.bats`. Not yet run on a real host.
 - **`mscorefonts` module — Microsoft core fonts (Times New Roman, Arial, ...)**
   (`module/mscorefonts.module.sh`). Wraps the apt
   `ttf-mscorefonts-installer` downloader package. That package only downloads

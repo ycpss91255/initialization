@@ -66,6 +66,11 @@ _mock_system() {
         esac
     }
     getent() { printf 'rtuser:x:1500:1500::%s:/bin/bash\n' "${FAKE_HOME}"; }
+    dpkg-query() {
+        local _f
+        for _f in "${PKG_DB}"/*; do [[ -e "${_f}" ]] && printf 'ii %s\n' "${_f##*/}"; done
+        return 0
+    }
     dpkg() { [[ -f "${PKG_DB}/$2" ]] && printf 'Status: install ok installed\n'; }
     sysctl() { printf '%s\n' "${MOCK_USERNS_RESTRICT:-0}"; }
     # systemctl is a PATH stub (not a function): `sudo systemctl ...` is also
@@ -116,7 +121,10 @@ STUB
                     apt-get)
                         [[ "${MOCK_APT_RC:-0}" == "0" ]] || return "${MOCK_APT_RC}"
                         local _a; for _a in "$@"; do
-                            case "${_a}" in uidmap|docker-ce-rootless-extras) : > "${PKG_DB}/${_a}" ;; esac
+                            case "${_a}" in
+                                uidmap) : > "${PKG_DB}/uidmap"; : > "${PKG_DB}/libsubid5" ;;  # dependency pulled in by apt
+                                docker-ce-rootless-extras) : > "${PKG_DB}/${_a}" ;;
+                            esac
                         done ;;
                 esac ;;
         esac
@@ -362,6 +370,60 @@ _sudo_count() { grep -c -- "$1" "${SUDO_LOG}" || true; }
     [[ -f "${_m}" ]]
     grep -qx uidmap "${_m}"
     grep -qx docker-ce-rootless-extras "${_m}"
+}
+
+@test "install records the dependencies apt pulled in (libsubid5 via uidmap)" {
+    _load_module; _mock_system; _mock_have_sudo
+    run install
+    assert_success
+    grep -qx libsubid5 "${DOCKER_ROOTLESS_ROOT}/var/lib/init_ubuntu/docker-rootless/rtuser.pkgs"
+}
+
+@test "install does not record unrelated packages that were already installed" {
+    _load_module; _mock_system; _mock_have_sudo
+    _mark_pkg libsubid5; _mark_pkg curl
+    run install
+    assert_success
+    local _m="${DOCKER_ROOTLESS_ROOT}/var/lib/init_ubuntu/docker-rootless/rtuser.pkgs"
+    run grep -qx libsubid5 "${_m}"
+    assert_failure
+    run grep -qx curl "${_m}"
+    assert_failure
+    grep -qx uidmap "${_m}"
+}
+
+@test "remove removes the recorded dependency but never a pre-existing package" {
+    _load_module; _mock_system; _mock_have_sudo
+    _mark_pkg curl
+    run install
+    assert_success
+    : > "${SUDO_LOG}"
+    run remove
+    assert_success
+    grep -q 'apt-get remove -y docker-ce-rootless-extras libsubid5 uidmap' "${SUDO_LOG}"
+    run grep -q 'apt-get remove.*curl' "${SUDO_LOG}"
+    assert_failure
+}
+
+@test "remove deletes the empty module state dir and its empty parent" {
+    _load_module; _mock_system; _mock_have_sudo
+    run install
+    assert_success
+    run remove
+    assert_success
+    [[ ! -e "${DOCKER_ROOTLESS_ROOT}/var/lib/init_ubuntu/docker-rootless" ]]
+    [[ ! -e "${DOCKER_ROOTLESS_ROOT}/var/lib/init_ubuntu" ]]
+}
+
+@test "remove keeps the state dir parent when it holds other content" {
+    _load_module; _mock_system; _mock_have_sudo
+    run install
+    assert_success
+    : > "${DOCKER_ROOTLESS_ROOT}/var/lib/init_ubuntu/other"
+    run remove
+    assert_success
+    [[ ! -e "${DOCKER_ROOTLESS_ROOT}/var/lib/init_ubuntu/docker-rootless" ]]
+    [[ -e "${DOCKER_ROOTLESS_ROOT}/var/lib/init_ubuntu/other" ]]
 }
 
 @test "install records only the missing package when uidmap is already present" {
@@ -692,7 +754,7 @@ _sudo_count() { grep -c -- "$1" "${SUDO_LOG}" || true; }
 loginctl disable-linger rtuser
 userdel -r rtuser
 systemctl daemon-reload
-apt-get remove -y docker-ce-rootless-extras uidmap" ]]
+apt-get remove -y docker-ce-rootless-extras libsubid5 uidmap" ]]
 }
 
 @test "remove deletes the account, linger, subuid/subgid entries and the Delegate drop-in" {

@@ -153,6 +153,13 @@ _dr_put() {
 
 _dr_pkg_installed() { dpkg -s "$1" 2>/dev/null | grep -q '^Status: install ok installed'; }
 
+# Sorted names of every installed package (used to diff around apt-get install,
+# so dependencies apt pulls in are recorded too, e.g. libsubid5 via uidmap).
+_dr_installed_set() {
+    dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 2>/dev/null \
+        | awk '$1 == "ii" { print $2 }' | sort -u
+}
+
 _dr_has_subid() {
     local _f
     for _f in subuid subgid; do
@@ -304,16 +311,23 @@ install() {
     fi
 
     # Packages: install and RECORD only the ones that were missing.
-    local -a _missing=() ; local _p
+    local -a _missing=() _new=() ; local _p _before _after
     for _p in "${_DR_PKGS[@]}"; do
         _dr_pkg_installed "${_p}" || _missing+=("${_p}")
     done
     if [[ "${#_missing[@]}" -gt 0 ]]; then
         log_info "[${NAME}] apt-get install ${_missing[*]}"
         sudo apt-get update -qq || log_warn "[${NAME}] apt-get update failed (continuing)"
+        _before="$(_dr_installed_set)"
         sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y "${_missing[@]}" || return 1
-        sudo mkdir -p "$(_dr_state_dir)" || return 1
-        printf '%s\n' "${_missing[@]}" | sudo tee -a "$(_dr_marker)" >/dev/null || return 1
+        _after="$(_dr_installed_set)"
+        # Exactly what this install added (requested packages + new dependencies);
+        # anything that was already installed is never recorded.
+        mapfile -t _new < <(comm -13 <(printf '%s\n' "${_before}") <(printf '%s\n' "${_after}"))
+        if [[ "${#_new[@]}" -gt 0 ]]; then
+            sudo mkdir -p "$(_dr_state_dir)" || return 1
+            printf '%s\n' "${_new[@]}" | sudo tee -a "$(_dr_marker)" >/dev/null || return 1
+        fi
     fi
 
     if ! _dr_user_exists; then
@@ -391,6 +405,8 @@ remove() {
         fi
         sudo rm -f "${_marker}"
     fi
+    # Drop the (now empty) state dir and its parent; rmdir never removes content.
+    sudo rmdir "$(_dr_state_dir)" "$(dirname -- "$(_dr_state_dir)")" 2>/dev/null || true
     return 0
 }
 

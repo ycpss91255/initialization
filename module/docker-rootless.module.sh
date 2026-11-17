@@ -18,7 +18,8 @@
 #
 # Lifecycle: install = packages -> account -> subuid/subgid -> linger ->
 # user@<uid> up -> Delegate drop-in -> dockerd-rootless-setuptool -> docker.service
-# drop-in (socket wait + Restart) -> enable --now. remove reverses all of it and
+# drop-in (socket wait + Restart) -> enable --now -> (NVIDIA) user-level runtime
+# config + user docker restart. Never touches the rootful daemon. remove reverses all of it and
 # removes only the packages this module itself installed (recorded in a marker).
 #
 # ── BEGIN: shared-bootstrap ─────────────────────────────────────────────────
@@ -174,6 +175,26 @@ _dr_has_nvidia() {
     command -v nvidia-smi >/dev/null 2>&1 || command -v nvidia-ctk >/dev/null 2>&1
 }
 
+# Register the nvidia runtime in the ACCOUNT's own daemon.json
+# (~/.config/docker/daemon.json) so `--gpus all` and `--device nvidia.com/gpu=all`
+# work rootless. User-level only: never touches /etc/docker, the rootful daemon
+# or /etc/nvidia-container-runtime/config.toml. Idempotent: skipped when the
+# runtime is already registered. Sets _DR_GPU_CONFIGURED=1 when it changed
+# something (the caller then restarts the USER docker service). The file lives in
+# the account's home, so `remove` (userdel -r) discards it with the account.
+_DR_GPU_CONFIGURED=0
+_dr_gpu_configure() {
+    _DR_GPU_CONFIGURED=0
+    command -v nvidia-ctk >/dev/null 2>&1 || return 0
+    local _cfg; _cfg="$(_dr_home)/.config/docker/daemon.json"
+    if sudo -H -u "$(_dr_user)" grep -q '"nvidia"' "${_cfg}" 2>/dev/null; then
+        return 0
+    fi
+    log_info "[${NAME}] registering the nvidia runtime in ${_cfg} (user-level)"
+    _dr_as_user nvidia-ctk runtime configure --runtime=docker "--config=${_cfg}" || return 1
+    _DR_GPU_CONFIGURED=1
+}
+
 # GPU readiness: advisory only (never changes the host's NVIDIA stack).
 _dr_gpu_check() {
     _dr_has_nvidia || return 0
@@ -255,6 +276,12 @@ ExecStartPost=/usr/bin/timeout 60 /bin/bash -c 'until [ -S \"%t/docker.sock\" ];
     fi
 
     _dr_as_user systemctl --user enable --now docker.service || return 1
+
+    # GPU: user-level nvidia runtime config, then restart ONLY the user daemon.
+    _dr_gpu_configure || return 1
+    if [[ "${_DR_GPU_CONFIGURED}" == "1" ]]; then
+        _dr_as_user systemctl --user restart docker.service || return 1
+    fi
 }
 
 install() {

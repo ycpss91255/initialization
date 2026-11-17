@@ -87,7 +87,7 @@ STUB
         [[ "${1:-}" == "-H" ]] && shift
         [[ "${1:-}" == "-u" ]] && shift 2
         case "$1" in
-            tee|cat|mkdir|rm|rmdir|sed|test) command "$@"; return $? ;;
+            tee|cat|mkdir|rm|rmdir|sed|test|grep) command "$@"; return $? ;;
             useradd)
                 : > "${USER_FLAG}"; mkdir -p "${FAKE_HOME}"
                 printf 'rtuser:100000:65536\n' >> "${DOCKER_ROOTLESS_ROOT}/etc/subuid"
@@ -106,6 +106,10 @@ STUB
                 shift
                 while [[ "${1:-}" == *=* ]]; do shift; done
                 case "$1" in
+                    nvidia-ctk)
+                        [[ "${MOCK_NVCTK_RC:-0}" == "0" ]] || return "${MOCK_NVCTK_RC}"
+                        mkdir -p "${FAKE_HOME}/.config/docker"
+                        printf '{"runtimes":{"nvidia":{}}}\n' > "${FAKE_HOME}/.config/docker/daemon.json" ;;
                     dockerd-rootless-setuptool.sh)
                         mkdir -p "${FAKE_HOME}/.config/systemd/user"
                         : > "${FAKE_HOME}/.config/systemd/user/docker.service" ;;
@@ -122,6 +126,7 @@ STUB
 
 # Helpers (not inline exports): shellcheck SC2030/SC2031 flag per-test var changes.
 _set_cdi_refresh()    { export MOCK_CDI_REFRESH="$1"; }
+_set_nvctk_rc()       { export MOCK_NVCTK_RC="$1"; }
 _set_user_active_rc() { export MOCK_USER_ACTIVE_RC="$1"; }
 
 _mark_user() { : > "${USER_FLAG}"; mkdir -p "${FAKE_HOME}"; }
@@ -545,6 +550,69 @@ _sudo_count() { grep -c -- "$1" "${SUDO_LOG}" || true; }
     assert_success
     assert_output --partial "no-cgroups = true"
     grep -q 'no-cgroups = true' "${DOCKER_ROOTLESS_ROOT}/etc/nvidia-container-runtime/config.toml"
+}
+
+@test "install on an NVIDIA host configures the nvidia runtime in the account's daemon.json" {
+    _load_module; _mock_system; _mock_have_sudo
+    _stub_bin nvidia-ctk
+    run install
+    assert_success
+    grep -q -- "-H -u rtuser env XDG_RUNTIME_DIR=/run/user/1500 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1500/bus nvidia-ctk runtime configure --runtime=docker --config=${FAKE_HOME}/.config/docker/daemon.json" "${SUDO_LOG}"
+    grep -q '"nvidia"' "${FAKE_HOME}/.config/docker/daemon.json"
+}
+
+@test "nvidia runtime config is followed by a restart of the USER docker service only" {
+    _load_module; _mock_system; _mock_have_sudo
+    _stub_bin nvidia-ctk
+    run install
+    assert_success
+    local _cfg _rst
+    _cfg="$(grep -n 'nvidia-ctk runtime configure' "${SUDO_LOG}" | head -1 | cut -d: -f1)"
+    _rst="$(grep -n 'systemctl --user restart docker.service' "${SUDO_LOG}" | head -1 | cut -d: -f1)"
+    [[ -n "${_cfg}" && -n "${_rst}" && "${_cfg}" -lt "${_rst}" ]]
+}
+
+@test "no nvidia-ctk: no runtime configuration and no restart" {
+    _load_module; _mock_system; _mock_have_sudo
+    run install
+    assert_success
+    run grep -q 'nvidia-ctk' "${SUDO_LOG}"
+    assert_failure
+    run grep -q 'restart' "${SUDO_LOG}"
+    assert_failure
+}
+
+@test "nvidia runtime config is skipped (no restart) when already registered" {
+    _load_module; _mock_system; _mock_have_sudo
+    _stub_bin nvidia-ctk
+    _mark_installed_all
+    mkdir -p "${FAKE_HOME}/.config/docker"
+    printf '{"runtimes":{"nvidia":{}}}\n' > "${FAKE_HOME}/.config/docker/daemon.json"
+    run _dr_converge
+    assert_success
+    run grep -q 'nvidia-ctk' "${SUDO_LOG}"
+    assert_failure
+    run grep -q 'restart' "${SUDO_LOG}"
+    assert_failure
+}
+
+@test "nvidia-ctk failure fails install" {
+    _load_module; _mock_system; _mock_have_sudo
+    _stub_bin nvidia-ctk
+    _set_nvctk_rc 1
+    run install
+    assert_failure
+}
+
+@test "install and remove never touch the rootful docker daemon or system nvidia config" {
+    _load_module; _mock_system; _mock_have_sudo
+    _stub_bin nvidia-ctk
+    run install
+    assert_success
+    run remove
+    assert_success
+    run grep -Eq '/etc/docker|config\.toml|systemctl (restart|reload|stop|start|enable|try-restart)( --now)? docker|systemctl (restart|stop) containerd|nvidia-ctk runtime configure .*--config=/etc|--set-as-default' "${SUDO_LOG}"
+    assert_failure
 }
 
 # ── Idempotency ──────────────────────────────────────────────────────────────

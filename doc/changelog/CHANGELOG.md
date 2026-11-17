@@ -61,7 +61,9 @@ not deferred to release. `release-tag.sh` promotes `[Unreleased]` →
   drop-in (`DOCKER_ROOTLESS_DELEGATE`), runs `dockerd-rootless-setuptool.sh`,
   and adds a user `docker.service` drop-in (`Restart=on-failure` + wait for
   `docker.sock`) because `After=user@UID.service` alone is not enough.
-  Advisory checks: AppArmor unprivileged-userns restriction, NVIDIA
+  When `nvidia-ctk` is present, registers the nvidia runtime in the account's
+  own `~/.config/docker/daemon.json` and restarts only the user docker
+  service (never the rootful daemon). Advisory checks: AppArmor unprivileged-userns restriction, NVIDIA
   `nvidia-cdi-refresh` and `no-cgroups`. `remove` stops `user@`/
   `user-runtime-dir@`, disables linger, `userdel -r`, cleans subuid/subgid,
   drops the drop-in, daemon-reloads and removes module-installed packages.
